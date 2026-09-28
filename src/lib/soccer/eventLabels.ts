@@ -117,6 +117,15 @@ export function soccerShotSourceLine(
 ): string | null {
   const sourceEventId = soccerShotSourceEventId(event)
   if (!sourceEventId) return null
+  return soccerRestartSourceLine(sourceEventId, activeEvents, timings)
+}
+
+/** Source line for a restart id, used before the shot exists (compact live sheet). */
+export function soccerRestartSourceLine(
+  sourceEventId: string,
+  activeEvents: readonly GameEvent[],
+  timings: readonly SoccerPeriodTiming[]
+): string {
   const source = activeEvents.find(candidate => candidate.id === sourceEventId)
   if (!source) return SOCCER_LINKED_RESTART_REMOVED
   return `From ${restartSourceLabel(source)}${timeSuffix(source, timings)}`

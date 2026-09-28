@@ -31,7 +31,11 @@ it('wires the selected beneficiary direction into both dialog capture paths', ()
   const inputs = declarations.filter(node => node.name.getText(tree) === 'input')
   expect(inputs).toHaveLength(2)
   for (const input of inputs) {
-    const object = input.initializer && ts.isSatisfiesExpression(input.initializer) ? input.initializer.expression : input.initializer
+    const unwrapped = input.initializer && ts.isSatisfiesExpression(input.initializer) ? input.initializer.expression : input.initializer
+    // The shot input goes through the shared `buildSoccerShotInput` builder.
+    const object = unwrapped && ts.isCallExpression(unwrapped) && unwrapped.expression.getText(tree) === 'buildSoccerShotInput'
+      ? unwrapped.arguments[0]
+      : unwrapped
     if (!object || !ts.isObjectLiteralExpression(object)) throw new Error('Capture input missing')
     const property = object.properties.find(item => ts.isPropertyAssignment(item) && item.name.getText(tree) === 'location')
     expect(property && ts.isPropertyAssignment(property) && property.initializer.getText(tree)).toBe('eventLocation')
@@ -40,8 +44,8 @@ it('wires the selected beneficiary direction into both dialog capture paths', ()
 
 it('opens live Field and Quick Goal shots with the suggested restart source', () => {
   const tracker = readFileSync('src/pages/SoccerGameTracker.tsx', 'utf8')
-  expect(tracker).toContain('setCaptureDraft(liveShotDraft(capturePreferences.teamSide, location))')
-  expect(tracker).toContain("setCaptureDraft(liveShotDraft(capturePreferences.teamSide, null, 'goal'))")
+  expect(tracker).toContain('openQuickShot(liveShotDraft(capturePreferences.teamSide, location))')
+  expect(tracker).toContain("openQuickShot(liveShotDraft(capturePreferences.teamSide, null, 'goal'))")
   expect(tracker).toMatch(/suggestSoccerShotSource\(inspection\.activeEvents,/)
   // Only live incident captures raise the penalty kick prompt.
   expect(tracker).toContain("if (applied && result.ok && incidentDraft?.mode === 'live')")
@@ -50,4 +54,23 @@ it('opens live Field and Quick Goal shots with the suggested restart source', ()
   // Draft defaults never override an edited event's own situation or source.
   expect(dialog).toContain('const draftSituation = event ? undefined : initializationDraft.situation')
   expect(dialog).toContain("shot?.payload.sourceEventId ?? (event ? null : initializationDraft.sourceEventId) ?? ''")
+})
+
+it('routes live shots to the compact sheet and hands off to the full dialog', () => {
+  const tracker = readFileSync('src/pages/SoccerGameTracker.tsx', 'utf8')
+  const sheet = readFileSync('src/components/soccer/SoccerQuickShotSheet.tsx', 'utf8')
+  const dialog = readFileSync('src/components/soccer/SoccerShotCaptureDialog.tsx', 'utf8')
+  // Penalty prompt uses the compact sheet; edits keep the full dialog.
+  expect(tracker).toMatch(/openQuickShot\(\{\s*teamSide: penaltyPrompt\.teamSide/)
+  expect(tracker).toMatch(/setCaptureDraft\(\{\s*mode: 'edit'/)
+  expect(tracker).toContain('lastShooterId={soccerLastTrackedShooterId(inspection.activeEvents)}')
+  expect(tracker).toMatch(/onMoreDetails=\{draft => \{\s*setQuickShotDraft\(null\)\s*setCaptureDraft\(draft\)/)
+  // The compact sheet records through the same builder as the full dialog.
+  expect(sheet).toContain('buildSoccerShotInput(soccerQuickShotSelection({')
+  expect(sheet).toContain('recordSoccerShot(state, input, { recorderUserId })')
+  expect(dialog).toContain('const input = buildSoccerShotInput({')
+  // Hand-off fields are read only for new shots, never over an edited event.
+  expect(dialog).toContain('const draftShooterId = event ? undefined : initializationDraft.shooterId')
+  expect(dialog).toContain("primary?.participantId ?? (event ? null : initializationDraft.primaryCreatorId) ?? ''")
+  expect(sheet).toMatch(/moreDetails = \(\) => onMoreDetails\(\{\s*mode: 'live',/)
 })
