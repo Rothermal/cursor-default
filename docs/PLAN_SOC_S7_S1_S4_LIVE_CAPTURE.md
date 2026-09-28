@@ -59,10 +59,27 @@ returns the first eligible restart when all of these hold:
 - It is a corner awarded to the shooting side, or a foul committed by the
   opposite side with restart `penalty` or `direct_free_kick`.
 - It is within 60 seconds of match clock of the shot moment.
-- Every event recorded after it is a shot by the same side, a card, or a
-  non-capture row (clock, role, direction). Any other capture (defensive
-  action, a different restart, a foul, an opponent shot, a goal by either
-  side) means play has moved on and the default is dropped.
+- Every event recorded after it is a card, a non-capture row (clock, role,
+  lineup, direction), or, for a corner only, a non-scoring shot by the same
+  side. Any other capture (defensive action, a different restart, a foul, an
+  opponent shot, a goal by either side) means play has moved on and the
+  default is dropped.
+
+Continuation is restart-specific:
+
+- A corner carries through non-scoring same-side shots, so corner -> saved
+  header -> rebound still defaults to Corner sequence from that corner.
+- A penalty or direct-free-kick foul is consumed by its first shot. Any later
+  rebound defaults to Open play with no source, because the projection counts
+  every `penalty` / `direct_free_kick` shot as another attempt from that
+  restart and capture excludes creators for those situations.
+- The scan stops at the newest restart it reaches. A consumed penalty or
+  direct free kick returns no default; it never falls back to an older
+  eligible restart behind it.
+
+Broader causal linking of a rebound to the set piece that preceded it is not
+part of this plan. If it is wanted later, it must stay separate from the
+shot's statistical `situation`.
 
 Situation maps from the source: corner -> `corner_sequence`, penalty foul ->
 `penalty`, direct-free-kick foul -> `direct_free_kick`. A penalty default also
@@ -71,7 +88,7 @@ and clears creators exactly as a manual Situation change does today.
 
 The default applies only to live capture (`mode: 'live'`). Historical add and
 edit keep their current behavior; the recorder can still pick a source there.
-The recorder clears the default with one tap (Section 4.2), which returns the
+The recorder clears the default with one tap (Section 3.1), which returns the
 shot to Open play with no source.
 
 ### 2.3 Penalty prompt
@@ -104,6 +121,10 @@ Restart mode, never persisted. (Question Q1.)
 
 - `capture.test.ts`: suggestion eligibility for each source kind, side rules,
   60-second window, intervening-event rules, removed sources, period boundary.
+  Discriminating continuation cases: corner -> save -> rebound keeps the
+  corner; penalty -> save -> rebound and direct free kick -> block or save ->
+  rebound return no default; each consumed case also has an older eligible
+  restart behind it that must not be returned.
 - `shotCaptureWiring.test.ts`: live Field tap and Quick Goal open with the
   suggested situation and source; clearing returns to Open play; historical and
   edit modes are unaffected.
