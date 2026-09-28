@@ -55,3 +55,21 @@ export function baseballPositionSortKey(position: string | null): number {
   const index = BASEBALL_POSITION_CODES.indexOf(position)
   return index >= 0 ? index : 500
 }
+
+const POSITION_LABELS = new Map<string, string>([
+  ...BASEBALL_FIELDING_POSITIONS.map(position => [position.code, position.label] as const),
+  ...BASEBALL_BATTING_ONLY_POSITIONS.map(position => [position.code, position.label] as const),
+])
+
+/** Standard codes read as "SS · Shortstop"; custom text as entered; null as Unassigned. */
+export function baseballPositionLabel(position: string | null): string {
+  if (position === null) return 'Unassigned'
+  const label = POSITION_LABELS.get(position)
+  return label ? `${position} · ${label}` : position
+}
+
+/** Picker options in scorebook order: fielding positions, then batting-only roles. */
+export const BASEBALL_POSITION_OPTIONS: ReadonlyArray<{ code: string; label: string }> = [
+  ...BASEBALL_FIELDING_POSITIONS.map(({ code, label }) => ({ code, label })),
+  ...BASEBALL_BATTING_ONLY_POSITIONS.map(({ code, label }) => ({ code, label })),
+]

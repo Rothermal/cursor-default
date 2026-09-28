@@ -212,6 +212,32 @@ export async function saveBasketballTeamSettings<TSettings>(
   }
 }
 
+export async function saveBaseballTeamSettings<TSettings>(
+  teamId: string,
+  expectedRevision: number | null,
+  settings: TSettings,
+  client: SportSettingsCloudClient | null =
+    supabase as unknown as SportSettingsCloudClient | null
+): Promise<SportSettingsCloudWriteResult<TSettings>> {
+  if (!client) return { status: 'not_configured' }
+
+  const { data, error } = await client.rpc(
+    'save_baseball_team_settings_revisioned',
+    {
+      p_team_id: teamId,
+      p_expected_revision: expectedRevision,
+      p_settings: settings,
+    }
+  )
+  if (error) return cloudFailure(error, 'team')
+
+  const result = parseSportSettingsSaveResult<TSettings>(data)
+  return result ?? {
+    status: 'error',
+    error: 'Shared Baseball settings returned an invalid save result.',
+  }
+}
+
 export function parseSportSettingsSaveResult<TSettings = unknown>(
   value: unknown
 ): SportSettingsSaveResult<TSettings> | null {

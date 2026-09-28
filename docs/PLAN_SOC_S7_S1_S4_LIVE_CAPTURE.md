@@ -1,8 +1,8 @@
 # Soccer Live Capture Plan: S7, S1, S4
 
-Status: plan under review. The owner accepted every recommended answer in
-[Section 6](#6-owner-questions) on 2026-09-28. Implementation waits for the
-plan PR to be approved and merged. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
+Status: approved (plan PR #436 merged 2026-09-28; owner accepted every
+recommended answer in [Section 6](#6-owner-questions)). S7A is implemented;
+S7B, S1, and S4 are not started. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
 this file is the execution plan for `S7`, `S1`, and `S4`.
 
 **Goal:** Make the three most common sideline gestures short: a shot after a
@@ -247,6 +247,24 @@ shown inline with a Timeline link. No cascade removal is added.
 
 Each slice is one PR with typecheck, lint, tests, and a 390px browser check in
 both themes. No slice needs a Supabase migration.
+
+### 5.1 S7A delivery record
+
+- `suggestSoccerShotSource` and `soccerLivePenaltyFoul` in
+  `src/lib/soccer/capture.ts` implement Section 2.2 and the prompt trigger.
+- `SoccerCaptureDraft` carries optional `situation` / `sourceEventId`; the
+  tracker's Field tap and Quick Goal build live drafts through
+  `liveShotDraft`. A penalty default without a location uses the penalty mark.
+  Edited events ignore draft defaults.
+- The "Log penalty kick" button appears only after a live incident capture
+  appends a penalty foul. It clears on the next successful change, tab or
+  period change, dismissal, or use, and re-checks that the foul is still active.
+- Tests: helper cases including the reviewed continuation and no-fallback
+  cases, an engine test that records corner and penalty shots with the
+  suggested source through checked validation, and wiring checks.
+- Browser check at 390px in light and dark: corner -> Field shot opened with
+  Corner sequence and the corner selected; opponent penalty foul -> prompt ->
+  shot sheet opened with Penalty, the foul, and the penalty-mark location.
 
 ## 6. Owner questions
 

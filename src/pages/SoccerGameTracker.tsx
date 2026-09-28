@@ -60,6 +60,9 @@ import {
   soccerLifecycleAction,
   soccerMatchActionsAvailable,
   soccerFieldReviewEvents,
+  soccerLivePenaltyFoul,
+  soccerPeriodTimings,
+  suggestSoccerShotSource,
   soccerTeamEventReviewPresentation,
   suggestSoccerRestartKind,
   soccerClockDisplayValue,
@@ -71,7 +74,9 @@ import {
   type SoccerProjectedParticipant,
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
+  type SoccerPenaltyKickPrompt,
   type SoccerTeamEventKind,
+  type SoccerTeamSide,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameSideDisplayName } from '../lib/display'
@@ -118,6 +123,7 @@ export default function SoccerGameTracker() {
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
   const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
   const [restartArmed, setRestartArmed] = useState(false)
+  const [penaltyPrompt, setPenaltyPrompt] = useState<SoccerPenaltyKickPrompt | null>(null)
   const [fieldFlipped, setFieldFlipped] = useState(false)
   const [markerSideFilter, setMarkerSideFilter] = useState<MarkerSideFilter>('all')
   const [markerScope, setMarkerScope] = useState<MarkerScope>('current')
@@ -159,6 +165,10 @@ export default function SoccerGameTracker() {
       state.cloudSync.gameStatus === 'final'
     ) setRestartArmed(false)
   }, [mainTab, projection?.status, state.cloudSync.gameStatus])
+
+  useEffect(() => {
+    setPenaltyPrompt(null)
+  }, [mainTab, projection?.currentPeriodId, projection?.status])
 
   const cloudConflicts = state.cloudSync.eventConflicts ?? []
   const primaryRecorder = primarySoccerRecorder(recorders)
@@ -370,6 +380,7 @@ export default function SoccerGameTracker() {
     }
     applyingRef.current = true
     setIsApplying(true)
+    setPenaltyPrompt(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
     setError(null)
     setDialogKind(null)
@@ -384,6 +395,52 @@ export default function SoccerGameTracker() {
     setDialogParticipantId(participantId)
     setDialogKind(kind)
     setActionsOpen(false)
+  }
+
+  const liveShotDraft = (
+    teamSide: SoccerTeamSide,
+    location: SoccerCaptureDraft['location'],
+    outcome?: SoccerCaptureDraft['outcome']
+  ): SoccerCaptureDraft => {
+    const timing = soccerPeriodTimings(state).find(item => item.period.id === projection.currentPeriodId)
+    const suggestion = timing
+      ? suggestSoccerShotSource(inspection.activeEvents, {
+          teamSide,
+          period: timing.period,
+          elapsedMs: timing.endElapsedMs,
+        })
+      : null
+    return {
+      teamSide,
+      location,
+      outcome,
+      situation: suggestion?.situation,
+      sourceEventId: suggestion?.sourceEventId ?? null,
+    }
+  }
+
+  const applyIncidentResult = (result: SoccerLiveResult): boolean => {
+    const applied = applyResult(result)
+    if (applied && result.ok && incidentDraft?.mode === 'live') {
+      const penaltyFoul = soccerLivePenaltyFoul(inspection.activeEvents, result.inspection.activeEvents)
+      if (penaltyFoul) setPenaltyPrompt(penaltyFoul)
+    }
+    return applied
+  }
+
+  const openPenaltyKick = () => {
+    if (!penaltyPrompt || !inspection.activeEvents.some(event => event.id === penaltyPrompt.foulId)) {
+      setPenaltyPrompt(null)
+      return
+    }
+    setRestartArmed(false)
+    setCaptureDraft({
+      teamSide: penaltyPrompt.teamSide,
+      location: null,
+      situation: 'penalty',
+      sourceEventId: penaltyPrompt.foulId,
+    })
+    setPenaltyPrompt(null)
   }
 
   const primaryClockAction = () => {
@@ -636,7 +693,7 @@ export default function SoccerGameTracker() {
                     return
                   }
                   if (capturePreferences.captureMode === 'shot') {
-                    setCaptureDraft({ teamSide: capturePreferences.teamSide, location })
+                    setCaptureDraft(liveShotDraft(capturePreferences.teamSide, location))
                   } else {
                     openIncident(capturePreferences.captureMode, location)
                   }
@@ -655,11 +712,7 @@ export default function SoccerGameTracker() {
                   disabled={!fieldCaptureEnabled}
                   onClick={() => {
                     setRestartArmed(false)
-                    setCaptureDraft({
-                      teamSide: capturePreferences.teamSide,
-                      location: null,
-                      outcome: 'goal',
-                    })
+                    setCaptureDraft(liveShotDraft(capturePreferences.teamSide, null, 'goal'))
                   }}
                 />
                 <QuickCaptureButton
@@ -683,8 +736,31 @@ export default function SoccerGameTracker() {
                 />
               </div>
               <p className="sr-only" role="status" aria-live="polite">
-                {restartArmed ? 'Restart capture armed. Tap the field to choose its location.' : ''}
+                {restartArmed
+                  ? 'Restart capture armed. Tap the field to choose its location.'
+                  : penaltyPrompt ? 'Penalty awarded. Log the penalty kick when it is taken.' : ''}
               </p>
+              {penaltyPrompt && fieldCaptureEnabled && (
+                <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" role="group" aria-label="Penalty kick">
+                  <button
+                    type="button"
+                    onClick={openPenaltyKick}
+                    className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md border border-accent bg-accent px-3 text-sm font-bold text-accent-content"
+                  >
+                    <Goal size={18} />
+                    <span className="truncate">Log penalty kick · {penaltyPrompt.teamSide === 'tracked' ? trackedLabel : opponentLabel}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPenaltyPrompt(null)}
+                    className="grid min-h-12 w-12 place-items-center rounded-md border border-line-strong bg-surface text-content"
+                    aria-label="Dismiss penalty kick prompt"
+                    title="Dismiss"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              )}
 
               {!ended && (
                 <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" role="group" aria-label="Field match actions">
@@ -836,7 +912,7 @@ export default function SoccerGameTracker() {
         state={state}
         recorderUserId={user?.id ?? null}
         busy={isApplying}
-        onApply={applyResult}
+        onApply={applyIncidentResult}
         onClose={() => setIncidentDraft(null)}
       />
 
@@ -1134,3 +1210,4 @@ function ClusterSheet({ events, onSelect, onClose }: { events: GameEvent[]; onSe
     </div>
   )
 }
+

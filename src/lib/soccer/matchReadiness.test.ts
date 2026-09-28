@@ -7,12 +7,13 @@ function source(path: string): string {
 }
 
 describe('Soccer match-readiness wiring', () => {
-  it('keeps Soccer role serialization scoped while Basketball also stores team positions', () => {
+  it('keeps Soccer role serialization scoped while Basketball and Baseball also store team positions', () => {
     const teams = source('src/pages/Teams.tsx')
 
     expect(teams).toContain("const isSoccerTeam = selectedTeam?.seasons.sport === 'soccer'")
-    expect(teams).toContain("...(isSoccerTeam || isBasketballTeam ? { position } : {})")
-    expect(teams).toContain('(isSoccerTeam && editingPlayerSoccerRoleDirty) || isBasketballTeam ? { position } : {}')
+    expect(teams).toContain("const usesCodedPosition = isBasketballTeam || isBaseballTeam")
+    expect(teams).toContain("...(isSoccerTeam || usesCodedPosition ? { position } : {})")
+    expect(teams).toContain('(isSoccerTeam && editingPlayerSoccerRoleDirty) || usesCodedPosition ? { position } : {}')
     expect(teams).toContain('isSoccerTeam ? serializeSoccerRosterRole(newPlayerSoccerRole)')
     expect(teams).toContain('setEditingPlayerSoccerRoleDirty(true)')
     expect(teams).toContain('existingPlayerSoccerRole')
@@ -128,7 +129,7 @@ describe('Soccer match-readiness wiring', () => {
     expect(shotDialog).toContain('sortSoccerActorParticipants(')
     expect(incidentDialog).toContain('sortSoccerActorParticipants(')
     expect(shotDialog).toContain(
-      '}, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings])'
+      '}, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings, trackedAttackingDirection])'
     )
     expect(incidentDialog).toContain(
       '}, [initialRoles, initializationDraft, mode, participants, periodTimings, projection])'

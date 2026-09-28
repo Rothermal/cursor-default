@@ -39,6 +39,9 @@ export interface SoccerCaptureDraft {
   teamSide: SoccerTeamSide
   location: GameEventLocation | null
   outcome?: SoccerShotOutcome
+  /** Live restart default from `suggestSoccerShotSource` or the penalty prompt. */
+  situation?: SoccerShotSituation
+  sourceEventId?: string | null
   preferTeamAttribution?: boolean
   mode?: 'live' | 'historical' | 'edit'
   event?: SoccerShotEvent | SoccerOwnGoalEvent
@@ -95,6 +98,7 @@ export default function SoccerShotCaptureDialog({
     [sportState?.setup?.participants]
   )
   const periodTimings = useMemo(() => soccerPeriodTimings(state), [state])
+  const trackedAttackingDirection = projection?.attackingDirection ?? 'left_to_right'
   const recentOpponentLabels = useMemo(() => opponentLabels(state), [state])
   const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
   const opponentTeamLabel = gameSideDisplayName(state.gameInfo, 'opponent')
@@ -202,11 +206,14 @@ export default function SoccerShotCaptureDialog({
     const ownGoalBy = ownGoalEvent ? actorForRole(ownGoalEvent, 'own_goal_by') : null
     setTeamSide(event?.teamSide ?? initializationDraft.teamSide)
     setOutcome(shot?.payload.outcome ?? (ownGoalEvent ? 'goal' : initializationDraft.outcome ?? null))
-    setSituation(shot?.payload.situation ?? 'open_play')
-    setSourceEventId(shot?.payload.sourceEventId ?? '')
+    const draftSituation = event ? undefined : initializationDraft.situation
+    setSituation(shot?.payload.situation ?? draftSituation ?? 'open_play')
+    setSourceEventId(shot?.payload.sourceEventId ?? (event ? null : initializationDraft.sourceEventId) ?? '')
     setOwnGoal(Boolean(ownGoalEvent))
     setShotDetails(shotDetailDraft(event))
-    setLocation(event?.location ?? initializationDraft.location)
+    setLocation(event?.location ?? initializationDraft.location ?? (draftSituation === 'penalty'
+      ? penaltyMark(soccerScoringDirection(initializationDraft.teamSide, trackedAttackingDirection))
+      : null))
     setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || initializationDraft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
     setOpponentShooterMode(shooter?.kind === 'team' ? 'team' : 'unknown')
     setOpponentShooterLabel(opponentLabel(shooter, 'Unknown opponent'))
@@ -230,7 +237,7 @@ export default function SoccerShotCaptureDialog({
     setLocationEditorOpen(false)
     setLocationFieldFlipped(false)
     setError(null)
-  }, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings])
+  }, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings, trackedAttackingDirection])
 
   useEffect(() => {
     if (initializationDraft && !trackedGoalkeeperId && goalkeeper) {
