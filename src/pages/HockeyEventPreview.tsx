@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import HockeyGoalieDialog, { type HockeyGoalieChange } from '../components/hockey/HockeyGoalieDialog'
 import HockeyRink from '../components/hockey/HockeyRink'
+import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -13,8 +15,16 @@ import {
   hockeyClockDisplay,
   hockeyRulesProfiles,
   hockeySportState,
+  adjustHockeyScore,
+  changeHockeyGoalie,
+  finishDecidedHockeyGame,
+  hockeyShotMarkers,
   hockeyZone,
   nearestHockeyFaceoffDot,
+  recentHockeyOpponentLabels,
+  recordHockeyShot,
+  type HockeySide,
+  type RecordHockeyShotInput,
   HOCKEY_RULES_FIELDS,
   initializeHockeyEventGame,
   interruptHockeyMatch,
@@ -40,7 +50,7 @@ import {
   type HockeySportGameState,
 } from '../lib/hockey'
 import { isHockeyEventPreviewAvailable } from '../lib/sportAvailability'
-import type { GameEventLocation } from '../lib/gameEvents/types'
+import type { GameEvent, GameEventLocation } from '../lib/gameEvents/types'
 import type { GameState } from '../types'
 
 /**
@@ -172,6 +182,8 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date().toISOString())
   const [lastTap, setLastTap] = useState<GameEventLocation | null>(null)
+  const [shotDraft, setShotDraft] = useState<HockeyShotDraft | null>(null)
+  const [goalieOpen, setGoalieOpen] = useState(false)
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -227,6 +239,30 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
   const flipped = sport.capturePreferences.rinkFlipped
   const inProgress = projection.status === 'in_progress'
   const active = Boolean(projection.activePeriodId)
+  const trackedLabel = state.gameInfo?.teamName || 'Tracked'
+  const opponentLabel = state.gameInfo?.opponentName || 'Opponent'
+  const streamEvents = (state.eventStream?.events ?? []) as GameEvent[]
+  const canCapture = inProgress && active && !projection.decidedInPeriodId
+
+  const recordShot = (input: RecordHockeyShotInput): string | null => {
+    const result = recordHockeyShot(state, input, context())
+    if (!result.ok) return result.message
+    apply(result)
+    setShotDraft(null)
+    return null
+  }
+
+  const recordGoalieChange = (change: HockeyGoalieChange): string | null => {
+    const result = changeHockeyGoalie(state, change, context())
+    if (!result.ok) return result.message
+    apply(result)
+    setGoalieOpen(false)
+    return null
+  }
+
+  const adjust = (side: HockeySide, delta: 1 | -1) =>
+    askReason(`Why is the ${side === 'tracked' ? trackedLabel : opponentLabel} score changing?`, reason =>
+      adjustHockeyScore(state, { side, delta, reason }, context()))
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-5 space-y-4">
@@ -246,7 +282,37 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
         )}
         {!projection.clock && <p className="text-sm text-content-muted">No clock for this game.</p>}
         {projection.statusReason && <p className="text-sm text-content-muted">Reason: {projection.statusReason}</p>}
+        <dl className="grid grid-cols-2 gap-2 pt-2 text-center">
+          {(['tracked', 'opponent'] as const).map(side => (
+            <div key={side} className="rounded-md bg-surface-muted p-2">
+              <dt className="truncate text-xs font-bold uppercase text-content-muted">{side === 'tracked' ? trackedLabel : opponentLabel}</dt>
+              <dd className="text-2xl font-bold tabular-nums" aria-label={`${side === 'tracked' ? trackedLabel : opponentLabel} score`}>{projection.score[side]}</dd>
+              <dd className="text-xs text-content-muted">{projection.shotsOnGoal[side]} {projection.shotsOnGoal[side] === 1 ? 'shot' : 'shots'} on goal</dd>
+              {inProgress && (
+                <dd className="mt-1 flex justify-center gap-1">
+                  <button type="button" className="rounded border border-line-strong px-2 text-xs" aria-label={`Add a ${side} goal by adjustment`} onClick={() => adjust(side, 1)}>+1</button>
+                  <button type="button" className="rounded border border-line-strong px-2 text-xs" aria-label={`Remove a ${side} goal by adjustment`} onClick={() => adjust(side, -1)}>-1</button>
+                </dd>
+              )}
+            </div>
+          ))}
+        </dl>
       </section>
+
+      {projection.decidedInPeriodId && inProgress && (
+        <section className="rounded-md border border-success-line bg-success p-3 text-success-content">
+          <p className="text-sm font-semibold">A team leads in sudden-death overtime, so the game is decided.</p>
+          <button type="button" className="btn-primary mt-2 w-full" onClick={() => apply(finishDecidedHockeyGame(state, context()))}>
+            End game
+          </button>
+        </section>
+      )}
+
+      {projection.warnings.length > 0 && (
+        <ul className="space-y-1 rounded-md border border-warning-line bg-warning p-3 text-sm text-warning-content">
+          {projection.warnings.map(warning => <li key={warning.eventId}>{warning.message}</li>)}
+        </ul>
+      )}
 
       {error && (
         <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
@@ -335,9 +401,22 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
           flipped={flipped}
           trapezoid={sport.setup.rulesSnapshot.trapezoid}
           trackedLabel={state.gameInfo?.teamName ?? 'Tracked'}
+          opponentLabel={opponentLabel}
+          disabled={!canCapture}
+          markers={hockeyShotMarkers(sport.setup, streamEvents)}
           onFlip={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
-          onLocation={setLastTap}
+          onLocation={location => {
+            setLastTap(location)
+            setShotDraft({ side: 'tracked', location: { x: location.x, y: location.y } })
+          }}
         />
+        {canCapture && (
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setShotDraft({ side: 'tracked', location: null })}>{trackedLabel} shot</button>
+            <button type="button" className="btn-secondary" onClick={() => setShotDraft({ side: 'opponent', location: null })}>{opponentLabel} shot</button>
+            <button type="button" className="btn-secondary" onClick={() => setGoalieOpen(true)}>Goalie</button>
+          </div>
+        )}
         {lastTap && (
           <p className="text-sm text-content-muted" aria-live="polite">
             Last tap: {hockeyZone(lastTap, 'tracked', direction)} zone for the tracked team,
@@ -345,6 +424,28 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
           </p>
         )}
       </section>
+
+      {shotDraft && (
+        <HockeyShotDialog
+          draft={shotDraft}
+          sport={sport}
+          events={streamEvents}
+          recentOpponentLabels={recentHockeyOpponentLabels(streamEvents)}
+          trackedLabel={trackedLabel}
+          opponentLabel={opponentLabel}
+          onSubmit={recordShot}
+          onClose={() => setShotDraft(null)}
+        />
+      )}
+      {goalieOpen && (
+        <HockeyGoalieDialog
+          sport={sport}
+          trackedLabel={trackedLabel}
+          opponentLabel={opponentLabel}
+          onSubmit={recordGoalieChange}
+          onClose={() => setGoalieOpen(false)}
+        />
+      )}
 
       <section>
         <h2 className="text-sm font-bold uppercase text-content-muted">Events</h2>

@@ -1,5 +1,5 @@
 import { isPlainObject } from '../gameEvents/envelope'
-import { DEFAULT_HOCKEY_PROFILE_ID, findHockeyRulesProfile } from './profiles'
+import { DEFAULT_HOCKEY_PROFILE_ID, findHockeyRulesProfile, withExplicitHockeySuddenDeath } from './profiles'
 import type { HockeyRulesProfile } from './profiles'
 import { HOCKEY_RULES_FIELDS, validateHockeyMatchRules } from './rules'
 import type {
@@ -141,7 +141,8 @@ export function resolveHockeySettingsHierarchy({
     ok: true,
     value: {
       profile,
-      rules,
+      // A stored HKY-1 overtime override resolves through the same reader; new setups write five keys.
+      rules: withExplicitHockeySuddenDeath(rules),
       sourceByField,
       customized: HOCKEY_RULES_FIELDS.some(field => sourceByField[field] !== 'built_in'),
     },

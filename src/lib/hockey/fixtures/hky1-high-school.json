@@ -1,0 +1,468 @@
+{
+  "gameDataAuthority": "sport_events",
+  "sport": {
+    "id": "hockey",
+    "name": "Hockey",
+    "icon": "🏒",
+    "theme": {
+      "bg": "bg-blue-600",
+      "bgLight": "bg-blue-50",
+      "text": "text-blue-600",
+      "border": "border-blue-400",
+      "gradient": "from-blue-600 to-cyan-500"
+    },
+    "scoreLabel": "Goals",
+    "keyStatIds": [
+      "goal",
+      "h_ast",
+      "shot"
+    ],
+    "categories": [
+      {
+        "id": "offense",
+        "name": "Offense",
+        "color": "blue",
+        "actions": [
+          {
+            "id": "goal",
+            "label": "Goal",
+            "shortLabel": "G",
+            "pointValue": 1
+          },
+          {
+            "id": "h_ast",
+            "label": "Assist",
+            "shortLabel": "A"
+          },
+          {
+            "id": "shot",
+            "label": "Shot",
+            "shortLabel": "SOG"
+          }
+        ],
+        "showTotal": true,
+        "totalLabel": "Points (G+A)"
+      },
+      {
+        "id": "physical",
+        "name": "Physical",
+        "color": "red",
+        "actions": [
+          {
+            "id": "hit",
+            "label": "Hit",
+            "shortLabel": "HIT"
+          },
+          {
+            "id": "h_blk",
+            "label": "Block",
+            "shortLabel": "BLK"
+          },
+          {
+            "id": "takeaway",
+            "label": "Takeaway",
+            "shortLabel": "TK"
+          },
+          {
+            "id": "giveaway",
+            "label": "Giveaway",
+            "shortLabel": "GV"
+          }
+        ]
+      },
+      {
+        "id": "penalties",
+        "name": "Penalties",
+        "color": "amber",
+        "actions": [
+          {
+            "id": "pim_minor",
+            "label": "Minor Penalty",
+            "shortLabel": "MIN"
+          },
+          {
+            "id": "pim_major",
+            "label": "Major Penalty",
+            "shortLabel": "MAJ"
+          }
+        ]
+      },
+      {
+        "id": "goaltending",
+        "name": "Goaltending",
+        "color": "teal",
+        "actions": [
+          {
+            "id": "sv",
+            "label": "Save",
+            "shortLabel": "SV"
+          },
+          {
+            "id": "ga",
+            "label": "Goal Against",
+            "shortLabel": "GA"
+          }
+        ]
+      }
+    ]
+  },
+  "gameInfo": {
+    "teamName": "Blades",
+    "opponentName": "Rivals",
+    "tournamentName": "",
+    "tournamentId": null,
+    "date": "2026-09-27"
+  },
+  "players": [
+    {
+      "id": "player-1",
+      "name": "Player 1",
+      "number": "1",
+      "stats": {}
+    },
+    {
+      "id": "player-2",
+      "name": "Player 2",
+      "number": "2",
+      "stats": {}
+    },
+    {
+      "id": "player-3",
+      "name": "Player 3",
+      "number": "3",
+      "stats": {}
+    },
+    {
+      "id": "player-4",
+      "name": "Player 4",
+      "number": "4",
+      "stats": {}
+    },
+    {
+      "id": "player-5",
+      "name": "Player 5",
+      "number": "5",
+      "stats": {}
+    },
+    {
+      "id": "player-6",
+      "name": "Player 6",
+      "number": "6",
+      "stats": {}
+    },
+    {
+      "id": "player-30",
+      "name": "Player 30",
+      "number": "30",
+      "stats": {}
+    }
+  ],
+  "activePlayerId": null,
+  "opponentScore": 0,
+  "homeTeamScore": 0,
+  "homeScoreAdjustment": 0,
+  "notes": "",
+  "actionLog": [],
+  "cloudSync": {
+    "seasonId": null,
+    "teamId": null,
+    "gameId": null,
+    "gameStatus": null,
+    "playerIdMap": {},
+    "status": "idle",
+    "lastSyncedAt": null,
+    "lastError": null,
+    "lastSyncedGameFingerprint": null,
+    "shotChartHydrationDroppedRows": 0,
+    "eventSyncBase": {},
+    "eventConflicts": [],
+    "pendingEventConflictResolutions": []
+  },
+  "currentPeriod": 1,
+  "teamStatsConfig": null,
+  "shotChart": [],
+  "eventStream": {
+    "version": 1,
+    "events": [
+      {
+        "id": "11111111-0000-4000-8000-000000000001",
+        "sportId": "hockey",
+        "eventType": "hockey.opening_lineup",
+        "schemaVersion": 1,
+        "recorderUserId": null,
+        "sequence": 1,
+        "period": {
+          "id": "regulation-1",
+          "order": 1
+        },
+        "elapsedMs": null,
+        "occurredAt": "2026-09-27T12:00:00.000Z",
+        "teamSide": "neutral",
+        "location": null,
+        "actors": [],
+        "payload": {
+          "captureCommandId": null,
+          "goalieParticipantId": "p1",
+          "skaterParticipantIds": [
+            "p2",
+            "p3",
+            "p4",
+            "p5",
+            "p6"
+          ],
+          "opponentGoalieId": "opp-goalie"
+        },
+        "revision": 1,
+        "createdAt": "2026-09-27T12:00:00.000Z",
+        "updatedAt": "2026-09-27T12:00:00.000Z",
+        "deletedAt": null
+      },
+      {
+        "id": "11111111-0000-4000-8000-000000000002",
+        "sportId": "hockey",
+        "eventType": "hockey.period_started",
+        "schemaVersion": 1,
+        "recorderUserId": null,
+        "sequence": 2,
+        "period": {
+          "id": "regulation-1",
+          "order": 1
+        },
+        "elapsedMs": 0,
+        "occurredAt": "2026-09-27T12:00:00.000Z",
+        "teamSide": "neutral",
+        "location": null,
+        "actors": [],
+        "payload": {
+          "captureCommandId": null,
+          "kind": "regulation",
+          "number": 1
+        },
+        "revision": 1,
+        "createdAt": "2026-09-27T12:00:00.000Z",
+        "updatedAt": "2026-09-27T12:00:00.000Z",
+        "deletedAt": null
+      },
+      {
+        "id": "11111111-0000-4000-8000-000000000003",
+        "sportId": "hockey",
+        "eventType": "hockey.clock_started",
+        "schemaVersion": 1,
+        "recorderUserId": null,
+        "sequence": 3,
+        "period": {
+          "id": "regulation-1",
+          "order": 1
+        },
+        "elapsedMs": 0,
+        "occurredAt": "2026-09-27T12:00:05.000Z",
+        "teamSide": "neutral",
+        "location": null,
+        "actors": [],
+        "payload": {
+          "captureCommandId": null,
+          "anchorElapsedMs": 0
+        },
+        "revision": 1,
+        "createdAt": "2026-09-27T12:00:05.000Z",
+        "updatedAt": "2026-09-27T12:00:05.000Z",
+        "deletedAt": null
+      },
+      {
+        "id": "11111111-0000-4000-8000-000000000004",
+        "sportId": "hockey",
+        "eventType": "hockey.clock_paused",
+        "schemaVersion": 1,
+        "recorderUserId": null,
+        "sequence": 4,
+        "period": {
+          "id": "regulation-1",
+          "order": 1
+        },
+        "elapsedMs": 60000,
+        "occurredAt": "2026-09-27T12:01:05.000Z",
+        "teamSide": "neutral",
+        "location": null,
+        "actors": [],
+        "payload": {
+          "captureCommandId": null,
+          "elapsedMs": 60000,
+          "source": "manual"
+        },
+        "revision": 1,
+        "createdAt": "2026-09-27T12:01:05.000Z",
+        "updatedAt": "2026-09-27T12:01:05.000Z",
+        "deletedAt": null
+      }
+    ]
+  },
+  "sportGameState": {
+    "sportId": "hockey",
+    "version": 1,
+    "setup": {
+      "version": 1,
+      "trackedTeam": "home",
+      "opponentName": "Rivals",
+      "sourceTeamId": null,
+      "sourceSeasonId": null,
+      "rulesSnapshot": {
+        "rulesSchemaVersion": 1,
+        "profileId": "high_school_us",
+        "profileVersion": 1,
+        "regulation": {
+          "periods": 3,
+          "periodLengthMs": 1020000
+        },
+        "clockModel": "anchored",
+        "clock": {
+          "display": "count_down",
+          "mode": "stop_time"
+        },
+        "skatersPerSide": 5,
+        "minimumSkaters": 3,
+        "overtime": {
+          "lengthMs": 480000,
+          "skaters": 5,
+          "repeat": false,
+          "endsPolicy": "continue_alternation"
+        },
+        "shootout": null,
+        "tiesAllowed": true,
+        "penalties": {
+          "minorMs": 120000,
+          "doubleMinorMs": 240000,
+          "majorMs": 300000,
+          "misconductMs": 600000,
+          "releaseMinorOnPowerPlayGoal": true,
+          "coincidentalMinors": "substitute"
+        },
+        "trapezoid": false
+      },
+      "rulesSource": {
+        "regulation": "built_in",
+        "clockModel": "built_in",
+        "clock": "built_in",
+        "skatersPerSide": "built_in",
+        "minimumSkaters": "built_in",
+        "overtime": "built_in",
+        "shootout": "built_in",
+        "tiesAllowed": "built_in",
+        "penalties": "built_in",
+        "trapezoid": "built_in"
+      },
+      "firstPeriodAttackingDirection": "left_to_right",
+      "participants": [
+        {
+          "id": "p1",
+          "playerId": "player-1",
+          "displayName": "Player 1",
+          "number": "1",
+          "position": "G",
+          "dressedAs": "goalie"
+        },
+        {
+          "id": "p2",
+          "playerId": "player-2",
+          "displayName": "Player 2",
+          "number": "2",
+          "position": "C",
+          "dressedAs": "skater"
+        },
+        {
+          "id": "p3",
+          "playerId": "player-3",
+          "displayName": "Player 3",
+          "number": "3",
+          "position": "LW",
+          "dressedAs": "skater"
+        },
+        {
+          "id": "p4",
+          "playerId": "player-4",
+          "displayName": "Player 4",
+          "number": "4",
+          "position": "RW",
+          "dressedAs": "skater"
+        },
+        {
+          "id": "p5",
+          "playerId": "player-5",
+          "displayName": "Player 5",
+          "number": "5",
+          "position": "D",
+          "dressedAs": "skater"
+        },
+        {
+          "id": "p6",
+          "playerId": "player-6",
+          "displayName": "Player 6",
+          "number": "6",
+          "position": "D",
+          "dressedAs": "skater"
+        },
+        {
+          "id": "p30",
+          "playerId": "player-30",
+          "displayName": "Player 30",
+          "number": "30",
+          "position": "G",
+          "dressedAs": "goalie"
+        }
+      ],
+      "openingLineup": {
+        "goalieParticipantId": "p1",
+        "skaterParticipantIds": [
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ]
+      },
+      "opponentGoalie": {
+        "id": "opp-goalie",
+        "label": null,
+        "number": "35"
+      }
+    },
+    "projection": {
+      "status": "in_progress",
+      "statusReason": null,
+      "lineupRecorded": true,
+      "periods": [
+        {
+          "id": "regulation-1",
+          "order": 1,
+          "kind": "regulation",
+          "number": 1,
+          "durationMs": 1020000,
+          "trackedAttackingDirection": "left_to_right",
+          "startedEventId": "11111111-0000-4000-8000-000000000002",
+          "endedEventId": null,
+          "endedAtElapsedMs": null,
+          "earlyEndReason": null
+        }
+      ],
+      "activePeriodId": "regulation-1",
+      "nextPeriod": null,
+      "canEndWithoutReason": false,
+      "clock": {
+        "periodId": "regulation-1",
+        "running": false,
+        "elapsedMs": 60000,
+        "anchorElapsedMs": null,
+        "anchorOccurredAt": null,
+        "expired": false
+      },
+      "score": {
+        "tracked": 0,
+        "opponent": 0
+      },
+      "trackedAttackingDirection": "left_to_right"
+    },
+    "capturePreferences": {
+      "rinkFlipped": false
+    }
+  },
+  "basketballCourtOrientation": "standard"
+}

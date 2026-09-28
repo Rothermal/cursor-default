@@ -45,6 +45,7 @@ const NHL_REGULAR: ProfileRules = {
     skaters: 3,
     repeat: false,
     endsPolicy: 'continue_alternation',
+    suddenDeath: true,
   },
   shootout: { rounds: 3, repeatShooters: 'after_all' },
   tiesAllowed: false,
@@ -105,6 +106,7 @@ const PROFILES: readonly HockeyRulesProfile[] = Object.freeze([
         skaters: 5,
         repeat: false,
         endsPolicy: 'continue_alternation',
+        suddenDeath: true,
       },
     }
   ),
@@ -140,6 +142,7 @@ const PROFILES: readonly HockeyRulesProfile[] = Object.freeze([
         skaters: 5,
         repeat: true,
         endsPolicy: 'continue_alternation',
+        suddenDeath: true,
       },
       shootout: null,
     }
@@ -163,13 +166,22 @@ export function findHockeyRulesProfile(id: string, version?: number): HockeyRule
   return PROFILES.find(value => value.id === id && (version === undefined || value.version === version)) ?? null
 }
 
+/**
+ * Returns rules with an explicit `suddenDeath`, for new writes only. Reads never call it,
+ * so a stored HKY-1 snapshot keeps its exact shape and fingerprint.
+ */
+export function withExplicitHockeySuddenDeath(rules: HockeyMatchRules): HockeyMatchRules {
+  if (!rules.overtime || 'suddenDeath' in rules.overtime) return rules
+  return { ...rules, overtime: { ...rules.overtime, suddenDeath: true } }
+}
+
 /** Returns a mutable clone of a profile's rules, optionally layered with overrides. */
 export function createHockeyMatchRules(
   profileId: HockeyProfileId = DEFAULT_HOCKEY_PROFILE_ID,
   overrides: HockeyRuleOverrides = {}
 ): HockeyMatchRules {
   const base = findHockeyRulesProfile(profileId) ?? findHockeyRulesProfile(DEFAULT_HOCKEY_PROFILE_ID)!
-  return structuredClone({ ...base.rules, ...overrides }) as HockeyMatchRules
+  return withExplicitHockeySuddenDeath(structuredClone({ ...base.rules, ...overrides }) as HockeyMatchRules)
 }
 
 function deepFreeze<T>(value: T): T {

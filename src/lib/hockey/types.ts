@@ -37,14 +37,25 @@ export interface HockeyClockRules extends JsonObject {
   mode: HockeyClockMode
 }
 
-/** `null` in the rules means no overtime. */
-export interface HockeyOvertimeRules extends JsonObject {
+/** The HKY-1 overtime shape, still readable in stored snapshots. */
+export interface HockeyOvertimeRulesV1 extends JsonObject {
   lengthMs: number
   skaters: number
   /** Repeat sudden-death periods until a goal (playoff style). */
   repeat: boolean
   endsPolicy: HockeyOvertimeEndsPolicy
 }
+
+/** Written since HKY-2: a goal ends an overtime period only when `suddenDeath` is true (Q4). */
+export interface HockeyOvertimeRulesV2 extends HockeyOvertimeRulesV1 {
+  suddenDeath: boolean
+}
+
+/**
+ * `null` in the rules means no overtime. Read sudden death through
+ * `hockeyOvertimeSuddenDeath`, which treats the HKY-1 shape as true.
+ */
+export type HockeyOvertimeRules = HockeyOvertimeRulesV1 | HockeyOvertimeRulesV2
 
 /** `null` in the rules means no shootout. */
 export interface HockeyShootoutRules extends JsonObject {
@@ -222,6 +233,56 @@ export interface HockeyReasonPayload extends HockeyCapturePayload {
   reason: string
 }
 
+// -- Capture events (HKY-2B) -------------------------------------------------
+
+export type HockeyShotOutcome = 'goal' | 'saved' | 'missed' | 'blocked'
+export type HockeyMissType = 'wide' | 'high' | 'post' | 'crossbar'
+/** Frozen now so HKY-3B needs no schema version 2; HKY-2 always writes null. */
+export type HockeyStrength = 'ev' | 'pp' | 'sh'
+export type HockeyOnIceStatus = 'complete' | 'partial' | 'not_recorded'
+
+/**
+ * The tracked side's players on the ice at a goal (HKY-2 on-ice prompt). `complete` is a
+ * recorder confirmation checked for structural possibility; it is never re-derived later.
+ */
+export interface HockeyOnIce extends JsonObject {
+  status: HockeyOnIceStatus
+  skaterParticipantIds: string[]
+  /** A goalie participant id, `'empty_net'`, or null when unknown. */
+  goalie: string | null
+}
+
+export const HOCKEY_EMPTY_NET = 'empty_net'
+
+export interface HockeyShotPayload extends HockeyCapturePayload {
+  outcome: HockeyShotOutcome
+  missType: HockeyMissType | null
+  /** Confirmed at capture, so a later goalie correction never silently changes it. */
+  emptyNet: boolean
+  penaltyShot: boolean
+  strength: HockeyStrength | null
+  /** Goals only; null for every other outcome. */
+  onIce: HockeyOnIce | null
+}
+
+export type HockeyGoalieChangeReason = 'tactical' | 'injury' | 'pulled' | 'return' | 'penalty'
+
+export interface HockeyGoalieChangePayload extends HockeyCapturePayload {
+  /** Participant or opponent goalie id; null leaves the net empty. */
+  inParticipantId: string | null
+  reason: HockeyGoalieChangeReason
+  /** Adds an opponent goalie identity the first time one is used. */
+  newOpponentGoalie: HockeyOpponentGoalie | null
+}
+
+export interface HockeyScoreAdjustmentPayload extends HockeyCapturePayload {
+  delta: 1 | -1
+  reason: string
+}
+
+/** Actor roles on `hockey.shot`. */
+export type HockeyShotActorRole = 'shooter' | 'assist_primary' | 'assist_secondary' | 'goalie' | 'blocker'
+
 export interface HockeyPayloadByType {
   'hockey.opening_lineup': HockeyOpeningLineupPayload
   'hockey.period_started': HockeyPeriodStartedPayload
@@ -233,12 +294,25 @@ export interface HockeyPayloadByType {
   'hockey.match_suspended': HockeyReasonPayload
   'hockey.match_abandoned': HockeyReasonPayload
   'hockey.match_reopened': HockeyReasonPayload
+  'hockey.shot': HockeyShotPayload
+  'hockey.goalie_change': HockeyGoalieChangePayload
+  'hockey.score_adjustment': HockeyScoreAdjustmentPayload
 }
 
 export type HockeyEventType = keyof HockeyPayloadByType
 
+/** Events that belong to one side; every other Hockey event is neutral. */
+export const HOCKEY_SIDED_EVENT_TYPES = ['hockey.shot', 'hockey.goalie_change', 'hockey.score_adjustment'] as const
+export type HockeySidedEventType = typeof HOCKEY_SIDED_EVENT_TYPES[number]
+export type HockeySide = 'tracked' | 'opponent'
+
 export type HockeyEvent<TType extends HockeyEventType = HockeyEventType> = {
-  [K in TType]: GameEvent<HockeyPayloadByType[K], K, 'hockey', 'neutral'>
+  [K in TType]: GameEvent<
+    HockeyPayloadByType[K],
+    K,
+    'hockey',
+    K extends HockeySidedEventType ? HockeySide : 'neutral'
+  >
 }[TType]
 
 // ---------------------------------------------------------------------------
@@ -287,6 +361,45 @@ export interface HockeyMatchProjection {
   score: { tracked: number; opponent: number }
   /** Direction for the active period, or the most recent one. */
   trackedAttackingDirection: HockeyAttackingDirection | null
+  /** Goals and shots on goal per period id (HKY-2B). */
+  periodTotals: Record<string, HockeyPeriodTotals>
+  shotsOnGoal: { tracked: number; opponent: number }
+  /** The goalie in each net; null is an empty net (pulled, or before the lineup). */
+  goalieInNet: { tracked: string | null; opponent: string | null }
+  goalieIntervals: HockeyGoalieInterval[]
+  /** Opponent goalies known to the match: setup's goalie plus any added by a change. */
+  opponentGoalies: HockeyOpponentGoalie[]
+  /** Set when a goal decides a sudden-death overtime period. */
+  decidedInPeriodId: string | null
+  warnings: HockeyProjectionWarning[]
+}
+
+export interface HockeyPeriodTotals {
+  goals: { tracked: number; opponent: number }
+  shotsOnGoal: { tracked: number; opponent: number }
+}
+
+/** One stint of a goalie (or an empty net) in one side's net. */
+export interface HockeyGoalieInterval {
+  side: HockeySide
+  participantId: string | null
+  eventId: string
+  periodId: string
+  /** Clock position at the change; null for clockless games or between periods. */
+  elapsedMs: number | null
+}
+
+/**
+ * Raised when a shot's stamped goalie differs from the goalie replay now puts in net,
+ * typically after a correction. Goalie credit follows the stamp (Baseball's actor_mismatch).
+ */
+export interface HockeyProjectionWarning {
+  code: 'actor_mismatch'
+  eventId: string
+  role: 'goalie'
+  recordedParticipantId: string | null
+  resolvedParticipantId: string | null
+  message: string
 }
 
 /** Device display choices; never part of fingerprints or cloud payloads. */

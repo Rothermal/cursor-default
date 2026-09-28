@@ -436,3 +436,40 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
   the ice and markers on their ink backing.
 - The development preview (`/setup?sport=hockey&events=1`) shows the rink, its flip,
   and the zone and nearest dot of the last tap. Taps are not recorded yet.
+
+### HKY-2B (implemented)
+
+- Rules: `overtime` is exactly the four HKY-1 keys or those plus a boolean
+  `suddenDeath`. `hockeyOvertimeSuddenDeath` reads a four-key snapshot as sudden death
+  and never rewrites it. New profile rules and settings resolution always write the
+  key (`withExplicitHockeySuddenDeath`). Two literal HKY-1 games in
+  `src/lib/hockey/fixtures/` prove hydrate, park, resume, import, fingerprint and an
+  overtime goal decide unchanged (`legacyRules.test.ts`).
+- Events: `hockey.shot` (goal, saved, missed with miss type, blocked; optional location,
+  empty net, penalty shot, strength, on-ice), `hockey.goalie_change` (put in, pull,
+  new labeled opponent goalie) and `hockey.score_adjustment` (signed delta, reason).
+  Commands live in `captureCommands.ts`; actor and on-ice checks in
+  `captureProjection.ts`; the `hky_*` catalog in `stats.ts`.
+- On-ice: an untouched section stores `not_recorded`. A complete set requires the
+  recorder's confirmation plus between the period's minimum and cap of skaters (one
+  more with an empty net), and `goalie` is a participant id, `empty_net` or null.
+- Sudden death: in an active overtime whose rules have it, `decidedInPeriodId` follows
+  the score after every goal and score adjustment: a lead decides the period and a tie
+  clears the decision, so a +1 correction for a missed overtime goal decides and a
+  tied game is never marked decided. Only pause, period end, match end, suspend,
+  abandon, reopen and score adjustment may follow a decision; `finishDecidedHockeyGame`
+  pauses, ends the period without a reason and ends the match. A tying adjustment after
+  the decided period has ended also clears the decision.
+- Goalie mismatches between a stamped goalie actor and the goalie in net become
+  `actor_mismatch` warnings, not failures.
+- The development preview records shots from a rink tap or the side buttons, goalie
+  changes, and +1/-1 adjustments with a reason, and shows markers, shots on goal,
+  warnings and the decided-game End button.
+
+Deviations from the plan above:
+
+- A goalie may be the scorer or an assister; only the blocker must be a skater.
+- Goalie changes are allowed between periods as well as during one.
+- Score adjustments change the score but not `periodTotals`.
+- Profile versions were not bumped; the explicit `suddenDeath` key carries the change.
+- `playerStatsById` holds only non-zero values, so HKY-1 fingerprints are unchanged.
