@@ -76,7 +76,7 @@ in [Section 6](#6-recommended-planning-order).
 
 ### S1 - Faster shot and goal capture
 
-**Status:** planned; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md)  
+**Status:** implemented (compact live shot sheet); pending deployed verification; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md)  
 **Theme:** sideline speed  
 **Where:** `SoccerShotCaptureDialog`, Field tap, Quick Goal
 

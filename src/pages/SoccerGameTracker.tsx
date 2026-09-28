@@ -41,6 +41,7 @@ import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupD
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
+import SoccerQuickShotSheet from '../components/soccer/SoccerQuickShotSheet'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
@@ -62,6 +63,7 @@ import {
   soccerFieldReviewEvents,
   soccerLivePenaltyFoul,
   soccerPeriodTimings,
+  soccerLastTrackedShooterId,
   soccerShotSourceLine,
   suggestSoccerShotSource,
   soccerTeamEventReviewPresentation,
@@ -122,6 +124,8 @@ export default function SoccerGameTracker() {
   const [error, setError] = useState<string | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [quickShotDraft, setQuickShotDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [quickShotKey, setQuickShotKey] = useState(0)
   const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
   const [restartArmed, setRestartArmed] = useState(false)
   const [penaltyPrompt, setPenaltyPrompt] = useState<SoccerPenaltyKickPrompt | null>(null)
@@ -420,6 +424,11 @@ export default function SoccerGameTracker() {
     }
   }
 
+  const openQuickShot = (draft: SoccerCaptureDraft) => {
+    setQuickShotKey(value => value + 1)
+    setQuickShotDraft({ ...draft, mode: 'live' })
+  }
+
   const applyIncidentResult = (result: SoccerLiveResult): boolean => {
     const applied = applyResult(result)
     if (applied && result.ok && incidentDraft?.mode === 'live') {
@@ -435,7 +444,7 @@ export default function SoccerGameTracker() {
       return
     }
     setRestartArmed(false)
-    setCaptureDraft({
+    openQuickShot({
       teamSide: penaltyPrompt.teamSide,
       location: null,
       situation: 'penalty',
@@ -694,7 +703,7 @@ export default function SoccerGameTracker() {
                     return
                   }
                   if (capturePreferences.captureMode === 'shot') {
-                    setCaptureDraft(liveShotDraft(capturePreferences.teamSide, location))
+                    openQuickShot(liveShotDraft(capturePreferences.teamSide, location))
                   } else {
                     openIncident(capturePreferences.captureMode, location)
                   }
@@ -713,7 +722,7 @@ export default function SoccerGameTracker() {
                   disabled={!fieldCaptureEnabled}
                   onClick={() => {
                     setRestartArmed(false)
-                    setCaptureDraft(liveShotDraft(capturePreferences.teamSide, null, 'goal'))
+                    openQuickShot(liveShotDraft(capturePreferences.teamSide, null, 'goal'))
                   }}
                 />
                 <QuickCaptureButton
@@ -896,6 +905,21 @@ export default function SoccerGameTracker() {
         onClose={() => {
           setDialogKind(null)
           setDialogParticipantId(null)
+        }}
+      />
+
+      <SoccerQuickShotSheet
+        key={quickShotKey}
+        draft={quickShotDraft}
+        state={state}
+        recorderUserId={user?.id ?? null}
+        busy={isApplying}
+        lastShooterId={soccerLastTrackedShooterId(inspection.activeEvents)}
+        onApply={applyResult}
+        onClose={() => setQuickShotDraft(null)}
+        onMoreDetails={draft => {
+          setQuickShotDraft(null)
+          setCaptureDraft(draft)
         }}
       />
 
