@@ -128,7 +128,7 @@ describe('Soccer match-readiness wiring', () => {
     expect(shotDialog).toContain('sortSoccerActorParticipants(')
     expect(incidentDialog).toContain('sortSoccerActorParticipants(')
     expect(shotDialog).toContain(
-      '}, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings])'
+      '}, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings, trackedAttackingDirection])'
     )
     expect(incidentDialog).toContain(
       '}, [initialRoles, initializationDraft, mode, participants, periodTimings, projection])'

@@ -37,3 +37,17 @@ it('wires the selected beneficiary direction into both dialog capture paths', ()
     expect(property && ts.isPropertyAssignment(property) && property.initializer.getText(tree)).toBe('eventLocation')
   }
 })
+
+it('opens live Field and Quick Goal shots with the suggested restart source', () => {
+  const tracker = readFileSync('src/pages/SoccerGameTracker.tsx', 'utf8')
+  expect(tracker).toContain('setCaptureDraft(liveShotDraft(capturePreferences.teamSide, location))')
+  expect(tracker).toContain("setCaptureDraft(liveShotDraft(capturePreferences.teamSide, null, 'goal'))")
+  expect(tracker).toMatch(/suggestSoccerShotSource\(inspection\.activeEvents,/)
+  // Only live incident captures raise the penalty kick prompt.
+  expect(tracker).toContain("if (applied && result.ok && incidentDraft?.mode === 'live')")
+
+  const dialog = readFileSync('src/components/soccer/SoccerShotCaptureDialog.tsx', 'utf8')
+  // Draft defaults never override an edited event's own situation or source.
+  expect(dialog).toContain('const draftSituation = event ? undefined : initializationDraft.situation')
+  expect(dialog).toContain("shot?.payload.sourceEventId ?? (event ? null : initializationDraft.sourceEventId) ?? ''")
+})

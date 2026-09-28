@@ -22,8 +22,11 @@ import {
 } from './gameState'
 import {
   endSoccerMatch,
+  inspectSoccerHistory,
   recordCheckedSoccerEvent,
   recordSoccerScoreAdjustment,
+  recordSoccerShot,
+  soccerPeriodTimings,
   recordSoccerShootoutKick,
   reviseSoccerShootoutKick,
   updateSoccerHistoryEvent,
@@ -31,6 +34,7 @@ import {
   reviseSoccerScoreAdjustment,
   startSoccerShootout,
 } from './live'
+import { suggestSoccerShotSource } from './capture'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import { SOCCER_GAME_STATE_VERSION } from './types'
@@ -306,6 +310,52 @@ describe('SOC-4A normal-match projection', () => {
     if (!result.ok) return
     expect(result.state.sportGameState!.projection.participantStats['match-defender'].interceptions)
       .toBe(1)
+  })
+
+  it('records live shots with the suggested restart source through checked validation', () => {
+    const at = (seconds: number) => Date.parse(`2026-07-21T12:00:${String(seconds).padStart(2, '0')}.000Z`)
+    const shoot = (state: typeof kickedOff, seconds: number, id: string) => {
+      const timings = soccerPeriodTimings(state, at(seconds))
+      const timing = timings[timings.length - 1]
+      const suggestion = suggestSoccerShotSource(inspectSoccerHistory(state).activeEvents, {
+        teamSide: 'tracked', period: timing.period, elapsedMs: timing.endElapsedMs,
+      })
+      expect(suggestion).not.toBeNull()
+      return recordSoccerShot(state, {
+        teamSide: 'tracked',
+        outcome: 'saved',
+        situation: suggestion!.situation,
+        sourceEventId: suggestion!.sourceEventId,
+        location: null,
+        shooter: { kind: 'participant', participantId: 'match-defender' },
+      }, { recorderUserId: 'user-1', nowMs: at(seconds), eventIds: [id] })
+    }
+    const kickedOff = append(initializedState(), kickoffEvents())
+
+    const corner = recordCheckedSoccerEvent(kickedOff, {
+      eventType: 'soccer.team_event',
+      payload: { kind: 'corner' },
+    }, { recorderUserId: 'user-1', nowMs: at(5), eventIds: ['50000000-0000-4000-8000-000000000011'] })
+    expect(corner.ok).toBe(true)
+    if (!corner.ok) return
+    const cornerShot = shoot(corner.state, 8, '50000000-0000-4000-8000-000000000012')
+    expect(cornerShot.ok && cornerShot.inspection.complete).toBe(true)
+
+    const penalty = recordCheckedSoccerEvent(kickedOff, {
+      eventType: 'soccer.foul',
+      teamSide: 'opponent',
+      payload: { restart: 'penalty', sanction: 'none', sanctionReason: null, note: null, lineupResolution: null },
+      actors: [
+        unknownActor('committed_by', 'Opponent 6'),
+        participantActor('fouled', 'match-defender', 'defender'),
+      ],
+    }, { recorderUserId: 'user-1', nowMs: at(5), eventIds: ['50000000-0000-4000-8000-000000000013'] })
+    expect(penalty.ok).toBe(true)
+    if (!penalty.ok) return
+    const penaltyKick = shoot(penalty.state, 9, '50000000-0000-4000-8000-000000000014')
+    expect(penaltyKick.ok && penaltyKick.inspection.complete).toBe(true)
+    if (!penaltyKick.ok) return
+    expect(penaltyKick.state.sportGameState!.projection.sideTotals.tracked.penaltyAttempts).toBe(1)
   })
 
   it('derives defensive, foul, discipline, team, penalty, and linked-block totals', () => {
