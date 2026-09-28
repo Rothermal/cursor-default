@@ -85,6 +85,14 @@ describe('appearance bootstrap/runtime contract', () => {
         const a = tokens[foreground], b = tokens['court-surface']
         expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/court-surface graphics`).toBeGreaterThanOrEqual(3)
       }
+      // Rink lines sit on the ice; rink markers sit on an ink backing disc.
+      for (const [foreground, background] of [
+        ['rink-board', 'rink-ice'], ['rink-red', 'rink-ice'], ['rink-blue', 'rink-ice'], ['rink-ink', 'rink-ice'],
+        ['rink-tracked', 'rink-ink'], ['rink-opponent', 'rink-ink'],
+      ]) {
+        const a = tokens[foreground], b = tokens[background]
+        expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/${background} graphics`).toBeGreaterThanOrEqual(3)
+      }
     }
   })
   it.each([null, '', '{', '{}', 'null', '[]', '{"version":2,"theme":"dark"}', '{"version":1,"theme":"system"}', '{"version":1,"theme":"dark","extra":true}'])('defaults malformed records to Light: %s', raw => {
