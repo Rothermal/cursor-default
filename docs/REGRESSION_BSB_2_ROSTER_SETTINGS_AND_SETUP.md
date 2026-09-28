@@ -5,7 +5,7 @@ owner before Baseball team-default saves work; reads and game setup work without
 
 ## Automated and local checks
 
-- Full Vitest suite: 238 files / 2,066 tests passed. `pnpm typecheck` and `pnpm build`
+- Full Vitest suite: 238 files / 2,071 tests passed (after the PR #437 review fix). `pnpm typecheck` and `pnpm build`
   passed. `pnpm lint` has 0 errors and the three existing context Fast Refresh warnings.
 - `src/lib/baseball/settings.test.ts` (BSB-2A/2B): position normalization, labels and
   sort order; exact team settings parsing (unknown keys, profile, version, overrides,
@@ -19,6 +19,12 @@ owner before Baseball team-default saves work; reads and game setup work without
   engine's validation message is shown; opponent details are trimmed; a created game
   starts, reloads with an identical fingerprint, stays `unsupported` for cloud sync and
   survives park, export and import.
+- Team prefill timing (PR #437 review): `useSportTeamSettings` exposes `settledTeamId`,
+  set only when the latest cloud read for that team finishes and cleared on scope change.
+  `planBaseballTeamPrefill` waits for it, so a cached revision shown while the read is in
+  flight cannot win over the cloud revision even when the roster loads first. A cache kept
+  after a failed read is used with a visible note; an error falls back to standard rules
+  and an empty lineup; later refreshes never replace an initialized or edited draft.
 - `src/lib/baseball/previewGate.test.ts`: the setup and holding page are development-only,
   Baseball event games never reach the legacy stat grid, and consumers are audited.
 - `src/lib/soccer/matchReadiness.test.ts` source pins updated for the shared

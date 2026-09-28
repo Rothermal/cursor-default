@@ -22,6 +22,12 @@ export type SportTeamSettingsStatus =
 
 export interface SportTeamSettingsController<TSettings> {
   scopeTeamId: string | null
+  /**
+   * The team whose first cloud read in the current scope has finished (loaded, missing,
+   * failed or offline). `cached` alone is shown while that read is still in flight, so
+   * one-time consumers such as game-setup prefill wait for this instead.
+   */
+  settledTeamId: string | null
   settings: TSettings
   status: SportTeamSettingsStatus
   revision: number | null
@@ -44,6 +50,7 @@ export function useSportTeamSettings<TSettings>(
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const [scopeTeamId, setScopeTeamId] = useState<string | null>(null)
+  const [settledTeamId, setSettledTeamId] = useState<string | null>(null)
   const [settings, setSettings] = useState<TSettings>(
     adapter.defaults
   )
@@ -154,12 +161,14 @@ export function useSportTeamSettings<TSettings>(
       )
     } finally {
       loadingRef.current = false
+      if (requestId === requestRef.current) setSettledTeamId(teamId)
     }
   }, [active, adapter, isConfigured, teamId, userId])
 
   useEffect(() => {
     requestRef.current += 1
     loadingRef.current = false
+    setSettledTeamId(null)
     if (!active || !teamId || !userId) {
       setScopeTeamId(null)
       setSettings(adapter.defaults())
@@ -315,6 +324,7 @@ export function useSportTeamSettings<TSettings>(
 
   return {
     scopeTeamId,
+    settledTeamId,
     settings,
     status,
     revision,

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sports } from '../../config/sports'
 import type { GameState } from '../../types'
@@ -6,17 +8,20 @@ import { exportParkedGames, importParkedGames, listParkedGameRecords, parkActive
 import { buildGameSyncFingerprint, cloudSyncRouteForState } from '../gameSyncFingerprint'
 import { baseballSportState, startBaseballGame } from './commands'
 import { createBaseballMatchRules } from './profiles'
+import { defaultBaseballTeamSettings, type BaseballTeamSettingsV1 } from './settings'
 import {
   applyBaseballLineupDefaults,
   buildBaseballMatchSetup,
   createBaseballEventGameState,
   createBaseballSetupDraft,
   missingBaseballDefaultPlayers,
+  planBaseballTeamPrefill,
   setBaseballDraftFielder,
   setBaseballDraftRules,
   setBaseballPlayerSelected,
   type BaseballSetupDraft,
   type BaseballSetupRosterPlayer,
+  type BaseballTeamSettingsSnapshot,
 } from './setupBuilder'
 
 const id = (n: number) => `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -146,5 +151,95 @@ describe('Baseball setup build', () => {
     importParkedGames(exported, 'user-1')
     const [record] = listParkedGameRecords('user-1')
     expect(buildGameSyncFingerprint(reload(record.gameState))).toBe(buildGameSyncFingerprint(started.state))
+  })
+})
+
+describe('Baseball team prefill timing', () => {
+  const TEAM = 'c0000000-0000-4000-8000-000000000001'
+  const revision = (innings: number, battingOrder: string[]): BaseballTeamSettingsV1 => ({
+    ...defaultBaseballTeamSettings(),
+    ruleOverrides: { scheduledInnings: innings },
+    lineupDefaults: { version: 1, battingOrder, defense: {} },
+  })
+  const cachedRevision1 = revision(5, [id(1), id(2)])
+  const cloudRevision2 = revision(6, [id(3), id(4)])
+
+  /** Mirrors the setup page effect: a snapshot either initializes the draft once or does nothing. */
+  function run(steps: Array<{ rosterReady: boolean; settings: BaseballTeamSettingsSnapshot; edit?: (draft: BaseballSetupDraft) => BaseballSetupDraft }>) {
+    let draft: BaseballSetupDraft | null = null
+    let initializedTeamId: string | null = null
+    for (const step of steps) {
+      const prefill = planBaseballTeamPrefill({
+        teamId: TEAM,
+        initializedTeamId,
+        rosterReady: step.rosterReady,
+        roster,
+        settings: step.settings,
+        sourceSeasonId: null,
+        trackedSide: 'home',
+        opponentName: '',
+      })
+      if (prefill) {
+        draft = prefill.draft
+        initializedTeamId = TEAM
+      }
+      if (draft && step.edit) draft = step.edit(draft)
+    }
+    return draft
+  }
+
+  it('waits for the first cloud read, so a cache shown during it cannot win', () => {
+    const draft = run([
+      { rosterReady: false, settings: { settledTeamId: null, status: 'cached', settings: cachedRevision1 } },
+      // Roster resolves first while the cloud read is still in flight.
+      { rosterReady: true, settings: { settledTeamId: null, status: 'cached', settings: cachedRevision1 } },
+      // Cloud revision 2 resolves later.
+      { rosterReady: true, settings: { settledTeamId: TEAM, status: 'synced', settings: cloudRevision2 } },
+    ])
+    expect(draft?.rules.scheduledInnings).toBe(6)
+    expect(draft?.battingOrder).toEqual([id(3), id(4)])
+  })
+
+  it('uses the device cache when the first cloud read fails and says so', () => {
+    const settings = { settledTeamId: TEAM, status: 'cached', settings: cachedRevision1 }
+    const prefill = planBaseballTeamPrefill({
+      teamId: TEAM, initializedTeamId: null, rosterReady: true, roster, settings,
+      sourceSeasonId: null, trackedSide: 'home', opponentName: '',
+    })
+    expect(prefill?.draft.rules.scheduledInnings).toBe(5)
+    expect(prefill?.draft.battingOrder).toEqual([id(1), id(2)])
+    expect(prefill?.note).toContain("this device's saved copy")
+  })
+
+  it('falls back to standard rules and an empty lineup when nothing usable loads', () => {
+    const prefill = planBaseballTeamPrefill({
+      teamId: TEAM, initializedTeamId: null, rosterReady: true, roster,
+      settings: { settledTeamId: TEAM, status: 'error', settings: cloudRevision2 },
+      sourceSeasonId: null, trackedSide: 'home', opponentName: '',
+    })
+    expect(prefill?.draft.battingOrder).toEqual([])
+    expect(prefill?.draft.rules.profileId).toBe('nfhs_baseball')
+  })
+
+  it('never replaces an initialized or edited draft on later refreshes', () => {
+    const draft = run([
+      { rosterReady: true, settings: { settledTeamId: TEAM, status: 'cached', settings: cachedRevision1 } },
+      {
+        rosterReady: true,
+        settings: { settledTeamId: TEAM, status: 'cached', settings: cachedRevision1 },
+        edit: current => ({ ...current, battingOrder: [id(9)] }),
+      },
+      // A focus/online refresh later brings revision 2.
+      { rosterReady: true, settings: { settledTeamId: TEAM, status: 'synced', settings: cloudRevision2 } },
+    ])
+    expect(draft?.battingOrder).toEqual([id(9)])
+    expect(draft?.rules.scheduledInnings).toBe(5)
+  })
+
+  it('marks a team settled only when its latest read finishes, and resets on scope change', () => {
+    const hook = readFileSync(resolve(process.cwd(), 'src/hooks/useSportTeamSettings.ts'), 'utf8')
+    expect(hook).toContain('if (requestId === requestRef.current) setSettledTeamId(teamId)')
+    const scopeEffect = hook.slice(hook.indexOf('requestRef.current += 1'))
+    expect(scopeEffect.indexOf('setSettledTeamId(null)')).toBeLessThan(scopeEffect.indexOf('void refresh()'))
   })
 })

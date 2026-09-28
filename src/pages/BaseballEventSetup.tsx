@@ -18,12 +18,11 @@ import {
   type BaseballProfileId,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
-import { resolveBaseballTeamRules } from '../lib/baseball/settings'
 import {
   buildBaseballMatchSetup,
   createBaseballEventGameState,
   createBaseballSetupDraft,
-  missingBaseballDefaultPlayers,
+  planBaseballTeamPrefill,
   setBaseballDraftFielder,
   setBaseballDraftRules,
   setBaseballPlayerSelected,
@@ -41,8 +40,6 @@ interface BaseballTeamOption {
 }
 
 type RosterStatus = 'idle' | 'loading' | 'ready' | 'error'
-
-const SETTLED_SETTINGS = new Set(['synced', 'cached', 'missing', 'conflict', 'error', 'backend_update_required'])
 
 /**
  * BSB-2 development setup for Baseball event games: builds the frozen BSB-1 setup from a
@@ -133,33 +130,30 @@ function BaseballSetupForm() {
     return () => { cancelled = true }
   }, [teamId])
 
-  // Team defaults are copied into the draft once per chosen team, after roster and settings settle.
+  // Team defaults are copied into the draft once per chosen team, after the roster and the
+  // first cloud settings read have both finished (see planBaseballTeamPrefill).
   useEffect(() => {
-    if (!teamId || draftTeamId === teamId || rosterStatus !== 'ready') return
-    if (teamSettings.scopeTeamId !== teamId || !SETTLED_SETTINGS.has(teamSettings.status)) return
     const team = teams.find(entry => entry.id === teamId)
-    const usable = teamSettings.status !== 'error' && teamSettings.status !== 'backend_update_required'
-    const resolved = usable ? resolveBaseballTeamRules(teamSettings.settings) : null
-    const rules = resolved?.ok ? resolved.rules : createBaseballMatchRules(DEFAULT_BASEBALL_PROFILE_ID)
-    const defaults = usable ? teamSettings.settings.lineupDefaults : null
-    setDraft(createBaseballSetupDraft({
-      rules,
+    const prefill = planBaseballTeamPrefill({
+      teamId,
+      initializedTeamId: draftTeamId || null,
+      rosterReady: rosterStatus === 'ready',
       roster,
-      lineupDefaults: defaults,
-      sourceTeamId: teamId,
+      settings: {
+        settledTeamId: teamSettings.settledTeamId,
+        status: teamSettings.status,
+        settings: teamSettings.settings,
+      },
       sourceSeasonId: team?.seasonId ?? null,
       trackedSide: draft.trackedSide,
       opponentName: draft.opponentName,
-    }))
-    const missing = defaults ? missingBaseballDefaultPlayers(roster, defaults).length : 0
-    setDefaultsNote(!usable
-      ? 'Team defaults could not be loaded, so the standard rules are used and the lineup is empty.'
-      : missing > 0
-        ? `${missing} player${missing === 1 ? '' : 's'} in the team default lineup ${missing === 1 ? 'is' : 'are'} no longer on the active roster and ${missing === 1 ? 'was' : 'were'} left out.`
-        : null)
+    })
+    if (!prefill) return
+    setDraft(prefill.draft)
+    setDefaultsNote(prefill.note)
     if (team) setTeamName(team.name)
     setDraftTeamId(teamId)
-  }, [teamId, draftTeamId, rosterStatus, roster, teams, teamSettings.scopeTeamId, teamSettings.status, teamSettings.settings, draft.trackedSide, draft.opponentName])
+  }, [teamId, draftTeamId, rosterStatus, roster, teams, teamSettings.settledTeamId, teamSettings.status, teamSettings.settings, draft.trackedSide, draft.opponentName])
 
   const chooseTeam = (next: string) => {
     setTeamId(next)

@@ -3,7 +3,8 @@ import { createInitialState } from '../gameReducer'
 import { initializeBaseballEventGame, type BaseballCommandResult } from './commands'
 import { createBaseballUuid } from './id'
 import { normalizeBaseballPosition } from './positions'
-import type { BaseballLineupDefaults } from './settings'
+import { createBaseballMatchRules, DEFAULT_BASEBALL_PROFILE_ID } from './profiles'
+import { resolveBaseballTeamRules, type BaseballLineupDefaults, type BaseballTeamSettingsV1 } from './settings'
 import { normalizeBaseballMatchSetup, validateBaseballMatchSetup } from './state'
 import type { BaseballHomeAway, BaseballMatchRules, BaseballMatchSetup } from './types'
 
@@ -93,6 +94,64 @@ export function applyBaseballLineupDefaults(
     battingOrder: defaults.battingOrder.map(resolve).filter((id): id is string => id !== null),
     defense,
   }
+}
+
+/** The parts of the team settings controller that decide when prefill may run. */
+export interface BaseballTeamSettingsSnapshot {
+  settledTeamId: string | null
+  status: string
+  settings: BaseballTeamSettingsV1
+}
+
+export interface BaseballTeamPrefill {
+  draft: BaseballSetupDraft
+  note: string | null
+}
+
+/**
+ * Decides the one-time team prefill. It waits until the roster is loaded and the first
+ * cloud settings read for this team has finished, so a cache shown during that read can
+ * never win over the current cloud revision. A cache kept after a failed read is a
+ * legitimate fallback. Once the draft is initialized for a team it is never replaced, so
+ * later refreshes cannot overwrite recorder edits.
+ */
+export function planBaseballTeamPrefill(input: {
+  teamId: string
+  initializedTeamId: string | null
+  rosterReady: boolean
+  roster: readonly BaseballSetupRosterPlayer[]
+  settings: BaseballTeamSettingsSnapshot
+  sourceSeasonId: string | null
+  trackedSide: BaseballHomeAway
+  opponentName: string
+}): BaseballTeamPrefill | null {
+  if (!input.teamId || input.initializedTeamId === input.teamId || !input.rosterReady) return null
+  if (input.settings.settledTeamId !== input.teamId) return null
+  const usable = input.settings.status !== 'error' && input.settings.status !== 'backend_update_required'
+  const resolved = usable ? resolveBaseballTeamRules(input.settings.settings) : null
+  const rules = resolved?.ok ? resolved.rules : createBaseballMatchRules(DEFAULT_BASEBALL_PROFILE_ID)
+  const defaults = resolved?.ok ? input.settings.settings.lineupDefaults : null
+  const draft = createBaseballSetupDraft({
+    rules,
+    roster: input.roster,
+    lineupDefaults: defaults,
+    sourceTeamId: input.teamId,
+    sourceSeasonId: input.sourceSeasonId,
+    trackedSide: input.trackedSide,
+    opponentName: input.opponentName,
+  })
+  const missing = defaults ? missingBaseballDefaultPlayers(input.roster, defaults).length : 0
+  const notes = !defaults
+    ? ['Team defaults could not be loaded, so the standard rules are used and the lineup is empty.']
+    : [
+        input.settings.status === 'cached'
+          ? "The latest team defaults could not be loaded, so this device's saved copy is used."
+          : null,
+        missing > 0
+          ? `${missing} player${missing === 1 ? '' : 's'} in the team default lineup ${missing === 1 ? 'is' : 'are'} no longer on the active roster and ${missing === 1 ? 'was' : 'were'} left out.`
+          : null,
+      ].filter((note): note is string => note !== null)
+  return { draft, note: notes.length ? notes.join(' ') : null }
 }
 
 /** Players listed in the defaults who are not on this game's roster (shown as a warning). */
