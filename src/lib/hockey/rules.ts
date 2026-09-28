@@ -43,6 +43,19 @@ const ENDS_POLICIES: readonly HockeyOvertimeEndsPolicy[] = [
 const REPEAT_SHOOTERS: readonly HockeyShootoutRepeatShooters[] = ['after_all', 'never', 'any']
 const COINCIDENTAL: readonly HockeyCoincidentalMinors[] = ['substitute', 'play_short']
 
+/** HKY-1 snapshots have no `suddenDeath`; both exact shapes stay readable (HKY-2 §2). */
+const HKY1_OVERTIME_KEYS = ['lengthMs', 'skaters', 'repeat', 'endsPolicy'] as const
+const OVERTIME_KEYS = [...HKY1_OVERTIME_KEYS, 'suddenDeath'] as const
+
+/**
+ * Whether a goal ends an overtime period. The HKY-1 four-key shape reads as true, the
+ * behavior every HKY-1 profile was designed for. Never read the raw field elsewhere.
+ */
+export function hockeyOvertimeSuddenDeath(rules: Pick<HockeyMatchRules, 'overtime'>): boolean {
+  if (!rules.overtime) return false
+  return 'suddenDeath' in rules.overtime ? rules.overtime.suddenDeath === true : true
+}
+
 /**
  * Exact parser: unknown or missing keys, out-of-range values, and inconsistent
  * combinations fail closed. Returns a mutable clone on success.
@@ -96,7 +109,8 @@ export function validateHockeyMatchRules(value: unknown): string | null {
   if (overtime !== null) {
     if (
       !isPlainObject(overtime) ||
-      !hasExactKeys(overtime, ['lengthMs', 'skaters', 'repeat', 'endsPolicy']) ||
+      !(hasExactKeys(overtime, HKY1_OVERTIME_KEYS) || hasExactKeys(overtime, OVERTIME_KEYS)) ||
+      (Object.prototype.hasOwnProperty.call(overtime, 'suddenDeath') && typeof overtime.suddenDeath !== 'boolean') ||
       !isWholeSeconds(overtime.lengthMs, MINUTE_MS, 60 * MINUTE_MS) ||
       !isInt(overtime.skaters, 3, Number(value.skatersPerSide)) ||
       typeof overtime.repeat !== 'boolean' ||

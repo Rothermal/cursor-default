@@ -6,9 +6,17 @@ import type {
   SportGameEventProjectionResult,
   SportGameEventProjector,
 } from '../gameEvents/types'
+import { checkHockeyGoalieChange, checkHockeyOnIce, checkHockeyShotActors, otherHockeySide } from './captureProjection'
 import { hockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './periods'
+import { hockeyOvertimeSuddenDeath } from './rules'
 import { hockeyTrackedAttackingDirection } from './setup'
 import { createHockeyMatchProjection } from './state'
+import {
+  accumulateHockeyShotStats,
+  emptyHockeyParticipantStats,
+  hockeyPlayerStatsById,
+  type HockeyParticipantStats,
+} from './stats'
 import type {
   HockeyClockProjection,
   HockeyEvent,
@@ -16,6 +24,7 @@ import type {
   HockeyMatchSetup,
   HockeyPeriodRecord,
   HockeyPeriodRef,
+  HockeySide,
   HockeySportGameState,
 } from './types'
 
@@ -24,6 +33,8 @@ export class HockeyReplayError extends Error {}
 export interface HockeyReplayOutput {
   projection: HockeyMatchProjection
   diagnostics: GameEventDiagnostic[]
+  /** Per participant; kept out of the persisted projection. */
+  participantStats: HockeyParticipantStats
 }
 
 export type HockeyClockMoment =
@@ -43,10 +54,11 @@ export function replayHockeyEvents(setup: HockeyMatchSetup, events: readonly Gam
       return {
         projection: replay.projection,
         diagnostics: [{ code: 'semantic_validation_failed', message: error.message, eventId: event.id }],
+        participantStats: replay.stats,
       }
     }
   }
-  return { projection: replay.projection, diagnostics: [] }
+  return { projection: replay.projection, diagnostics: [], participantStats: replay.stats }
 }
 
 export const hockeyGameEventProjector: SportGameEventProjector = {
@@ -66,10 +78,10 @@ export const hockeyGameEventProjector: SportGameEventProjector = {
       }
     }
     const hockey = sportState as HockeySportGameState
-    const { projection, diagnostics } = replayHockeyEvents(hockey.setup, events)
+    const { projection, diagnostics, participantStats } = replayHockeyEvents(hockey.setup, events)
     return {
       projection: {
-        playerStatsById: {},
+        playerStatsById: hockeyPlayerStatsById(hockey.setup, participantStats),
         homeTeamScore: projection.score.tracked,
         opponentScore: projection.score.opponent,
         shotChart: [],
@@ -121,12 +133,25 @@ function fail(message: string): never {
   throw new HockeyReplayError(message)
 }
 
+/** After a sudden-death goal only these may follow, so the game can be closed or the goal corrected. */
+const AFTER_DECISION = new Set<string>([
+  'hockey.clock_paused',
+  'hockey.period_ended',
+  'hockey.match_ended',
+  'hockey.match_suspended',
+  'hockey.match_abandoned',
+  'hockey.match_reopened',
+  'hockey.score_adjustment',
+])
+
 class HockeyReplay {
   readonly projection: HockeyMatchProjection
+  readonly stats: HockeyParticipantStats
   private readonly anchored: boolean
 
   constructor(private readonly setup: HockeyMatchSetup) {
     this.projection = createHockeyMatchProjection(setup)
+    this.stats = emptyHockeyParticipantStats(setup)
     this.anchored = setup.rulesSnapshot.clockModel === 'anchored'
   }
 
@@ -134,6 +159,9 @@ class HockeyReplay {
     if (event.sportId !== 'hockey') fail('Only Hockey events can be replayed.')
     this.checkPeriodEnvelope(event)
     this.checkElapsed(event)
+    if (this.projection.decidedInPeriodId && !AFTER_DECISION.has(event.eventType)) {
+      fail('A lead in sudden-death overtime decided the game. End it, or correct the score first.')
+    }
     switch (event.eventType) {
       case 'hockey.opening_lineup':
         return this.openingLineup(event)
@@ -152,6 +180,12 @@ class HockeyReplay {
         return this.matchInterrupted(event)
       case 'hockey.match_reopened':
         return this.matchReopened(event)
+      case 'hockey.shot':
+        return this.shot(event)
+      case 'hockey.goalie_change':
+        return this.goalieChange(event)
+      case 'hockey.score_adjustment':
+        return this.scoreAdjustment(event)
       default:
         fail('Unknown Hockey event type.')
     }
@@ -222,6 +256,17 @@ class HockeyReplay {
     }
     p.lineupRecorded = true
     p.nextPeriod = { kind: 'regulation', number: 1 }
+    p.goalieInNet = { tracked: payload.goalieParticipantId, opponent: payload.opponentGoalieId }
+    const first = hockeyPeriod('regulation', 1)
+    for (const side of ['tracked', 'opponent'] as const) {
+      p.goalieIntervals.push({
+        side,
+        participantId: p.goalieInNet[side],
+        eventId: event.id,
+        periodId: first.id,
+        elapsedMs: this.anchored ? 0 : null,
+      })
+    }
   }
 
   private periodStarted(event: HockeyEvent<'hockey.period_started'>): void {
@@ -276,7 +321,7 @@ class HockeyReplay {
     if (p.clock) {
       if (p.clock.running) fail('Pause the clock before ending the period.')
       endedAt = p.clock.elapsedMs
-      if (endedAt < active.durationMs && event.payload.reason === null) {
+      if (endedAt < active.durationMs && event.payload.reason === null && p.decidedInPeriodId !== active.id) {
         fail('Ending a period before the clock expires needs a reason.')
       }
     }
@@ -362,6 +407,111 @@ class HockeyReplay {
     p.status = 'in_progress'
     p.statusReason = event.payload.reason
     if (!p.activePeriodId) this.refreshBetweenPeriods()
+  }
+
+  // -- capture (HKY-2B) -----------------------------------------------------
+
+  private shot(event: HockeyEvent<'hockey.shot'>): void {
+    const p = this.projection
+    const active = hockeyActivePeriod(p)
+    if (p.status !== 'in_progress' || !active) fail('Shots are recorded during a period.')
+    const actorMessage = checkHockeyShotActors(this.setup, p, event)
+    if (actorMessage) fail(actorMessage)
+    const payload = event.payload
+    if (payload.onIce) {
+      const onIceMessage = checkHockeyOnIce(this.setup, active, payload.onIce)
+      if (onIceMessage) fail(onIceMessage)
+    }
+    const side = event.teamSide
+    const defending = otherHockeySide(side)
+    if (!payload.emptyNet) {
+      const stamped = event.actors.find(actor => actor.role === 'goalie')?.participantId ?? null
+      const resolved = p.goalieInNet[defending]
+      if (stamped !== resolved) this.warnGoalieMismatch(event.id, stamped, resolved)
+    }
+    const totals = this.periodTotals(active.id)
+    if (payload.outcome === 'goal' || payload.outcome === 'saved') {
+      p.shotsOnGoal[side] += 1
+      totals.shotsOnGoal[side] += 1
+    }
+    if (payload.outcome === 'goal') {
+      p.score[side] += 1
+      totals.goals[side] += 1
+      this.refreshSuddenDeathDecision()
+    }
+    accumulateHockeyShotStats(this.stats, event)
+  }
+
+  private goalieChange(event: HockeyEvent<'hockey.goalie_change'>): void {
+    const p = this.projection
+    if (p.status !== 'in_progress') fail('Goalie changes are recorded while the match is in progress.')
+    const message = checkHockeyGoalieChange(this.setup, p, event)
+    if (message) fail(message)
+    const side = event.teamSide
+    if (event.payload.newOpponentGoalie) p.opponentGoalies.push(structuredClone(event.payload.newOpponentGoalie))
+    p.goalieInNet[side] = event.payload.inParticipantId
+    const period = hockeyActivePeriod(p) ?? lastHockeyPeriod(p)
+    p.goalieIntervals.push({
+      side,
+      participantId: event.payload.inParticipantId,
+      eventId: event.id,
+      periodId: period?.id ?? hockeyPeriod('regulation', 1).id,
+      elapsedMs: event.elapsedMs,
+    })
+  }
+
+  /** Adjustments change the score but never create player goals. */
+  private scoreAdjustment(event: HockeyEvent<'hockey.score_adjustment'>): void {
+    const p = this.projection
+    if (p.status !== 'in_progress') fail('Reopen the match to adjust the score.')
+    const side: HockeySide = event.teamSide
+    const next = p.score[side] + event.payload.delta
+    if (next < 0) fail('A score cannot go below zero.')
+    p.score[side] = next
+    if (!this.refreshSuddenDeathDecision() && p.decidedInPeriodId && p.score.tracked === p.score.opponent) {
+      // A tying adjustment after the decided period has ended still reopens the decision.
+      p.decidedInPeriodId = null
+    }
+    if (!p.activePeriodId && p.periods.length > 0) this.refreshBetweenPeriods()
+  }
+
+  /**
+   * In an active sudden-death overtime the decision follows the score: any goal or
+   * adjustment that leaves a leader decides the period, and one that leaves a tie
+   * clears it. Returns false outside active sudden-death overtime.
+   */
+  private refreshSuddenDeathDecision(): boolean {
+    const p = this.projection
+    const active = hockeyActivePeriod(p)
+    if (!active || active.kind !== 'overtime' || !hockeyOvertimeSuddenDeath(this.setup.rulesSnapshot)) return false
+    p.decidedInPeriodId = p.score.tracked === p.score.opponent ? null : active.id
+    return true
+  }
+
+  private periodTotals(periodId: string) {
+    const existing = this.projection.periodTotals[periodId]
+    if (existing) return existing
+    const created = { goals: { tracked: 0, opponent: 0 }, shotsOnGoal: { tracked: 0, opponent: 0 } }
+    this.projection.periodTotals[periodId] = created
+    return created
+  }
+
+  private warnGoalieMismatch(eventId: string, recorded: string | null, resolved: string | null): void {
+    const name = (id: string | null) => {
+      if (id === null) return 'an empty net'
+      const participant = this.setup.participants.find(entry => entry.id === id)
+      if (participant) return participant.displayName
+      const opponent = this.projection.opponentGoalies.find(entry => entry.id === id)
+      return opponent?.label ?? (opponent?.number ? `#${opponent.number}` : 'the opponent goalie')
+    }
+    this.projection.warnings.push({
+      code: 'actor_mismatch',
+      eventId,
+      role: 'goalie',
+      recordedParticipantId: recorded,
+      resolvedParticipantId: resolved,
+      message: `This shot was recorded against ${name(recorded)}, but the goalie changes now put ${name(resolved)} in net.`,
+    })
   }
 
   // -- derived -------------------------------------------------------------

@@ -9,7 +9,7 @@ import {
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream, stableJson } from '../gameEvents/stream'
-import type { GameEvent, GameEventPeriod } from '../gameEvents/types'
+import type { GameEvent, GameEventActor, GameEventLocation, GameEventPeriod } from '../gameEvents/types'
 import { createHockeyEvent, isHockeyReason } from './events'
 import { hockeyPeriod } from './periods'
 import { hockeyActivePeriod, hockeyClockMomentAt, lastHockeyPeriod, replayHockeyEvents } from './projector'
@@ -20,6 +20,7 @@ import type {
   HockeyMatchProjection,
   HockeyMatchSetup,
   HockeyPayloadByType,
+  HockeySide,
   HockeySportGameState,
 } from './types'
 
@@ -45,14 +46,19 @@ export interface HockeyCommandContext {
   eventIds?: string[]
 }
 
-type PendingEvent = {
+export type HockeyPendingEvent = {
   [K in HockeyEventType]: {
     eventType: K
     payload: HockeyPayloadByType[K]
     period: GameEventPeriod
     elapsedMs: number | null
+    teamSide?: HockeySide
+    location?: GameEventLocation | null
+    actors?: GameEventActor[]
   }
 }[HockeyEventType]
+
+type PendingEvent = HockeyPendingEvent
 
 // ---------------------------------------------------------------------------
 // Game creation
@@ -100,7 +106,7 @@ function invalidSetupMessage(setup: HockeyMatchSetup): string {
 
 /** Records the opening lineup and opens period 1 atomically; an anchored clock starts paused at zero. */
 export function startHockeyGame(state: GameState, context: HockeyCommandContext): HockeyCommandResult {
-  return command(state, context, (sport, projection) => {
+  return runHockeyCommand(state, context, (sport, projection) => {
     if (projection.status !== 'pregame' || projection.lineupRecorded) return 'The game has already started.'
     const lineup = sport.setup.openingLineup
     const firstPeriod = hockeyPeriod('regulation', 1)
@@ -128,7 +134,7 @@ export function startHockeyGame(state: GameState, context: HockeyCommandContext)
 }
 
 export function startNextHockeyPeriod(state: GameState, context: HockeyCommandContext): HockeyCommandResult {
-  return command(state, context, (sport, projection) => {
+  return runHockeyCommand(state, context, (sport, projection) => {
     if (projection.status !== 'in_progress') return 'The match is not in progress.'
     if (projection.activePeriodId) return 'End the current period first.'
     const next = projection.nextPeriod
@@ -151,7 +157,7 @@ export function endHockeyPeriod(
   input: { reason?: string | null },
   context: HockeyCommandContext
 ): HockeyCommandResult {
-  return command(state, context, (_sport, projection) => {
+  return runHockeyCommand(state, context, (_sport, projection) => {
     const active = hockeyActivePeriod(projection)
     if (projection.status !== 'in_progress' || !active) return 'No period is in progress.'
     const period = { id: active.id, order: active.order }
@@ -182,7 +188,7 @@ export function endHockeyMatch(
   input: { reason?: string | null },
   context: HockeyCommandContext
 ): HockeyCommandResult {
-  return command(state, context, (_sport, projection) => {
+  return runHockeyCommand(state, context, (_sport, projection) => {
     if (projection.status !== 'in_progress') return 'The match is not in progress.'
     if (projection.activePeriodId) return 'End the current period first.'
     const reason = cleanReason(input.reason)
@@ -204,7 +210,7 @@ export function interruptHockeyMatch(
   input: { kind: 'suspended' | 'abandoned'; reason: string },
   context: HockeyCommandContext
 ): HockeyCommandResult {
-  return command(state, context, (_sport, projection) => {
+  return runHockeyCommand(state, context, (_sport, projection) => {
     if (projection.status !== 'in_progress') return 'The match is not in progress.'
     const reason = cleanReason(input.reason)
     if (!reason) return { code: 'reason_required', message: 'A reason is required.' }
@@ -228,7 +234,7 @@ export function reopenHockeyMatch(
   input: { reason: string },
   context: HockeyCommandContext
 ): HockeyCommandResult {
-  return command(state, context, (_sport, projection) => {
+  return runHockeyCommand(state, context, (_sport, projection) => {
     if (projection.status !== 'ended' && projection.status !== 'suspended' && projection.status !== 'abandoned') {
       return 'Only an ended, suspended or abandoned match can be reopened.'
     }
@@ -240,6 +246,40 @@ export function reopenHockeyMatch(
       period: currentPeriod(projection),
       elapsedMs: null,
     }]
+  })
+}
+
+/**
+ * One tap after a sudden-death goal: pauses a running clock, ends the decided period
+ * and ends the match, atomically. No reason is needed; the goal decided it.
+ */
+export function finishDecidedHockeyGame(state: GameState, context: HockeyCommandContext): HockeyCommandResult {
+  return runHockeyCommand(state, context, (_sport, projection) => {
+    if (projection.status !== 'in_progress' || !projection.decidedInPeriodId) {
+      return 'No lead has decided the sudden-death overtime.'
+    }
+    const events: PendingEvent[] = []
+    const active = hockeyActivePeriod(projection)
+    let period = currentPeriod(projection)
+    if (active) {
+      period = { id: active.id, order: active.order }
+      const pause = pauseIfRunning(projection, period, context.occurredAt)
+      if (typeof pause === 'string') return pause
+      if (pause) events.push(pause.event)
+      events.push({
+        eventType: 'hockey.period_ended',
+        payload: { captureCommandId: null, reason: null },
+        period,
+        elapsedMs: eventElapsed(projection, pause?.elapsedMs),
+      })
+    }
+    events.push({
+      eventType: 'hockey.match_ended',
+      payload: { captureCommandId: null, reason: null },
+      period,
+      elapsedMs: null,
+    })
+    return events
   })
 }
 
@@ -370,9 +410,14 @@ export function hockeySportState(state: GameState): HockeySportGameState | null 
 // ---------------------------------------------------------------------------
 // Internals
 
-type Built = PendingEvent[] | string | { code: HockeyCommandErrorCode; message: string }
+export type HockeyCommandBuild = PendingEvent[] | string | { code: HockeyCommandErrorCode; message: string }
+type Built = HockeyCommandBuild
 
-function command(
+/**
+ * Shared command path: a fresh replay decides, the registry and a candidate replay check
+ * the new events, and they append atomically. Capture commands (HKY-2B) use it too.
+ */
+export function runHockeyCommand(
   state: GameState,
   context: HockeyCommandContext,
   build: (sport: HockeySportGameState, projection: HockeyMatchProjection) => Built
@@ -397,6 +442,9 @@ function command(
     payload: pending.payload,
     period: pending.period,
     elapsedMs: pending.elapsedMs,
+    teamSide: pending.teamSide,
+    location: pending.location,
+    actors: pending.actors,
     recorderUserId: context.recorderUserId,
     sequence: sequence++,
     occurredAt: context.occurredAt,
@@ -431,7 +479,7 @@ function clockCommand(
     period: GameEventPeriod
   ) => Built
 ): HockeyCommandResult {
-  return command(state, context, (_sport, projection) => {
+  return runHockeyCommand(state, context, (_sport, projection) => {
     const clock = projection.clock
     if (!clock) return { code: 'clock_unavailable', message: 'This game does not use a clock.' }
     const active = hockeyActivePeriod(projection)

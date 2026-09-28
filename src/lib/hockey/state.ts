@@ -43,6 +43,13 @@ export function createHockeyMatchProjection(setup: HockeyMatchSetup): HockeyMatc
       : null,
     score: { tracked: 0, opponent: 0 },
     trackedAttackingDirection: null,
+    periodTotals: {},
+    shotsOnGoal: { tracked: 0, opponent: 0 },
+    goalieInNet: { tracked: null, opponent: null },
+    goalieIntervals: [],
+    opponentGoalies: [structuredClone(setup.opponentGoalie)],
+    decidedInPeriodId: null,
+    warnings: [],
   }
 }
 
@@ -55,9 +62,12 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
   if (value.sportId !== 'hockey' || value.version !== HOCKEY_GAME_STATE_VERSION) return null
   const setup = normalizeHockeyMatchSetup(value.setup)
   if (!setup) return null
+  // A cache from before HKY-2B lacks the capture fields; the projector rebuilds it either way.
   const cachedProjection = isPlainObject(value.projection) &&
     typeof value.projection.status === 'string' &&
-    Array.isArray(value.projection.periods)
+    Array.isArray(value.projection.periods) &&
+    isPlainObject(value.projection.goalieInNet) &&
+    Array.isArray(value.projection.warnings)
   return {
     sportId: 'hockey',
     version: HOCKEY_GAME_STATE_VERSION,
