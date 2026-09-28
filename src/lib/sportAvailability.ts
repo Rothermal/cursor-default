@@ -38,6 +38,14 @@ export function isHockeyEventPreviewAvailable(development: boolean = DEVELOPMENT
   return development
 }
 
+/**
+ * BSB-2: the Baseball event setup and holding page are a development preview. Production
+ * builds keep the legacy Baseball stat grid; BSB-7 owns the release decision.
+ */
+export function isBaseballEventPreviewAvailable(development: boolean = DEVELOPMENT_BUILD): boolean {
+  return development
+}
+
 export function getSportAvailabilityPolicy(
   sportId: string,
   enabledInSettings: boolean,
