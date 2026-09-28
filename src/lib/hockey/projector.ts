@@ -6,12 +6,20 @@ import type {
   SportGameEventProjectionResult,
   SportGameEventProjector,
 } from '../gameEvents/types'
-import { checkHockeyGoalieChange, checkHockeyOnIce, checkHockeyShotActors, otherHockeySide } from './captureProjection'
+import {
+  checkHockeyGoalieChange,
+  checkHockeyOnIce,
+  checkHockeyPlayActors,
+  checkHockeyShotActors,
+  otherHockeySide,
+} from './captureProjection'
 import { hockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './periods'
+import { HOCKEY_FACEOFF_DOTS, hockeyZone, type HockeyFaceoffDotId } from './rinkGeometry'
 import { hockeyOvertimeSuddenDeath } from './rules'
 import { hockeyTrackedAttackingDirection } from './setup'
 import { createHockeyMatchProjection } from './state'
 import {
+  accumulateHockeyPlayStats,
   accumulateHockeyShotStats,
   emptyHockeyParticipantStats,
   hockeyPlayerStatsById,
@@ -186,6 +194,12 @@ class HockeyReplay {
         return this.goalieChange(event)
       case 'hockey.score_adjustment':
         return this.scoreAdjustment(event)
+      case 'hockey.faceoff':
+        return this.faceoff(event)
+      case 'hockey.hit':
+      case 'hockey.takeaway':
+      case 'hockey.giveaway':
+        return this.play(event)
       default:
         fail('Unknown Hockey event type.')
     }
@@ -486,6 +500,40 @@ class HockeyReplay {
     if (!active || active.kind !== 'overtime' || !hockeyOvertimeSuddenDeath(this.setup.rulesSnapshot)) return false
     p.decidedInPeriodId = p.score.tracked === p.score.opponent ? null : active.id
     return true
+  }
+
+  // -- capture (HKY-2C) -----------------------------------------------------
+
+  private faceoff(event: HockeyEvent<'hockey.faceoff'>): void {
+    const p = this.projection
+    const active = hockeyActivePeriod(p)
+    if (p.status !== 'in_progress' || !active) fail('Faceoffs are recorded during a period.')
+    const direction = active.trackedAttackingDirection
+    if (!direction || event.location?.attackingDirection !== direction) {
+      fail('A faceoff is located in the tracked side\'s direction for the period.')
+    }
+    const actorMessage = checkHockeyPlayActors(this.setup, p, event)
+    if (actorMessage) fail(actorMessage)
+    const dot = HOCKEY_FACEOFF_DOTS[event.payload.dotId as HockeyFaceoffDotId]
+    const zone = hockeyZone(dot, 'tracked', direction)
+    const result = event.payload.winner === 'tracked' ? 'won' : 'lost'
+    p.faceoffs[result] += 1
+    p.faceoffs.byZone[zone][result] += 1
+    const taker = event.actors.find(actor => actor.role === 'taker')?.participantId
+    if (taker) p.lastTrackedFaceoffTakerId = taker
+    accumulateHockeyPlayStats(this.stats, event)
+  }
+
+  private play(event: HockeyEvent<'hockey.hit' | 'hockey.takeaway' | 'hockey.giveaway'>): void {
+    const p = this.projection
+    if (p.status !== 'in_progress' || !hockeyActivePeriod(p)) fail('Plays are recorded during a period.')
+    const actorMessage = checkHockeyPlayActors(this.setup, p, event)
+    if (actorMessage) fail(actorMessage)
+    const totals = event.eventType === 'hockey.hit'
+      ? p.hits
+      : event.eventType === 'hockey.takeaway' ? p.takeaways : p.giveaways
+    totals[event.teamSide] += 1
+    accumulateHockeyPlayStats(this.stats, event)
   }
 
   private periodTotals(periodId: string) {

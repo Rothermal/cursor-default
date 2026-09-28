@@ -16,6 +16,7 @@ import {
   HOCKEY_TRAPEZOID_GOAL_LINE_WIDTH_FT,
   hockeyRinkLocation,
   oppositeHockeyDirection,
+  type HockeyFaceoffDotId,
 } from '../../lib/hockey/rinkGeometry'
 import type { HockeyAttackingDirection } from '../../lib/hockey'
 
@@ -38,6 +39,8 @@ interface HockeyRinkProps {
   disabled?: boolean
   trapezoid: boolean
   markers?: HockeyRinkMarker[]
+  /** Rings the faceoff dot a tap snapped to (HKY-2C). */
+  highlightDotId?: HockeyFaceoffDotId | null
   onFlip: () => void
   onLocation: (location: GameEventLocation) => void
   onMarker?: (markerId: string) => void
@@ -67,6 +70,7 @@ export default function HockeyRink({
   disabled = false,
   trapezoid,
   markers = [],
+  highlightDotId = null,
   onFlip,
   onLocation,
   onMarker,
@@ -174,6 +178,18 @@ export default function HockeyRink({
               />
             )
           })}
+
+          {highlightDotId && (
+            <circle
+              data-highlight-dot={highlightDotId}
+              cx={HOCKEY_FACEOFF_DOTS[highlightDotId].x * L}
+              cy={HOCKEY_FACEOFF_DOTS[highlightDotId].y * W}
+              r="4"
+              fill="none"
+              stroke="rgb(var(--rink-tracked))"
+              strokeWidth="1.2"
+            />
+          )}
 
           {markers.map(marker => (
             <HockeyMarker

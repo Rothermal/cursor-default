@@ -5,6 +5,7 @@ import { otherHockeySide } from './captureProjection'
 import { runHockeyCommand, type HockeyCommandContext, type HockeyCommandResult } from './live'
 import { sortHockeyActors } from './positions'
 import { hockeyActivePeriod, hockeyClockMomentAt } from './projector'
+import { HOCKEY_FACEOFF_DOTS, oppositeHockeyDirection, type HockeyFaceoffDotId } from './rinkGeometry'
 import type {
   HockeyGoalieChangeReason,
   HockeyMatchParticipant,
@@ -86,16 +87,7 @@ export function recordHockeyShot(
     if (problem) return problem
     if (!emptyNet && netGoalie !== null) actors.push(goalieActor(sport.setup, projection, defending, netGoalie))
 
-    const direction = projection.trackedAttackingDirection
-    const location: GameEventLocation | null = input.location && direction
-      ? {
-          x: clamp(input.location.x),
-          y: clamp(input.location.y),
-          attackingDirection: side === 'tracked'
-            ? direction
-            : direction === 'left_to_right' ? 'right_to_left' : 'left_to_right',
-        }
-      : null
+    const location = sideLocation(projection, side, input.location)
 
     return [{
       eventType: 'hockey.shot',
@@ -189,6 +181,112 @@ export function adjustHockeyScore(
   })
 }
 
+export interface RecordHockeyFaceoffInput {
+  dotId: HockeyFaceoffDotId
+  winner: HockeySide
+  /** A dressed tracked skater, or null when unknown. */
+  takerParticipantId?: string | null
+  opponentTakerLabel?: string | null
+}
+
+/**
+ * Records a faceoff at a dot (HKY-2C). The location is the dot's exact point in the
+ * tracked side's direction for the period, so zone stats never depend on where the tap landed.
+ */
+export function recordHockeyFaceoff(
+  state: GameState,
+  input: RecordHockeyFaceoffInput,
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (sport, projection) => {
+    const active = hockeyActivePeriod(projection)
+    if (projection.status !== 'in_progress' || !active) return 'Faceoffs are recorded during a period.'
+    const direction = active.trackedAttackingDirection
+    if (!direction) return 'The tracked side\'s direction is not known for this period.'
+    const elapsedMs = captureElapsed(projection, context.occurredAt)
+    if (typeof elapsedMs === 'string') return elapsedMs
+    const dot = HOCKEY_FACEOFF_DOTS[input.dotId]
+    if (!dot) return 'Unknown faceoff dot.'
+    const actors: GameEventActor[] = []
+    if (input.takerParticipantId) {
+      const actor = choiceActor(sport.setup, 'taker', 'tracked', { participantId: input.takerParticipantId })
+      if (typeof actor === 'string') return actor
+      actors.push(actor)
+    }
+    if (input.opponentTakerLabel && cleanLabel(input.opponentTakerLabel)) {
+      const actor = choiceActor(sport.setup, 'opponent_taker', 'opponent', { label: input.opponentTakerLabel })
+      if (typeof actor === 'string') return actor
+      actors.push(actor)
+    }
+    return [{
+      eventType: 'hockey.faceoff',
+      location: { x: dot.x, y: dot.y, attackingDirection: direction },
+      actors,
+      payload: { captureCommandId: null, dotId: input.dotId, winner: input.winner },
+      period: { id: active.id, order: active.order },
+      elapsedMs,
+    }]
+  })
+}
+
+export type HockeyPlayKind = 'hit' | 'takeaway' | 'giveaway'
+
+export interface RecordHockeyPlayInput {
+  kind: HockeyPlayKind
+  /** The side that made the hit, took the puck, or gave it away. */
+  side: HockeySide
+  player?: HockeyActorChoice | null
+  /** Hits only: the player hit, on the other side. */
+  hitPlayer?: HockeyActorChoice | null
+  location?: { x: number; y: number } | null
+}
+
+/** Records a hit, takeaway or giveaway; every actor and the location are optional. */
+export function recordHockeyPlay(
+  state: GameState,
+  input: RecordHockeyPlayInput,
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (sport, projection) => {
+    const active = hockeyActivePeriod(projection)
+    if (projection.status !== 'in_progress' || !active) return 'Plays are recorded during a period.'
+    const elapsedMs = captureElapsed(projection, context.occurredAt)
+    if (typeof elapsedMs === 'string') return elapsedMs
+    if (input.hitPlayer && input.kind !== 'hit') return 'Only a hit names the player hit.'
+    const actors: GameEventActor[] = []
+    const push = (role: string, owner: HockeySide, choice: HockeyActorChoice | null | undefined) => {
+      if (!choice) return null
+      const actor = choiceActor(sport.setup, role, owner, choice)
+      if (typeof actor === 'string') return actor
+      actors.push(actor)
+      return null
+    }
+    const problem =
+      push(input.kind === 'hit' ? 'hitter' : 'player', input.side, input.player) ??
+      push('hit_player', otherHockeySide(input.side), input.hitPlayer)
+    if (problem) return problem
+    return [{
+      eventType: `hockey.${input.kind}`,
+      teamSide: input.side,
+      location: sideLocation(projection, input.side, input.location),
+      actors,
+      payload: { captureCommandId: null },
+      period: { id: active.id, order: active.order },
+      elapsedMs,
+    }]
+  })
+}
+
+/**
+ * The default tracked faceoff taker (HKY-0 Q7): the last tracked taker, else the first
+ * dressed centre, else nobody.
+ */
+export function hockeyFaceoffTakerDefault(setup: HockeyMatchSetup, projection: HockeyMatchProjection): string | null {
+  const last = projection.lastTrackedFaceoffTakerId
+  if (last && setup.participants.some(entry => entry.id === last && entry.dressedAs === 'skater')) return last
+  return hockeySkaterChoices(setup).find(entry => entry.position === 'C')?.id ?? null
+}
+
 // ---------------------------------------------------------------------------
 // Actor eligibility without shift tracking (HKY-0 §9)
 
@@ -215,17 +313,27 @@ export function recentHockeyOpponentLabels(events: readonly GameEvent[], limit =
   const labels: string[] = []
   const ordered = [...events].sort((left, right) => right.sequence - left.sequence)
   for (const event of ordered) {
-    if (event.eventType !== 'hockey.shot' || event.deletedAt) continue
-    const shooting = event.teamSide
+    if (event.deletedAt) continue
     for (const actor of event.actors) {
-      const side = actor.role === 'goalie' || actor.role === 'blocker' ? otherHockeySide(shooting as HockeySide) : shooting
-      if (side !== 'opponent' || actor.role === 'goalie' || !actor.label) continue
+      if (hockeyActorSide(event, actor) !== 'opponent' || actor.role === 'goalie' || !actor.label) continue
       const label = actor.label.trim()
       if (!labels.some(existing => existing.toLowerCase() === label.toLowerCase())) labels.push(label)
       if (labels.length >= limit) return labels
     }
   }
   return labels
+}
+
+/** The side an actor plays for, from the event type, its side and the actor's role. */
+export function hockeyActorSide(event: GameEvent, actor: GameEventActor): HockeySide | null {
+  if (event.eventType === 'hockey.faceoff') return actor.role === 'taker' ? 'tracked' : 'opponent'
+  if (event.teamSide !== 'tracked' && event.teamSide !== 'opponent') return null
+  const against = actor.role === 'goalie' || actor.role === 'blocker' || actor.role === 'hit_player'
+  return against ? otherHockeySide(event.teamSide) : event.teamSide
+}
+
+export function hockeyParticipantLabel(participant: HockeyMatchParticipant): string {
+  return participant.number ? `#${participant.number} ${participant.displayName}` : participant.displayName
 }
 
 export function hockeyOpponentGoalieLabel(goalie: HockeyOpponentGoalie): string {
@@ -286,6 +394,31 @@ export function hockeyShotMarkers(setup: HockeyMatchSetup, events: readonly Game
         label: `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} ${HOCKEY_OUTCOME_LABELS[outcome].toLowerCase()} by ${who}`,
       }
     })
+}
+
+/** Located hits, takeaways and giveaways for the rink (HKY-2C), on the acting side's colour. */
+export function hockeyPlayMarkers(setup: HockeyMatchSetup, events: readonly GameEvent[]): HockeyRinkPlayMarker[] {
+  const names: Record<string, string> = { 'hockey.hit': 'hit', 'hockey.takeaway': 'takeaway', 'hockey.giveaway': 'giveaway' }
+  return events
+    .filter(event => names[event.eventType] && !event.deletedAt && event.location)
+    .map(event => {
+      const actor = event.actors.find(entry => entry.role === 'hitter' || entry.role === 'player')
+      const who = actor
+        ? setup.participants.find(entry => entry.id === actor.participantId)?.displayName ?? actor.label ?? 'Unknown'
+        : 'Team'
+      return {
+        id: event.id,
+        x: event.location!.x,
+        y: event.location!.y,
+        teamSide: event.teamSide as HockeySide,
+        kind: 'event' as const,
+        label: `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} ${names[event.eventType]} by ${who}`,
+      }
+    })
+}
+
+export interface HockeyRinkPlayMarker extends Omit<HockeyShotMarker, 'kind'> {
+  kind: 'event'
 }
 
 export const HOCKEY_OUTCOME_LABELS: Record<HockeyShotOutcome, string> = {
@@ -352,6 +485,21 @@ function captureElapsed(projection: HockeyMatchProjection, occurredAt: string): 
     return 'The period clock has expired; pause it first.'
   }
   return moment.elapsedMs
+}
+
+/** A canonical point stamped with `side`'s attacking direction, or null without one. */
+function sideLocation(
+  projection: HockeyMatchProjection,
+  side: HockeySide,
+  point: { x: number; y: number } | null | undefined
+): GameEventLocation | null {
+  const direction = projection.trackedAttackingDirection
+  if (!point || !direction) return null
+  return {
+    x: clamp(point.x),
+    y: clamp(point.y),
+    attackingDirection: side === 'tracked' ? direction : oppositeHockeyDirection(direction),
+  }
 }
 
 function cleanLabel(value: string | null | undefined): string | null {

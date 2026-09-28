@@ -473,3 +473,38 @@ Deviations from the plan above:
 - Score adjustments change the score but not `periodTotals`.
 - Profile versions were not bumped; the explicit `suddenDeath` key carries the change.
 - `playerStatsById` holds only non-zero values, so HKY-1 fingerprints are unchanged.
+
+### HKY-2C (implemented)
+
+- Events: `hockey.faceoff` (neutral; `dotId` and `winner`; the location must equal the
+  dot's exact point, and replay requires the tracked side's direction for the period),
+  plus `hockey.hit`, `hockey.takeaway` and `hockey.giveaway` on the acting side with an
+  optional location. The commands `recordHockeyFaceoff` and `recordHockeyPlay` live in
+  `captureCommands.ts`, and the actor checks are in `captureProjection.ts`.
+- Stats: `hky_fow`, `hky_fol`, `hky_hit`, `hky_tk` and `hky_gv`. The projection adds
+  `faceoffs` (won and lost, in total and by zone from the dot and the period direction),
+  `lastTrackedFaceoffTakerId`, and per-side `hits`, `takeaways` and `giveaways`.
+- Taker default (`hockeyFaceoffTakerDefault`): the last tracked taker, else the first
+  dressed C, else nobody.
+- `recentEvents.ts`:
+  - `hockeyRecentEvents` lists the ten newest rows. A capture unit is the events that share a
+    `captureCommandId`, or a single event. Lifecycle and clock rows are shown for context.
+  - `undoHockeyCapture` soft-deletes only the newest unit, and only when it is a capture.
+    It must pass a candidate replay and a complete inspection.
+  - `restoreHockeyCapture` uses one receipt, `capturePreferences.lastUndo`, which stays out of
+    fingerprints, survives reload and park, and is dropped if malformed. Any new event
+    clears it.
+- The preview adds:
+  - A tap chooser (Shot, Faceoff, Hit, Takeaway, Giveaway).
+  - A two-tap faceoff control that rings the snapped dot and offers taker chips.
+  - A play dialog, a quick Play button with no location, rink markers for located plays,
+    and Recent Events with Undo and Restore.
+  - A C position for its first preview skater, so the taker default has a centre to pick.
+- `HockeyShotDialog`'s form pieces moved to `hockeyFields.tsx`, and
+  `hockeyParticipantLabel` moved to `captureCommands.ts`, so the play dialog shares them.
+
+Deviations from the plan above:
+
+- Both players on a hit are optional, so a hit can be credited to the team only.
+- Faceoffs are not drawn as rink markers; their zone totals are in the projection.
+- Recent Events labels use the team names rather than "tracked" and "opponent".
