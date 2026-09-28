@@ -1,7 +1,8 @@
 # Soccer Live Capture Plan: S7, S1, S4
 
-Status: approved 2026-09-28; the owner accepted every recommendation in
-[Section 6](#6-owner-questions). Implementation proceeds slice by slice. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
+Status: plan under review. The owner accepted every recommended answer in
+[Section 6](#6-owner-questions) on 2026-09-28. Implementation waits for the
+plan PR to be approved and merged. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
 this file is the execution plan for `S7`, `S1`, and `S4`.
 
 **Goal:** Make the three most common sideline gestures short: a shot after a
