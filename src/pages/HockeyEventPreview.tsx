@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import HockeyRink from '../components/hockey/HockeyRink'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -12,6 +13,8 @@ import {
   hockeyClockDisplay,
   hockeyRulesProfiles,
   hockeySportState,
+  hockeyZone,
+  nearestHockeyFaceoffDot,
   HOCKEY_RULES_FIELDS,
   initializeHockeyEventGame,
   interruptHockeyMatch,
@@ -37,11 +40,13 @@ import {
   type HockeySportGameState,
 } from '../lib/hockey'
 import { isHockeyEventPreviewAvailable } from '../lib/sportAvailability'
+import type { GameEventLocation } from '../lib/gameEvents/types'
 import type { GameState } from '../types'
 
 /**
- * HKY-1 development preview: a plain setup form and a period/clock panel for
- * exercising the Hockey event engine. No rink; production builds never render it.
+ * Hockey development preview: a plain setup form and a period/clock panel for
+ * exercising the Hockey event engine, plus the HKY-2A rink. Taps are shown,
+ * not recorded. Production builds never render it.
  */
 export default function HockeyEventPreview() {
   const { state } = useGame()
@@ -166,6 +171,7 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
   const { user } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date().toISOString())
+  const [lastTap, setLastTap] = useState<GameEventLocation | null>(null)
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -217,9 +223,8 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
 
   const reading = hockeyClockDisplay(sport, now)
   const period = hockeyActivePeriod(projection) ?? lastHockeyPeriod(projection)
-  const direction = projection.trackedAttackingDirection
+  const direction = projection.trackedAttackingDirection ?? sport.setup.firstPeriodAttackingDirection
   const flipped = sport.capturePreferences.rinkFlipped
-  const shownDirection = direction && (flipped ? (direction === 'left_to_right' ? 'right_to_left' : 'left_to_right') : direction)
   const inProgress = projection.status === 'in_progress'
   const active = Boolean(projection.activePeriodId)
 
@@ -240,11 +245,6 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
           </p>
         )}
         {!projection.clock && <p className="text-sm text-content-muted">No clock for this game.</p>}
-        {shownDirection && (
-          <p className="text-sm">
-            Tracked team attacks {shownDirection === 'left_to_right' ? 'left to right →' : '← right to left'}
-          </p>
-        )}
         {projection.statusReason && <p className="text-sm text-content-muted">Reason: {projection.statusReason}</p>}
       </section>
 
@@ -327,15 +327,24 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
             Reopen
           </button>
         )}
-        <button
-          type="button"
-          className="btn-secondary"
-          aria-pressed={flipped}
-          onClick={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
-        >
-          Flip rink view
-        </button>
       </div>
+
+      <section className="space-y-2">
+        <HockeyRink
+          trackedDirection={direction}
+          flipped={flipped}
+          trapezoid={sport.setup.rulesSnapshot.trapezoid}
+          trackedLabel={state.gameInfo?.teamName ?? 'Tracked'}
+          onFlip={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
+          onLocation={setLastTap}
+        />
+        {lastTap && (
+          <p className="text-sm text-content-muted" aria-live="polite">
+            Last tap: {hockeyZone(lastTap, 'tracked', direction)} zone for the tracked team,
+            nearest dot {nearestHockeyFaceoffDot(lastTap).id.replace(/_/g, ' ')}
+          </p>
+        )}
+      </section>
 
       <section>
         <h2 className="text-sm font-bold uppercase text-content-muted">Events</h2>

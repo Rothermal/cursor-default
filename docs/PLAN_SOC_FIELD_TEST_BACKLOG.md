@@ -76,7 +76,7 @@ in [Section 6](#6-recommended-planning-order).
 
 ### S1 - Faster shot and goal capture
 
-**Status:** proposed  
+**Status:** planned; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md)  
 **Theme:** sideline speed  
 **Where:** `SoccerShotCaptureDialog`, Field tap, Quick Goal
 
@@ -153,7 +153,7 @@ bar because each event sheet already owns actor selection.
 
 ### S4 - Recent-events undo on Field
 
-**Status:** proposed  
+**Status:** planned; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md)  
 **Theme:** last-action correction  
 **Where:** Field tab; `SoccerTimeline` already owns revisioned correction
 
@@ -224,7 +224,7 @@ sync.
 
 ### S7 - Offer the last restart as the next shot source
 
-**Status:** confirmed product request; focused plan required
+**Status:** planned; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md). `sourceEventId` is sufficient; no chain schema
 **Theme:** set-piece linking  
 **Where:** `sourceEventId` on attacking events; live Goal/Shot sheets
 

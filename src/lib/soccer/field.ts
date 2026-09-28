@@ -1,4 +1,5 @@
 import type { GameEvent, GameEventLocation } from '../gameEvents/types'
+import { surfaceLocation } from '../surface/location'
 import type {
   SoccerAttackingDirection,
   SoccerTeamEventKind,
@@ -18,13 +19,7 @@ export function soccerFieldLocation(
   flipped: boolean,
   attackingDirection: SoccerAttackingDirection
 ): GameEventLocation {
-  const x = clamp(displayX)
-  const y = clamp(displayY)
-  return {
-    x: flipped ? 1 - x : x,
-    y: flipped ? 1 - y : y,
-    attackingDirection,
-  }
+  return surfaceLocation(displayX, displayY, flipped, attackingDirection)
 }
 
 export function suggestSoccerRestartKind(
@@ -135,10 +130,6 @@ export function clusterSoccerMarkerPoints<TPoint extends SoccerMarkerPoint>(
   return clusters.map(cluster =>
     cluster.sort((left, right) => left.id.localeCompare(right.id))
   )
-}
-
-function clamp(value: number): number {
-  return Math.min(1, Math.max(0, value))
 }
 
 function oppositeDirection(direction: SoccerAttackingDirection): SoccerAttackingDirection {

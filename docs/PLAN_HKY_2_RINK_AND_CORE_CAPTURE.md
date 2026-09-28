@@ -6,6 +6,7 @@ Execution plan for the second hockey phase defined in
 the sport state, the lifecycle and clock events, and the development-only preview.
 
 Status: approved for implementation. The owner answered every §7 question on 2026-09-27.
+HKY-2A is implemented; see §8.
 
 ---
 
@@ -411,3 +412,27 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
 | Q5 | Plus/minus before strength exists? | Yes: capture on-ice sets now, show plus/minus from HKY-3B |
 | Q6 | Opponent shooters and goalies? | Yes: jersey or name labels with chips for labels used this game |
 | Q7 | Must shots be placed on the rink? | No: rink taps store a location, and quick Shot and Goal buttons record without one |
+
+---
+
+## 8. Delivery record
+
+### HKY-2A (implemented)
+
+- `src/lib/surface/location.ts` holds `surfaceLocation`; `soccerFieldLocation` is a
+  one-line wrapper, and `src/lib/surface/location.test.ts` compares it with the
+  pre-extraction formula across a grid of taps, both flips and both directions.
+- `src/lib/hockey/rinkGeometry.ts` holds the normalized lines, the nine dots in
+  `HOCKEY_FACEOFF_DOT_IDS` order, `hockeyRinkLocation`, `nearestHockeyFaceoffDot` and
+  `hockeyZone`. Snapping measures distance in feet, so the rink's 200 x 85 shape does
+  not skew it, and exact ties go to the earlier id in that list. A point exactly on a
+  blue line is neutral.
+- `src/components/hockey/HockeyRink.tsx` draws the rink in a `0 0 200 85` foot viewBox:
+  28 ft corners, goal lines clipped to the corners, creases, nets, blue and center
+  lines, five circles, nine dots, and the trapezoid only when the rules enable it. The
+  flip rotates the view 180 degrees and the tap handler undoes it. Markers accept
+  `goal | saved | missed | blocked | event` for HKY-2B and HKY-2C to use.
+- New `rink-*` color tokens exist in both themes, with a contrast test for lines on
+  the ice and markers on their ink backing.
+- The development preview (`/setup?sport=hockey&events=1`) shows the rink, its flip,
+  and the zone and nearest dot of the last tap. Taps are not recorded yet.
