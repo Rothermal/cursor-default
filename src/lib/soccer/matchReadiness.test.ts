@@ -144,11 +144,12 @@ describe('Soccer match-readiness wiring', () => {
 
   it('routes team-event review labels through the shared presentation helper', () => {
     const timeline = source('src/components/soccer/SoccerTimeline.tsx')
+    const labels = source('src/lib/soccer/eventLabels.ts')
     const tracker = source('src/pages/SoccerGameTracker.tsx')
     const fieldReview = source('src/components/soccer-summary/SoccerFieldReview.tsx')
-    const eventTitleFn = timeline.slice(
-      timeline.indexOf('function eventTitle('),
-      timeline.indexOf('function eventDetail(')
+    const eventTitleFn = labels.slice(
+      labels.indexOf('export function soccerEventTitle('),
+      labels.indexOf('export function soccerEventDetail(')
     )
     const markerBuilder = fieldReview.slice(
       fieldReview.indexOf('const markers: SoccerFieldMarker[]'),
@@ -158,7 +159,13 @@ describe('Soccer match-readiness wiring', () => {
     expect(eventTitleFn).toContain(
       'soccerTeamEventReviewPresentation(event).kindLabel'
     )
-    expect(eventTitleFn).not.toMatch(/'soccer\.team_event':/)
+    expect(labels.slice(0, labels.indexOf('export function soccerEventTitle('))).not.toMatch(/'soccer\.team_event':/)
+    expect(timeline).toContain('soccerEventTitle(event)')
+    expect(timeline).not.toContain('function eventTitle(')
+    expect(timeline).not.toContain('Linked restart: ')
+    expect(timeline).toContain('soccerShotSourceLine(event, links.activeEvents, links.timings)')
+    expect(timeline).toContain('nested={row.nestedUnderEventId !== null}')
+    expect(tracker).toContain('soccerShotSourceLine(event, inspection.activeEvents')
     expect(tracker).toContain('soccerTeamEventReviewPresentation(event).label')
     expect(markerBuilder).toContain('item.participantLabel')
   })

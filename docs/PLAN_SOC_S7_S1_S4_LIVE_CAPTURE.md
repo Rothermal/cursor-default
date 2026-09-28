@@ -1,8 +1,8 @@
 # Soccer Live Capture Plan: S7, S1, S4
 
 Status: approved (plan PR #436 merged 2026-09-28; owner accepted every
-recommended answer in [Section 6](#6-owner-questions)). S7A is implemented;
-S7B, S1, and S4 are not started. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
+recommended answer in [Section 6](#6-owner-questions)). S7A and S7B are
+implemented; S1 and S4 are not started. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
 this file is the execution plan for `S7`, `S1`, and `S4`.
 
 **Goal:** Make the three most common sideline gestures short: a shot after a
@@ -265,6 +265,30 @@ both themes. No slice needs a Supabase migration.
 - Browser check at 390px in light and dark: corner -> Field shot opened with
   Corner sequence and the corner selected; opponent penalty foul -> prompt ->
   shot sheet opened with Penalty, the foul, and the penalty-mark location.
+
+### 5.2 S7B delivery record
+
+- `src/lib/soccer/eventLabels.ts` owns `soccerEventTitle`,
+  `soccerEventDetail`, `soccerShotSourceLine`, and `soccerRestartLedToLine`.
+  Timeline no longer keeps private copies.
+- Source lines read `From corner, taker #7 Ava, 23:10`, `From penalty foul on
+  #9 Mia, 41:02`, or `From free kick foul`; the taker, fouled player, or time
+  is omitted when not recorded. Times are period-local. A source that is not
+  active reads `Linked restart removed` in the danger color.
+- Restart rows list every active linked shot as `Led to: Goal (header) #9 Mia,
+  23:14`, joined with `;`.
+- `soccerSummaryTimelineReview` rows carry `nestedUnderEventId`; a linked shot
+  moves directly under its restart when both are in the same section and
+  filter, with an L-shaped connector. Nested rows hide the visible source line
+  (kept for screen readers) and the restart omits them from `Led to`. Live
+  Timeline keeps newest-first order with both text lines.
+- Summary Field detail appends the source line to the situation; the live
+  Field overlap sheet shows it under the marker label. No pitch connector.
+- Tests: label and nesting cases in `summaryTimeline.test.ts`, linked detail in
+  `summaryField.test.ts`, and wiring checks in `matchReadiness.test.ts`.
+- Browser check at 390px in light and dark: corner then goal showed `From
+  corner, 0:02` and `Led to: Goal Dee, 0:04` in live Timeline, and the shot
+  nested under the corner in Summary Timeline.
 
 ## 6. Owner questions
 

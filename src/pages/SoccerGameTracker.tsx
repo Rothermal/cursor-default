@@ -62,6 +62,7 @@ import {
   soccerFieldReviewEvents,
   soccerLivePenaltyFoul,
   soccerPeriodTimings,
+  soccerShotSourceLine,
   suggestSoccerShotSource,
   soccerTeamEventReviewPresentation,
   suggestSoccerRestartKind,
@@ -940,6 +941,7 @@ export default function SoccerGameTracker() {
       {clusterEventIds && (
         <ClusterSheet
           events={inspection.activeEvents.filter(event => clusterEventIds.includes(event.id))}
+          sourceLine={event => soccerShotSourceLine(event, inspection.activeEvents, soccerPeriodTimings(state))}
           onSelect={event => {
             setClusterEventIds(null)
             editFieldEvent(event)
@@ -1198,13 +1200,13 @@ function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
   return event.eventType === 'soccer.foul' ? 'foul' : 'card'
 }
 
-function ClusterSheet({ events, onSelect, onClose }: { events: GameEvent[]; onSelect: (event: GameEvent) => void; onClose: () => void }) {
+function ClusterSheet({ events, sourceLine, onSelect, onClose }: { events: GameEvent[]; sourceLine: (event: GameEvent) => string | null; onSelect: (event: GameEvent) => void; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}>
       <div className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-content">Events at this location</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
         <div className="divide-y divide-line border-y border-line">
-          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="truncate text-sm font-semibold text-content">{markerLabel(event)}</span><span className="text-xs font-bold text-success-content">Edit</span></button>)}
+          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-content">{markerLabel(event)}</span>{sourceLine(event) && <span className="block truncate text-xs text-content-muted">{sourceLine(event)}</span>}</span><span className="text-xs font-bold text-success-content">Edit</span></button>)}
         </div>
       </div>
     </div>

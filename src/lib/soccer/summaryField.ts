@@ -19,7 +19,8 @@ import {
   soccerEventTimeLabel,
   soccerTeamEventReviewPresentation,
 } from './timeline'
-import { soccerPeriodTimings } from './live'
+import { soccerPeriodTimings, type SoccerPeriodTiming } from './live'
+import { soccerShotSourceLine } from './eventLabels'
 
 export type SoccerFieldReviewOrientation = 'normalized' | 'original'
 export type SoccerFieldReviewSide = 'all' | SoccerTeamSide
@@ -148,7 +149,7 @@ export function soccerSummaryFieldReview(
         periodLabel: periodLabels.get(soccerEvent.period.id) ?? soccerEvent.period.id,
         timeLabel: soccerEventTimeLabel(soccerEvent, timings),
         title: soccerFieldReviewTitle(soccerEvent),
-        detail: soccerFieldReviewDetail(soccerEvent),
+        detail: soccerFieldReviewDetail(soccerEvent, inspection.activeEvents, timings),
         displayLocation: transformFieldLocation(soccerEvent.location, filters.orientation),
         markerKind: soccerFieldReviewMarkerKind(soccerEvent),
       } satisfies SoccerFieldReviewEvent]
@@ -337,9 +338,16 @@ function soccerFieldReviewTitle(event: GameEvent): string {
   return `${presentation.sideLabel} ${presentation.kindLabel.toLowerCase()}`
 }
 
-function soccerFieldReviewDetail(event: GameEvent): string | null {
+function soccerFieldReviewDetail(
+  event: GameEvent,
+  activeEvents: readonly GameEvent[],
+  timings: readonly SoccerPeriodTiming[]
+): string | null {
   if (event.eventType === 'soccer.shot') {
-    return humanize((event as SoccerShotEvent).payload.situation)
+    return [
+      humanize((event as SoccerShotEvent).payload.situation),
+      soccerShotSourceLine(event, activeEvents, timings),
+    ].filter(Boolean).join(' - ')
   }
   if (event.eventType === 'soccer.foul') {
     const payload = (event as SoccerFoulEvent).payload
