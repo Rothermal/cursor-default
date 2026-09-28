@@ -301,7 +301,7 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
 
       {projection.decidedInPeriodId && inProgress && (
         <section className="rounded-md border border-success-line bg-success p-3 text-success-content">
-          <p className="text-sm font-semibold">The overtime goal decided the game.</p>
+          <p className="text-sm font-semibold">A team leads in sudden-death overtime, so the game is decided.</p>
           <button type="button" className="btn-primary mt-2 w-full" onClick={() => apply(finishDecidedHockeyGame(state, context()))}>
             End game
           </button>

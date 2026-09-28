@@ -453,10 +453,13 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
 - On-ice: an untouched section stores `not_recorded`. A complete set requires the
   recorder's confirmation plus between the period's minimum and cap of skaters (one
   more with an empty net), and `goalie` is a participant id, `empty_net` or null.
-- Sudden death: an overtime goal sets `decidedInPeriodId` when the rules have it. Only
-  pause, period end, match end, suspend, abandon, reopen and score adjustment may follow;
-  `finishDecidedHockeyGame` pauses, ends the period without a reason and ends the match.
-  An adjustment that re-ties the score clears the decision.
+- Sudden death: in an active overtime whose rules have it, `decidedInPeriodId` follows
+  the score after every goal and score adjustment: a lead decides the period and a tie
+  clears the decision, so a +1 correction for a missed overtime goal decides and a
+  tied game is never marked decided. Only pause, period end, match end, suspend,
+  abandon, reopen and score adjustment may follow a decision; `finishDecidedHockeyGame`
+  pauses, ends the period without a reason and ends the match. A tying adjustment after
+  the decided period has ended also clears the decision.
 - Goalie mismatches between a stamped goalie actor and the goalie in net become
   `actor_mismatch` warnings, not failures.
 - The development preview records shots from a rink tap or the side buttons, goalie

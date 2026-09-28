@@ -256,7 +256,7 @@ export function reopenHockeyMatch(
 export function finishDecidedHockeyGame(state: GameState, context: HockeyCommandContext): HockeyCommandResult {
   return runHockeyCommand(state, context, (_sport, projection) => {
     if (projection.status !== 'in_progress' || !projection.decidedInPeriodId) {
-      return 'No overtime goal has decided the game.'
+      return 'No lead has decided the sudden-death overtime.'
     }
     const events: PendingEvent[] = []
     const active = hockeyActivePeriod(projection)

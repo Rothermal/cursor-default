@@ -67,13 +67,16 @@ function playerStats(state: GameState, playerId: string): Record<string, number>
   return Object.fromEntries(HOCKEY_FILLED_STAT_IDS.map(id => [id, stats[id] ?? 0]))
 }
 
-/** Clockless NHL rules: 3 x 20, 3-on-3 sudden-death overtime, no ties. */
-function inOvertime(overtime: { suddenDeath?: boolean } = {}): GameState {
+/** NHL rules (clockless unless asked): 3 x 20, 3-on-3 sudden-death overtime, no ties. */
+function inOvertime(overtime: { suddenDeath?: boolean; anchored?: boolean } = {}): GameState {
   const base = createHockeyMatchRules('nhl_regular').overtime!
-  const rules: HockeyRuleOverrides = { ...CLOCKLESS, overtime: { ...base, suddenDeath: overtime.suddenDeath ?? true } }
+  const rules: HockeyRuleOverrides = {
+    ...(overtime.anchored ? {} : CLOCKLESS),
+    overtime: { ...base, suddenDeath: overtime.suddenDeath ?? true },
+  }
   let state = started(hockeySetup({ profile: 'nhl_regular', rules }))
   for (let period = 1; period <= 3; period++) {
-    state = expectOk(endHockeyPeriod(state, {}, ctx(period * 10)))
+    state = expectOk(endHockeyPeriod(state, overtime.anchored ? { reason: 'Fixture' } : {}, ctx(period * 10)))
     if (period < 3) state = expectOk(startNextHockeyPeriod(state, ctx(period * 10 + 1)))
   }
   return expectOk(startNextHockeyPeriod(state, ctx(40)))
@@ -321,6 +324,54 @@ describe('hockey sudden-death overtime', () => {
     expect(projection(state).decidedInPeriodId).toBeNull()
     state = shot(state, { side: 'tracked', outcome: 'saved' }, 47)
     expect(projection(state).shotsOnGoal.tracked).toBe(2)
+  })
+
+  describe.each([
+    { clock: 'clockless', anchored: false },
+    { clock: 'anchored', anchored: true },
+  ])('with score adjustments in overtime ($clock)', ({ anchored }) => {
+    it.each(['tracked', 'opponent'] as const)('a +1 %s adjustment decides, and a tying goal can no longer follow', side => {
+      let state = inOvertime({ anchored })
+      state = expectOk(adjustHockeyScore(state, { side, delta: 1, reason: 'Missed goal' }, ctx(45)))
+      expect(projection(state).decidedInPeriodId).toBe('overtime-1')
+      const other = side === 'tracked' ? 'opponent' : 'tracked'
+      expect(rejected(recordHockeyShot(state, { side: other, outcome: 'goal' }, ctx(46)))).toMatch(/decided the game/)
+      state = expectOk(finishDecidedHockeyGame(state, ctx(47)))
+      expect(projection(state)).toMatchObject({ status: 'ended', score: { [side]: 1, [other]: 0 } })
+    })
+
+    it.each(['tracked', 'opponent'] as const)('a %s goal that ties an adjusted score never decides', side => {
+      // Reached through a corrected deciding goal: 1-0 by adjustment, reopened, then a tying goal.
+      let state = inOvertime({ anchored })
+      const other = side === 'tracked' ? 'opponent' : 'tracked'
+      state = shot(state, { side: other, outcome: 'goal' }, 45)
+      state = expectOk(adjustHockeyScore(state, { side: other, delta: 1, reason: 'Two goals' }, ctx(46)))
+      state = expectOk(adjustHockeyScore(state, { side: other, delta: -1, reason: 'Undo' }, ctx(47)))
+      expect(projection(state).decidedInPeriodId).toBe('overtime-1')
+      state = expectOk(adjustHockeyScore(state, { side, delta: 1, reason: 'Missed tying goal' }, ctx(48)))
+      expect(projection(state)).toMatchObject({ decidedInPeriodId: null, score: { tracked: 1, opponent: 1 } })
+      state = shot(state, { side, outcome: 'goal' }, 49)
+      expect(projection(state)).toMatchObject({ decidedInPeriodId: 'overtime-1', score: { [side]: 2, [other]: 1 } })
+    })
+
+    it.each(['tracked', 'opponent'] as const)('a %s adjustment then a tying goal leaves the game open without sudden death', side => {
+      let state = inOvertime({ anchored, suddenDeath: false })
+      const other = side === 'tracked' ? 'opponent' : 'tracked'
+      state = expectOk(adjustHockeyScore(state, { side, delta: 1, reason: 'Missed goal' }, ctx(45)))
+      expect(projection(state).decidedInPeriodId).toBeNull()
+      state = shot(state, { side: other, outcome: 'goal' }, 46)
+      expect(projection(state)).toMatchObject({ decidedInPeriodId: null, score: { tracked: 1, opponent: 1 } })
+      state = shot(state, { side, outcome: 'saved' }, 47)
+      expect(projection(state).shotsOnGoal[side]).toBe(1)
+    })
+  })
+
+  it('never marks a tied game decided (review reproduction)', () => {
+    let state = inOvertime()
+    state = expectOk(adjustHockeyScore(state, { side: 'tracked', delta: 1, reason: 'Missed goal' }, ctx(45)))
+    const tying = recordHockeyShot(state, { side: 'opponent', outcome: 'goal' }, ctx(46))
+    expect(tying.ok).toBe(false)
+    expect(projection(state)).toMatchObject({ decidedInPeriodId: 'overtime-1', score: { tracked: 1, opponent: 0 } })
   })
 
   it('does not decide on a regulation goal', () => {

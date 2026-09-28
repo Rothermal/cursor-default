@@ -160,7 +160,7 @@ class HockeyReplay {
     this.checkPeriodEnvelope(event)
     this.checkElapsed(event)
     if (this.projection.decidedInPeriodId && !AFTER_DECISION.has(event.eventType)) {
-      fail('The overtime goal decided the game. End it, or correct the goal first.')
+      fail('A lead in sudden-death overtime decided the game. End it, or correct the score first.')
     }
     switch (event.eventType) {
       case 'hockey.opening_lineup':
@@ -437,9 +437,7 @@ class HockeyReplay {
     if (payload.outcome === 'goal') {
       p.score[side] += 1
       totals.goals[side] += 1
-      if (active.kind === 'overtime' && hockeyOvertimeSuddenDeath(this.setup.rulesSnapshot)) {
-        p.decidedInPeriodId = active.id
-      }
+      this.refreshSuddenDeathDecision()
     }
     accumulateHockeyShotStats(this.stats, event)
   }
@@ -470,9 +468,24 @@ class HockeyReplay {
     const next = p.score[side] + event.payload.delta
     if (next < 0) fail('A score cannot go below zero.')
     p.score[side] = next
-    // Undoing the deciding goal by adjustment reopens sudden death.
-    if (p.decidedInPeriodId && p.score.tracked === p.score.opponent) p.decidedInPeriodId = null
+    if (!this.refreshSuddenDeathDecision() && p.decidedInPeriodId && p.score.tracked === p.score.opponent) {
+      // A tying adjustment after the decided period has ended still reopens the decision.
+      p.decidedInPeriodId = null
+    }
     if (!p.activePeriodId && p.periods.length > 0) this.refreshBetweenPeriods()
+  }
+
+  /**
+   * In an active sudden-death overtime the decision follows the score: any goal or
+   * adjustment that leaves a leader decides the period, and one that leaves a tie
+   * clears it. Returns false outside active sudden-death overtime.
+   */
+  private refreshSuddenDeathDecision(): boolean {
+    const p = this.projection
+    const active = hockeyActivePeriod(p)
+    if (!active || active.kind !== 'overtime' || !hockeyOvertimeSuddenDeath(this.setup.rulesSnapshot)) return false
+    p.decidedInPeriodId = p.score.tracked === p.score.opponent ? null : active.id
+    return true
   }
 
   private periodTotals(periodId: string) {
