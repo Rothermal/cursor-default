@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import type { GameEventLocation } from '../../lib/gameEvents/types'
 import {
@@ -25,6 +26,8 @@ interface BaseballDiamondProps {
   onFielder?: (position: number) => void
   /** A placed batted ball waiting for a result. */
   pendingLocation?: { x: number; y: number } | null
+  /** Shows a pencil on the batter card (opponent slot labels). */
+  onEditBatter?: () => void
 }
 
 const S = 100
@@ -61,6 +64,7 @@ export default function BaseballDiamond({
   onRunner,
   onFielder,
   pendingLocation = null,
+  onEditBatter,
 }: BaseballDiamondProps) {
   const fieldingColor = view.fieldingSide === 'tracked' ? 'rgb(var(--diamond-tracked))' : 'rgb(var(--diamond-opponent))'
   const battingColor = view.fieldingSide === 'tracked' ? 'rgb(var(--diamond-opponent))' : 'rgb(var(--diamond-tracked))'
@@ -190,11 +194,26 @@ export default function BaseballDiamond({
         </svg>
 
         {view.batter && (
-          <div className="pointer-events-none absolute bottom-1 left-1 max-w-[42%] rounded-md bg-surface/90 px-2 py-1 text-left shadow-sm">
-            <p className="text-[11px] font-bold uppercase text-content-muted">
-              Batting {ORDINALS[view.batter.slot - 1] ?? view.batter.slot}
-            </p>
-            <p className="truncate text-sm font-semibold text-content">{view.batter.name}</p>
+          <div
+            className={`absolute bottom-1 left-1 flex max-w-[48%] items-center gap-1 rounded-md bg-surface/90 py-1 pl-2 text-left shadow-sm ${onEditBatter ? 'pr-0' : 'pointer-events-none pr-2'}`}
+          >
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase text-content-muted">
+                Batting {ORDINALS[view.batter.slot - 1] ?? view.batter.slot}
+              </p>
+              <p className="truncate text-sm font-semibold text-content">{view.batter.name}</p>
+            </div>
+            {onEditBatter && (
+              <button
+                type="button"
+                className="grid h-10 w-10 shrink-0 place-items-center text-content-muted"
+                aria-label={`Edit label for ${view.batter.name}`}
+                title="Edit batter label"
+                onClick={onEditBatter}
+              >
+                <Pencil size={16} aria-hidden="true" />
+              </button>
+            )}
           </div>
         )}
       </div>
