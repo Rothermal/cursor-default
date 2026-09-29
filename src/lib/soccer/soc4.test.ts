@@ -406,6 +406,19 @@ describe('SOC-4A normal-match projection', () => {
       ['goalkeeper', 'match-keeper'],
     ])
     expect(saved.state.sportGameState!.projection.sideTotals.opponent.shotsOnTarget).toBe(1)
+
+    const trackedSave = recordSoccerShot(saved.state, quick('tracked', 'saved', 'match-defender', null), {
+      recorderUserId: 'user-1',
+      eventIds: ['50000000-0000-4000-8000-000000000023'],
+    })
+    expect(trackedSave.ok && trackedSave.inspection.complete).toBe(true)
+    if (!trackedSave.ok) return
+    const recordedTrackedSave = trackedSave.inspection.activeEvents[trackedSave.inspection.activeEvents.length - 1]
+    expect(recordedTrackedSave.actors.map(actor => [actor.role, actor.participantId ?? actor.label])).toEqual([
+      ['shooter', 'match-defender'],
+      ['goalkeeper', 'Bears goalkeeper'],
+    ])
+    expect(trackedSave.state.sportGameState!.projection.sideTotals.tracked.saved).toBe(1)
   })
 
   it('undoes the newest recorded event and restores it for Field Undo', () => {

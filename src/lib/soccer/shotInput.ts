@@ -142,17 +142,24 @@ export function soccerQuickShotSelection(input: {
     showSecondary: false,
     trackedBlockerId: SOCCER_TEAM_ACTOR_ID,
     opponentBlockerLabel: '',
-    opponentGoalkeeperLabel: '',
+    // Opponent lineups are label-only, so a tracked shot's save names the
+    // defending keeper by team; opponent shots credit the tracked keeper.
+    opponentGoalkeeperLabel: input.teamSide === 'tracked' && input.outcome === 'saved'
+      ? `${input.opponentTeamLabel} goalkeeper`
+      : '',
     trackedGoalkeeperId: input.trackedGoalkeeperId ?? '',
   }
 }
 
-/** Outcomes the compact sheet saves as soon as the shooter is chosen. */
+/**
+ * Outcomes the compact sheet saves as soon as the shooter is chosen. Only a
+ * Goal asks for an assist; a Saved shot is credited to the defending keeper.
+ */
 export function soccerQuickShotSavesOnShooter(
   outcome: SoccerShotOutcome,
   situation: SoccerShotSituation
 ): boolean {
-  return !((outcome === 'goal' || outcome === 'saved') && soccerShotCreatorsAllowed(situation))
+  return !(outcome === 'goal' && soccerShotCreatorsAllowed(situation))
 }
 
 /**

@@ -64,7 +64,7 @@ describe('soccer shot input builder', () => {
       ],
       [
         { outcome: 'saved', situation: 'corner_sequence', sourceEventId: 'corner-1', shooterId: 'mia' },
-        { outcome: 'saved', situation: 'corner_sequence', sourceEventId: 'corner-1', trackedShooterId: 'mia' },
+        { outcome: 'saved', situation: 'corner_sequence', sourceEventId: 'corner-1', trackedShooterId: 'mia', opponentGoalkeeperLabel: 'Bears goalkeeper' },
       ],
       [
         { teamSide: 'opponent', outcome: 'saved' },
@@ -102,9 +102,20 @@ describe('soccer shot input builder', () => {
       .toEqual({ kind: 'unknown', label: 'Unknown opponent' })
   })
 
-  it('asks for an assist only after a Goal or Saved outside penalty and direct free kick', () => {
+  it('credits a tracked shot save to the opponent keeper, not a tracked player', () => {
+    const saved = buildSoccerShotInput(quick({ outcome: 'saved', shooterId: 'mia' }))
+    expect(saved.goalkeeper).toEqual({ kind: 'unknown', label: 'Bears goalkeeper' })
+    expect(saved.primaryCreator).toBeNull()
+    expect(buildSoccerShotInput(quick({ outcome: 'off_target', shooterId: 'mia' })).goalkeeper).toBeNull()
+    expect(buildSoccerShotInput(quick({ outcome: 'goal', shooterId: 'mia' })).goalkeeper).toBeNull()
+    expect(buildSoccerShotInput(quick({ teamSide: 'opponent', outcome: 'saved' })).goalkeeper)
+      .toEqual({ kind: 'participant', participantId: 'keeper' })
+  })
+
+  it('asks for an assist only after a Goal outside penalty and direct free kick', () => {
     expect(soccerQuickShotSavesOnShooter('goal', 'open_play')).toBe(false)
-    expect(soccerQuickShotSavesOnShooter('saved', 'corner_sequence')).toBe(false)
+    expect(soccerQuickShotSavesOnShooter('saved', 'open_play')).toBe(true)
+    expect(soccerQuickShotSavesOnShooter('saved', 'corner_sequence')).toBe(true)
     expect(soccerQuickShotSavesOnShooter('blocked', 'open_play')).toBe(true)
     expect(soccerQuickShotSavesOnShooter('off_target', 'open_play')).toBe(true)
     expect(soccerQuickShotSavesOnShooter('woodwork', 'open_play')).toBe(true)
