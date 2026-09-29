@@ -61,7 +61,17 @@ export function createHockeyMatchProjection(setup: HockeyMatchSetup): HockeyMatc
     penaltyReleases: [],
     penaltyTotals: { tracked: { penalties: 0, pimMs: 0 }, opponent: { penalties: 0, pimMs: 0 } },
     removedParticipantIds: [],
+    goalsByStrength: { tracked: emptyGoalStrengthTotals(), opponent: emptyGoalStrengthTotals() },
+    powerPlayGoals: [],
+    plusMinusSkippedGoalIds: [],
+    timeouts: { tracked: 0, opponent: 0 },
+    icings: { tracked: 0, opponent: 0 },
+    offsides: { tracked: 0, opponent: 0 },
   }
+}
+
+function emptyGoalStrengthTotals() {
+  return { ev: 0, pp: 0, sh: 0, unrecorded: 0 }
 }
 
 export function emptyHockeyFaceoffTotals(): HockeyFaceoffTotals {
@@ -85,7 +95,7 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
   if (value.sportId !== 'hockey' || value.version !== HOCKEY_GAME_STATE_VERSION) return null
   const setup = normalizeHockeyMatchSetup(value.setup)
   if (!setup) return null
-  // A cache from before HKY-2B, HKY-2C or HKY-3A lacks the capture fields; the projector rebuilds it either way.
+  // A cache from before HKY-2B, HKY-2C, HKY-3A or HKY-3B lacks the capture fields; the projector rebuilds it either way.
   const cachedProjection = isPlainObject(value.projection) &&
     typeof value.projection.status === 'string' &&
     Array.isArray(value.projection.periods) &&
@@ -93,7 +103,8 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
     Array.isArray(value.projection.warnings) &&
     isPlainObject(value.projection.faceoffs) &&
     Array.isArray(value.projection.penalties) &&
-    Array.isArray(value.projection.removedParticipantIds)
+    Array.isArray(value.projection.removedParticipantIds) &&
+    isPlainObject(value.projection.goalsByStrength)
   return {
     sportId: 'hockey',
     version: HOCKEY_GAME_STATE_VERSION,

@@ -176,8 +176,9 @@ export const hockeyEventDefinitions: GameEventDefinition<GameEvent>[] = [
       if (typeof payload.emptyNet !== 'boolean' || typeof payload.penaltyShot !== 'boolean') {
         return 'Empty net and penalty shot are true or false.'
       }
-      if (payload.strength !== null && !['ev', 'pp', 'sh'].includes(payload.strength as string)) {
-        return 'Unknown strength.'
+      if (payload.strength !== null) {
+        if (!['ev', 'pp', 'sh'].includes(payload.strength as string)) return 'Unknown strength.'
+        if (outcome !== 'goal') return 'Only a goal records its strength.'
       }
       if (outcome === 'goal') return validateOnIce(payload.onIce)
       return payload.onIce === null ? null : 'Only a goal records who was on the ice.'
@@ -315,6 +316,17 @@ export const hockeyEventDefinitions: GameEventDefinition<GameEvent>[] = [
       isReason(payload.reason)
         ? null
         : 'A release names the penalty, its segment and a reason.'
+  ),
+  captureDefinition('hockey.timeout', { location: false, roles: [] }, playPayload),
+  captureDefinition(
+    'hockey.team_event',
+    { location: true, roles: [] },
+    payload =>
+      exactKeys(payload, ['captureCommandId', 'kind']) &&
+      isCaptureId(payload.captureCommandId) &&
+      (payload.kind === 'icing' || payload.kind === 'offside')
+        ? null
+        : 'A team event is icing or offside.'
   ),
   captureDefinition('hockey.hit', { location: true, roles: ['hitter', 'hit_player'] }, playPayload),
   captureDefinition('hockey.takeaway', { location: true, roles: ['player'] }, playPayload),

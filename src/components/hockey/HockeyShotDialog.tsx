@@ -19,6 +19,7 @@ import {
   type HockeyShotOutcome,
   type HockeySide,
   type HockeySportGameState,
+  type HockeyStrength,
   type RecordHockeyShotInput,
 } from '../../lib/hockey'
 import type { GameEvent } from '../../lib/gameEvents/types'
@@ -35,12 +36,19 @@ interface HockeyShotDialogProps {
   recentOpponentLabels: string[]
   trackedLabel: string
   opponentLabel: string
+  /** Goal strength read from the penalty box for a scoring side; null when there is no clock. */
+  derivedStrength: (side: HockeySide) => HockeyStrength | null
   /** Returns an error message, or null once the shot is recorded. */
   onSubmit: (input: RecordHockeyShotInput) => string | null
   onClose: () => void
 }
 
 const OUTCOMES: HockeyShotOutcome[] = ['goal', 'saved', 'missed', 'blocked']
+const STRENGTHS: Array<{ value: HockeyStrength; label: string; name: string }> = [
+  { value: 'ev', label: 'Even', name: 'even strength' },
+  { value: 'pp', label: 'Power play', name: 'a power play' },
+  { value: 'sh', label: 'Short', name: 'short-handed' },
+]
 const MISS_TYPES: Array<{ value: HockeyMissType; label: string }> = [
   { value: 'wide', label: 'Wide' },
   { value: 'high', label: 'High' },
@@ -60,6 +68,7 @@ export default function HockeyShotDialog({
   recentOpponentLabels,
   trackedLabel,
   opponentLabel,
+  derivedStrength,
   onSubmit,
   onClose,
 }: HockeyShotDialogProps) {
@@ -74,6 +83,7 @@ export default function HockeyShotDialog({
   const [blocker, setBlocker] = useState('')
   const [penaltyShot, setPenaltyShot] = useState(false)
   const [emptyNetOverride, setEmptyNetOverride] = useState<boolean | null>(null)
+  const [strengthOverride, setStrengthOverride] = useState<HockeyStrength | null>(null)
   const [error, setError] = useState<string | null>(null)
   const prefill = useMemo(() => hockeyOnIcePrefill(setup, projection, events), [setup, projection, events])
   const [onIceTouched, setOnIceTouched] = useState(false)
@@ -85,6 +95,8 @@ export default function HockeyShotDialog({
   const netGoalie = projection.goalieInNet[defending]
   const emptyNet = emptyNetOverride ?? netGoalie === null
   const goal = outcome === 'goal'
+  const derived = derivedStrength(side)
+  const strength = strengthOverride ?? derived ?? 'ev'
   const sideName = (value: HockeySide) => (value === 'tracked' ? trackedLabel : opponentLabel)
   const netGoalieName = netGoalie === null
     ? 'Net empty'
@@ -100,6 +112,7 @@ export default function HockeyShotDialog({
     setAssist2('')
     setBlocker('')
     setEmptyNetOverride(null)
+    setStrengthOverride(null)
   }
 
   const choice = (owner: HockeySide, value: string): HockeyActorChoice | null => {
@@ -128,6 +141,7 @@ export default function HockeyShotDialog({
       blocker: outcome === 'blocked' ? choice(defending, blocker) : null,
       location: draft.location,
       onIce,
+      ...(goal ? { strength } : {}),
     })
     if (message) setError(message)
   }
@@ -207,6 +221,19 @@ export default function HockeyShotDialog({
               recentLabels={recentOpponentLabels}
               emptyLabel="Unknown"
             />
+          )}
+
+          {goal && (
+            <Group label="Strength">
+              <Choices options={STRENGTHS} value={strength} onChange={setStrengthOverride} columns={3} />
+              <p className="mt-1 text-xs text-content-muted">
+                {derived === null
+                  ? 'No game clock, so pick the strength.'
+                  : strengthOverride === null || strengthOverride === derived
+                    ? 'From the penalty box.'
+                    : `The penalty box says ${STRENGTHS.find(entry => entry.value === derived)!.name}.`}
+              </p>
+            </Group>
           )}
 
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">

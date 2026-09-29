@@ -9,10 +9,7 @@ export interface HockeyStatDefinition {
   group: HockeyStatGroup
 }
 
-/**
- * The `hky_*` catalog. Ids are final so HKY-6 aggregates can reuse them. `hky_pm` is
- * reserved: plus/minus waits for strength (HKY-3B), so replay never fills it yet.
- */
+/** The `hky_*` catalog. Ids are final so HKY-6 aggregates can reuse them. */
 export const HOCKEY_STAT_CATALOG: readonly HockeyStatDefinition[] = Object.freeze(([
   { id: 'hky_g', label: 'Goals', group: 'skater' },
   { id: 'hky_a', label: 'Assists', group: 'skater' },
@@ -27,6 +24,10 @@ export const HOCKEY_STAT_CATALOG: readonly HockeyStatDefinition[] = Object.freez
   { id: 'hky_ga', label: 'Goals against', group: 'goalie' },
   { id: 'hky_sa', label: 'Shots against', group: 'goalie' },
   { id: 'hky_sv', label: 'Saves', group: 'goalie' },
+  { id: 'hky_ppg', label: 'Power-play goals', group: 'skater' },
+  { id: 'hky_ppa', label: 'Power-play assists', group: 'skater' },
+  { id: 'hky_shg', label: 'Short-handed goals', group: 'skater' },
+  { id: 'hky_sha', label: 'Short-handed assists', group: 'skater' },
   { id: 'hky_pm', label: 'Plus/minus', group: 'plus_minus' },
   { id: 'hky_fow', label: 'Faceoffs won', group: 'play' },
   { id: 'hky_fol', label: 'Faceoffs lost', group: 'play' },
@@ -38,10 +39,8 @@ export const HOCKEY_STAT_CATALOG: readonly HockeyStatDefinition[] = Object.freez
   { id: 'hky_pend', label: 'Penalties drawn', group: 'penalty' },
 ] as HockeyStatDefinition[]).map(definition => Object.freeze(definition)))
 
-/** Stats replay fills today; `hky_pm` joins in HKY-3B. */
-export const HOCKEY_FILLED_STAT_IDS = HOCKEY_STAT_CATALOG
-  .filter(definition => definition.id !== 'hky_pm')
-  .map(definition => definition.id)
+/** Stats replay fills; every catalog entry since HKY-3B. */
+export const HOCKEY_FILLED_STAT_IDS = HOCKEY_STAT_CATALOG.map(definition => definition.id)
 
 export type HockeyParticipantStats = Record<string, Record<string, number>>
 
@@ -59,7 +58,7 @@ export function emptyHockeyParticipantStats(setup: HockeyMatchSetup): HockeyPart
  * stamped at capture, not the one replay now puts in net.
  */
 export function accumulateHockeyShotStats(stats: HockeyParticipantStats, event: HockeyEvent<'hockey.shot'>): void {
-  const { outcome, emptyNet } = event.payload
+  const { outcome, emptyNet, strength } = event.payload
   const add = (role: string, statIds: string[]) => {
     const participantId = trackedActor(event, role)
     if (!participantId || !stats[participantId]) return
@@ -71,15 +70,36 @@ export function accumulateHockeyShotStats(stats: HockeyParticipantStats, event: 
     if (outcome === 'saved') shooterStats.push('hky_sog')
     if (outcome === 'missed') shooterStats.push('hky_miss')
     if (outcome === 'blocked') shooterStats.push('hky_blocked_by')
+    const special = outcome === 'goal' && (strength === 'pp' || strength === 'sh') ? strength : null
+    if (special) shooterStats.push(special === 'pp' ? 'hky_ppg' : 'hky_shg')
+    const assistExtra = special ? [special === 'pp' ? 'hky_ppa' : 'hky_sha'] : []
     add('shooter', shooterStats)
-    add('assist_primary', ['hky_a', 'hky_a1', 'hky_pts'])
-    add('assist_secondary', ['hky_a', 'hky_a2', 'hky_pts'])
+    add('assist_primary', ['hky_a', 'hky_a1', 'hky_pts', ...assistExtra])
+    add('assist_secondary', ['hky_a', 'hky_a2', 'hky_pts', ...assistExtra])
     return
   }
   add('blocker', ['hky_blk'])
   if (emptyNet) return
   if (outcome === 'goal') add('goalie', ['hky_sa', 'hky_ga'])
   if (outcome === 'saved') add('goalie', ['hky_sa', 'hky_sv'])
+}
+
+/**
+ * Plus/minus (HKY-3B): every tracked skater in a complete on-ice set gets +1 for a goal for
+ * and -1 for a goal against, when the scoring side was even strength or short-handed (empty
+ * net included). Power-play goals never count. Returns false for a goal left out because its
+ * on-ice set is not complete or its strength was not recorded.
+ */
+export function accumulateHockeyPlusMinus(stats: HockeyParticipantStats, event: HockeyEvent<'hockey.shot'>): boolean {
+  const { outcome, onIce, strength } = event.payload
+  if (outcome !== 'goal') return true
+  if (!onIce || onIce.status !== 'complete' || strength === null) return false
+  if (strength === 'pp') return true
+  const delta = event.teamSide === 'tracked' ? 1 : -1
+  for (const id of onIce.skaterParticipantIds) {
+    if (stats[id]) stats[id].hky_pm += delta
+  }
+  return true
 }
 
 /** Credits a faceoff, hit, takeaway or giveaway to its tracked actor (HKY-2C). */

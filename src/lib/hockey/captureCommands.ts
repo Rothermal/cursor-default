@@ -5,6 +5,7 @@ import { hockeyParticipantRemoved, otherHockeySide } from './captureProjection'
 import { createHockeyUuid } from './id'
 import {
   hockeyClockDisplay,
+  hockeyPauseIfRunning,
   runHockeyCommand,
   type HockeyCommandContext,
   type HockeyCommandResult,
@@ -13,6 +14,7 @@ import {
 import {
   hockeyCurrentGameTimeMs,
   hockeyGameTimeMs,
+  hockeyGoalStrengthFor,
   hockeyPenaltyBoxAt,
   hockeyPenaltyDefaultDurationMs,
   hockeyStrengthState,
@@ -28,6 +30,8 @@ import type {
   HockeyOffenderKind,
   HockeyPenaltyClass,
   HockeySportGameState,
+  HockeyStrength,
+  HockeyTeamEventKind,
   HockeyMatchParticipant,
   HockeyMatchProjection,
   HockeyMatchSetup,
@@ -59,6 +63,11 @@ export interface RecordHockeyShotInput {
   location?: { x: number; y: number } | null
   /** Goals only; defaults to not recorded. */
   onIce?: HockeyOnIce | null
+  /**
+   * Goals only (HKY-3B): the recorder's confirmed strength. Defaults to the strength derived
+   * from the penalty box, or even strength in a clockless game.
+   */
+  strength?: HockeyStrength | null
 }
 
 export const HOCKEY_ON_ICE_NOT_RECORDED: HockeyOnIce = Object.freeze({
@@ -108,6 +117,10 @@ export function recordHockeyShot(
     if (!emptyNet && netGoalie !== null) actors.push(goalieActor(sport.setup, projection, defending, netGoalie))
 
     const location = sideLocation(projection, side, input.location)
+    if (input.strength && !goal) return 'Only a goal records its strength.'
+    const strength = goal
+      ? input.strength ?? hockeyDerivedGoalStrength(sport.setup, projection, active.id, elapsedMs, side)
+      : null
 
     return [{
       eventType: 'hockey.shot',
@@ -120,7 +133,7 @@ export function recordHockeyShot(
         missType: input.outcome === 'missed' ? input.missType ?? null : null,
         emptyNet,
         penaltyShot: input.penaltyShot ?? false,
-        strength: null,
+        strength,
         onIce: goal ? structuredClone(input.onIce ?? HOCKEY_ON_ICE_NOT_RECORDED) : null,
       },
       period: { id: active.id, order: active.order },
@@ -414,6 +427,70 @@ export function releaseHockeyPenalty(
       eventType: 'hockey.penalty_release',
       teamSide: record.side,
       payload: { captureCommandId: null, penaltyEventId: record.eventId, segment, reason },
+      period: { id: active.id, order: active.order },
+      elapsedMs,
+    }]
+  })
+}
+
+/** The strength a goal would carry now: derived from the box, or even strength without a clock. */
+export function hockeyDerivedGoalStrength(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  periodId: string,
+  elapsedMs: number | null,
+  scoringSide: HockeySide
+): HockeyStrength {
+  if (!projection.clock) return 'ev'
+  const box = hockeyPenaltyBoxAt(setup, projection, hockeyGameTimeMs(projection, periodId, elapsedMs))
+  return hockeyGoalStrengthFor(hockeyStrengthState(setup, projection, box), scoringSide)
+}
+
+/** A team timeout (HKY-3B). A running clock is paused in the same command. */
+export function recordHockeyTimeout(
+  state: GameState,
+  input: { side: HockeySide },
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (_sport, projection) => {
+    const active = hockeyActivePeriod(projection)
+    if (projection.status !== 'in_progress' || !active) return 'Timeouts are taken during a period.'
+    const period = { id: active.id, order: active.order }
+    const events: HockeyPendingEvent[] = []
+    let elapsedMs: number | null = null
+    if (projection.clock) {
+      const pause = hockeyPauseIfRunning(projection, period, context.occurredAt)
+      if (typeof pause === 'string') return pause
+      if (pause) events.push(pause.event)
+      elapsedMs = pause ? pause.elapsedMs : projection.clock.elapsedMs
+    }
+    events.push({
+      eventType: 'hockey.timeout',
+      teamSide: input.side,
+      payload: { captureCommandId: null },
+      period,
+      elapsedMs,
+    })
+    return events
+  })
+}
+
+/** Icing or offside against a side (HKY-3B), with an optional rink location. */
+export function recordHockeyTeamEvent(
+  state: GameState,
+  input: { kind: HockeyTeamEventKind; side: HockeySide; location?: { x: number; y: number } | null },
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (_sport, projection) => {
+    const active = hockeyActivePeriod(projection)
+    if (projection.status !== 'in_progress' || !active) return 'Icing and offside are recorded during a period.'
+    const elapsedMs = captureElapsed(projection, context.occurredAt)
+    if (typeof elapsedMs === 'string') return elapsedMs
+    return [{
+      eventType: 'hockey.team_event',
+      teamSide: input.side,
+      location: sideLocation(projection, input.side, input.location),
+      payload: { captureCommandId: null, kind: input.kind },
       period: { id: active.id, order: active.order },
       elapsedMs,
     }]

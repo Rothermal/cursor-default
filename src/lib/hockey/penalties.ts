@@ -7,7 +7,9 @@ import type {
   HockeyPenaltyRecord,
   HockeyPenaltyReleaseRecord,
   HockeyPenaltyRules,
+  HockeyPowerPlayGoalRecord,
   HockeySide,
+  HockeyStrength,
 } from './types'
 
 /**
@@ -206,6 +208,10 @@ export interface HockeyPenaltyBox {
   /** Penalties whose time counted against strength when assessed (not cancelled). */
   strengthPenaltyIds: string[]
   cancelledPenaltyIds: string[]
+  /** Power plays: when a penalty is assessed, or when earlier penalties end and leave its side short (HKY-3B). */
+  powerPlayOpportunities: { tracked: number; opponent: number }
+  /** Power-play goals that ended a minor, with the penalty each one released. */
+  powerPlayReleases: Array<{ goalEventId: string; penaltyEventId: string; segment: 1 | 2 }>
   notes: HockeyBoxNote[]
 }
 
@@ -239,14 +245,62 @@ export function hockeyPenaltyBoxAt(
   setup: HockeyMatchSetup,
   projection: HockeyMatchProjection,
   gameTimeMs: number | null,
-  options: { penalties?: readonly HockeyPenaltyRecord[]; releases?: readonly HockeyPenaltyReleaseRecord[] } = {}
+  options: {
+    penalties?: readonly HockeyPenaltyRecord[]
+    releases?: readonly HockeyPenaltyReleaseRecord[]
+    powerPlayGoals?: readonly HockeyPowerPlayGoalRecord[]
+  } = {}
 ): HockeyPenaltyBox {
   const penalties = options.penalties ?? projection.penalties
   const releases = options.releases ?? projection.penaltyReleases
-  const simulation = new BoxSimulation(setup.rulesSnapshot.penalties.coincidentalMinors)
+  const goals = options.powerPlayGoals ?? projection.powerPlayGoals ?? []
+  const simulation = new BoxSimulation(setup.rulesSnapshot.penalties)
   if (gameTimeMs === null || !projection.clock) return simulation.result()
-  simulation.run(penalties, releases, gameTimeMs)
+  simulation.run(penalties, releases, goals, gameTimeMs)
   return simulation.result()
+}
+
+/** Goal strength from the scoring side's view: more skaters is a power play, fewer short-handed. */
+export function hockeyGoalStrengthFor(strength: HockeyStrengthState, scoringSide: HockeySide): HockeyStrength {
+  const scoring = strength[scoringSide].baseSkaters
+  const defending = strength[scoringSide === 'tracked' ? 'opponent' : 'tracked'].baseSkaters
+  if (scoring > defending) return 'pp'
+  return scoring < defending ? 'sh' : 'ev'
+}
+
+export interface HockeySpecialTeams {
+  /** Null for clockless games, which derive no strength. */
+  powerPlayOpportunities: { tracked: number; opponent: number } | null
+  powerPlayGoals: { tracked: number; opponent: number }
+  shortHandedGoals: { tracked: number; opponent: number }
+}
+
+/**
+ * Power-play and penalty-kill totals over the whole game so far. A live screen passes the
+ * box it already read at the displayed time (`hockeyPenaltyBoxNow`), because a power play
+ * can begin when a penalty expires on a running clock. Without it, the box is replayed up to
+ * the latest recorded box action or the paused clock, which is deterministic but can lag a
+ * running clock.
+ */
+export function hockeySpecialTeams(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  liveBox: HockeyPenaltyBox | null = null
+): HockeySpecialTeams {
+  const goals = projection.goalsByStrength
+  // The projected clock of a running game is only its anchor and can lag the recorded actions.
+  const latest = Math.max(
+    hockeyCurrentGameTimeMs(projection, null) ?? 0,
+    ...projection.penalties.map(record => record.gameTimeMs ?? 0),
+    ...projection.penaltyReleases.map(record => record.gameTimeMs),
+    ...(projection.powerPlayGoals ?? []).map(record => record.gameTimeMs)
+  )
+  const box = !projection.clock ? null : liveBox ?? hockeyPenaltyBoxAt(setup, projection, latest)
+  return {
+    powerPlayOpportunities: box ? box.powerPlayOpportunities : null,
+    powerPlayGoals: { tracked: goals?.tracked.pp ?? 0, opponent: goals?.opponent.pp ?? 0 },
+    shortHandedGoals: { tracked: goals?.tracked.sh ?? 0, opponent: goals?.opponent.sh ?? 0 },
+  }
 }
 
 /** Current strength from a box; a side's net is empty when its goalie is pulled. */
@@ -295,24 +349,34 @@ class BoxSimulation {
   private readonly notes: HockeyBoxNote[] = []
   private readonly strengthIds: string[] = []
   private readonly cancelledIds: string[] = []
+  private readonly opportunities = { tracked: 0, opponent: 0 }
+  /** The side with more skaters by open strength penalties, after the last transition. */
+  private advantage: HockeySide | null = null
+  /** Penalties that already gave the other side a power play; each gives at most one. */
+  private readonly countedPenaltyIds = new Set<string>()
+  private readonly powerPlayReleases: HockeyPenaltyBox['powerPlayReleases'] = []
   private queueCounter = 0
 
-  constructor(private readonly coincidentalMinors: 'substitute' | 'play_short') {}
+  constructor(private readonly rules: HockeyPenaltyRules) {}
 
-  run(penalties: readonly HockeyPenaltyRecord[], releases: readonly HockeyPenaltyReleaseRecord[], until: number): void {
+  run(
+    penalties: readonly HockeyPenaltyRecord[],
+    releases: readonly HockeyPenaltyReleaseRecord[],
+    goals: readonly HockeyPowerPlayGoalRecord[],
+    until: number
+  ): void {
     type Action = { time: number; order: number; apply: () => void }
     const actions: Action[] = []
     const units = groupPenaltyUnits(penalties.filter(record => record.gameTimeMs !== null))
-    units.forEach((unit, index) => {
-      actions.push({ time: Math.min(unit[0].gameTimeMs!, until), order: index, apply: () => this.assess(unit) })
-    })
-    releases.forEach((release, index) => {
-      actions.push({
-        time: Math.min(release.gameTimeMs, until),
-        order: units.length + index,
-        apply: () => this.release(release),
-      })
-    })
+    for (const unit of units) {
+      actions.push({ time: Math.min(unit[0].gameTimeMs!, until), order: unit[0].replayIndex ?? 0, apply: () => this.assess(unit) })
+    }
+    for (const release of releases) {
+      actions.push({ time: Math.min(release.gameTimeMs, until), order: release.replayIndex ?? 0, apply: () => this.release(release) })
+    }
+    for (const goal of goals) {
+      actions.push({ time: Math.min(goal.gameTimeMs, until), order: goal.replayIndex, apply: () => this.powerPlayGoal(goal) })
+    }
     actions.sort((left, right) => left.time - right.time || left.order - right.order)
     let now = actions.length > 0 ? Math.min(actions[0].time, until) : until
     for (const action of actions) {
@@ -345,6 +409,8 @@ class BoxSimulation {
       opponent: entries('opponent'),
       strengthPenaltyIds: [...this.strengthIds],
       cancelledPenaltyIds: [...this.cancelledIds],
+      powerPlayOpportunities: { ...this.opportunities },
+      powerPlayReleases: [...this.powerPlayReleases],
       notes: [...this.notes],
     }
   }
@@ -387,6 +453,74 @@ class BoxSimulation {
         .flatMap(other => other.items)
     }
     for (const chain of chains) this.tryStart(chain.items[0])
+    // Each penalty that leaves its side with more skaters in the box is a power play for the other.
+    for (const chain of chains) {
+      if (!chain.items[0].strength) continue
+      const penalized = chain.record.side
+      const other: HockeySide = penalized === 'tracked' ? 'opponent' : 'tracked'
+      if (this.openStrength(penalized) > this.openStrength(other)) {
+        this.opportunities[other] += 1
+        this.countedPenaltyIds.add(chain.record.eventId)
+      }
+    }
+    this.advantage = this.currentAdvantage()
+  }
+
+  private currentAdvantage(): HockeySide | null {
+    const tracked = this.openStrength('tracked')
+    const opponent = this.openStrength('opponent')
+    return tracked === opponent ? null : tracked < opponent ? 'tracked' : 'opponent'
+  }
+
+  /**
+   * A power play can also begin when penalties end: the earlier of two overlapping
+   * opposite minors expires or is released and leaves the other side short. Count it when
+   * a side gains the advantage it did not have before and the short side serves a penalty
+   * that has not already given a power play (so a power play interrupted by four on four
+   * does not count twice). One call per instant, so penalties ending together never count.
+   */
+  private noteAdvantage(): void {
+    const now = this.currentAdvantage()
+    if (now && now !== this.advantage) {
+      const short: HockeySide = now === 'tracked' ? 'opponent' : 'tracked'
+      const open = this.items
+        .filter(item => item.record.side === short && item.strength && item.state !== 'done')
+        .map(item => item.record.eventId)
+      if (open.some(id => !this.countedPenaltyIds.has(id))) {
+        this.opportunities[now] += 1
+        for (const id of open) this.countedPenaltyIds.add(id)
+      }
+    }
+    this.advantage = now
+  }
+
+  /**
+   * A power-play goal ends the running minor of the short-handed side with the least time
+   * left; for a double minor only the segment being served. Majors are never released.
+   */
+  private powerPlayGoal(goal: HockeyPowerPlayGoalRecord): void {
+    if (!this.rules.releaseMinorOnPowerPlayGoal) return
+    const shortHanded: HockeySide = goal.side === 'tracked' ? 'opponent' : 'tracked'
+    const candidates = this.items
+      .filter(item =>
+        item.record.side === shortHanded &&
+        item.strength &&
+        item.state === 'running' &&
+        (item.record.class === 'minor' || item.record.class === 'double_minor')
+      )
+      .sort((left, right) => left.remainingMs - right.remainingMs || left.queuedAt - right.queuedAt)
+    const released = candidates[0]
+    if (!released) return
+    this.powerPlayReleases.push({ goalEventId: goal.eventId, penaltyEventId: released.record.eventId, segment: released.segment })
+    this.finish(released)
+    this.noteAdvantage()
+  }
+
+  /** Strength time running or waiting for a side. */
+  private openStrength(side: HockeySide): number {
+    return this.items.filter(item =>
+      item.record.side === side && item.strength && item.state !== 'done' && isChainHead(this.items, item)
+    ).length
   }
 
   /**
@@ -400,7 +534,7 @@ class BoxSimulation {
     const strengthPenalties = grouped.filter(record => hockeyPenaltyAffectsStrength(record.class))
     const minors = strengthPenalties.filter(record => record.class === 'minor')
     if (
-      this.coincidentalMinors === 'play_short' &&
+      this.rules.coincidentalMinors === 'play_short' &&
       strengthPenalties.length === 2 &&
       minors.length === 2 &&
       minors[0].side !== minors[1].side &&
@@ -431,6 +565,7 @@ class BoxSimulation {
       return
     }
     this.finish(item)
+    this.noteAdvantage()
   }
 
   private advance(delta: number): void {
@@ -444,6 +579,7 @@ class BoxSimulation {
       for (const item of running) {
         if (item.remainingMs <= 0 && item.state === 'running') this.finish(item)
       }
+      this.noteAdvantage()
     }
   }
 
