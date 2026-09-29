@@ -1,8 +1,7 @@
 # Plan: BSB-3 Baseball Diamond Tracker and Pitch Pad
 
-Status: owner questions answered 2026-09-29 (section 9); revised 2026-09-29 for the review of
-`98c68bd` (terminal-pitch runner outcomes, fielder-to-pitcher swap). Plan under review. No
-code starts until Mark approves or merges this plan.
+Status: approved and merged 2026-09-29 (PR #448; owner answers in section 9). BSB-3A is
+implemented (section 10); BSB-3B to BSB-3D follow.
 Builds on the BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)) and BSB-2 roster,
 defaults and setup ([plan](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 4, 8 and 12.
@@ -423,4 +422,40 @@ or merged.
 
 ## 10. Delivery Record
 
-Empty until implementation starts.
+### BSB-3A Surfaces and shell
+
+- `src/lib/baseball/diamondGeometry.ts`: the fixed frame (home at `(0.5, 0.95)`, 0.2
+  between bases, rubber at 60.5 of 90 ft), fence points and curve control, infield arc,
+  fielder spots 1 to 10, `baseballDiamondLocation` (shared surface helper, never
+  flipped, `attackingDirection: 'unknown'`, rounded to 0.001), read-time
+  `isBaseballFair` and `baseballFieldArea`, and the pitch pad frame (`-0.75..1.75`,
+  matching the engine's accepted range) with `baseballPitchPadLocation`,
+  `baseballPitchPadDisplay` and `isBaseballPitchInZone`.
+- `src/lib/baseball/trackerView.ts`: read-only scoreboard, line score (R per inning,
+  R/H/E with errors charged to the fielding side) and diamond models, person labels for
+  participants, opponent slots and opponent pitchers, the pitch result lists, and
+  `setBaseballCapturePreferences` (kept out of fingerprints and events).
+- `src/components/baseball/`: `BaseballScoreboard` (sticky strip, count and outs as
+  dots only while play is live, pitch count with the profile warning or limit, tap for
+  the line score), `BaseballDiamond` (grass, dirt, chalk, bases, runner chips on the
+  bases, the batter chip and card, fielder markers; buttons with labels only when a
+  handler is passed, plus Location unknown) and `BaseballPitchPad` (catcher's-view zone,
+  pending marker and Clear, the six main results and More; results disabled until
+  BSB-3B).
+- `src/pages/BaseballGameTracker.tsx` replaces the BSB-2 holding page: pregame keeps
+  the rules line, Start game and lineup review; after the start it shows the
+  scoreboard, diamond and pitch pad. The Game menu holds the two location switches.
+- Theme tokens `--diamond-grass`, `-dirt`, `-line`, `-ink`, `-tracked` and `-opponent`
+  in both palettes, with contrast checks in `appearance.test.ts`.
+- Tests: `diamondGeometry.test.ts` (frame, spots inside the frame and in fair territory,
+  stored taps, fair/foul/infield/outfield, pad mapping, idle versus play-entry
+  rendering, the hidden zone) and `trackerView.test.ts` (home/away order, count,
+  pitch-count warning and limit, line score and errors, runners and batter slot,
+  opponent position numbers, ten fielders for slowpitch, preferences outside the
+  fingerprint and surviving reload). The preview gate test follows the page rename.
+- Browser check at 390 px (development build, light and dark): a local game set up from
+  ten players, Start game, then scripted engine play (a strikeout half, a single, a walk
+  and a 1-1 count) after reload shows runners on first and second, the batter card, the
+  count dots, the pitch count and the line score; turning off pitch location hides the
+  zone and survives reload; no horizontal scroll and no console errors.
+

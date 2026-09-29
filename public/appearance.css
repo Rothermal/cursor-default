@@ -31,6 +31,12 @@
   --rink-tracked: 250 204 21;
   --rink-opponent: 56 189 248;
   --rink-ink: 15 23 42;
+  --diamond-grass: 34 120 70;
+  --diamond-dirt: 176 122 72;
+  --diamond-line: 248 250 252;
+  --diamond-ink: 15 23 42;
+  --diamond-tracked: 250 204 21;
+  --diamond-opponent: 56 189 248;
   --accent: 29 78 216;
   --accent-hover: 30 64 175;
   --accent-content: 255 255 255;
@@ -134,6 +140,12 @@
   --rink-tracked: 250 204 21;
   --rink-opponent: 56 189 248;
   --rink-ink: 15 23 42;
+  --diamond-grass: 34 120 70;
+  --diamond-dirt: 176 122 72;
+  --diamond-line: 248 250 252;
+  --diamond-ink: 15 23 42;
+  --diamond-tracked: 250 204 21;
+  --diamond-opponent: 56 189 248;
   color-scheme: dark;
   --canvas: 24 25 28;
   --surface: 33 35 39;
