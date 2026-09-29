@@ -161,7 +161,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const streamEvents = (state.eventStream?.events ?? []) as GameEvent[]
   const canCapture = inProgress && active && !projection.decidedInPeriodId
   const recentLabels = recentHockeyOpponentLabels(streamEvents)
-  const specialTeams = hockeySpecialTeams(sport.setup, projection)
+  const specialTeams = hockeySpecialTeams(sport.setup, projection, penaltyBox.box)
   const powerPlayLine = (side: HockeySide) => {
     const chances = specialTeams.powerPlayOpportunities?.[side] ?? 0
     const goals = specialTeams.powerPlayGoals[side]

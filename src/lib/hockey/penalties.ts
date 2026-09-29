@@ -275,18 +275,27 @@ export interface HockeySpecialTeams {
   shortHandedGoals: { tracked: number; opponent: number }
 }
 
-/** Power-play and penalty-kill totals over the whole game so far. */
-export function hockeySpecialTeams(setup: HockeyMatchSetup, projection: HockeyMatchProjection): HockeySpecialTeams {
+/**
+ * Power-play and penalty-kill totals over the whole game so far. A live screen passes the
+ * box it already read at the displayed time (`hockeyPenaltyBoxNow`), because a power play
+ * can begin when a penalty expires on a running clock. Without it, the box is replayed up to
+ * the latest recorded box action or the paused clock, which is deterministic but can lag a
+ * running clock.
+ */
+export function hockeySpecialTeams(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  liveBox: HockeyPenaltyBox | null = null
+): HockeySpecialTeams {
   const goals = projection.goalsByStrength
-  // Opportunities are counted at assessment, so replay up to the latest recorded action; the
-  // projected clock of a running game is only its anchor and can lag behind them.
+  // The projected clock of a running game is only its anchor and can lag the recorded actions.
   const latest = Math.max(
     hockeyCurrentGameTimeMs(projection, null) ?? 0,
     ...projection.penalties.map(record => record.gameTimeMs ?? 0),
     ...projection.penaltyReleases.map(record => record.gameTimeMs),
     ...(projection.powerPlayGoals ?? []).map(record => record.gameTimeMs)
   )
-  const box = projection.clock ? hockeyPenaltyBoxAt(setup, projection, latest) : null
+  const box = !projection.clock ? null : liveBox ?? hockeyPenaltyBoxAt(setup, projection, latest)
   return {
     powerPlayOpportunities: box ? box.powerPlayOpportunities : null,
     powerPlayGoals: { tracked: goals?.tracked.pp ?? 0, opponent: goals?.opponent.pp ?? 0 },

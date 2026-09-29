@@ -343,7 +343,10 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
   other side, or when penalties end (expiry, early release, PP goal) and a side gains an
   advantage while the short side serves a penalty that has not already given one. So an
   earlier opposite minor expiring counts, while penalties ending together, a double
-  minor's second half, and a power play resuming after four on four do not. The scoreboard shows `PP goals/opportunities` per side (`PPG n` when clockless).
+  minor's second half, and a power play resuming after four on four do not.
+  The tracker passes the box it already read at the displayed time, so a power play that
+  begins by expiry on a running clock shows at once; other callers replay to the latest
+  recorded box action or the paused clock. The scoreboard shows `PP goals/opportunities` per side (`PPG n` when clockless).
   New player stats `hky_ppg`, `hky_ppa`, `hky_shg`, `hky_sha`; team goals by strength in
   `goalsByStrength`.
 - Plus/minus: `hky_pm` counts EV and SH goals (empty-net included) with a complete on-ice
@@ -354,4 +357,4 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
   rejects one stored while the clock runs. The scoreboard shows the timeout count.
 - Deviations: PK percentage and the skipped plus/minus quality note have no screen yet;
   both are derivable from the projection and land with the Hockey Summary.
-- Tests: `specialTeams.test.ts` (25 cases).
+- Tests: `specialTeams.test.ts` (26 cases).

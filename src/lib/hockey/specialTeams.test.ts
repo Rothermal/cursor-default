@@ -55,6 +55,10 @@ function stat(state: GameState, playerId: string, id: string): number {
   return state.players.find(player => player.id === playerId)?.stats[id] ?? 0
 }
 
+function hydrate(state: GameState): GameState {
+  return gameReducer(createInitialState(), { type: 'HYDRATE_STATE', state: JSON.parse(JSON.stringify(state)) as GameState })
+}
+
 function rejected(result: HockeyCommandResult): string {
   if (result.ok) throw new Error('Expected a rejection')
   return result.message
@@ -207,6 +211,22 @@ describe('power-play opportunities after assessment', () => {
     state = goal(state, { side: 'opponent', shooter: { label: '#9' } }, 150)
     expect(storedStrength(state)).toBe('ev')
     expect(opportunities(state)).toEqual({ tracked: 1, opponent: 1 })
+  })
+
+  it('shows a power play that begins by expiry on the live clock, with no goal or pause', () => {
+    let state = trackedMinor('p2', 11)(running())
+    state = opponentMinor(61)(state)
+    state = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'saved' }, ctx(141)))
+    const live = (seconds: number) => {
+      const sport = hockeySportState(state)!
+      return hockeySpecialTeams(sport.setup, sport.projection, hockeyPenaltyBoxNow(sport, at(seconds)).box).powerPlayOpportunities
+    }
+    expect(live(100)).toEqual({ tracked: 0, opponent: 1 })
+    expect(live(141)).toEqual({ tracked: 1, opponent: 1 })
+    expect(live(150)).toEqual({ tracked: 1, opponent: 1 })
+    expect(hockeyPenaltyBoxNow(hockeySportState(state)!, at(141)).box.powerPlayOpportunities).toEqual(live(141))
+    // Nothing about the displayed time is stored.
+    expect(hydrate(state).eventStream).toEqual(state.eventStream)
   })
 
   it('counts a power play that begins with an early release', () => {
