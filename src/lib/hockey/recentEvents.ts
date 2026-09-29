@@ -6,9 +6,16 @@ import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEve
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
 import { HOCKEY_OUTCOME_LABELS } from './captureCommands'
 import { hockeySportState, withHockeyUndoReceipt, type HockeyCommandResult } from './live'
+import { hockeyPenaltyLabel } from './penalties'
 import { formatHockeyPeriod, parseHockeyPeriod } from './periods'
 import { replayHockeyEvents } from './projector'
-import type { HockeyMatchSetup, HockeyShotOutcome, HockeySportGameState, HockeyUndoReceipt } from './types'
+import type {
+  HockeyMatchSetup,
+  HockeyPenaltyPayload,
+  HockeyShotOutcome,
+  HockeySportGameState,
+  HockeyUndoReceipt,
+} from './types'
 import { HOCKEY_CAPTURE_EVENT_TYPES } from './types'
 
 /** One row of Recent Events: a capture unit, or a lifecycle or clock event shown for context. */
@@ -127,6 +134,15 @@ export function hockeyEventLabel(
       return `${side} takeaway${by('player')}`
     case 'hockey.giveaway':
       return `${side} giveaway${by('player')}`
+    case 'hockey.penalty': {
+      const penalty = payload as unknown as HockeyPenaltyPayload
+      const offender = penalty.offenderKind === 'bench' || penalty.offenderKind === 'staff'
+        ? ` (${penalty.offenderKind})`
+        : who('offender') ? ` on ${who('offender')}` : ''
+      return `${side} ${hockeyPenaltyLabel(penalty)}${offender}`
+    }
+    case 'hockey.penalty_release':
+      return `${side} penalty released early (${payload.reason as string})`
     default:
       return event.eventType.replace('hockey.', '').replace(/_/g, ' ')
   }

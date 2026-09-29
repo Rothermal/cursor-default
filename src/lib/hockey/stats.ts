@@ -1,7 +1,7 @@
 import type { GameEvent } from '../gameEvents/types'
 import type { HockeyEvent, HockeyMatchParticipant, HockeyMatchSetup } from './types'
 
-export type HockeyStatGroup = 'skater' | 'goalie' | 'plus_minus' | 'play'
+export type HockeyStatGroup = 'skater' | 'goalie' | 'plus_minus' | 'play' | 'penalty'
 
 export interface HockeyStatDefinition {
   id: string
@@ -33,6 +33,9 @@ export const HOCKEY_STAT_CATALOG: readonly HockeyStatDefinition[] = Object.freez
   { id: 'hky_hit', label: 'Hits', group: 'play' },
   { id: 'hky_tk', label: 'Takeaways', group: 'play' },
   { id: 'hky_gv', label: 'Giveaways', group: 'play' },
+  { id: 'hky_pim', label: 'Penalty minutes', group: 'penalty' },
+  { id: 'hky_pen', label: 'Penalties taken', group: 'penalty' },
+  { id: 'hky_pend', label: 'Penalties drawn', group: 'penalty' },
 ] as HockeyStatDefinition[]).map(definition => Object.freeze(definition)))
 
 /** Stats replay fills today; `hky_pm` joins in HKY-3B. */
@@ -99,6 +102,22 @@ export function accumulateHockeyPlayStats(stats: HockeyParticipantStats, event: 
       if (event.teamSide === 'tracked') credit('player', 'hky_gv')
       return
   }
+}
+
+/**
+ * Credits a penalty (HKY-3A): PIM and a penalty taken to a tracked offender, or a penalty
+ * drawn to the tracked player an opponent penalty was drawn by. PIM is in minutes.
+ */
+export function accumulateHockeyPenaltyStats(stats: HockeyParticipantStats, event: HockeyEvent<'hockey.penalty'>): void {
+  if (event.teamSide === 'tracked') {
+    const offender = trackedActor(event, 'offender')
+    if (!offender || !stats[offender]) return
+    stats[offender].hky_pen += 1
+    stats[offender].hky_pim += event.payload.durationMs / 60_000
+    return
+  }
+  const drawnBy = trackedActor(event, 'drawn_by')
+  if (drawnBy && stats[drawnBy]) stats[drawnBy].hky_pend += 1
 }
 
 /**

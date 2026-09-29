@@ -33,7 +33,7 @@ export function checkHockeyShotActors(
   for (const actor of event.actors) {
     const side = actor.role === 'goalie' || actor.role === 'blocker' ? defending : shooting
     const message = side === 'tracked'
-      ? checkTrackedActor(setup, actor)
+      ? checkTrackedActor(setup, projection, actor)
       : checkOpponentActor(projection, actor)
     if (message) return message
   }
@@ -49,12 +49,17 @@ export function checkHockeyShotActors(
  * A tracked actor is a dressed participant. Goalies stop shots; everyone else who shoots,
  * assists or blocks is chosen from the whole dressed roster, never narrowed by the opening five.
  */
-function checkTrackedActor(setup: HockeyMatchSetup, actor: GameEventActor): string | null {
+function checkTrackedActor(
+  setup: HockeyMatchSetup,
+  projection: Pick<HockeyMatchProjection, 'removedParticipantIds'>,
+  actor: GameEventActor
+): string | null {
   const participant = setup.participants.find(entry => entry.id === actor.participantId)
   if (!participant) return 'A tracked actor must be a dressed player.'
   if (actor.kind === 'player' ? actor.playerId !== participant.playerId : participant.playerId !== null) {
     return 'The actor does not match the dressed player.'
   }
+  if (hockeyParticipantRemoved(projection, participant.id)) return `${participant.displayName} has left the game.`
   if (actor.role === 'goalie' && participant.dressedAs !== 'goalie') return 'Only a dressed goalie can face a shot.'
   if (actor.role === 'blocker' && participant.dressedAs !== 'skater') return 'Only a skater can block a shot.'
   if (actor.role === 'taker' && participant.dressedAs !== 'skater') return 'Only a skater can take a faceoff.'
@@ -75,8 +80,48 @@ export function checkHockeyPlayActors(
     if (event.eventType === 'hockey.faceoff') side = actor.role === 'taker' ? 'tracked' : 'opponent'
     else if (actor.role === 'hit_player') side = otherHockeySide(event.teamSide as HockeySide)
     else side = event.teamSide as HockeySide
-    const message = side === 'tracked' ? checkTrackedActor(setup, actor) : checkOpponentActor(projection, actor)
+    const message = side === 'tracked' ? checkTrackedActor(setup, projection, actor) : checkOpponentActor(projection, actor)
     if (message) return message
+  }
+  return null
+}
+
+/** True when a game misconduct or match penalty removed the tracked participant (HKY-3A). */
+export function hockeyParticipantRemoved(
+  projection: Pick<HockeyMatchProjection, 'removedParticipantIds'>,
+  participantId: string
+): boolean {
+  return (projection.removedParticipantIds ?? []).includes(participantId)
+}
+
+/**
+ * Penalty actors (HKY-3A): the offender and server play for the penalized side, the player
+ * who drew it for the other. A tracked offender matches the offender kind; a tracked server is
+ * a skater other than the offender. Opponent actors are labels.
+ */
+export function checkHockeyPenaltyActors(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  event: HockeyEvent<'hockey.penalty'>
+): string | null {
+  const side = event.teamSide
+  for (const actor of event.actors) {
+    const owner = actor.role === 'drawn_by' ? otherHockeySide(side) : side
+    const message = owner === 'tracked' ? checkTrackedActor(setup, projection, actor) : checkOpponentActor(projection, actor)
+    if (message) return message
+    if (owner !== 'tracked') continue
+    const participant = setup.participants.find(entry => entry.id === actor.participantId)!
+    if (actor.role === 'offender') {
+      const kind = event.payload.offenderKind
+      if (kind === 'goalie' && participant.dressedAs !== 'goalie') return 'The offending goalie must be a dressed goalie.'
+      if (kind === 'player' && participant.dressedAs !== 'skater') return 'Choose Goalie for a penalty on a goalie.'
+    }
+    if (actor.role === 'served_by' && participant.dressedAs !== 'skater') return 'A penalty is served by a skater.'
+  }
+  const offender = event.actors.find(actor => actor.role === 'offender')
+  const server = event.actors.find(actor => actor.role === 'served_by')
+  if (offender && server && actorIdentity(offender) === actorIdentity(server)) {
+    return 'The server must be a different player from the offender.'
   }
   return null
 }
@@ -100,14 +145,17 @@ function actorIdentity(actor: GameEventActor): string {
 export function checkHockeyOnIce(
   setup: HockeyMatchSetup,
   period: Pick<HockeyPeriodRecord, 'kind'>,
-  onIce: HockeyOnIce
+  onIce: HockeyOnIce,
+  removedParticipantIds: readonly string[] = []
 ): string | null {
   const dressed = new Map<string, HockeyMatchParticipant>(setup.participants.map(entry => [entry.id, entry]))
   for (const id of onIce.skaterParticipantIds) {
     if (dressed.get(id)?.dressedAs !== 'skater') return 'On-ice skaters must be dressed skaters.'
+    if (removedParticipantIds.includes(id)) return `${dressed.get(id)!.displayName} has left the game.`
   }
-  if (onIce.goalie !== null && onIce.goalie !== HOCKEY_EMPTY_NET && dressed.get(onIce.goalie)?.dressedAs !== 'goalie') {
-    return 'The on-ice goalie must be a dressed goalie.'
+  if (onIce.goalie !== null && onIce.goalie !== HOCKEY_EMPTY_NET) {
+    if (dressed.get(onIce.goalie)?.dressedAs !== 'goalie') return 'The on-ice goalie must be a dressed goalie.'
+    if (removedParticipantIds.includes(onIce.goalie)) return `${dressed.get(onIce.goalie)!.displayName} has left the game.`
   }
   if (onIce.status !== 'complete') return null
   const cap = hockeyPeriodSkaters(setup, period)
@@ -133,7 +181,8 @@ export function checkHockeyGoalieChange(
   if (incoming === current) return 'That goalie is already in net.'
   if (side === 'tracked') {
     const participant = setup.participants.find(entry => entry.id === incoming)
-    return participant?.dressedAs === 'goalie' ? null : 'Only a dressed goalie can go in net.'
+    if (participant?.dressedAs !== 'goalie') return 'Only a dressed goalie can go in net.'
+    return hockeyParticipantRemoved(projection, incoming) ? `${participant.displayName} has left the game.` : null
   }
   const added = event.payload.newOpponentGoalie
   const known = projection.opponentGoalies.some(goalie => goalie.id === incoming)

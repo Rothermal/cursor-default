@@ -3,6 +3,8 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import HockeyFaceoffControl from '../components/hockey/HockeyFaceoffControl'
 import HockeyGoalieDialog, { type HockeyGoalieChange } from '../components/hockey/HockeyGoalieDialog'
+import HockeyPenaltyBox from '../components/hockey/HockeyPenaltyBox'
+import HockeyPenaltyDialog from '../components/hockey/HockeyPenaltyDialog'
 import HockeyPlayDialog, { type HockeyPlayDraft } from '../components/hockey/HockeyPlayDialog'
 import HockeyRecentEvents from '../components/hockey/HockeyRecentEvents'
 import HockeyRink from '../components/hockey/HockeyRink'
@@ -20,6 +22,7 @@ import {
   formatHockeyPeriod,
   hockeyActivePeriod,
   hockeyClockDisplay,
+  hockeyPenaltyBoxNow,
   hockeyPlayMarkers,
   hockeyRecentEvents,
   hockeyShotMarkers,
@@ -30,8 +33,10 @@ import {
   pauseHockeyClock,
   recentHockeyOpponentLabels,
   recordHockeyFaceoff,
+  recordHockeyPenalties,
   recordHockeyPlay,
   recordHockeyShot,
+  releaseHockeyPenalty,
   reopenHockeyMatch,
   restoreHockeyCapture,
   setHockeyClock,
@@ -47,14 +52,15 @@ import {
   type HockeyPlayKind,
   type HockeySide,
   type HockeySportGameState,
+  type RecordHockeyPenaltiesInput,
   type RecordHockeyPlayInput,
   type RecordHockeyShotInput,
 } from '../lib/hockey'
 import type { GameEvent, GameEventLocation } from '../lib/gameEvents/types'
 
 /**
- * The Hockey event tracker (HKY-2E). Top to bottom: the scoreboard strip with the clock,
- * the rink, the quick row and Recent Events; period and match controls live in the Game
+ * The Hockey event tracker (HKY-2E). Top to bottom: the scoreboard strip with the clock and
+ * the penalty box (HKY-3A), the rink, the quick row and Recent Events; period and match controls live in the Game
  * menu. Existing event games always open here, whatever the release stage.
  */
 export default function HockeyGameTracker() {
@@ -84,6 +90,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [tap, setTap] = useState<GameEventLocation | null>(null)
   const [faceoffDot, setFaceoffDot] = useState<HockeyFaceoffDotId | null>(null)
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
+  const [penaltyOpen, setPenaltyOpen] = useState(false)
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -138,6 +145,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   }
 
   const reading = hockeyClockDisplay(sport, now)
+  const penaltyBox = hockeyPenaltyBoxNow(sport, now)
   const period = hockeyActivePeriod(projection) ?? lastHockeyPeriod(projection)
   const direction = projection.trackedAttackingDirection ?? sport.setup.firstPeriodAttackingDirection
   const flipped = sport.capturePreferences.rinkFlipped
@@ -180,6 +188,14 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
     if (!result.ok) return result.message
     apply(result)
     setPlayDraft(null)
+    return null
+  }
+
+  const recordPenalties = (input: RecordHockeyPenaltiesInput): string | null => {
+    const result = recordHockeyPenalties(state, input, context())
+    if (!result.ok) return result.message
+    apply(result)
+    setPenaltyOpen(false)
     return null
   }
 
@@ -261,6 +277,17 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             )}
           </div>
         </div>
+        {projection.status !== 'pregame' && (
+          <HockeyPenaltyBox
+            sport={sport}
+            reading={penaltyBox}
+            sideLabel={sideLabel}
+            onRelease={projection.clock && inProgress && active
+              ? entry => askReason('Why is this penalty ending early?', reason =>
+                  releaseHockeyPenalty(state, { penaltyEventId: entry.penaltyEventId, segment: entry.segment, reason }, context()))
+              : undefined}
+          />
+        )}
         {projection.status === 'pregame' && (
           <button type="button" className="btn-primary w-full" onClick={() => apply(startHockeyGame(state, context()))}>
             Start game
@@ -366,7 +393,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           />
         )}
         {canCapture && (
-          <div className="grid grid-cols-4 gap-2" role="group" aria-label="Quick capture">
+          <div className="grid grid-cols-5 gap-2" role="group" aria-label="Quick capture">
             {(['tracked', 'opponent'] as const).map(side => (
               <button
                 key={side}
@@ -379,8 +406,9 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
                 <span>Shot</span>
               </button>
             ))}
-            <button type="button" className="btn-secondary px-2" onClick={() => setGoalieOpen(true)}>Goalie</button>
-            <button type="button" className="btn-secondary px-2" onClick={() => setPlayDraft({ kind: 'hit', location: null })}>Play</button>
+            <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPenaltyOpen(true)}>Penalty</button>
+            <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setGoalieOpen(true)}>Goalie</button>
+            <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPlayDraft({ kind: 'hit', location: null })}>Play</button>
           </div>
         )}
       </section>
@@ -474,6 +502,16 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           opponentLabel={opponentLabel}
           onSubmit={recordGoalieChange}
           onClose={() => setGoalieOpen(false)}
+        />
+      )}
+      {penaltyOpen && (
+        <HockeyPenaltyDialog
+          sport={sport}
+          recentOpponentLabels={recentLabels}
+          trackedLabel={trackedLabel}
+          opponentLabel={opponentLabel}
+          onSubmit={recordPenalties}
+          onClose={() => setPenaltyOpen(false)}
         />
       )}
       {playDraft && (

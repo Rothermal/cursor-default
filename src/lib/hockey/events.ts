@@ -4,7 +4,15 @@ import type { GameEvent, GameEventActor, GameEventLocation, GameEventPeriod } fr
 import { createHockeyUuid } from './id'
 import { parseHockeyPeriod } from './periods'
 import { HOCKEY_FACEOFF_DOT_IDS, HOCKEY_FACEOFF_DOTS, type HockeyFaceoffDotId } from './rinkGeometry'
-import type { HockeyEvent, HockeyEventType, HockeyPayloadByType, HockeyShotActorRole, HockeySide } from './types'
+import { HOCKEY_INFRACTIONS, HOCKEY_PENALTY_CLASSES } from './penalties'
+import type {
+  HockeyEvent,
+  HockeyEventType,
+  HockeyPayloadByType,
+  HockeyPenaltyActorRole,
+  HockeyShotActorRole,
+  HockeySide,
+} from './types'
 import { HOCKEY_EMPTY_NET, HOCKEY_EVENT_SCHEMA_VERSION } from './types'
 
 export const HOCKEY_MAX_REASON_LENGTH = 200
@@ -13,6 +21,8 @@ const MAX_ID_LENGTH = 100
 const MAX_ON_ICE = 7
 const SHOT_ROLES: readonly HockeyShotActorRole[] = ['shooter', 'assist_primary', 'assist_secondary', 'goalie', 'blocker']
 const MAX_ELAPSED_MS = 4 * 60 * 60 * 1000
+const MAX_PENALTY_MS = 60 * 60 * 1000
+const PENALTY_ROLES: readonly HockeyPenaltyActorRole[] = ['offender', 'served_by', 'drawn_by']
 
 export interface CreateHockeyEventInput<TType extends HockeyEventType> {
   id?: string
@@ -247,6 +257,64 @@ export const hockeyEventDefinitions: GameEventDefinition<GameEvent>[] = [
         ? null
         : 'A faceoff is located exactly on its dot.'
     }
+  ),
+  captureDefinition(
+    'hockey.penalty',
+    { location: false, roles: PENALTY_ROLES },
+    payload => {
+      if (!exactKeys(payload, [
+        'captureCommandId',
+        'class',
+        'infraction',
+        'infractionLabel',
+        'durationMs',
+        'offenderKind',
+        'delayed',
+        'coincidenceGroupId',
+      ])) return 'Invalid penalty payload.'
+      if (!isCaptureId(payload.captureCommandId)) return 'Invalid capture command id.'
+      if (!(HOCKEY_PENALTY_CLASSES as readonly unknown[]).includes(payload.class)) return 'Unknown penalty class.'
+      if (!(HOCKEY_INFRACTIONS as readonly unknown[]).includes(payload.infraction)) return 'Unknown infraction.'
+      if (payload.infraction === 'other' ? !isLabel(payload.infractionLabel) : payload.infractionLabel !== null) {
+        return 'Name the infraction when it is Other, and only then.'
+      }
+      if (!['player', 'goalie', 'bench', 'staff'].includes(payload.offenderKind as string)) return 'Unknown offender.'
+      if (typeof payload.delayed !== 'boolean') return 'Delayed is true or false.'
+      const duration = payload.durationMs
+      if (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 0 || duration > MAX_PENALTY_MS) {
+        return 'A penalty lasts whole milliseconds, up to an hour.'
+      }
+      if ((payload.class === 'penalty_shot') !== (duration === 0)) {
+        return 'Only a penalty shot has no penalty time.'
+      }
+      if (payload.coincidenceGroupId !== null) {
+        if (!isId(payload.coincidenceGroupId)) return 'Invalid coincidence group.'
+        if (payload.coincidenceGroupId !== payload.captureCommandId) {
+          return 'A coincidence group is the penalties saved together.'
+        }
+      }
+      return null
+    },
+    event => {
+      const payload = event.payload as { offenderKind: string }
+      const roles = roleSet(event)
+      if (roles.has('offender') && (payload.offenderKind === 'bench' || payload.offenderKind === 'staff')) {
+        return 'A bench or staff penalty names no offending player.'
+      }
+      return null
+    }
+  ),
+  captureDefinition(
+    'hockey.penalty_release',
+    { location: false, roles: [] },
+    payload =>
+      exactKeys(payload, ['captureCommandId', 'penaltyEventId', 'segment', 'reason']) &&
+      isCaptureId(payload.captureCommandId) &&
+      isId(payload.penaltyEventId) &&
+      (payload.segment === 1 || payload.segment === 2) &&
+      isReason(payload.reason)
+        ? null
+        : 'A release names the penalty, its segment and a reason.'
   ),
   captureDefinition('hockey.hit', { location: true, roles: ['hitter', 'hit_player'] }, playPayload),
   captureDefinition('hockey.takeaway', { location: true, roles: ['player'] }, playPayload),
