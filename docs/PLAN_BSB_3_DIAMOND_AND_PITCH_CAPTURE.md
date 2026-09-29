@@ -1,6 +1,7 @@
 # Plan: BSB-3 Baseball Diamond Tracker and Pitch Pad
 
-Status: draft for owner review. No code starts until Mark approves or merges this plan.
+Status: owner questions answered 2026-09-29 (section 9); plan under review. No code starts
+until Mark approves or merges this plan.
 Builds on the BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)) and BSB-2 roster,
 defaults and setup ([plan](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 4, 8 and 12.
@@ -121,7 +122,7 @@ the same drawing.
 | BSB-3A | Diamond geometry and component, pitch pad component, scoreboard strip, tracker page shell replacing the holding page (Start game stays), preferences | The tracker shows the live projection of a started game at 390px in both themes; no capture yet |
 | BSB-3B | Pitches and plate appearances: pitch results, automatic walk/HBP/strikeout completion, in-play sheet (result, batted-ball type, spray location, fielder sequence), Quick PA | A plate appearance of every result type can be recorded and the count, outs, bases and score update |
 | BSB-3C | Runner resolution and between-pitch running | Every runner outcome in the BSB-1 fixtures can be entered by taps |
-| BSB-3D | Endings, pitching changes, opponent slot labels, Recent plays and Undo, release toggle (Q1) | A full seven-inning local game, with a pitching change and a walk-off, can be scored and survives reload |
+| BSB-3D | Endings, pitching changes, opponent slot labels, Recent plays and Undo, owner-only release toggle (Q1) | A full seven-inning local game, with a pitching change and a walk-off, can be scored and survives reload |
 
 ### BSB-3B Pitches and plate appearances
 
@@ -244,7 +245,7 @@ The command is `recordBaseballPitch`, with the movements proposed by
 
 **Release toggle (Q1):**
 
-- If approved, production gets an owner-only, default-off device toggle for Baseball
+- Production gets an owner-only, default-off device toggle for Baseball
   event tracking, like Hockey HKY-2E. It adds a per-sport stage in
   `sportAvailability.ts`, so `isBaseballEventPreviewAvailable` becomes the audited
   policy.
@@ -275,7 +276,7 @@ The command is `recordBaseballPitch`, with the movements proposed by
 - BSB-0 cross-sport note 5, secondary placement: the pitch pad is the second "placement
   in a sport frame" after the Soccer goal mouth. No shared component is extracted yet.
   It is noted for when a third use appears.
-- XS-1 release gating, if Q1 is approved.
+- XS-1 release gating (Q1).
 - The Recent plays and Undo rules match Hockey HKY-2C and Basketball. The components stay
   sport-owned under the shared product decisions.
 
@@ -338,12 +339,13 @@ The command is `recordBaseballPitch`, with the movements proposed by
 
 ---
 
-## 9. Questions for Mark
+## 9. Owner Decisions (2026-09-29)
 
-Each has a recommended default. Work proceeds on the recommendation for any question
-left unanswered once the plan itself is approved.
+Mark accepted every recommendation ("yes to all recommendations"). Recording these
+answers does not approve the plan; implementation starts after the plan PR is approved
+or merged.
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 | --- | --- | --- |
 | Q1 | Should you be able to try Baseball on your phone before the full release? | Yes: an owner-only, default-off device toggle in production at the end of BSB-3, local-only, like Hockey |
 | Q2 | Include pitching changes (both teams) in BSB-3, leaving other substitutions for BSB-4? | Yes: a real game needs pitching changes to be scored |
