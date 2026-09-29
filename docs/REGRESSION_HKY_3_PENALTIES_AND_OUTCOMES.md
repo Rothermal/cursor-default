@@ -53,3 +53,43 @@ Browser (dev build, 390 x 844, touch):
 - Reload: the box and timers come back.
 
 Checks: `pnpm typecheck`, `pnpm lint` (0 errors), `pnpm test`, `pnpm build`.
+
+## HKY-3B Goal strength, special teams, timeouts, icing and offside
+
+Automated (`src/lib/hockey/specialTeams.test.ts`, 19 cases):
+
+| Case | Result |
+|---|---|
+| Goal strength prefilled EV, PP and SH from the box | Pass |
+| Pulled-goalie extra attacker reads as even strength | Pass |
+| Recorder's choice stored and kept through a clock correction | Pass |
+| Clockless games default to EV and store the recorder's choice | Pass |
+| Strength on a non-goal rejected | Pass |
+| PP goal ends the short-handed minor with the least time left | Pass |
+| PP goal never releases a major | Pass |
+| PP goal releases only the double-minor segment being served | Pass |
+| No release when `releaseMinorOnPowerPlayGoal` is false | Pass |
+| Undoing the PP goal brings the minor back | Pass |
+| PP opportunities skip coincidental and four-on-four minors | Pass |
+| PP and SH goals and assists credited | Pass |
+| Plus/minus counts EV and SH goals with a complete on-ice set | Pass |
+| Plus/minus counts empty-net goals, skips PP goals | Pass |
+| Goals without a complete set or strength listed as skipped | Pass |
+| Timeout pauses a running clock; counted per side | Pass |
+| Stored timeout while the clock runs rejected on replay | Pass |
+| Icing and offside counted per side with an optional location | Pass |
+| Timeouts and team events round-trip through `HYDRATE_STATE` | Pass |
+
+HKY-1, HKY-2 and HKY-3A suites pass unchanged.
+
+Browser (dev build, 390 x 844, touch):
+
+- Opponent minor: box `5v4`, scoreboard `PP 0/1` for the tracked side.
+- Tracked goal: Power play chip preselected with "From the penalty box."; after saving,
+  the opponent minor leaves the box and the scoreboard shows `PP 1/1`; Recent Events
+  shows `Home goal (PP)`.
+- Play dialog Timeout pauses the clock and the scoreboard shows `TO 1`; Icing against
+  the opponent records and shows in Recent Events.
+- Reload: scoreboard totals come back. No console errors.
+
+Checks: `pnpm typecheck`, `pnpm lint` (0 errors), `pnpm test`, `pnpm build`.

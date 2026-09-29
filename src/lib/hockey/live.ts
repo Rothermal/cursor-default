@@ -166,7 +166,7 @@ export function endHockeyPeriod(
     const events: PendingEvent[] = []
     let elapsedMs: number | null = null
     if (projection.clock) {
-      const pause = pauseIfRunning(projection, period, context.occurredAt)
+      const pause = hockeyPauseIfRunning(projection, period, context.occurredAt)
       if (typeof pause === 'string') return pause
       if (pause) events.push(pause.event)
       elapsedMs = pause ? pause.elapsedMs : projection.clock.elapsedMs
@@ -217,7 +217,7 @@ export function interruptHockeyMatch(
     if (!reason) return { code: 'reason_required', message: 'A reason is required.' }
     const period = currentPeriod(projection)
     const events: PendingEvent[] = []
-    const pause = pauseIfRunning(projection, period, context.occurredAt)
+    const pause = hockeyPauseIfRunning(projection, period, context.occurredAt)
     if (typeof pause === 'string') return pause
     if (pause) events.push(pause.event)
     events.push({
@@ -264,7 +264,7 @@ export function finishDecidedHockeyGame(state: GameState, context: HockeyCommand
     let period = currentPeriod(projection)
     if (active) {
       period = { id: active.id, order: active.order }
-      const pause = pauseIfRunning(projection, period, context.occurredAt)
+      const pause = hockeyPauseIfRunning(projection, period, context.occurredAt)
       if (typeof pause === 'string') return pause
       if (pause) events.push(pause.event)
       events.push({
@@ -303,7 +303,7 @@ export function startHockeyClock(state: GameState, context: HockeyCommandContext
 export function pauseHockeyClock(state: GameState, context: HockeyCommandContext): HockeyCommandResult {
   return clockCommand(state, context, (projection, clock, _active, period) => {
     if (!clock.running) return 'The clock is already paused.'
-    const pause = pauseIfRunning(projection, period, context.occurredAt)
+    const pause = hockeyPauseIfRunning(projection, period, context.occurredAt)
     if (typeof pause === 'string') return pause
     return pause ? [pause.event] : 'The clock is already paused.'
   })
@@ -501,7 +501,7 @@ function clockCommand(
 }
 
 /** A pause event when the anchored clock is running; expiration is detected from the moment. */
-function pauseIfRunning(
+export function hockeyPauseIfRunning(
   projection: HockeyMatchProjection,
   period: GameEventPeriod,
   occurredAt: string

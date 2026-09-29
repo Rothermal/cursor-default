@@ -8,12 +8,22 @@ import {
   type HockeyPlayKind,
   type HockeySide,
   type HockeySportGameState,
+  type HockeyTeamEventKind,
   type RecordHockeyPlayInput,
 } from '../../lib/hockey'
 import { ActorField, Choices, Group } from './hockeyFields'
 
+/** Plays by a player, plus team-only events: timeouts (HKY-3B), icing and offside. */
+export type HockeyPlayDialogKind = HockeyPlayKind | HockeyTeamEventKind | 'timeout'
+
+export interface HockeyTeamPlayInput {
+  kind: HockeyTeamEventKind | 'timeout'
+  side: HockeySide
+  location: { x: number; y: number } | null
+}
+
 export interface HockeyPlayDraft {
-  kind: HockeyPlayKind
+  kind: HockeyPlayDialogKind
   location: { x: number; y: number } | null
 }
 
@@ -25,12 +35,27 @@ interface HockeyPlayDialogProps {
   opponentLabel: string
   /** Returns an error message, or null once the play is recorded. */
   onSubmit: (input: RecordHockeyPlayInput) => string | null
+  /** Timeouts, icing and offside; returns an error message, or null once recorded. */
+  onTeamSubmit: (input: HockeyTeamPlayInput) => string | null
   onClose: () => void
 }
 
-const TITLES: Record<HockeyPlayKind, string> = { hit: 'Hit', takeaway: 'Takeaway', giveaway: 'Giveaway' }
+const TITLES: Record<HockeyPlayDialogKind, string> = {
+  hit: 'Hit',
+  takeaway: 'Takeaway',
+  giveaway: 'Giveaway',
+  timeout: 'Timeout',
+  icing: 'Icing',
+  offside: 'Offside',
+}
+const KINDS: HockeyPlayDialogKind[] = ['hit', 'takeaway', 'giveaway', 'timeout', 'icing', 'offside']
+const isTeamKind = (kind: HockeyPlayDialogKind): kind is HockeyTeamPlayInput['kind'] =>
+  kind === 'timeout' || kind === 'icing' || kind === 'offside'
 
-/** Hits, takeaways and giveaways (HKY-2C). Every player field is optional. */
+/**
+ * Hits, takeaways and giveaways (HKY-2C), with timeouts, icing and offside (HKY-3B). Every
+ * player field is optional; team events record only the side.
+ */
 export default function HockeyPlayDialog({
   draft,
   sport,
@@ -38,10 +63,11 @@ export default function HockeyPlayDialog({
   trackedLabel,
   opponentLabel,
   onSubmit,
+  onTeamSubmit,
   onClose,
 }: HockeyPlayDialogProps) {
   const titleId = useId()
-  const [kind, setKind] = useState<HockeyPlayKind>(draft.kind)
+  const [kind, setKind] = useState<HockeyPlayDialogKind>(draft.kind)
   const [side, setSide] = useState<HockeySide>('tracked')
   const [player, setPlayer] = useState('')
   const [hitPlayer, setHitPlayer] = useState('')
@@ -55,7 +81,13 @@ export default function HockeyPlayDialog({
     return owner === 'tracked' ? { participantId: trimmed } : { label: trimmed }
   }
 
+  const team = isTeamKind(kind)
   const submit = () => {
+    if (isTeamKind(kind)) {
+      const message = onTeamSubmit({ kind, side, location: kind === 'timeout' ? null : draft.location })
+      if (message) setError(message)
+      return
+    }
     const message = onSubmit({
       kind,
       side,
@@ -78,7 +110,9 @@ export default function HockeyPlayDialog({
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="truncate font-bold text-content">{TITLES[kind]}</h2>
-            <p className="text-xs text-content-muted">{draft.location ? 'Located on the rink' : 'No location'}</p>
+            <p className="text-xs text-content-muted">
+              {kind === 'timeout' ? 'Pauses a running clock' : draft.location ? 'Located on the rink' : 'No location'}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close">
             <X size={20} />
@@ -87,20 +121,20 @@ export default function HockeyPlayDialog({
         <div className="space-y-4 p-4">
           <Group label="Play">
             <Choices
-              options={(['hit', 'takeaway', 'giveaway'] as const).map(value => ({ value, label: TITLES[value] }))}
+              options={KINDS.map(value => ({ value, label: TITLES[value] }))}
               value={kind}
               onChange={value => { setKind(value); setError(null) }}
-              columns={4}
+              columns={3}
             />
           </Group>
-          <Group label={kind === 'hit' ? 'Hitting side' : 'Side'}>
+          <Group label={kind === 'hit' ? 'Hitting side' : kind === 'timeout' ? 'Timeout for' : team ? 'Called against' : 'Side'}>
             <Choices
               options={(['tracked', 'opponent'] as const).map(value => ({ value, label: sideName(value) }))}
               value={side}
               onChange={value => { setSide(value); setPlayer(''); setHitPlayer(''); setError(null) }}
             />
           </Group>
-          <ActorField
+          {!team && <ActorField
             label={kind === 'hit' ? 'Hit by' : 'Player'}
             owner={side}
             value={player}
@@ -108,7 +142,7 @@ export default function HockeyPlayDialog({
             trackedOptions={choices}
             recentLabels={recentOpponentLabels}
             emptyLabel="Unknown"
-          />
+          />}
           {kind === 'hit' && (
             <ActorField
               label="Player hit"

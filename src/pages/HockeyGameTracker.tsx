@@ -5,7 +5,7 @@ import HockeyFaceoffControl from '../components/hockey/HockeyFaceoffControl'
 import HockeyGoalieDialog, { type HockeyGoalieChange } from '../components/hockey/HockeyGoalieDialog'
 import HockeyPenaltyBox from '../components/hockey/HockeyPenaltyBox'
 import HockeyPenaltyDialog from '../components/hockey/HockeyPenaltyDialog'
-import HockeyPlayDialog, { type HockeyPlayDraft } from '../components/hockey/HockeyPlayDialog'
+import HockeyPlayDialog, { type HockeyPlayDraft, type HockeyTeamPlayInput } from '../components/hockey/HockeyPlayDialog'
 import HockeyRecentEvents from '../components/hockey/HockeyRecentEvents'
 import HockeyRink from '../components/hockey/HockeyRink'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
@@ -22,10 +22,12 @@ import {
   formatHockeyPeriod,
   hockeyActivePeriod,
   hockeyClockDisplay,
+  hockeyGoalStrengthFor,
   hockeyPenaltyBoxNow,
   hockeyPlayMarkers,
   hockeyRecentEvents,
   hockeyShotMarkers,
+  hockeySpecialTeams,
   hockeySportState,
   interruptHockeyMatch,
   lastHockeyPeriod,
@@ -36,6 +38,8 @@ import {
   recordHockeyPenalties,
   recordHockeyPlay,
   recordHockeyShot,
+  recordHockeyTeamEvent,
+  recordHockeyTimeout,
   releaseHockeyPenalty,
   reopenHockeyMatch,
   restoreHockeyCapture,
@@ -157,6 +161,13 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const streamEvents = (state.eventStream?.events ?? []) as GameEvent[]
   const canCapture = inProgress && active && !projection.decidedInPeriodId
   const recentLabels = recentHockeyOpponentLabels(streamEvents)
+  const specialTeams = hockeySpecialTeams(sport.setup, projection)
+  const powerPlayLine = (side: HockeySide) => {
+    const chances = specialTeams.powerPlayOpportunities?.[side] ?? 0
+    const goals = specialTeams.powerPlayGoals[side]
+    if (chances === 0 && goals === 0) return null
+    return specialTeams.powerPlayOpportunities ? `PP ${goals}/${chances}` : `PPG ${goals}`
+  }
 
   const recordShot = (input: RecordHockeyShotInput): string | null => {
     const result = recordHockeyShot(state, input, context())
@@ -185,6 +196,16 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
 
   const recordPlay = (input: RecordHockeyPlayInput): string | null => {
     const result = recordHockeyPlay(state, input, context())
+    if (!result.ok) return result.message
+    apply(result)
+    setPlayDraft(null)
+    return null
+  }
+
+  const recordTeamPlay = (input: HockeyTeamPlayInput): string | null => {
+    const result = input.kind === 'timeout'
+      ? recordHockeyTimeout(state, { side: input.side }, context())
+      : recordHockeyTeamEvent(state, { kind: input.kind, side: input.side, location: input.location }, context())
     if (!result.ok) return result.message
     apply(result)
     setPlayDraft(null)
@@ -249,7 +270,13 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             <div key={side} className={`min-w-0 text-center ${side === 'opponent' ? 'order-3' : ''}`}>
               <p className="truncate text-xs font-bold uppercase text-content-muted">{sideLabel(side)}</p>
               <p className="text-3xl font-bold tabular-nums" aria-label={`${sideLabel(side)} score`}>{projection.score[side]}</p>
-              <p className="text-xs text-content-muted">{projection.shotsOnGoal[side]} SOG</p>
+              <p className="text-xs text-content-muted">
+                {[
+                  `${projection.shotsOnGoal[side]} SOG`,
+                  powerPlayLine(side),
+                  projection.timeouts[side] > 0 ? `TO ${projection.timeouts[side]}` : null,
+                ].filter(Boolean).join(' · ')}
+              </p>
             </div>
           ))}
           <div className="order-2 flex flex-col items-center gap-1">
@@ -491,6 +518,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           recentOpponentLabels={recentLabels}
           trackedLabel={trackedLabel}
           opponentLabel={opponentLabel}
+          derivedStrength={side => (penaltyBox.strength ? hockeyGoalStrengthFor(penaltyBox.strength, side) : null)}
           onSubmit={recordShot}
           onClose={() => setShotDraft(null)}
         />
@@ -522,6 +550,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           trackedLabel={trackedLabel}
           opponentLabel={opponentLabel}
           onSubmit={recordPlay}
+          onTeamSubmit={recordTeamPlay}
           onClose={() => setPlayDraft(null)}
         />
       )}

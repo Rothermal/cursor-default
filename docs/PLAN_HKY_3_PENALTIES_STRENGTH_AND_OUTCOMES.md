@@ -324,3 +324,30 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 - Tests: `penalties.test.ts` (32 cases). Record:
   [REGRESSION_HKY_3_PENALTIES_AND_OUTCOMES.md](REGRESSION_HKY_3_PENALTIES_AND_OUTCOMES.md).
 
+
+### HKY-3B (implemented)
+
+- Goal strength: `recordHockeyShot` writes `strength` on goals only (other outcomes are
+  rejected by the registry). Without a recorder choice it uses
+  `hockeyDerivedGoalStrength`, which compares both sides' `baseSkaters` at the goal's
+  game time, so a pulled-goalie extra attacker stays even strength. The shot dialog shows
+  Even / Power play / Short chips prefilled from the box and says when the recorder's
+  choice differs; clockless games preselect Even. Stored strength is never re-derived.
+- Power-play goal release: the box simulation now takes goals confirmed as PP (in
+  `powerPlayGoals`, replay order) and ends the short-handed side's running minor or
+  double-minor segment with the least time left. Undoing the goal brings the minor back.
+- Special teams: `hockeySpecialTeams` gives PP opportunities (counted when a
+  non-cancelled strength penalty leaves the penalized side with more strength items open
+  than the other side), PP goals and SH goals; opportunities are null for clockless
+  games. The scoreboard shows `PP goals/opportunities` per side (`PPG n` when clockless).
+  New player stats `hky_ppg`, `hky_ppa`, `hky_shg`, `hky_sha`; team goals by strength in
+  `goalsByStrength`.
+- Plus/minus: `hky_pm` counts EV and SH goals (empty-net included) with a complete on-ice
+  set; PP goals are skipped by rule, and goals without a complete set or a recorded
+  strength go to `plusMinusSkippedGoalIds`.
+- Timeouts (`hockey.timeout`) and icing/offside (`hockey.team_event`) are recorded from
+  the Play dialog. A timeout pauses a running clock in the same command and replay
+  rejects one stored while the clock runs. The scoreboard shows the timeout count.
+- Deviations: PK percentage and the skipped plus/minus quality note have no screen yet;
+  both are derivable from the projection and land with the Hockey Summary.
+- Tests: `specialTeams.test.ts` (19 cases).

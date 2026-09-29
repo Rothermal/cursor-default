@@ -29,6 +29,7 @@ import { hockeyTrackedAttackingDirection } from './setup'
 import { createHockeyMatchProjection } from './state'
 import {
   accumulateHockeyPenaltyStats,
+  accumulateHockeyPlusMinus,
   accumulateHockeyPlayStats,
   accumulateHockeyShotStats,
   emptyHockeyParticipantStats,
@@ -185,8 +186,12 @@ class HockeyReplay {
     this.anchored = setup.rulesSnapshot.clockModel === 'anchored'
   }
 
+  /** Position of the event being applied, so simultaneous box actions keep capture order. */
+  private replayIndex = -1
+
   apply(event: HockeyEvent): void {
     if (event.sportId !== 'hockey') fail('Only Hockey events can be replayed.')
+    this.replayIndex += 1
     this.trackUnit(event)
     this.checkPeriodEnvelope(event)
     this.checkElapsed(event)
@@ -227,6 +232,10 @@ class HockeyReplay {
         return this.penalty(event)
       case 'hockey.penalty_release':
         return this.penaltyRelease(event)
+      case 'hockey.timeout':
+        return this.timeout(event)
+      case 'hockey.team_event':
+        return this.teamEvent(event)
       default:
         fail('Unknown Hockey event type.')
     }
@@ -478,6 +487,12 @@ class HockeyReplay {
     if (payload.outcome === 'goal') {
       p.score[side] += 1
       totals.goals[side] += 1
+      p.goalsByStrength[side][payload.strength ?? 'unrecorded'] += 1
+      const gameTimeMs = hockeyGameTimeMs(p, active.id, event.elapsedMs)
+      if (payload.strength === 'pp' && gameTimeMs !== null) {
+        p.powerPlayGoals.push({ eventId: event.id, side, gameTimeMs, replayIndex: this.replayIndex })
+      }
+      if (!accumulateHockeyPlusMinus(this.stats, event)) p.plusMinusSkippedGoalIds.push(event.id)
       this.refreshSuddenDeathDecision()
     }
     accumulateHockeyShotStats(this.stats, event)
@@ -665,6 +680,7 @@ class HockeyReplay {
       gameTimeMs,
       captureCommandId: commandId,
       coincidenceGroupId: payload.coincidenceGroupId,
+      replayIndex: this.replayIndex,
     })
     p.penaltyTotals[side].penalties += 1
     p.penaltyTotals[side].pimMs += payload.durationMs
@@ -693,7 +709,24 @@ class HockeyReplay {
     if (hockeyPenaltyReleaseExists(p.penaltyReleases, penaltyEventId, segment)) fail('That penalty segment was already released.')
     const gameTimeMs = hockeyGameTimeMs(p, active.id, event.elapsedMs)
     if (gameTimeMs === null) fail('A release needs the clock time.')
-    p.penaltyReleases.push({ eventId: event.id, penaltyEventId, segment, reason, gameTimeMs })
+    p.penaltyReleases.push({ eventId: event.id, penaltyEventId, segment, reason, gameTimeMs, replayIndex: this.replayIndex })
+  }
+
+  // -- team events (HKY-3B) --------------------------------------------------
+
+  /** A team timeout is taken with the clock stopped. */
+  private timeout(event: HockeyEvent<'hockey.timeout'>): void {
+    const p = this.projection
+    if (p.status !== 'in_progress' || !hockeyActivePeriod(p)) fail('Timeouts are taken during a period.')
+    if (p.clock?.running) fail('Pause the clock for the timeout.')
+    p.timeouts[event.teamSide] += 1
+  }
+
+  private teamEvent(event: HockeyEvent<'hockey.team_event'>): void {
+    const p = this.projection
+    if (p.status !== 'in_progress' || !hockeyActivePeriod(p)) fail('Icing and offside are recorded during a period.')
+    const totals = event.payload.kind === 'icing' ? p.icings : p.offsides
+    totals[event.teamSide] += 1
   }
 
   private periodTotals(periodId: string) {

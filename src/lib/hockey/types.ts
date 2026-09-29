@@ -237,7 +237,7 @@ export interface HockeyReasonPayload extends HockeyCapturePayload {
 
 export type HockeyShotOutcome = 'goal' | 'saved' | 'missed' | 'blocked'
 export type HockeyMissType = 'wide' | 'high' | 'post' | 'crossbar'
-/** Frozen now so HKY-3B needs no schema version 2; HKY-2 always writes null. */
+/** Written on goals since HKY-3B; HKY-2 goals and every non-goal keep null. */
 export type HockeyStrength = 'ev' | 'pp' | 'sh'
 export type HockeyOnIceStatus = 'complete' | 'partial' | 'not_recorded'
 
@@ -344,6 +344,17 @@ export interface HockeyPenaltyReleasePayload extends HockeyCapturePayload {
   reason: string
 }
 
+// -- Team events (HKY-3B) ----------------------------------------------------
+
+/** A team timeout; the clock is paused. */
+export type HockeyTimeoutPayload = HockeyCapturePayload
+
+export type HockeyTeamEventKind = 'icing' | 'offside'
+
+export interface HockeyTeamEventPayload extends HockeyCapturePayload {
+  kind: HockeyTeamEventKind
+}
+
 /** Actor roles on `hockey.penalty`. */
 export type HockeyPenaltyActorRole = 'offender' | 'served_by' | 'drawn_by'
 
@@ -370,6 +381,8 @@ export interface HockeyPayloadByType {
   'hockey.giveaway': HockeyPlayPayload
   'hockey.penalty': HockeyPenaltyPayload
   'hockey.penalty_release': HockeyPenaltyReleasePayload
+  'hockey.timeout': HockeyTimeoutPayload
+  'hockey.team_event': HockeyTeamEventPayload
 }
 
 export type HockeyEventType = keyof HockeyPayloadByType
@@ -384,6 +397,8 @@ export const HOCKEY_SIDED_EVENT_TYPES = [
   'hockey.giveaway',
   'hockey.penalty',
   'hockey.penalty_release',
+  'hockey.timeout',
+  'hockey.team_event',
 ] as const
 
 /** Events the recorder captures, which Recent Events can undo. Faceoffs are neutral. */
@@ -470,6 +485,29 @@ export interface HockeyMatchProjection {
   penaltyTotals: { tracked: HockeyPenaltyTotals; opponent: HockeyPenaltyTotals }
   /** Tracked participants removed by a game misconduct or match penalty. */
   removedParticipantIds: string[]
+  /** Goals by the strength stored on them (HKY-3B); HKY-2 goals are `unrecorded`. */
+  goalsByStrength: { tracked: HockeyGoalStrengthTotals; opponent: HockeyGoalStrengthTotals }
+  /** Power-play goals with a clock time, which can release a minor in the box. */
+  powerPlayGoals: HockeyPowerPlayGoalRecord[]
+  /** Goals left out of plus/minus: no complete on-ice set, or no recorded strength. */
+  plusMinusSkippedGoalIds: string[]
+  timeouts: { tracked: number; opponent: number }
+  icings: { tracked: number; opponent: number }
+  offsides: { tracked: number; opponent: number }
+}
+
+export interface HockeyGoalStrengthTotals {
+  ev: number
+  pp: number
+  sh: number
+  unrecorded: number
+}
+
+export interface HockeyPowerPlayGoalRecord {
+  eventId: string
+  side: HockeySide
+  gameTimeMs: number
+  replayIndex: number
 }
 
 export interface HockeyPenaltyTotals {
@@ -498,6 +536,8 @@ export interface HockeyPenaltyRecord {
   gameTimeMs: number | null
   captureCommandId: string | null
   coincidenceGroupId: string | null
+  /** Position in replay, so simultaneous box actions keep capture order. */
+  replayIndex: number
 }
 
 export interface HockeyPenaltyReleaseRecord {
@@ -506,6 +546,7 @@ export interface HockeyPenaltyReleaseRecord {
   segment: 1 | 2
   reason: string
   gameTimeMs: number
+  replayIndex: number
 }
 
 export interface HockeyFaceoffRecord {

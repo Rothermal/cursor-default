@@ -22,10 +22,10 @@ export function Choices<T extends string>({
   options: Array<{ value: T; label: string }>
   value: T
   onChange: (value: T) => void
-  columns?: 2 | 4
+  columns?: 2 | 3 | 4
 }) {
   return (
-    <div className={`grid gap-1 rounded-md bg-control p-1 ${columns === 4 ? 'grid-cols-4' : 'grid-cols-2'}`}>
+    <div className={`grid gap-1 rounded-md bg-control p-1 ${columns === 4 ? 'grid-cols-4' : columns === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
       {options.map(option => (
         <button
           key={option.value}
