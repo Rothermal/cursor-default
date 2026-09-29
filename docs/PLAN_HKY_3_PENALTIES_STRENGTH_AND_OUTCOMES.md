@@ -117,9 +117,17 @@ anchored games only:
 - `penalty_shot` has no box time; the recorder then records the penalty shot through the
   existing shot flow with `penaltyShot: true`.
 
-**Strength projection**: skaters per side = `skatersPerSide` minus penalties counting
-against strength (never below `minimumSkaters`), plus one extra attacker when that side's
-goalie is pulled. The projection exposes the current state and a timeline for review.
+**Strength projection** exposes two named counts per side, and every consumer says which
+one it reads:
+
+- `baseSkaters`: the period's skaters (`skatersPerSide`, or `overtime.skaters` in
+  overtime) adjusted by penalties counting against strength (never below
+  `minimumSkaters`). It never includes an extra attacker.
+- `skatersOnIce`: `baseSkaters` plus one when that side's net is empty. This is the
+  displayed strength (for example `6v5`) and the input to goal-strength prefill.
+
+The empty-net increment is applied in exactly one place, the step from `baseSkaters` to
+`skatersOnIce`. The projection exposes the current state and a timeline for review.
 Clockless games record penalties, PIM and the box list, but have no timers and no derived
 strength (§7 Q1).
 
@@ -175,12 +183,14 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 - **On-ice validation follows the event-time strength.** Today `checkHockeyOnIce`
   (`captureProjection.ts`) caps a complete set at the period's skaters, plus one for an
   empty net, so a complete 4-skater set in a 3v3 overtime is rejected. HKY-3C changes it
-  to take the side's allowed skater count at the event's clock time from the strength
-  projection:
-  - anchored games: minimum `min(minimumSkaters, allowed)`, maximum `allowed`, plus one
-    when that side's net is empty,
+  to take the side's `baseSkaters` at the event's clock time from the strength
+  projection, never `skatersOnIce`, and to add the empty-net attacker once from the
+  set's own goalie field, as today:
+  - anchored games: minimum `min(minimumSkaters, baseSkaters)`, maximum `baseSkaters`,
+    plus one when the set's goalie is the empty net,
   - clockless games (no derived strength): the period's skaters as today, widened in
-    overtime to `skatersPerSide`, because penalties can only add overtime skaters,
+    overtime to `skatersPerSide`, because penalties can only add overtime skaters, plus
+    one for an empty net in the same way,
   - capture and replay use the same function, and the on-ice picker in the shot dialog
     reads the same limit, so the UI never offers a set that replay rejects.
   Pre-HKY-3 games have no penalties, so the allowed count equals today's period cap and
@@ -246,6 +256,9 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 - overtime on-ice: complete tracked 4v3 and 5v3 overtime goal sets accepted at capture
   and replay, hydrated, and scored in plus/minus under the plus/minus rule; a 4-skater
   set rejected in 3v3 with no penalty; the shot dialog offering the same limits,
+- empty net counted once: a regulation empty-net set of 6 accepted and 7 rejected; a
+  penalty-free 3v3 overtime empty-net set of 4 accepted and 5 rejected; a literal
+  pre-HKY-3 empty-net goal fixture replaying unchanged,
 - goal strength prefilled for EV, PP, SH and a pulled-goalie 6v5, and changed by the
   recorder; a clock correction not relabelling stored strength,
 - plus/minus with complete, partial and missing on-ice sets,
