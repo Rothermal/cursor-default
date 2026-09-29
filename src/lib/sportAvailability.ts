@@ -1,9 +1,17 @@
 export const SOCCER_RELEASED_IN_PRODUCTION = true
 export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
+/**
+ * XS-1 per-sport event stages (HKY-2E). Rollback: set a row to 'internal'. Existing
+ * event games stay reachable at every stage; only new games are gated.
+ */
+export const SPORT_EVENT_RELEASE_STAGES = {
+  hockey: 'opt_in',
+} as const satisfies Record<string, SportEventReleaseStage>
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
 export type SportReleaseStage = 'unreleased' | 'preview' | 'released'
 export type BasketballEventReleaseStage = 'internal' | 'opt_in'
+export type SportEventReleaseStage = 'internal' | 'opt_in'
 
 export interface SportAvailabilityPolicy {
   releaseStage: SportReleaseStage | null
@@ -30,12 +38,38 @@ interface BasketballEventCreationPolicyOptions {
   releaseStage?: BasketballEventReleaseStage
 }
 
+export interface SportEventCreationPolicy {
+  releaseStage: SportEventReleaseStage
+  /** Whether the device toggle is shown and honoured in this build. */
+  preferenceAvailable: boolean
+  canCreateNewEventGame: boolean
+  canAccessExistingEventGames: true
+}
+
+interface SportEventCreationPolicyOptions {
+  development?: boolean
+  releaseStage?: SportEventReleaseStage
+}
+
 /**
- * HKY-1: the Hockey event workspace is a development preview. Production builds keep
- * the legacy Hockey stat grid; HKY-6 owns the release decision.
+ * HKY-2E (Q2): new Hockey event games need the owner's device toggle in production,
+ * which defaults off. Development keeps the preview without the toggle. Event Hockey
+ * stays local-only at every stage; HKY-6 owns the wider release.
  */
-export function isHockeyEventPreviewAvailable(development: boolean = DEVELOPMENT_BUILD): boolean {
-  return development
+export function getHockeyEventCreationPolicy(
+  enabledOnDevice: boolean,
+  {
+    development = DEVELOPMENT_BUILD,
+    releaseStage = SPORT_EVENT_RELEASE_STAGES.hockey,
+  }: SportEventCreationPolicyOptions = {}
+): SportEventCreationPolicy {
+  const preferenceAvailable = releaseStage === 'opt_in'
+  return {
+    releaseStage,
+    preferenceAvailable,
+    canCreateNewEventGame: development || (preferenceAvailable && enabledOnDevice),
+    canAccessExistingEventGames: true,
+  }
 }
 
 /**

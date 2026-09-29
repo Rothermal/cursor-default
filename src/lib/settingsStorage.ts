@@ -7,9 +7,15 @@ export interface BasketballDeviceSettings {
   clockExpirationVibrationEnabled: boolean
 }
 
+export interface HockeyDeviceSettings {
+  /** HKY-2E: owner opt-in for new Hockey event games; defaults off. */
+  eventTrackerEnabled: boolean
+}
+
 export interface AppSettings {
   enabledSports: Record<string, boolean>
   basketball: BasketballDeviceSettings
+  hockey: HockeyDeviceSettings
   courtCapture: {
     reboundPromptAfterMiss: boolean
   }
@@ -28,6 +34,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showClockTenths: true,
     clockExpirationSoundEnabled: false,
     clockExpirationVibrationEnabled: false,
+  },
+  hockey: {
+    eventTrackerEnabled: false,
   },
   courtCapture: {
     reboundPromptAfterMiss: false,
@@ -56,6 +65,7 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
   const basketball = isRecord(stored.basketball)
     ? stored.basketball
     : {}
+  const hockey = isRecord(stored.hockey) ? stored.hockey : {}
 
   return {
     enabledSports: {
@@ -79,6 +89,10 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
         typeof basketball.clockExpirationVibrationEnabled === 'boolean'
           ? basketball.clockExpirationVibrationEnabled
           : DEFAULT_SETTINGS.basketball.clockExpirationVibrationEnabled,
+    },
+    hockey: {
+      // Only an explicit true opts in; malformed values fail closed.
+      eventTrackerEnabled: hockey.eventTrackerEnabled === true,
     },
     courtCapture: {
       reboundPromptAfterMiss:

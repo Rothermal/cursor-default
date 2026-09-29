@@ -16,7 +16,7 @@ import {
   sportTeamsPath,
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
-import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import { getHockeyEventCreationPolicy, getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import { gameSideDisplayName } from '../lib/display'
 import {
   basketballSetupAccountScope,
@@ -53,7 +53,7 @@ export default function SportDashboard() {
   const { sportId } = useParams()
   const navigate = useNavigate()
   const { isConfigured, user } = useAuth()
-  const { isSportEnabled } = useSettings()
+  const { isSportEnabled, hockeyEventTrackerEnabled } = useSettings()
   const {
     state,
     activeLocalGameId,
@@ -136,6 +136,16 @@ export default function SportDashboard() {
         clearBasketballSetupDraft(scope)
       }
       navigate('/setup?sport=basketball')
+      return
+    }
+    // HKY-2E: with the device toggle on, new Hockey games use the event tracker. Its setup
+    // page replaces the active game only when Start is pressed.
+    if (
+      sport.id === 'hockey' &&
+      hockeyEventTrackerEnabled &&
+      getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame
+    ) {
+      navigate('/setup?sport=hockey&events=1')
       return
     }
     if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
