@@ -74,3 +74,18 @@ it('routes live shots to the compact sheet and hands off to the full dialog', ()
   expect(dialog).toContain("primary?.participantId ?? (event ? null : initializationDraft.primaryCreatorId) ?? ''")
   expect(sheet).toMatch(/moreDetails = \(\) => onMoreDetails\(\{\s*mode: 'live',/)
 })
+
+it('wires Field Undo through the checked history helpers and tracker guard', () => {
+  const tracker = readFileSync('src/pages/SoccerGameTracker.tsx', 'utf8')
+  const sheet = readFileSync('src/components/soccer/SoccerRecentEventsSheet.tsx', 'utf8')
+  // Disabled with nothing to undo, an unhealthy history, while applying, or cloud final.
+  expect(tracker).toContain('disabled={!healthy || isApplying || cloudFinal || !recentUndo.target}')
+  expect(tracker).toContain("? 'Pause the clock to undo.'")
+  expect(tracker).toMatch(/onApply=\{applyResult\}\s+onOpenTimeline/)
+  // Only the newest row undoes; restore uses the checked helper; rejections stay inline.
+  expect(sheet).toContain('apply(deleteSoccerHistoryEvent(state, target.id))')
+  expect(sheet).toContain('apply(restoreSoccerHistoryEvent(state, undone.id))')
+  expect(sheet).toContain("{index === 0 && row.kind === 'event' && (")
+  expect(sheet).toContain("setError('That change would leave the match history incomplete.')")
+  expect(sheet).toMatch(/role="alert"[\s\S]*Open Timeline/)
+})
