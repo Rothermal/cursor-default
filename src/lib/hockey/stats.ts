@@ -1,7 +1,7 @@
 import type { GameEvent } from '../gameEvents/types'
 import type { HockeyEvent, HockeyMatchSetup } from './types'
 
-export type HockeyStatGroup = 'skater' | 'goalie' | 'plus_minus'
+export type HockeyStatGroup = 'skater' | 'goalie' | 'plus_minus' | 'play'
 
 export interface HockeyStatDefinition {
   id: string
@@ -28,6 +28,11 @@ export const HOCKEY_STAT_CATALOG: readonly HockeyStatDefinition[] = Object.freez
   { id: 'hky_sa', label: 'Shots against', group: 'goalie' },
   { id: 'hky_sv', label: 'Saves', group: 'goalie' },
   { id: 'hky_pm', label: 'Plus/minus', group: 'plus_minus' },
+  { id: 'hky_fow', label: 'Faceoffs won', group: 'play' },
+  { id: 'hky_fol', label: 'Faceoffs lost', group: 'play' },
+  { id: 'hky_hit', label: 'Hits', group: 'play' },
+  { id: 'hky_tk', label: 'Takeaways', group: 'play' },
+  { id: 'hky_gv', label: 'Giveaways', group: 'play' },
 ] as HockeyStatDefinition[]).map(definition => Object.freeze(definition)))
 
 /** Stats replay fills today; `hky_pm` joins in HKY-3B. */
@@ -72,6 +77,28 @@ export function accumulateHockeyShotStats(stats: HockeyParticipantStats, event: 
   if (emptyNet) return
   if (outcome === 'goal') add('goalie', ['hky_sa', 'hky_ga'])
   if (outcome === 'saved') add('goalie', ['hky_sa', 'hky_sv'])
+}
+
+/** Credits a faceoff, hit, takeaway or giveaway to its tracked actor (HKY-2C). */
+export function accumulateHockeyPlayStats(stats: HockeyParticipantStats, event: GameEvent): void {
+  const credit = (role: string, statId: string) => {
+    const participantId = trackedActor(event, role)
+    if (participantId && stats[participantId]) stats[participantId][statId] += 1
+  }
+  switch (event.eventType) {
+    case 'hockey.faceoff':
+      credit('taker', (event.payload as { winner: string }).winner === 'tracked' ? 'hky_fow' : 'hky_fol')
+      return
+    case 'hockey.hit':
+      if (event.teamSide === 'tracked') credit('hitter', 'hky_hit')
+      return
+    case 'hockey.takeaway':
+      if (event.teamSide === 'tracked') credit('player', 'hky_tk')
+      return
+    case 'hockey.giveaway':
+      if (event.teamSide === 'tracked') credit('player', 'hky_gv')
+      return
+  }
 }
 
 /**

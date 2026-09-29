@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import HockeyFaceoffControl from '../components/hockey/HockeyFaceoffControl'
 import HockeyGoalieDialog, { type HockeyGoalieChange } from '../components/hockey/HockeyGoalieDialog'
+import HockeyPlayDialog, { type HockeyPlayDraft } from '../components/hockey/HockeyPlayDialog'
+import HockeyRecentEvents from '../components/hockey/HockeyRecentEvents'
 import HockeyRink from '../components/hockey/HockeyRink'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { sports } from '../config/sports'
@@ -18,11 +21,22 @@ import {
   adjustHockeyScore,
   changeHockeyGoalie,
   finishDecidedHockeyGame,
+  canRestoreHockeyCapture,
+  hockeyPlayMarkers,
+  hockeyRecentEvents,
   hockeyShotMarkers,
   hockeyZone,
+  HOCKEY_FACEOFF_DOTS,
   nearestHockeyFaceoffDot,
   recentHockeyOpponentLabels,
+  recordHockeyFaceoff,
+  recordHockeyPlay,
   recordHockeyShot,
+  restoreHockeyCapture,
+  undoHockeyCapture,
+  type HockeyFaceoffDotId,
+  type HockeyPlayKind,
+  type RecordHockeyPlayInput,
   type HockeySide,
   type RecordHockeyShotInput,
   HOCKEY_RULES_FIELDS,
@@ -55,8 +69,8 @@ import type { GameState } from '../types'
 
 /**
  * Hockey development preview: a plain setup form and a period/clock panel for
- * exercising the Hockey event engine, plus the HKY-2A rink. Taps are shown,
- * not recorded. Production builds never render it.
+ * exercising the Hockey event engine, the rink, shot, goalie, faceoff and play
+ * capture, and Recent Events with Undo. Production builds never render it.
  */
 export default function HockeyEventPreview() {
   const { state } = useGame()
@@ -184,6 +198,9 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
   const [lastTap, setLastTap] = useState<GameEventLocation | null>(null)
   const [shotDraft, setShotDraft] = useState<HockeyShotDraft | null>(null)
   const [goalieOpen, setGoalieOpen] = useState(false)
+  const [tap, setTap] = useState<GameEventLocation | null>(null)
+  const [faceoffDot, setFaceoffDot] = useState<HockeyFaceoffDotId | null>(null)
+  const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -259,6 +276,35 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
     setGoalieOpen(false)
     return null
   }
+
+  const recordFaceoff = (input: { winner: HockeySide; takerParticipantId: string | null; opponentTakerLabel: string | null }) => {
+    if (!faceoffDot) return null
+    const result = recordHockeyFaceoff(state, { dotId: faceoffDot, ...input }, context())
+    if (!result.ok) return result.message
+    apply(result)
+    setFaceoffDot(null)
+    return null
+  }
+
+  const recordPlay = (input: RecordHockeyPlayInput): string | null => {
+    const result = recordHockeyPlay(state, input, context())
+    if (!result.ok) return result.message
+    apply(result)
+    setPlayDraft(null)
+    return null
+  }
+
+  /** The tap chooser (HKY-2C): Shot opens the shot dialog here; Faceoff snaps to a dot. */
+  const choose = (choice: 'shot' | 'faceoff' | HockeyPlayKind) => {
+    if (!tap) return
+    const point = { x: tap.x, y: tap.y }
+    setTap(null)
+    if (choice === 'shot') setShotDraft({ side: 'tracked', location: point })
+    else if (choice === 'faceoff') setFaceoffDot(nearestHockeyFaceoffDot(point).id)
+    else setPlayDraft({ kind: choice, location: point })
+  }
+
+  const recentLabels = recentHockeyOpponentLabels(streamEvents)
 
   const adjust = (side: HockeySide, delta: 1 | -1) =>
     askReason(`Why is the ${side === 'tracked' ? trackedLabel : opponentLabel} score changing?`, reason =>
@@ -403,18 +449,54 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
           trackedLabel={state.gameInfo?.teamName ?? 'Tracked'}
           opponentLabel={opponentLabel}
           disabled={!canCapture}
-          markers={hockeyShotMarkers(sport.setup, streamEvents)}
+          markers={[...hockeyShotMarkers(sport.setup, streamEvents), ...hockeyPlayMarkers(sport.setup, streamEvents)]}
+          highlightDotId={faceoffDot}
+          onFaceoffDot={dotId => {
+            setLastTap({ ...HOCKEY_FACEOFF_DOTS[dotId], attackingDirection: direction })
+            setTap(null)
+            setFaceoffDot(dotId)
+          }}
           onFlip={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
           onLocation={location => {
             setLastTap(location)
-            setShotDraft({ side: 'tracked', location: { x: location.x, y: location.y } })
+            setFaceoffDot(null)
+            setTap(location)
           }}
         />
+        {canCapture && tap && (
+          <div className="rounded-md border border-line bg-surface p-3" role="group" aria-label="Record at this spot">
+            <p className="text-xs font-bold uppercase text-content-muted">Record at this spot</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <button type="button" className="btn-primary" onClick={() => choose('shot')}>Shot</button>
+              <button type="button" className="btn-secondary" onClick={() => choose('faceoff')}>Faceoff</button>
+              <button type="button" className="btn-secondary" onClick={() => choose('hit')}>Hit</button>
+              <button type="button" className="btn-secondary" onClick={() => choose('takeaway')}>Takeaway</button>
+              <button type="button" className="btn-secondary" onClick={() => choose('giveaway')}>Giveaway</button>
+              <button type="button" className="btn-secondary" onClick={() => setTap(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {canCapture && faceoffDot && (
+          <HockeyFaceoffControl
+            key={faceoffDot}
+            sport={sport}
+            dotId={faceoffDot}
+            trackedLabel={trackedLabel}
+            recentOpponentLabels={recentLabels}
+            onRecord={recordFaceoff}
+            onCancel={() => setFaceoffDot(null)}
+            onOther={() => {
+              setTap({ ...HOCKEY_FACEOFF_DOTS[faceoffDot], attackingDirection: direction })
+              setFaceoffDot(null)
+            }}
+          />
+        )}
         {canCapture && (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <button type="button" className="btn-secondary" onClick={() => setShotDraft({ side: 'tracked', location: null })}>{trackedLabel} shot</button>
             <button type="button" className="btn-secondary" onClick={() => setShotDraft({ side: 'opponent', location: null })}>{opponentLabel} shot</button>
             <button type="button" className="btn-secondary" onClick={() => setGoalieOpen(true)}>Goalie</button>
+            <button type="button" className="btn-secondary" onClick={() => setPlayDraft({ kind: 'hit', location: null })}>Play</button>
           </div>
         )}
         {lastTap && (
@@ -430,7 +512,7 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
           draft={shotDraft}
           sport={sport}
           events={streamEvents}
-          recentOpponentLabels={recentHockeyOpponentLabels(streamEvents)}
+          recentOpponentLabels={recentLabels}
           trackedLabel={trackedLabel}
           opponentLabel={opponentLabel}
           onSubmit={recordShot}
@@ -447,25 +529,29 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
         />
       )}
 
-      <section>
-        <h2 className="text-sm font-bold uppercase text-content-muted">Events</h2>
-        <ol className="mt-2 space-y-1 text-sm">
-          {[...(state.eventStream?.events ?? [])].reverse().map((raw, index) => {
-            const event = raw as { id?: string; eventType?: string; elapsedMs?: number | null }
-            return (
-              <li key={event.id ?? index} className="flex justify-between gap-3">
-                <span>{event.eventType?.replace('hockey.', '').replace(/_/g, ' ')}</span>
-                <span className="tabular-nums text-content-muted">
-                  {typeof event.elapsedMs === 'number' ? formatHockeyClock(event.elapsedMs) : ''}
-                </span>
-              </li>
-            )
-          })}
-        </ol>
-      </section>
+      {playDraft && (
+        <HockeyPlayDialog
+          draft={playDraft}
+          sport={sport}
+          recentOpponentLabels={recentLabels}
+          trackedLabel={trackedLabel}
+          opponentLabel={opponentLabel}
+          onSubmit={recordPlay}
+          onClose={() => setPlayDraft(null)}
+        />
+      )}
+
+      <HockeyRecentEvents
+        rows={hockeyRecentEvents(state, { tracked: trackedLabel, opponent: opponentLabel })}
+        canRestore={canRestoreHockeyCapture(state)}
+        onUndo={() => apply(undoHockeyCapture(state, new Date().toISOString()))}
+        onRestore={() => apply(restoreHockeyCapture(state, new Date().toISOString()))}
+      />
     </main>
   )
 }
+
+const PREVIEW_POSITIONS = ['C', 'LW', 'RW', 'D', 'D']
 
 function buildPreviewSetup(input: {
   profileId: HockeyProfileId
@@ -483,7 +569,7 @@ function buildPreviewSetup(input: {
       playerId: `preview-skater-${index + 1}`,
       displayName: `Skater ${index + 1}`,
       number: String(index + 2),
-      position: null,
+      position: PREVIEW_POSITIONS[index % PREVIEW_POSITIONS.length],
       dressedAs: 'skater',
     })),
   ]

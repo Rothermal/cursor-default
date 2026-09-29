@@ -3,6 +3,7 @@ import type { GameEventDefinition } from '../gameEvents/registry'
 import type { GameEvent, GameEventActor, GameEventLocation, GameEventPeriod } from '../gameEvents/types'
 import { createHockeyUuid } from './id'
 import { parseHockeyPeriod } from './periods'
+import { HOCKEY_FACEOFF_DOT_IDS, HOCKEY_FACEOFF_DOTS, type HockeyFaceoffDotId } from './rinkGeometry'
 import type { HockeyEvent, HockeyEventType, HockeyPayloadByType, HockeyShotActorRole, HockeySide } from './types'
 import { HOCKEY_EMPTY_NET, HOCKEY_EVENT_SCHEMA_VERSION } from './types'
 
@@ -231,7 +232,32 @@ export const hockeyEventDefinitions: GameEventDefinition<GameEvent>[] = [
         ? null
         : 'A score adjustment is plus or minus one, with a reason.'
   ),
+  captureDefinition(
+    'hockey.faceoff',
+    { location: 'required', roles: ['taker', 'opponent_taker'], sides: ['neutral'] },
+    payload => {
+      if (!exactKeys(payload, ['captureCommandId', 'dotId', 'winner'])) return 'Invalid faceoff payload.'
+      if (!isCaptureId(payload.captureCommandId)) return 'Invalid capture command id.'
+      if (!(HOCKEY_FACEOFF_DOT_IDS as readonly unknown[]).includes(payload.dotId)) return 'Unknown faceoff dot.'
+      return payload.winner === 'tracked' || payload.winner === 'opponent' ? null : 'A faceoff winner is tracked or opponent.'
+    },
+    event => {
+      const dot = HOCKEY_FACEOFF_DOTS[(event.payload as { dotId: HockeyFaceoffDotId }).dotId]
+      return event.location && event.location.x === dot.x && event.location.y === dot.y
+        ? null
+        : 'A faceoff is located exactly on its dot.'
+    }
+  ),
+  captureDefinition('hockey.hit', { location: true, roles: ['hitter', 'hit_player'] }, playPayload),
+  captureDefinition('hockey.takeaway', { location: true, roles: ['player'] }, playPayload),
+  captureDefinition('hockey.giveaway', { location: true, roles: ['player'] }, playPayload),
 ]
+
+function playPayload(payload: Record<string, unknown>): string | null {
+  return exactKeys(payload, ['captureCommandId']) && isCaptureId(payload.captureCommandId)
+    ? null
+    : 'Invalid payload.'
+}
 
 /**
  * Structural checks for sided capture events. Who may take part (dressed skaters, the
@@ -239,7 +265,11 @@ export const hockeyEventDefinitions: GameEventDefinition<GameEvent>[] = [
  */
 function captureDefinition(
   eventType: HockeyEventType,
-  options: { location: boolean; roles: readonly string[] },
+  options: {
+    location: boolean | 'required'
+    roles: readonly string[]
+    sides?: GameEventDefinition<GameEvent>['allowedTeamSides']
+  },
   validatePayload: PayloadValidator,
   validateEvent: (event: GameEvent) => string | null = () => null
 ): GameEventDefinition<GameEvent> {
@@ -247,7 +277,7 @@ function captureDefinition(
     sportId: 'hockey',
     eventType,
     currentSchemaVersion: HOCKEY_EVENT_SCHEMA_VERSION,
-    allowedTeamSides: ['tracked', 'opponent'],
+    allowedTeamSides: options.sides ?? ['tracked', 'opponent'],
     validate: event => {
       if (event.schemaVersion !== HOCKEY_EVENT_SCHEMA_VERSION) {
         return { ok: false, message: 'Unsupported Hockey event schema version.' }
@@ -261,8 +291,11 @@ function captureDefinition(
       if (event.location !== null && !options.location) {
         return { ok: false, message: 'This Hockey event has no rink location.' }
       }
+      if (event.location === null && options.location === 'required') {
+        return { ok: false, message: 'This Hockey event needs a rink location.' }
+      }
       if (event.location !== null && event.location.attackingDirection === 'unknown') {
-        return { ok: false, message: 'A rink location needs the shooting side\'s direction.' }
+        return { ok: false, message: 'A rink location needs an attacking direction.' }
       }
       const actorMessage = validateActors(event.actors, options.roles)
       if (actorMessage) return { ok: false, message: actorMessage }

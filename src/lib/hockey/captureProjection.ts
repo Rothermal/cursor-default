@@ -57,6 +57,27 @@ function checkTrackedActor(setup: HockeyMatchSetup, actor: GameEventActor): stri
   }
   if (actor.role === 'goalie' && participant.dressedAs !== 'goalie') return 'Only a dressed goalie can face a shot.'
   if (actor.role === 'blocker' && participant.dressedAs !== 'skater') return 'Only a skater can block a shot.'
+  if (actor.role === 'taker' && participant.dressedAs !== 'skater') return 'Only a skater can take a faceoff.'
+  return null
+}
+
+/**
+ * Faceoffs, hits, takeaways and giveaways (HKY-2C). A faceoff's tracked taker is a dressed
+ * skater and its opponent taker a label; a hit's `hit_player` is on the other side.
+ */
+export function checkHockeyPlayActors(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  event: HockeyEvent<'hockey.faceoff' | 'hockey.hit' | 'hockey.takeaway' | 'hockey.giveaway'>
+): string | null {
+  for (const actor of event.actors) {
+    let side: HockeySide
+    if (event.eventType === 'hockey.faceoff') side = actor.role === 'taker' ? 'tracked' : 'opponent'
+    else if (actor.role === 'hit_player') side = otherHockeySide(event.teamSide as HockeySide)
+    else side = event.teamSide as HockeySide
+    const message = side === 'tracked' ? checkTrackedActor(setup, actor) : checkOpponentActor(projection, actor)
+    if (message) return message
+  }
   return null
 }
 
