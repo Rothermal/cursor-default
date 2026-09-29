@@ -291,6 +291,62 @@ export interface HockeyFaceoffPayload extends HockeyCapturePayload {
 /** Hits, takeaways and giveaways carry only actors and an optional location. */
 export type HockeyPlayPayload = HockeyCapturePayload
 
+// -- Penalties (HKY-3A) ------------------------------------------------------
+
+export type HockeyPenaltyClass =
+  | 'minor'
+  | 'double_minor'
+  | 'major'
+  | 'misconduct'
+  | 'game_misconduct'
+  | 'match'
+  | 'penalty_shot'
+
+export type HockeyInfraction =
+  | 'tripping'
+  | 'hooking'
+  | 'slashing'
+  | 'interference'
+  | 'holding'
+  | 'high_sticking'
+  | 'roughing'
+  | 'cross_checking'
+  | 'boarding'
+  | 'charging'
+  | 'elbowing'
+  | 'too_many_men'
+  | 'delay_of_game'
+  | 'unsportsmanlike'
+  | 'fighting'
+  | 'abuse_of_officials'
+  | 'other'
+
+export type HockeyOffenderKind = 'player' | 'goalie' | 'bench' | 'staff'
+
+export interface HockeyPenaltyPayload extends HockeyCapturePayload {
+  class: HockeyPenaltyClass
+  infraction: HockeyInfraction
+  /** The recorder's label when `infraction` is `other`; null otherwise. */
+  infractionLabel: string | null
+  /** Assessed length and PIM. Box time follows the class; a penalty shot is zero. */
+  durationMs: number
+  offenderKind: HockeyOffenderKind
+  /** Context only: the penalty was signalled while the other side kept the puck. */
+  delayed: boolean
+  /** Equals `captureCommandId` when the recorder marked the unit's penalties coincidental. */
+  coincidenceGroupId: string | null
+}
+
+export interface HockeyPenaltyReleasePayload extends HockeyCapturePayload {
+  penaltyEventId: string
+  /** 1, or 2 for the second half of a double minor. */
+  segment: 1 | 2
+  reason: string
+}
+
+/** Actor roles on `hockey.penalty`. */
+export type HockeyPenaltyActorRole = 'offender' | 'served_by' | 'drawn_by'
+
 /** Actor roles on `hockey.shot`. */
 export type HockeyShotActorRole = 'shooter' | 'assist_primary' | 'assist_secondary' | 'goalie' | 'blocker'
 
@@ -312,6 +368,8 @@ export interface HockeyPayloadByType {
   'hockey.hit': HockeyPlayPayload
   'hockey.takeaway': HockeyPlayPayload
   'hockey.giveaway': HockeyPlayPayload
+  'hockey.penalty': HockeyPenaltyPayload
+  'hockey.penalty_release': HockeyPenaltyReleasePayload
 }
 
 export type HockeyEventType = keyof HockeyPayloadByType
@@ -324,6 +382,8 @@ export const HOCKEY_SIDED_EVENT_TYPES = [
   'hockey.hit',
   'hockey.takeaway',
   'hockey.giveaway',
+  'hockey.penalty',
+  'hockey.penalty_release',
 ] as const
 
 /** Events the recorder captures, which Recent Events can undo. Faceoffs are neutral. */
@@ -404,6 +464,48 @@ export interface HockeyMatchProjection {
   hits: { tracked: number; opponent: number }
   takeaways: { tracked: number; opponent: number }
   giveaways: { tracked: number; opponent: number }
+  /** Every accepted penalty in capture order (HKY-3A). The box is derived from these. */
+  penalties: HockeyPenaltyRecord[]
+  penaltyReleases: HockeyPenaltyReleaseRecord[]
+  penaltyTotals: { tracked: HockeyPenaltyTotals; opponent: HockeyPenaltyTotals }
+  /** Tracked participants removed by a game misconduct or match penalty. */
+  removedParticipantIds: string[]
+}
+
+export interface HockeyPenaltyTotals {
+  penalties: number
+  pimMs: number
+}
+
+/** One accepted penalty, as replay saw it at its assessment. */
+export interface HockeyPenaltyRecord {
+  eventId: string
+  side: HockeySide
+  class: HockeyPenaltyClass
+  infraction: HockeyInfraction
+  infractionLabel: string | null
+  durationMs: number
+  offenderKind: HockeyOffenderKind
+  /** Tracked participant, when known. */
+  offenderParticipantId: string | null
+  offenderLabel: string | null
+  /** Tracked participant serving box time for the offender, when one is named. */
+  serverParticipantId: string | null
+  serverLabel: string | null
+  periodId: string
+  elapsedMs: number | null
+  /** Game clock time since the first period started; null for clockless games. */
+  gameTimeMs: number | null
+  captureCommandId: string | null
+  coincidenceGroupId: string | null
+}
+
+export interface HockeyPenaltyReleaseRecord {
+  eventId: string
+  penaltyEventId: string
+  segment: 1 | 2
+  reason: string
+  gameTimeMs: number
 }
 
 export interface HockeyFaceoffRecord {

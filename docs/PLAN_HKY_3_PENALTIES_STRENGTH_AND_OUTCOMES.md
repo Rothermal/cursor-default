@@ -5,8 +5,8 @@ Execution plan for the third hockey phase defined in
 lifecycle and clock) and [HKY-2](PLAN_HKY_2_RINK_AND_CORE_CAPTURE.md) (rink, shots,
 goalies, faceoffs, plays, Recent Events, and the owner tracker behind a default-off toggle).
 
-Status: draft for owner review. Nothing in HKY-3 is built until this plan is approved.
-§7 lists the questions that need an answer; each has a recommendation.
+Status: approved (PR #446 merged, 2026-09-29); built with the §7 recommendations.
+HKY-3A is implemented; §8 is the delivery record.
 
 ---
 
@@ -292,3 +292,35 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 | Q6 | Shootout: a hockey-specific module following Soccer's shape, rather than extracting a shared core now? | Hockey-specific; extract only if another sport needs it |
 | Q7 | Infractions: a fixed catalog plus Other with a free label? | Yes |
 | Q8 | Plus/minus: count EV, SH and EN goals, skip PP goals and goals without a complete on-ice set? | Yes, with a quality note for skipped goals |
+
+---
+
+## 8. Delivery record
+
+### HKY-3A (implemented)
+
+- `penalties.ts` owns the class and infraction catalogs, rules lengths, segments, game
+  time (clock played in earlier periods plus the current elapsed) and the box simulation.
+  The box is never stored: `hockeyPenaltyBoxAt` replays penalties and releases up to a
+  game time, so pausing, setting the clock and period ends move every timer. Penalties or
+  releases later than the requested time (only after the clock was set back) count as
+  happening at it.
+- `hockey.penalty` and `hockey.penalty_release` are sided capture events. Replay checks
+  a unit when it closes: a coincidence group needs both sides, and a tracked minor whose
+  offender also has a misconduct in the unit needs a server. Actor checks cover the
+  offender kind, a skater server other than the offender, and the other side's drawer.
+- Strength: `hockeyStrengthState` gives `baseSkaters` and `skatersOnIce` per side; the
+  floor is `min(minimumSkaters, period skaters)` until HKY-3C adds overtime skaters.
+- Removal: game misconducts and match penalties add the tracked offender to
+  `removedParticipantIds`. Replay rejects them as any later actor, in an on-ice set, or as
+  a goalie going in; the dialogs hide them. Removing the goalie in net is refused until
+  another goalie goes in.
+- Stats: `hky_pim` (minutes), `hky_pen`, `hky_pend`, and team `penaltyTotals`.
+- UI: a Penalty button in the quick row opens `HockeyPenaltyDialog` (rows saved as one
+  unit, Coincidental once both sides have a row); `HockeyPenaltyBox` sits under the
+  scoreboard with the strength, each running or waiting segment and Release.
+- Deviations: an opponent server stays optional, because opponent players are labels;
+  clockless games list this period's penalties under the scoreboard instead of a box.
+- Tests: `penalties.test.ts` (32 cases). Record:
+  [REGRESSION_HKY_3_PENALTIES_AND_OUTCOMES.md](REGRESSION_HKY_3_PENALTIES_AND_OUTCOMES.md).
+

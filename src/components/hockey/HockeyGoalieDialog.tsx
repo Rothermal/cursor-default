@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useId, useState } from 'react'
 import { createHockeyUuid } from '../../lib/hockey/id'
 import {
+  hockeyAvailableParticipants,
   hockeyGoalieChoices,
   hockeyOpponentGoalieChoices,
   hockeyOpponentGoalieLabel,
@@ -35,7 +36,7 @@ export default function HockeyGoalieDialog({ sport, trackedLabel, opponentLabel,
   const current = sport.projection.goalieInNet[side]
 
   const choices = side === 'tracked'
-    ? hockeyGoalieChoices(sport.setup).map(participant => ({
+    ? hockeyAvailableParticipants(hockeyGoalieChoices(sport.setup), sport.projection).map(participant => ({
         id: participant.id,
         label: participant.number ? `#${participant.number} ${participant.displayName}` : participant.displayName,
       }))

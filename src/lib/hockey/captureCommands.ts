@@ -1,13 +1,33 @@
 import type { GameState } from '../../types'
 import type { GameEvent, GameEventActor, GameEventLocation } from '../gameEvents/types'
 import { isHockeyReason } from './events'
-import { otherHockeySide } from './captureProjection'
-import { runHockeyCommand, type HockeyCommandContext, type HockeyCommandResult } from './live'
+import { hockeyParticipantRemoved, otherHockeySide } from './captureProjection'
+import { createHockeyUuid } from './id'
+import {
+  hockeyClockDisplay,
+  runHockeyCommand,
+  type HockeyCommandContext,
+  type HockeyCommandResult,
+  type HockeyPendingEvent,
+} from './live'
+import {
+  hockeyCurrentGameTimeMs,
+  hockeyGameTimeMs,
+  hockeyPenaltyBoxAt,
+  hockeyPenaltyDefaultDurationMs,
+  hockeyStrengthState,
+  type HockeyPenaltyBox,
+  type HockeyStrengthState,
+} from './penalties'
 import { sortHockeyActors } from './positions'
 import { hockeyActivePeriod, hockeyClockMomentAt } from './projector'
 import { HOCKEY_FACEOFF_DOTS, oppositeHockeyDirection, type HockeyFaceoffDotId } from './rinkGeometry'
 import type {
   HockeyGoalieChangeReason,
+  HockeyInfraction,
+  HockeyOffenderKind,
+  HockeyPenaltyClass,
+  HockeySportGameState,
   HockeyMatchParticipant,
   HockeyMatchProjection,
   HockeyMatchSetup,
@@ -277,14 +297,161 @@ export function recordHockeyPlay(
   })
 }
 
+// ---------------------------------------------------------------------------
+// Penalties (HKY-3A)
+
+export interface HockeyPenaltyInput {
+  /** The penalized side. */
+  side: HockeySide
+  class: HockeyPenaltyClass
+  infraction: HockeyInfraction
+  infractionLabel?: string | null
+  /** Defaults to the rules' length for the class. */
+  durationMs?: number
+  offenderKind: HockeyOffenderKind
+  offender?: HockeyActorChoice | null
+  servedBy?: HockeyActorChoice | null
+  /** A player on the other side. */
+  drawnBy?: HockeyActorChoice | null
+  delayed?: boolean
+}
+
+export interface RecordHockeyPenaltiesInput {
+  penalties: HockeyPenaltyInput[]
+  /** Marks the penalties coincidental; the unit must hold a penalty for each side. */
+  coincidental?: boolean
+  /** Deterministic capture id for tests; generated when the unit has more than one penalty. */
+  captureCommandId?: string
+}
+
+/**
+ * Records one or more penalties as one capture unit, so Undo and Restore treat them together.
+ * Coincidence is never inferred: only the recorder's Coincidental choice groups them.
+ */
+export function recordHockeyPenalties(
+  state: GameState,
+  input: RecordHockeyPenaltiesInput,
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (sport, projection) => {
+    const active = hockeyActivePeriod(projection)
+    if (projection.status !== 'in_progress' || !active) return 'Penalties are recorded during a period.'
+    if (input.penalties.length === 0) return 'Add a penalty.'
+    const elapsedMs = captureElapsed(projection, context.occurredAt)
+    if (typeof elapsedMs === 'string') return elapsedMs
+    const coincidental = input.coincidental === true
+    if (coincidental && new Set(input.penalties.map(penalty => penalty.side)).size < 2) {
+      return 'Coincidental penalties need a penalty on each side.'
+    }
+    const captureCommandId = input.penalties.length > 1 ? input.captureCommandId ?? createHockeyUuid() : null
+    const pending: HockeyPendingEvent[] = []
+    for (const penalty of input.penalties) {
+      const actors: GameEventActor[] = []
+      const push = (role: string, owner: HockeySide, choice: HockeyActorChoice | null | undefined) => {
+        if (!choice) return null
+        const actor = choiceActor(sport.setup, role, owner, choice)
+        if (typeof actor === 'string') return actor
+        actors.push(actor)
+        return null
+      }
+      const bench = penalty.offenderKind === 'bench' || penalty.offenderKind === 'staff'
+      const problem =
+        push('offender', penalty.side, bench ? null : penalty.offender) ??
+        push('served_by', penalty.side, penalty.servedBy) ??
+        push('drawn_by', otherHockeySide(penalty.side), penalty.drawnBy)
+      if (problem) return problem
+      const infractionLabel = penalty.infraction === 'other' ? cleanLabel(penalty.infractionLabel) : null
+      if (penalty.infraction === 'other' && !infractionLabel) return 'Name the infraction.'
+      const durationMs = penalty.class === 'penalty_shot'
+        ? 0
+        : penalty.durationMs ?? hockeyPenaltyDefaultDurationMs(sport.setup.rulesSnapshot.penalties, penalty.class)
+      pending.push({
+        eventType: 'hockey.penalty',
+        teamSide: penalty.side,
+        actors,
+        payload: {
+          captureCommandId,
+          class: penalty.class,
+          infraction: penalty.infraction,
+          infractionLabel,
+          durationMs,
+          offenderKind: penalty.offenderKind,
+          delayed: penalty.delayed ?? false,
+          coincidenceGroupId: coincidental ? captureCommandId : null,
+        },
+        period: { id: active.id, order: active.order },
+        elapsedMs,
+      })
+    }
+    return pending
+  })
+}
+
+/**
+ * Ends one running or waiting penalty segment now (HKY-3A), for the rare case the clock-derived
+ * expiry is wrong. Assessed PIM never changes; anchored games only.
+ */
+export function releaseHockeyPenalty(
+  state: GameState,
+  input: { penaltyEventId: string; segment?: 1 | 2; reason: string },
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (sport, projection) => {
+    const active = hockeyActivePeriod(projection)
+    if (!projection.clock) return { code: 'clock_unavailable', message: 'Penalties are released early only in games with a clock.' }
+    if (projection.status !== 'in_progress' || !active) return 'Penalties are released during a period.'
+    const reason = input.reason.trim()
+    if (!isHockeyReason(reason)) return { code: 'reason_required', message: 'Say why the penalty is ending early.' }
+    const elapsedMs = captureElapsed(projection, context.occurredAt)
+    if (typeof elapsedMs === 'string') return elapsedMs
+    const record = projection.penalties.find(entry => entry.eventId === input.penaltyEventId)
+    if (!record) return 'That penalty is not in this game.'
+    const segment = input.segment ?? 1
+    const box = hockeyPenaltyBoxAt(sport.setup, projection, hockeyGameTimeMs(projection, active.id, elapsedMs))
+    const entry = box[record.side].find(item => item.penaltyEventId === record.eventId && item.segment === segment)
+    if (!entry) return 'That penalty has already ended.'
+    return [{
+      eventType: 'hockey.penalty_release',
+      teamSide: record.side,
+      payload: { captureCommandId: null, penaltyEventId: record.eventId, segment, reason },
+      period: { id: active.id, order: active.order },
+      elapsedMs,
+    }]
+  })
+}
+
+export interface HockeyPenaltyBoxReading {
+  box: HockeyPenaltyBox
+  /** Null for clockless games, which have no derived strength. */
+  strength: HockeyStrengthState | null
+}
+
+/** The box and strength at the displayed clock; display only, never written to state. */
+export function hockeyPenaltyBoxNow(sport: HockeySportGameState, nowIso: string): HockeyPenaltyBoxReading {
+  const projection = sport.projection
+  const reading = hockeyClockDisplay(sport, nowIso)
+  const gameTimeMs = hockeyCurrentGameTimeMs(projection, reading?.elapsedMs ?? null)
+  const box = hockeyPenaltyBoxAt(sport.setup, projection, gameTimeMs)
+  return { box, strength: projection.clock ? hockeyStrengthState(sport.setup, projection, box) : null }
+}
+
+/** Tracked players still in the game: game misconducts and match penalties remove players. */
+export function hockeyAvailableParticipants(
+  participants: readonly HockeyMatchParticipant[],
+  projection: Pick<HockeyMatchProjection, 'removedParticipantIds'>
+): HockeyMatchParticipant[] {
+  return participants.filter(participant => !hockeyParticipantRemoved(projection, participant.id))
+}
+
 /**
  * The default tracked faceoff taker (HKY-0 Q7): the last tracked taker, else the first
  * dressed centre, else nobody.
  */
 export function hockeyFaceoffTakerDefault(setup: HockeyMatchSetup, projection: HockeyMatchProjection): string | null {
   const last = projection.lastTrackedFaceoffTakerId
-  if (last && setup.participants.some(entry => entry.id === last && entry.dressedAs === 'skater')) return last
-  return hockeySkaterChoices(setup).find(entry => entry.position === 'C')?.id ?? null
+  const available = hockeyAvailableParticipants(hockeySkaterChoices(setup), projection)
+  if (last && available.some(entry => entry.id === last)) return last
+  return available.find(entry => entry.position === 'C')?.id ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +528,8 @@ export function hockeyOnIcePrefill(
     .map(event => (event.payload as { onIce?: HockeyOnIce | null }).onIce)
     .find((onIce): onIce is HockeyOnIce => Boolean(onIce && onIce.status !== 'not_recorded' && onIce.skaterParticipantIds.length > 0))
   return {
-    skaterParticipantIds: [...(previous?.skaterParticipantIds ?? setup.openingLineup.skaterParticipantIds)],
+    skaterParticipantIds: (previous?.skaterParticipantIds ?? setup.openingLineup.skaterParticipantIds)
+      .filter(id => !hockeyParticipantRemoved(projection, id)),
     goalie: projection.goalieInNet.tracked ?? HOCKEY_EMPTY_NET,
   }
 }
