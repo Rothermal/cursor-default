@@ -4,6 +4,7 @@ import { ActorField, Choices, Group } from './hockeyFields'
 import {
   HOCKEY_EMPTY_NET,
   HOCKEY_OUTCOME_LABELS,
+  hockeyAvailableParticipants,
   hockeyGoalieChoices,
   hockeyOnIcePrefill,
   hockeyOpponentGoalieLabel,
@@ -184,15 +185,15 @@ export default function HockeyShotDialog({
             owner={side}
             value={shooter}
             onChange={setShooter}
-            trackedOptions={hockeyScorerChoices(setup)}
+            trackedOptions={hockeyAvailableParticipants(hockeyScorerChoices(setup), projection)}
             recentLabels={recentOpponentLabels}
             emptyLabel="Team (unattributed)"
           />
 
           {goal && shooter && (
             <div className="grid grid-cols-2 gap-3">
-              <ActorField label="Primary assist" owner={side} value={assist1} onChange={value => { setAssist1(value); if (!value) setAssist2('') }} trackedOptions={hockeyScorerChoices(setup)} recentLabels={recentOpponentLabels} emptyLabel="None" />
-              <ActorField label="Secondary assist" owner={side} value={assist2} onChange={setAssist2} trackedOptions={hockeyScorerChoices(setup)} recentLabels={recentOpponentLabels} emptyLabel="None" disabled={!assist1} />
+              <ActorField label="Primary assist" owner={side} value={assist1} onChange={value => { setAssist1(value); if (!value) setAssist2('') }} trackedOptions={hockeyAvailableParticipants(hockeyScorerChoices(setup), projection)} recentLabels={recentOpponentLabels} emptyLabel="None" />
+              <ActorField label="Secondary assist" owner={side} value={assist2} onChange={setAssist2} trackedOptions={hockeyAvailableParticipants(hockeyScorerChoices(setup), projection)} recentLabels={recentOpponentLabels} emptyLabel="None" disabled={!assist1} />
             </div>
           )}
 
@@ -202,7 +203,7 @@ export default function HockeyShotDialog({
               owner={defending}
               value={blocker}
               onChange={setBlocker}
-              trackedOptions={hockeySkaterChoices(setup)}
+              trackedOptions={hockeyAvailableParticipants(hockeySkaterChoices(setup), projection)}
               recentLabels={recentOpponentLabels}
               emptyLabel="Unknown"
             />
@@ -223,8 +224,8 @@ export default function HockeyShotDialog({
           {goal && (
             <OnIceSection
               trackedLabel={trackedLabel}
-              skaters={hockeySkaterChoices(setup)}
-              goalies={hockeyGoalieChoices(setup)}
+              skaters={hockeyAvailableParticipants(hockeySkaterChoices(setup), projection)}
+              goalies={hockeyAvailableParticipants(hockeyGoalieChoices(setup), projection)}
               touched={onIceTouched}
               selected={onIceSkaters}
               goalie={onIceGoalie}

@@ -9,16 +9,26 @@ import type {
 import {
   checkHockeyGoalieChange,
   checkHockeyOnIce,
+  checkHockeyPenaltyActors,
   checkHockeyPlayActors,
   checkHockeyShotActors,
   otherHockeySide,
 } from './captureProjection'
+import {
+  hockeyGameTimeMs,
+  hockeyPenaltyAffectsStrength,
+  hockeyPenaltyHasBoxTime,
+  hockeyPenaltyReleaseExists,
+  hockeyPenaltyRemovesOffender,
+  hockeyPenaltySegmentsMs,
+} from './penalties'
 import { hockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './periods'
 import { HOCKEY_FACEOFF_DOTS, hockeyZone, type HockeyFaceoffDotId } from './rinkGeometry'
 import { hockeyOvertimeSuddenDeath } from './rules'
 import { hockeyTrackedAttackingDirection } from './setup'
 import { createHockeyMatchProjection } from './state'
 import {
+  accumulateHockeyPenaltyStats,
   accumulateHockeyPlayStats,
   accumulateHockeyShotStats,
   emptyHockeyParticipantStats,
@@ -36,7 +46,11 @@ import type {
   HockeySportGameState,
 } from './types'
 
-export class HockeyReplayError extends Error {}
+export class HockeyReplayError extends Error {
+  constructor(message: string, readonly eventId: string | null = null) {
+    super(message)
+  }
+}
 
 export interface HockeyReplayOutput {
   projection: HockeyMatchProjection
@@ -53,18 +67,26 @@ export type HockeyClockMoment =
 export function replayHockeyEvents(setup: HockeyMatchSetup, events: readonly GameEvent[]): HockeyReplayOutput {
   const replay = new HockeyReplay(setup)
   const ordered = [...events].sort(compareGameEventCaptureOrder)
+  const failed = (error: unknown, eventId: string): HockeyReplayOutput => {
+    if (!(error instanceof HockeyReplayError)) throw error
+    return {
+      projection: replay.projection,
+      diagnostics: [{ code: 'semantic_validation_failed', message: error.message, eventId: error.eventId ?? eventId }],
+      participantStats: replay.stats,
+    }
+  }
   for (const event of ordered) {
     try {
       // Each event is checked before it mutates anything, so the projection is the valid prefix.
       replay.apply(event as HockeyEvent)
     } catch (error) {
-      if (!(error instanceof HockeyReplayError)) throw error
-      return {
-        projection: replay.projection,
-        diagnostics: [{ code: 'semantic_validation_failed', message: error.message, eventId: event.id }],
-        participantStats: replay.stats,
-      }
+      return failed(error, event.id)
     }
+  }
+  try {
+    replay.finish()
+  } catch (error) {
+    return failed(error, ordered[ordered.length - 1]?.id ?? '')
   }
   return { projection: replay.projection, diagnostics: [], participantStats: replay.stats }
 }
@@ -165,6 +187,7 @@ class HockeyReplay {
 
   apply(event: HockeyEvent): void {
     if (event.sportId !== 'hockey') fail('Only Hockey events can be replayed.')
+    this.trackUnit(event)
     this.checkPeriodEnvelope(event)
     this.checkElapsed(event)
     if (this.projection.decidedInPeriodId && !AFTER_DECISION.has(event.eventType)) {
@@ -200,6 +223,10 @@ class HockeyReplay {
       case 'hockey.takeaway':
       case 'hockey.giveaway':
         return this.play(event)
+      case 'hockey.penalty':
+        return this.penalty(event)
+      case 'hockey.penalty_release':
+        return this.penaltyRelease(event)
       default:
         fail('Unknown Hockey event type.')
     }
@@ -433,7 +460,7 @@ class HockeyReplay {
     if (actorMessage) fail(actorMessage)
     const payload = event.payload
     if (payload.onIce) {
-      const onIceMessage = checkHockeyOnIce(this.setup, active, payload.onIce)
+      const onIceMessage = checkHockeyOnIce(this.setup, active, payload.onIce, p.removedParticipantIds)
       if (onIceMessage) fail(onIceMessage)
     }
     const side = event.teamSide
@@ -534,6 +561,139 @@ class HockeyReplay {
       : event.eventType === 'hockey.takeaway' ? p.takeaways : p.giveaways
     totals[event.teamSide] += 1
     accumulateHockeyPlayStats(this.stats, event)
+  }
+
+  // -- penalties (HKY-3A) ---------------------------------------------------
+
+  /** The open capture unit: penalties saved together, checked as a whole when it closes. */
+  private unit: HockeyEvent<'hockey.penalty'>[] = []
+  private readonly closedUnits = new Set<string>()
+
+  /** Closes the open unit when an event from another command arrives. */
+  private trackUnit(event: HockeyEvent): void {
+    const commandId = (event.payload as { captureCommandId?: string | null }).captureCommandId ?? null
+    const open = this.unit[0]?.payload.captureCommandId ?? null
+    if (open !== null && commandId === open) {
+      if (event.eventType !== 'hockey.penalty') fail('Penalties saved together form their own capture unit.')
+      return
+    }
+    if (open !== null) this.closeUnit()
+    if (commandId !== null && this.closedUnits.has(commandId)) fail('A capture unit is recorded together.')
+  }
+
+  finish(): void {
+    if (this.unit.length > 0) this.closeUnit()
+  }
+
+  private closeUnit(): void {
+    const unit = this.unit
+    this.unit = []
+    const commandId = unit[0].payload.captureCommandId!
+    this.closedUnits.add(commandId)
+    if (unit[0].payload.coincidenceGroupId !== null) {
+      const sides = new Set(unit.map(event => event.teamSide))
+      if (sides.size < 2) throw new HockeyReplayError('Coincidental penalties need a penalty on each side.', unit[0].id)
+    }
+    // A player with a minor and a misconduct sits both, so a teammate serves the minor.
+    for (const event of unit) {
+      if (event.teamSide !== 'tracked' || !hockeyPenaltyAffectsStrength(event.payload.class)) continue
+      const offender = event.actors.find(actor => actor.role === 'offender')?.participantId
+      if (!offender || event.actors.some(actor => actor.role === 'served_by')) continue
+      const misconduct = unit.some(other =>
+        other !== event &&
+        other.payload.class === 'misconduct' &&
+        other.actors.some(actor => actor.role === 'offender' && actor.participantId === offender)
+      )
+      if (misconduct) throw new HockeyReplayError('Name the teammate who serves the minor while the offender sits the misconduct too.', event.id)
+    }
+  }
+
+  private penalty(event: HockeyEvent<'hockey.penalty'>): void {
+    const p = this.projection
+    const active = hockeyActivePeriod(p)
+    if (p.status !== 'in_progress' || !active) fail('Penalties are recorded during a period.')
+    const payload = event.payload
+    const commandId = payload.captureCommandId
+    if (commandId !== null) {
+      const first = this.unit[0]
+      if (first) {
+        if (
+          first.payload.coincidenceGroupId !== payload.coincidenceGroupId ||
+          first.period.id !== event.period.id ||
+          first.elapsedMs !== event.elapsedMs ||
+          first.occurredAt !== event.occurredAt
+        ) fail('Penalties saved together share their time and coincidence.')
+      }
+    } else if (payload.coincidenceGroupId !== null) {
+      fail('A coincidence group is the penalties saved together.')
+    }
+    const actorMessage = checkHockeyPenaltyActors(this.setup, p, event)
+    if (actorMessage) fail(actorMessage)
+    const side = event.teamSide
+    const offender = event.actors.find(actor => actor.role === 'offender')
+    const server = event.actors.find(actor => actor.role === 'served_by')
+    const needsServer = side === 'tracked' && hockeyPenaltyHasBoxTime(payload.class) &&
+      (payload.offenderKind !== 'player' || payload.class === 'match')
+    if (needsServer && !server) {
+      fail(payload.class === 'match'
+        ? 'Name the teammate who serves the match penalty.'
+        : 'Name the skater who serves this penalty.')
+    }
+    if (
+      side === 'tracked' &&
+      hockeyPenaltyRemovesOffender(payload.class) &&
+      offender?.participantId &&
+      p.goalieInNet.tracked === offender.participantId
+    ) {
+      fail('Put another goalie in net before removing this one.')
+    }
+    const gameTimeMs = hockeyGameTimeMs(p, active.id, event.elapsedMs)
+    p.penalties.push({
+      eventId: event.id,
+      side,
+      class: payload.class,
+      infraction: payload.infraction,
+      infractionLabel: payload.infractionLabel,
+      durationMs: payload.durationMs,
+      offenderKind: payload.offenderKind,
+      offenderParticipantId: side === 'tracked' ? offender?.participantId ?? null : null,
+      offenderLabel: offender?.label ?? null,
+      serverParticipantId: side === 'tracked' ? server?.participantId ?? null : null,
+      serverLabel: server?.label ?? null,
+      periodId: active.id,
+      elapsedMs: event.elapsedMs,
+      gameTimeMs,
+      captureCommandId: commandId,
+      coincidenceGroupId: payload.coincidenceGroupId,
+    })
+    p.penaltyTotals[side].penalties += 1
+    p.penaltyTotals[side].pimMs += payload.durationMs
+    if (side === 'tracked' && hockeyPenaltyRemovesOffender(payload.class) && offender?.participantId) {
+      p.removedParticipantIds.push(offender.participantId)
+    }
+    if (commandId !== null) this.unit.push(event)
+    accumulateHockeyPenaltyStats(this.stats, event)
+  }
+
+  /**
+   * An early release (HKY-3A) ends one segment at its own clock time. Replay accepts one whose
+   * segment had already ended, as an inert release the box reports; the command rejects it.
+   */
+  private penaltyRelease(event: HockeyEvent<'hockey.penalty_release'>): void {
+    const p = this.projection
+    const active = hockeyActivePeriod(p)
+    if (!p.clock) fail('Penalties are released early only in games with a clock.')
+    if (p.status !== 'in_progress' || !active) fail('Penalties are released during a period.')
+    const { penaltyEventId, segment, reason } = event.payload
+    const record = p.penalties.find(entry => entry.eventId === penaltyEventId)
+    if (!record) fail('That penalty is not in this game.')
+    if (record.side !== event.teamSide) fail('A release belongs to the penalized side.')
+    const segments = hockeyPenaltySegmentsMs(record.class, record.durationMs)
+    if (segment > segments.length) fail('That penalty has no such segment to release.')
+    if (hockeyPenaltyReleaseExists(p.penaltyReleases, penaltyEventId, segment)) fail('That penalty segment was already released.')
+    const gameTimeMs = hockeyGameTimeMs(p, active.id, event.elapsedMs)
+    if (gameTimeMs === null) fail('A release needs the clock time.')
+    p.penaltyReleases.push({ eventId: event.id, penaltyEventId, segment, reason, gameTimeMs })
   }
 
   private periodTotals(periodId: string) {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  hockeyAvailableParticipants,
   hockeyFaceoffTakerDefault,
   hockeySkaterChoices,
   hockeyZone,
@@ -39,7 +40,7 @@ export default function HockeyFaceoffControl({
   const [error, setError] = useState<string | null>(null)
   const direction = sport.projection.trackedAttackingDirection ?? sport.setup.firstPeriodAttackingDirection
   const zone = hockeyZone(HOCKEY_FACEOFF_DOTS[dotId], 'tracked', direction)
-  const skaters = hockeySkaterChoices(sport.setup)
+  const skaters = hockeyAvailableParticipants(hockeySkaterChoices(sport.setup), sport.projection)
 
   const record = (winner: HockeySide) => {
     const message = onRecord({ winner, takerParticipantId: taker, opponentTakerLabel: opponentTaker })

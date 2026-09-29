@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import { useId, useState } from 'react'
 import {
+  hockeyAvailableParticipants,
   hockeyScorerChoices,
   otherHockeySide,
   type HockeyActorChoice,
@@ -46,7 +47,7 @@ export default function HockeyPlayDialog({
   const [hitPlayer, setHitPlayer] = useState('')
   const [error, setError] = useState<string | null>(null)
   const sideName = (value: HockeySide) => (value === 'tracked' ? trackedLabel : opponentLabel)
-  const choices = hockeyScorerChoices(sport.setup)
+  const choices = hockeyAvailableParticipants(hockeyScorerChoices(sport.setup), sport.projection)
 
   const choice = (owner: HockeySide, value: string): HockeyActorChoice | null => {
     const trimmed = value.trim()
