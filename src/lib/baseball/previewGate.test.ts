@@ -26,7 +26,7 @@ describe('BSB-2 Baseball event preview gate', () => {
     expect(setupRoute).toContain("searchParams.get('events') === '1'")
     expect(setupRoute).toContain('isBaseballEventPreviewAvailable()')
     expect(source('src/pages/BaseballEventSetup.tsx')).toContain('if (!isBaseballEventPreviewAvailable())')
-    expect(source('src/pages/BaseballEventGame.tsx')).toContain('if (!isBaseballEventPreviewAvailable())')
+    expect(source('src/pages/BaseballGameTracker.tsx')).toContain('if (!isBaseballEventPreviewAvailable())')
   })
 
   it('never sends a Baseball event game to the legacy stat grid', () => {
@@ -40,6 +40,6 @@ describe('BSB-2 Baseball event preview gate', () => {
     const consumers = implementationFiles('src')
       .filter(path => path !== 'src/lib/sportAvailability.ts' && source(path).includes('isBaseballEventPreviewAvailable'))
       .sort()
-    expect(consumers).toEqual(['src/App.tsx', 'src/pages/BaseballEventGame.tsx', 'src/pages/BaseballEventSetup.tsx'])
+    expect(consumers).toEqual(['src/App.tsx', 'src/pages/BaseballEventSetup.tsx', 'src/pages/BaseballGameTracker.tsx'])
   })
 })

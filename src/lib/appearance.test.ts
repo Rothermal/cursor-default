@@ -89,6 +89,10 @@ describe('appearance bootstrap/runtime contract', () => {
       for (const [foreground, background] of [
         ['rink-board', 'rink-ice'], ['rink-red', 'rink-ice'], ['rink-blue', 'rink-ice'], ['rink-ink', 'rink-ice'],
         ['rink-tracked', 'rink-ink'], ['rink-opponent', 'rink-ink'],
+        // Diamond chalk and markers sit on grass or dirt; chips sit on an ink backing.
+        ['diamond-line', 'diamond-grass'], ['diamond-line', 'diamond-dirt'],
+        ['diamond-ink', 'diamond-grass'], ['diamond-ink', 'diamond-dirt'],
+        ['diamond-tracked', 'diamond-ink'], ['diamond-opponent', 'diamond-ink'],
       ]) {
         const a = tokens[foreground], b = tokens[background]
         expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/${background} graphics`).toBeGreaterThanOrEqual(3)
