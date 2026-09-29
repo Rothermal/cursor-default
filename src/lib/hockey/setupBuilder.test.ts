@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sports } from '../../config/sports'
 import { createInitialState, gameReducer } from '../gameReducer'
 import { cloudSyncRouteForState } from '../gameSyncFingerprint'
+import { recordHockeyPlay, recordHockeyShot } from './captureCommands'
 import { hockeySportState } from './live'
 import { normalizeHockeyMatchSetup } from './setup'
 import {
@@ -9,6 +10,7 @@ import {
   buildHockeyMatchSetup,
   createHockeyEventGameState,
   createHockeySetupDraft,
+  hockeySetupTeamGate,
   hockeyDraftOverrides,
   hockeyDraftRules,
   hockeyDraftRulesSource,
@@ -180,3 +182,54 @@ describe('HKY-2E building the setup', () => {
     expect(hockeySportState(hydrated)?.setup).toEqual(built.setup)
   })
 })
+
+describe('HKY-2E local roster stats (PR #444 review)', () => {
+  it('projects a local player\'s goal and hit into their player row, through hydration', () => {
+    let draft = addHockeyDraftPlayers(createHockeySetupDraft(), ['30', '2', '3', '4', '5', '6'].map(number => ({ displayName: '', number, position: null })))
+    draft = setHockeyDraftGoalie(draft, draft.entries[0].id)
+    for (const entry of draft.entries.slice(1)) draft = toggleHockeyDraftStarter(draft, entry.id)
+    const built = buildHockeyMatchSetup(draft, NO_SOURCE)
+    if (!built.ok) throw new Error(built.message)
+    expect(built.setup.participants.every(participant => participant.playerId === null)).toBe(true)
+    const created = createHockeyEventGameState({ sport: hockey, setup: built.setup, teamName: 'Home', opponentName: 'Wolves', date: '2026-09-29', context: ctx(0) })
+    if (!created.ok) throw new Error(created.message)
+    const shooter = draft.entries[1].id
+    const goal = recordHockeyShot(created.state, { side: 'tracked', outcome: 'goal', shooter: { participantId: shooter } }, ctx(10))
+    if (!goal.ok) throw new Error(goal.message)
+    const hit = recordHockeyPlay(goal.state, { kind: 'hit', side: 'tracked', player: { participantId: shooter } }, ctx(20))
+    if (!hit.ok) throw new Error(hit.message)
+
+    const hydrated = gameReducer(createInitialState(), { type: 'HYDRATE_STATE', state: hit.state })
+    for (const state of [hit.state, hydrated]) {
+      expect(hockeySportState(state)?.projection.score.tracked).toBe(1)
+      const row = state.players.find(player => player.id === shooter)
+      expect(row?.stats).toMatchObject({ hky_g: 1, hky_hit: 1 })
+    }
+  })
+})
+
+describe('HKY-2E selected team gate (PR #444 review)', () => {
+  const teams = [{ id: 'team-1', seasonId: 'season-1' }]
+  const ready = { selectedTeamId: 'team-1', teamsStatus: 'ready' as const, teams, rosterStatus: 'ready' as const, rosterTeamId: 'team-1' }
+
+  it('lets a local roster start and freezes a resolved team with its season', () => {
+    expect(hockeySetupTeamGate({ ...ready, selectedTeamId: '', teamsStatus: 'error', rosterStatus: 'idle', rosterTeamId: null }))
+      .toEqual({ ok: true, source: { teamId: null, seasonId: null } })
+    expect(hockeySetupTeamGate(ready)).toEqual({ ok: true, source: { teamId: 'team-1', seasonId: 'season-1' } })
+  })
+
+  it('never turns a selected team into a local setup while its metadata is late or failed', () => {
+    expect(hockeySetupTeamGate({ ...ready, teamsStatus: 'loading', teams: [] }).ok).toBe(false)
+    expect(hockeySetupTeamGate({ ...ready, teamsStatus: 'error', teams: [] }))
+      .toEqual({ ok: false, message: 'Your teams could not load. Retry, or choose Local roster.' })
+  })
+
+  it('rejects a team outside the Hockey list and a roster from another or unfinished load', () => {
+    expect(hockeySetupTeamGate({ ...ready, selectedTeamId: 'soccer-team' }).ok).toBe(false)
+    expect(hockeySetupTeamGate({ ...ready, rosterTeamId: 'team-2' }).ok).toBe(false)
+    expect(hockeySetupTeamGate({ ...ready, rosterStatus: 'loading', rosterTeamId: null }).ok).toBe(false)
+    expect(hockeySetupTeamGate({ ...ready, rosterStatus: 'error', rosterTeamId: null }))
+      .toEqual({ ok: false, message: 'The roster could not load. Retry, or choose Local roster.' })
+  })
+})
+

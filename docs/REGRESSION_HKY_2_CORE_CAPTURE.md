@@ -5,7 +5,7 @@ one owner-only, default-off device toggle (Q2); owner verification on a phone re
 
 ## Automated and local checks
 
-- Full Vitest suite: 245 files / 2,190 tests passed. `pnpm typecheck` and `pnpm build`
+- Full Vitest suite: 246 files / 2,202 tests passed. `pnpm typecheck` and `pnpm build`
   passed. `pnpm lint` has 0 errors and the three existing context Fast Refresh warnings.
 - HKY-2A to HKY-2C coverage is listed in the HKY-2 plan §8 delivery records
   (`rinkGeometry.test.ts`, `capture.test.ts`, `plays.test.ts`, `legacyRules.test.ts`).
@@ -19,7 +19,11 @@ one owner-only, default-off device toggle (Q2); owner verification on a phone re
   - a frozen setup that passes the strict parser, holds only dressed players and keeps
     the source team and season;
   - a new local game starting period 1 paused, surviving hydration, and reaching no
-    cloud route.
+    cloud route;
+  - a local-roster goal and hit landing in the local player's row, before and after
+    hydration (PR #444 review);
+  - the selected-team gate: late or failed team metadata, a non-Hockey team, and a roster
+    from another or unfinished load all block Start (PR #444 review).
 - `src/lib/hockey/releasePolicy.test.ts` (replaces the HKY-1 preview gate test) covers:
   - the `opt_in` stage, the toggle requirement in production, rollback to `internal`,
     and the development preview without the toggle;

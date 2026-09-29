@@ -1,5 +1,5 @@
 import type { GameEvent } from '../gameEvents/types'
-import type { HockeyEvent, HockeyMatchSetup } from './types'
+import type { HockeyEvent, HockeyMatchParticipant, HockeyMatchSetup } from './types'
 
 export type HockeyStatGroup = 'skater' | 'goalie' | 'plus_minus' | 'play'
 
@@ -104,8 +104,14 @@ export function accumulateHockeyPlayStats(stats: HockeyParticipantStats, event: 
 /**
  * Maps participant stats to `playerStatsById` for the generic surfaces. Only non-zero
  * values are written, so a game with no captures keeps the empty stats (and fingerprint)
- * it had before HKY-2B.
+ * it had before HKY-2B. A local participant has no cloud `playerId`, so its row is keyed
+ * by the participant id, the same key `createHockeyEventGameState` gives its player row.
  */
+/** The local player-row key: the cloud player id, else the participant id. */
+export function hockeyLocalPlayerKey(participant: Pick<HockeyMatchParticipant, 'id' | 'playerId'>): string {
+  return participant.playerId ?? participant.id
+}
+
 export function hockeyPlayerStatsById(
   setup: HockeyMatchSetup,
   stats: HockeyParticipantStats
@@ -113,9 +119,9 @@ export function hockeyPlayerStatsById(
   const byPlayer: Record<string, Record<string, number>> = {}
   for (const participant of setup.participants) {
     const values = stats[participant.id]
-    if (!participant.playerId || !values) continue
+    if (!values) continue
     const nonZero = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== 0))
-    if (Object.keys(nonZero).length > 0) byPlayer[participant.playerId] = nonZero
+    if (Object.keys(nonZero).length > 0) byPlayer[hockeyLocalPlayerKey(participant)] = nonZero
   }
   return byPlayer
 }

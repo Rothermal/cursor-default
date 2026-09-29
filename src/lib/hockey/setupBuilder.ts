@@ -6,6 +6,7 @@ import { defaultHockeyDressedAs, normalizeHockeyPosition, sortHockeyActors } fro
 import { createHockeyMatchRules, findHockeyRulesProfile, DEFAULT_HOCKEY_PROFILE_ID } from './profiles'
 import { HOCKEY_RULES_FIELDS } from './rules'
 import { validateHockeyMatchSetup } from './setup'
+import { hockeyLocalPlayerKey } from './stats'
 import type {
   HockeyAttackingDirection,
   HockeyClockModel,
@@ -166,6 +167,40 @@ export function hockeyDraftRulesSource(draft: HockeySetupDraft): Record<HockeyRu
   ) as Record<HockeyRulesField, HockeyRuleSource>
 }
 
+export type HockeySetupLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+export type HockeySetupTeamGate =
+  | { ok: true; source: { teamId: string | null; seasonId: string | null } }
+  | { ok: false; message: string }
+
+/**
+ * Whether Start may freeze the chosen team (PR #444 review). A selected team must resolve
+ * to one of the recorder's Hockey teams and its own roster must have loaded; a selection
+ * never falls back to a local setup silently. No selection is a local roster.
+ */
+export function hockeySetupTeamGate(input: {
+  selectedTeamId: string
+  teamsStatus: HockeySetupLoadStatus
+  teams: readonly { id: string; seasonId: string | null }[]
+  rosterStatus: HockeySetupLoadStatus
+  rosterTeamId: string | null
+}): HockeySetupTeamGate {
+  if (!input.selectedTeamId) return { ok: true, source: { teamId: null, seasonId: null } }
+  if (input.teamsStatus === 'error') {
+    return { ok: false, message: 'Your teams could not load. Retry, or choose Local roster.' }
+  }
+  if (input.teamsStatus !== 'ready') return { ok: false, message: 'Your teams are still loading.' }
+  const team = input.teams.find(entry => entry.id === input.selectedTeamId)
+  if (!team) return { ok: false, message: 'That team is not one of your Hockey teams. Choose another team or Local roster.' }
+  if (input.rosterStatus === 'error') {
+    return { ok: false, message: 'The roster could not load. Retry, or choose Local roster.' }
+  }
+  if (input.rosterStatus !== 'ready' || input.rosterTeamId !== team.id) {
+    return { ok: false, message: 'The roster is still loading.' }
+  }
+  return { ok: true, source: { teamId: team.id, seasonId: team.seasonId } }
+}
+
 export type HockeySetupBuildResult = { ok: true; setup: HockeyMatchSetup } | { ok: false; message: string }
 
 /** Freezes the draft into setup v1; the message is suitable for the form. */
@@ -237,7 +272,7 @@ export function createHockeyEventGameState(input: {
       date: input.date,
     },
     players: input.setup.participants.map(participant => ({
-      id: participant.playerId ?? participant.id,
+      id: hockeyLocalPlayerKey(participant),
       name: participant.displayName,
       number: participant.number ?? '',
       stats: {},

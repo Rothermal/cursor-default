@@ -29,7 +29,9 @@ import {
   type HockeyAttackingDirection,
   type HockeyClockModel,
   type HockeyProfileId,
+  hockeySetupTeamGate,
   type HockeySetupDraft,
+  type HockeySetupLoadStatus,
   type HockeySetupEntry,
 } from '../lib/hockey'
 import { getHockeyEventCreationPolicy } from '../lib/sportAvailability'
@@ -40,8 +42,6 @@ interface HockeyTeamOption {
   name: string
   seasonId: string | null
 }
-
-type RosterStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /**
  * HKY-2E setup for Hockey event games. A cloud team's roster is read-only here; without a
@@ -69,20 +69,27 @@ function HockeySetupForm() {
   const [searchParams] = useSearchParams()
   const cloudAvailable = Boolean(user && supabase)
   const [teams, setTeams] = useState<HockeyTeamOption[]>([])
+  const [teamsStatus, setTeamsStatus] = useState<HockeySetupLoadStatus>('idle')
   const [teamsError, setTeamsError] = useState<string | null>(null)
+  const [teamsAttempt, setTeamsAttempt] = useState(0)
   // A team link only applies when the cloud is available; otherwise the roster is local.
   const [teamId, setTeamId] = useState(() => (cloudAvailable ? searchParams.get('teamId') ?? '' : ''))
   const [localTeamName, setLocalTeamName] = useState('Home')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [rosterStatus, setRosterStatus] = useState<RosterStatus>('idle')
+  const [rosterStatus, setRosterStatus] = useState<HockeySetupLoadStatus>('idle')
   const [rosterError, setRosterError] = useState<string | null>(null)
+  const [rosterTeamId, setRosterTeamId] = useState<string | null>(null)
+  const [rosterAttempt, setRosterAttempt] = useState(0)
   const [draft, setDraft] = useState<HockeySetupDraft>(() => createHockeySetupDraft())
   const [jerseys, setJerseys] = useState('')
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '' })
   const [error, setError] = useState<string | null>(null)
   const [viewFlipped, setViewFlipped] = useState(false)
 
-  const team = teams.find(entry => entry.id === teamId) ?? null
+  // Only a selection that resolves to one of the recorder's Hockey teams loads a roster.
+  const team = teamsStatus === 'ready' ? teams.find(entry => entry.id === teamId) ?? null : null
+  const resolvedTeamId = team?.id ?? null
+  const teamGate = hockeySetupTeamGate({ selectedTeamId: teamId, teamsStatus, teams, rosterStatus, rosterTeamId })
   const rules = useMemo(() => hockeyDraftRules(draft), [draft])
   const profile = findHockeyRulesProfile(draft.profileId)
   const trackedName = team?.name ?? (localTeamName.trim() || 'Home')
@@ -90,6 +97,8 @@ function HockeySetupForm() {
   useEffect(() => {
     if (!cloudAvailable) return
     let cancelled = false
+    setTeamsStatus('loading')
+    setTeamsError(null)
     void (async () => {
       const { data, error: loadError } = await supabase!
         .from('teams')
@@ -99,16 +108,19 @@ function HockeySetupForm() {
       if (cancelled) return
       if (loadError) {
         setTeamsError(loadError.message)
+        setTeamsStatus('error')
         return
       }
       setTeams(((data ?? []) as Array<{ id: string; name: string; season_id: string | null }>)
         .map(row => ({ id: row.id, name: row.name, seasonId: row.season_id })))
+      setTeamsStatus('ready')
     })()
     return () => { cancelled = true }
-  }, [cloudAvailable])
+  }, [cloudAvailable, teamsAttempt])
 
   useEffect(() => {
-    if (!teamId || !supabase) {
+    setRosterTeamId(null)
+    if (!resolvedTeamId || !supabase) {
       setRosterStatus('idle')
       return
     }
@@ -119,7 +131,7 @@ function HockeySetupForm() {
       const { data, error: loadError } = await supabase!
         .from('team_players')
         .select('player_id, jersey_number, position, players!inner(id, first_name, last_name)')
-        .eq('team_id', teamId)
+        .eq('team_id', resolvedTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
       if (cancelled) return
@@ -136,10 +148,11 @@ function HockeySetupForm() {
         position: normalizeHockeyPosition(row.position),
       }))
       setDraft(current => setHockeyDraftRoster(current, roster))
+      setRosterTeamId(resolvedTeamId)
       setRosterStatus('ready')
     })()
     return () => { cancelled = true }
-  }, [teamId])
+  }, [resolvedTeamId, rosterAttempt])
 
   const update = (next: HockeySetupDraft) => {
     setDraft(next)
@@ -172,7 +185,11 @@ function HockeySetupForm() {
   const start = () => {
     const hockey = sports.find(entry => entry.id === 'hockey')
     if (!hockey) return
-    const built = buildHockeyMatchSetup(draft, { teamId: team?.id ?? null, seasonId: team?.seasonId ?? null })
+    if (!teamGate.ok) {
+      setError(teamGate.message)
+      return
+    }
+    const built = buildHockeyMatchSetup(draft, teamGate.source)
     if (!built.ok) {
       setError(built.message)
       return
@@ -213,11 +230,20 @@ function HockeySetupForm() {
             Your team
             <select className="input-field mt-1" value={teamId} onChange={event => chooseTeam(event.target.value)}>
               <option value="">Local roster (not a cloud team)</option>
+              {teamId && !team && <option value={teamId}>{teamsStatus === 'ready' ? 'Team not found' : 'Selected team (loading)'}</option>}
               {teams.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
             </select>
           </label>
         )}
-        {teamsError && <p className="text-sm text-danger-content">Teams could not load: {teamsError}</p>}
+        {teamsStatus === 'error' && (
+          <div role="alert" className="flex items-center gap-2 text-sm text-danger-content">
+            <span className="min-w-0 flex-1">Teams could not load: {teamsError}</span>
+            <button type="button" className="btn-secondary shrink-0" onClick={() => setTeamsAttempt(attempt => attempt + 1)}>Retry</button>
+          </div>
+        )}
+        {teamId && teamsStatus === 'ready' && !team && (
+          <p role="alert" className="text-sm text-danger-content">That team is not one of your Hockey teams. Choose another team or Local roster.</p>
+        )}
         {!teamId && (
           <label className="block text-sm font-medium text-content">
             Team name
@@ -308,7 +334,10 @@ function HockeySetupForm() {
       <Section title={`${trackedName} lineup`}>
         {teamId && rosterStatus === 'loading' && <p className="text-sm text-content-muted">Loading the roster…</p>}
         {teamId && rosterStatus === 'error' && (
-          <p role="alert" className="text-sm text-danger-content">The roster could not load: {rosterError}</p>
+          <div role="alert" className="flex items-center gap-2 text-sm text-danger-content">
+            <span className="min-w-0 flex-1">The roster could not load: {rosterError}</span>
+            <button type="button" className="btn-secondary shrink-0" onClick={() => setRosterAttempt(attempt => attempt + 1)}>Retry</button>
+          </div>
         )}
         {teamId && rosterStatus === 'ready' && draft.entries.length === 0 && (
           <p className="text-sm text-content-muted">This team has no active players. Add them in Team Manage, or use a local roster.</p>

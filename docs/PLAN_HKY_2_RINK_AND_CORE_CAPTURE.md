@@ -538,6 +538,13 @@ Deviations from the plan above:
   rink, the quick row, and Recent Events. Set clock, End period, score adjustments,
   Suspend, Abandon and Reopen live in the Game menu.
 - `releasePolicy.test.ts` replaces `previewGate.test.ts` as the audited consumer list.
+- PR #444 review:
+  - Local participants have no cloud `playerId`, so their stats and player rows share one
+    key, `hockeyLocalPlayerKey` (the player id, else the participant id). Cloud identity
+    stays null.
+  - `hockeySetupTeamGate` stops Start until a selected team resolves to one of the
+    recorder's Hockey teams and that team's own roster has loaded. A failed load offers
+    Retry or Local roster, and a selection is never turned into a local setup.
 - `docs/REGRESSION_HKY_2_CORE_CAPTURE.md` is the regression record.
 
 Deviations from the plan above:
