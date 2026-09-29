@@ -6,7 +6,7 @@ lifecycle and clock) and [HKY-2](PLAN_HKY_2_RINK_AND_CORE_CAPTURE.md) (rink, sho
 goalies, faceoffs, plays, Recent Events, and the owner tracker behind a default-off toggle).
 
 Status: approved (PR #446 merged, 2026-09-29); built with the §7 recommendations.
-HKY-3A is implemented; §8 is the delivery record.
+HKY-3A, HKY-3B and HKY-3C are implemented; §8 is the delivery record.
 
 ---
 
@@ -358,3 +358,37 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 - Deviations: PK percentage and the skipped plus/minus quality note have no screen yet;
   both are derivable from the projection and land with the Hockey Summary.
 - Tests: `specialTeams.test.ts` (26 cases).
+
+### HKY-3C (implemented)
+
+- Overtime strength: in an overtime with fewer skaters than `skatersPerSide` (3v3), a
+  running strength penalty adds a skater to the other side (4v3, then 5v3); only beyond
+  full strength does the penalized side lose one. Offsetting penalties leave 3v3.
+  Regulation and full-strength overtime keep the HKY-3A rule.
+- On-ice limits: `hockeyOnIceLimits` gives the complete-set range. Anchored games read the
+  side's `baseSkaters` at the goal's game time (minimum `min(minimumSkaters, base)`);
+  clockless games use the period's skaters, widened in overtime to full strength. Replay
+  and capture share it, the empty-net attacker is added once from the set's goalie, and the
+  shot dialog shows the range under the on-ice set.
+- Shootout: `hockey.shootout_started` (neutral, `firstSide`) and `hockey.shootout_attempt`
+  (the shooting side; optional `shooter` and stamped defending `goalie`; `goal | saved |
+  missed`). Both use the last period's envelope with no clock time. `shootoutAvailable` is
+  true once regulation and overtime are over, the score is tied, the rules have a
+  shootout, and ties are not allowed. Sides alternate; the shootout ends early once one
+  side cannot be caught, then goes to sudden death, decided after a complete round.
+  `shootout.ts` checks `repeatShooters` for tracked skaters; opponent shooters are
+  labels, so only `never` compares their labels. Attempts are never shots, goals or saves.
+  Score adjustments are refused once a shootout starts (Undo removes it). Recent Events
+  can undo attempts and the start.
+- Result: once the match ends, `result` holds `win | loss | tie`, `decidedIn` and the
+  final score with one goal for the shootout winner (`formatHockeyFinalScore`: `1-0 (SO)`).
+  Suspended, abandoned and reopened games have none. `goalieOfRecord` is the tracked
+  goalie in net (or last in net, when pulled) when the winner scored the goal that put
+  them ahead for good, or the goalie who faced the shootout; null for a tie.
+- UI: `HockeyShootoutPanel` (first side, per-side marks, shooter picker limited to
+  eligible skaters, Goal/Save/Miss, End game once decided) and a Final line on the
+  scoreboard.
+- Deviations: a shooter serving a penalty when overtime ended is not blocked; the
+  recorder picks eligible shooters.
+- Tests: `outcomes.test.ts` (16 cases).
+

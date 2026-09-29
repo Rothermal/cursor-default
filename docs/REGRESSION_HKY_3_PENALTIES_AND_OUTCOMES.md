@@ -100,3 +100,39 @@ Browser (dev build, 390 x 844, touch):
 - Reload: scoreboard totals come back. No console errors.
 
 Checks: `pnpm typecheck`, `pnpm lint` (0 errors), `pnpm test`, `pnpm build`.
+
+## HKY-3C Overtime strength, shootout and outcomes
+
+Automated (`src/lib/hockey/outcomes.test.ts`, 16 cases):
+
+| Case | Result |
+|---|---|
+| Shootout offered only after a tied overtime with shootout rules and no ties (not youth, NCAA or with a lead) | Pass |
+| Early shootout win; attempts outside shots, goals and saves; `1-0 (SO)`; goalie of record | Pass |
+| Sudden death after three rounds, decided only on a complete round; shootout loss | Pass |
+| `after_all`: a repeat waits for every eligible skater; a goalie cannot shoot | Pass |
+| `never`: an opponent label cannot repeat | Pass |
+| Score adjustment refused during a shootout; Undo of an attempt and of the start; hydration | Pass |
+| Goalie of record for a regulation win (after a goalie change) and loss | Pass |
+| Pulled goalie keeps the decision | Pass |
+| Youth tie: no goalie of record | Pass |
+| NHL playoffs decided in a second overtime, `1-0 (OT)` | Pass |
+| No result while suspended; reopen clears it | Pass |
+| 3v3 overtime: penalties give 3v4, 3v5, stay 3v5, then 3v4 after an opponent minor | Pass |
+| Complete sets follow the box at capture, replay and hydration (3 max at 3v3, 5 with two opponent minors) | Pass |
+| Empty net counted once: 4 accepted and 5 rejected in penalty-free 3v3; 6 accepted in regulation | Pass |
+| Clockless overtime widened to full strength | Pass |
+| Regulation coincidental minors still 4v4 | Pass |
+
+HKY-1, HKY-2, HKY-3A and HKY-3B suites and the literal pre-HKY-3 fixtures pass unchanged.
+
+Browser (dev build, 390 x 844, touch, NHL regular season, no clock):
+
+- End three periods and overtime tied: the Shootout panel asks who shoots first.
+- Home first: goal by a tracked skater, Wolves miss, Home save, Wolves save; the next
+  tracked picker leaves out the two skaters who already shot; Home goal decides it 2-0.
+- End game: the scoreboard shows `Final: Win 1-0 (SO)` and the score stays 0-0 with 0 SOG.
+- Reload: the result comes back. No console errors.
+
+Checks: `pnpm typecheck`, `pnpm lint` (0 errors), `pnpm test`, `pnpm build`.
+

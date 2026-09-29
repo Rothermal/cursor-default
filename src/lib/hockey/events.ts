@@ -328,6 +328,23 @@ export const hockeyEventDefinitions: GameEventDefinition<GameEvent>[] = [
         ? null
         : 'A team event is icing or offside.'
   ),
+  definition('hockey.shootout_started', payload =>
+    exactKeys(payload, ['captureCommandId', 'firstSide']) &&
+    isCaptureId(payload.captureCommandId) &&
+    (payload.firstSide === 'tracked' || payload.firstSide === 'opponent')
+      ? null
+      : 'A shootout names the side that shoots first.'
+  ),
+  captureDefinition(
+    'hockey.shootout_attempt',
+    { location: false, roles: ['shooter', 'goalie'] },
+    payload =>
+      exactKeys(payload, ['captureCommandId', 'outcome']) &&
+      isCaptureId(payload.captureCommandId) &&
+      (payload.outcome === 'goal' || payload.outcome === 'saved' || payload.outcome === 'missed')
+        ? null
+        : 'A shootout attempt is a goal, a save or a miss.'
+  ),
   captureDefinition('hockey.hit', { location: true, roles: ['hitter', 'hit_player'] }, playPayload),
   captureDefinition('hockey.takeaway', { location: true, roles: ['player'] }, playPayload),
   captureDefinition('hockey.giveaway', { location: true, roles: ['player'] }, playPayload),
