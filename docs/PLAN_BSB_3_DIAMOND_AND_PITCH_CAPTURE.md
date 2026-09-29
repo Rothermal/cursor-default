@@ -1,7 +1,8 @@
 # Plan: BSB-3 Baseball Diamond Tracker and Pitch Pad
 
-Status: owner questions answered 2026-09-29 (section 9); plan under review. No code starts
-until Mark approves or merges this plan.
+Status: owner questions answered 2026-09-29 (section 9); revised 2026-09-29 for the review of
+`98c68bd` (terminal-pitch runner outcomes, fielder-to-pitcher swap). Plan under review. No
+code starts until Mark approves or merges this plan.
 Builds on the BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)) and BSB-2 roster,
 defaults and setup ([plan](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 4, 8 and 12.
@@ -120,9 +121,9 @@ the same drawing.
 | Slice | Content | Exit |
 | --- | --- | --- |
 | BSB-3A | Diamond geometry and component, pitch pad component, scoreboard strip, tracker page shell replacing the holding page (Start game stays), preferences | The tracker shows the live projection of a started game at 390px in both themes; no capture yet |
-| BSB-3B | Pitches and plate appearances: pitch results, automatic walk/HBP/strikeout completion, in-play sheet (result, batted-ball type, spray location, fielder sequence), Quick PA | A plate appearance of every result type can be recorded and the count, outs, bases and score update |
+| BSB-3B | Pitches and plate appearances: pitch results, automatic walk/HBP/strikeout completion, the "Runners moved" exception path, in-play sheet (result, batted-ball type, spray location, fielder sequence), Quick PA | A plate appearance of every result type can be recorded, a terminal pitch with its runner outcomes is one event, and the count, outs, bases and score update |
 | BSB-3C | Runner resolution and between-pitch running | Every runner outcome in the BSB-1 fixtures can be entered by taps |
-| BSB-3D | Endings, pitching changes, opponent slot labels, Recent plays and Undo, owner-only release toggle (Q1) | A full seven-inning local game, with a pitching change and a walk-off, can be scored and survives reload |
+| BSB-3D | Endings, pitching changes (bench pitcher or fielder swap), opponent slot labels, Recent plays and Undo, owner-only release toggle (Q1) | A full seven-inning local game, with a pitching change and a walk-off, can be scored and survives reload |
 
 ### BSB-3B Pitches and plate appearances
 
@@ -143,6 +144,34 @@ The command is `recordBaseballPitch`, with the movements proposed by
     outs, a small choice appears first: "Strikeout" or "Dropped third strike". The
     dropped-third-strike choice opens runner resolution with the batter's destination
     and fielder sequence.
+- **Runners moved on this pitch (the exception path):** one-tap saving stays the
+  default, but the recorder must be able to add runner outcomes to the same pitch
+  before it is written.
+  - A "Runners moved" chip sits on the pad whenever a runner is on base or a dropped
+    third strike is possible. Tapping it arms the next pitch; tapping again disarms it.
+  - When armed, the next result, terminal or not, opens runner resolution (BSB-3C)
+    instead of saving. The sheet starts from the proposal for that result: forced
+    advances for ball four or HBP, the batter out for strike three, the batter to first
+    for a dropped third strike, and every runner staying for a non-terminal pitch.
+  - Each runner row has a reason chip: Wild pitch, Passed ball, Steal, Caught stealing,
+    Error, Throw or Forced. A forced runner defaults to Forced (`awarded`); others
+    default to Wild pitch. Only engine running reasons are offered for a non-terminal
+    pitch.
+  - Confirm writes one `baseball.pitch` event with the pitch result and every movement.
+    Cancel writes nothing and keeps the chip armed. The chip disarms after the write.
+  - Examples it covers: ball four with a wild pitch that moves another runner two bases;
+    a caught strikeout with the runner caught stealing ("strike 'em out, throw 'em
+    out"); a dropped third strike on a wild pitch that also moves a runner up; and a
+    forced winning run on ball four plus a wild-pitch advance.
+  - Why it must be atomic: the engine applies movements, completes the plate appearance
+    and then runs the half-inning and game-ending checks for the one event
+    (`projector.ts` `applyPitch`). A third out moves play to the next half, and a
+    winning run sets `pendingEnd`, which blocks every later play event. A separate
+    baserunning event after the pitch is therefore not an equivalent correction, and
+    BSB-3 does not rely on one or on later Timeline editing.
+  - The BSB-1 engine already accepts all of these as one pitch event (checked against
+    the current `projector.ts` while revising this plan), so no engine change is
+    expected.
 - **In play** opens the in-play sheet:
   1. **Result chips:** 1B, 2B, 3B, HR, Out, Error, Fielder's choice, Sac bunt, Sac fly,
      DP, TP and Ground-rule 2B. HR also offers "Inside the park".
@@ -203,9 +232,11 @@ The command is `recordBaseballPitch`, with the movements proposed by
   - for caught stealing or a pickoff, the runner is out with a fielder sequence.
 - A double steal is one play, with both runners edited in the same sheet.
 - Confirm writes `recordBaseballBaserunning`.
-- A wild pitch or passed ball on ball four or strike three is entered from the pitch:
-  resolution offers "Advance on WP/PB" per runner. The engine already stores a reason
-  per movement.
+- A wild pitch, passed ball, steal or caught stealing that happens on a pitch should be
+  recorded with the pad's "Runners moved" chip (BSB-3B), so the pitch and the running
+  are one capture unit. This is required when the pitch ends the plate appearance. The
+  runner menu is for plays with no pitch (pickoff, balk, appeal) and for games where
+  pitches are not tracked.
 
 ### BSB-3D Endings, pitching changes, Recent plays and Undo
 
@@ -224,12 +255,28 @@ The command is `recordBaseballPitch`, with the movements proposed by
 
 **Pitching changes (Q2):** these use the engine's substitution command.
 
-- For the tracked team, the recorder picks the incoming pitcher from dressed players
-  who are not in the game, or from fielders, which is a position change.
-- For the opponent, a new pitcher gets a label or number.
+- **Tracked team, two choices only.** The sheet asks who pitches now and shows exactly
+  what happens before Confirm:
+  1. **A bench player.** One `defensive` substitution at position 1 with the current
+     pitcher as the player leaving. The new pitcher takes the old pitcher's batting
+     slot, and the old pitcher leaves the game (re-entry follows the rules profile).
+     When the old pitcher does not bat (DH formats), the new pitcher does not bat
+     either. The sheet says "#12 Smith replaces #7 Jones, batting 5th. Jones leaves the
+     game."
+  2. **A fielder, swapping with the pitcher.** One `position_change` with two
+     assignments: the fielder to position 1 and the old pitcher to the fielder's
+     position. The sheet shows "Jones moves to 3B" and Confirm is the explicit
+     confirmation of the swap. Both keep their batting slots.
+  - The engine requires every displaced fielder to get a new position
+    (`applyPositionChange`), so choosing a fielder without a destination for the old
+    pitcher is not offered. The two-player swap always leaves a complete defense.
+  - Anything else, such as the old pitcher moving to a third position, a bench player
+    taking the fielder's spot, or a double switch, is a defensive switch and stays in
+    BSB-4. The sheet says so and points to it rather than offering a partial change.
+- For the opponent, a new pitcher gets a label or number (`opponent_pitcher`).
 - The count carries over and inherited runners are recorded by the engine.
-- Pinch hitters, pinch runners, defensive switches, courtesy runners and re-entry stay
-  in BSB-4.
+- Pinch hitters, pinch runners, other defensive switches, courtesy runners and re-entry
+  stay in BSB-4.
 
 **Recent plays and Undo (Q3):** this follows the Hockey HKY-2C and Basketball
 `courtCorrections` rules.
@@ -294,6 +341,16 @@ The command is `recordBaseballPitch`, with the movements proposed by
   - ball four, HBP and strike three complete the plate appearance with the proposed
     movements;
   - the dropped-third-strike choice appears only when the rules and bases allow it.
+- **Terminal pitches with runner outcomes ("Runners moved"), each written as one event:**
+  - ball four plus a wild-pitch or passed-ball advance by another runner;
+  - HBP plus a passed-ball advance;
+  - a caught strikeout plus a runner caught stealing, including when that makes the
+    third out and play moves to the next half;
+  - a dropped third strike plus a wild-pitch advance by another runner;
+  - a forced winning run on ball four plus a wild-pitch advance, which sets
+    `pendingEnd` only after the whole pitch is recorded;
+  - a non-terminal pitch with a steal or wild pitch;
+  - Cancel writes nothing and an engine rejection keeps the sheet open.
 - **In-play sheet:**
   - every result chip produces a valid event from a fresh count;
   - an out without fielders is blocked;
@@ -310,6 +367,13 @@ The command is `recordBaseballPitch`, with the movements proposed by
   - pendingEnd blocks play and End game writes the ending;
   - time-limit and mercy half-inning endings;
   - suspend, abandon and reopen.
+- **Pitching changes:**
+  - a bench pitcher takes the old pitcher's batting slot, the old pitcher leaves, and
+    the count and inherited runners carry over;
+  - a fielder-to-pitcher swap moves the old pitcher to the fielder's position, keeps
+    both batting slots, and the next pitch records with a complete defense;
+  - a DH-format bench pitcher does not enter the batting order;
+  - options outside these two are not offered.
 - **Undo:**
   - each capture family can be undone;
   - Undo is refused behind a lifecycle event;
