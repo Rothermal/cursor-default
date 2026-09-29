@@ -153,7 +153,7 @@ bar because each event sheet already owns actor selection.
 
 ### S4 - Recent-events undo on Field
 
-**Status:** planned; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md)  
+**Status:** implemented (Field Undo sheet); pending deployed verification; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md)  
 **Theme:** last-action correction  
 **Where:** Field tab; `SoccerTimeline` already owns revisioned correction
 
