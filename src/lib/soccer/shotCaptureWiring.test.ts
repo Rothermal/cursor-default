@@ -81,7 +81,7 @@ it('wires Field Undo through the checked history helpers and tracker guard', () 
   // Disabled with nothing to undo, an unhealthy history, while applying, or cloud final.
   expect(tracker).toContain('disabled={!healthy || isApplying || cloudFinal || !recentUndo.target}')
   expect(tracker).toContain("? 'Pause the clock to undo.'")
-  expect(tracker).toContain('onApply={applyResult}\n        onOpenTimeline')
+  expect(tracker).toMatch(/onApply=\{applyResult\}\s+onOpenTimeline/)
   // Only the newest row undoes; restore uses the checked helper; rejections stay inline.
   expect(sheet).toContain('apply(deleteSoccerHistoryEvent(state, target.id))')
   expect(sheet).toContain('apply(restoreSoccerHistoryEvent(state, undone.id))')
