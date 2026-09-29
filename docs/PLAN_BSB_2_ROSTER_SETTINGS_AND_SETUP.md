@@ -1,6 +1,6 @@
 # Plan: BSB-2 Baseball Roster Positions, Team Defaults and Game Setup
 
-Status: implemented (BSB-2A, 2B, 2C); migration 071 awaits owner apply. Approved to start by Mark (2026-09-27, "Start BSB-2"). Builds on the merged
+Status: implemented (BSB-2A, 2B, 2C); migration 071 applied by Mark 2026-09-29. Approved to start by Mark (2026-09-27, "Start BSB-2"). Builds on the merged
 BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 5, 9 and 12.
 
