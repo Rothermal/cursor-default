@@ -489,7 +489,8 @@ class HockeyReplay {
       totals.goals[side] += 1
       p.goalsByStrength[side][payload.strength ?? 'unrecorded'] += 1
       const gameTimeMs = hockeyGameTimeMs(p, active.id, event.elapsedMs)
-      if (payload.strength === 'pp' && gameTimeMs !== null) {
+      // A penalty-shot goal never ends a penalty (NHL rule 24.6), whatever its strength.
+      if (payload.strength === 'pp' && !payload.penaltyShot && gameTimeMs !== null) {
         p.powerPlayGoals.push({ eventId: event.id, side, gameTimeMs, replayIndex: this.replayIndex })
       }
       if (!accumulateHockeyPlusMinus(this.stats, event)) p.plusMinusSkippedGoalIds.push(event.id)

@@ -56,7 +56,7 @@ Checks: `pnpm typecheck`, `pnpm lint` (0 errors), `pnpm test`, `pnpm build`.
 
 ## HKY-3B Goal strength, special teams, timeouts, icing and offside
 
-Automated (`src/lib/hockey/specialTeams.test.ts`, 19 cases):
+Automated (`src/lib/hockey/specialTeams.test.ts`, 25 cases):
 
 | Case | Result |
 |---|---|
@@ -79,6 +79,12 @@ Automated (`src/lib/hockey/specialTeams.test.ts`, 19 cases):
 | Stored timeout while the clock runs rejected on replay | Pass |
 | Icing and offside counted per side with an optional location | Pass |
 | Timeouts and team events round-trip through `HYDRATE_STATE` | Pass |
+| Penalty-shot goal (derived or chosen PP) never releases a minor | Pass |
+| Penalty-shot goal keeps the minor through hydration and Undo; a later PP goal releases it | Pass |
+| Opportunity when the earlier of two opposite minors expires, counted once | Pass |
+| Opportunity when an early release leaves the other side short | Pass |
+| No opportunity when minors end together | Pass |
+| No second opportunity for a double minor after four on four or its second half | Pass |
 
 HKY-1, HKY-2 and HKY-3A suites pass unchanged.
 

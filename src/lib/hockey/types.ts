@@ -487,7 +487,7 @@ export interface HockeyMatchProjection {
   removedParticipantIds: string[]
   /** Goals by the strength stored on them (HKY-3B); HKY-2 goals are `unrecorded`. */
   goalsByStrength: { tracked: HockeyGoalStrengthTotals; opponent: HockeyGoalStrengthTotals }
-  /** Power-play goals with a clock time, which can release a minor in the box. */
+  /** Power-play goals with a clock time, which can release a minor in the box; penalty-shot goals never do. */
   powerPlayGoals: HockeyPowerPlayGoalRecord[]
   /** Goals left out of plus/minus: no complete on-ice set, or no recorded strength. */
   plusMinusSkippedGoalIds: string[]

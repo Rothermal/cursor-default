@@ -208,7 +208,7 @@ export interface HockeyPenaltyBox {
   /** Penalties whose time counted against strength when assessed (not cancelled). */
   strengthPenaltyIds: string[]
   cancelledPenaltyIds: string[]
-  /** Penalties that put the other side on a power play when assessed (HKY-3B). */
+  /** Power plays: when a penalty is assessed, or when earlier penalties end and leave its side short (HKY-3B). */
   powerPlayOpportunities: { tracked: number; opponent: number }
   /** Power-play goals that ended a minor, with the penalty each one released. */
   powerPlayReleases: Array<{ goalEventId: string; penaltyEventId: string; segment: 1 | 2 }>
@@ -341,6 +341,10 @@ class BoxSimulation {
   private readonly strengthIds: string[] = []
   private readonly cancelledIds: string[] = []
   private readonly opportunities = { tracked: 0, opponent: 0 }
+  /** The side with more skaters by open strength penalties, after the last transition. */
+  private advantage: HockeySide | null = null
+  /** Penalties that already gave the other side a power play; each gives at most one. */
+  private readonly countedPenaltyIds = new Set<string>()
   private readonly powerPlayReleases: HockeyPenaltyBox['powerPlayReleases'] = []
   private queueCounter = 0
 
@@ -445,8 +449,40 @@ class BoxSimulation {
       if (!chain.items[0].strength) continue
       const penalized = chain.record.side
       const other: HockeySide = penalized === 'tracked' ? 'opponent' : 'tracked'
-      if (this.openStrength(penalized) > this.openStrength(other)) this.opportunities[other] += 1
+      if (this.openStrength(penalized) > this.openStrength(other)) {
+        this.opportunities[other] += 1
+        this.countedPenaltyIds.add(chain.record.eventId)
+      }
     }
+    this.advantage = this.currentAdvantage()
+  }
+
+  private currentAdvantage(): HockeySide | null {
+    const tracked = this.openStrength('tracked')
+    const opponent = this.openStrength('opponent')
+    return tracked === opponent ? null : tracked < opponent ? 'tracked' : 'opponent'
+  }
+
+  /**
+   * A power play can also begin when penalties end: the earlier of two overlapping
+   * opposite minors expires or is released and leaves the other side short. Count it when
+   * a side gains the advantage it did not have before and the short side serves a penalty
+   * that has not already given a power play (so a power play interrupted by four on four
+   * does not count twice). One call per instant, so penalties ending together never count.
+   */
+  private noteAdvantage(): void {
+    const now = this.currentAdvantage()
+    if (now && now !== this.advantage) {
+      const short: HockeySide = now === 'tracked' ? 'opponent' : 'tracked'
+      const open = this.items
+        .filter(item => item.record.side === short && item.strength && item.state !== 'done')
+        .map(item => item.record.eventId)
+      if (open.some(id => !this.countedPenaltyIds.has(id))) {
+        this.opportunities[now] += 1
+        for (const id of open) this.countedPenaltyIds.add(id)
+      }
+    }
+    this.advantage = now
   }
 
   /**
@@ -468,6 +504,7 @@ class BoxSimulation {
     if (!released) return
     this.powerPlayReleases.push({ goalEventId: goal.eventId, penaltyEventId: released.record.eventId, segment: released.segment })
     this.finish(released)
+    this.noteAdvantage()
   }
 
   /** Strength time running or waiting for a side. */
@@ -519,6 +556,7 @@ class BoxSimulation {
       return
     }
     this.finish(item)
+    this.noteAdvantage()
   }
 
   private advance(delta: number): void {
@@ -532,6 +570,7 @@ class BoxSimulation {
       for (const item of running) {
         if (item.remainingMs <= 0 && item.state === 'running') this.finish(item)
       }
+      this.noteAdvantage()
     }
   }
 

@@ -9,6 +9,7 @@ import {
   recordHockeyShot,
   recordHockeyTeamEvent,
   recordHockeyTimeout,
+  releaseHockeyPenalty,
   type HockeyPenaltyInput,
   type RecordHockeyShotInput,
 } from './captureCommands'
@@ -160,6 +161,76 @@ describe('power-play goal release', () => {
     expect(hockeyPenaltyBoxNow(hockeySportState(state)!, at(21)).box.opponent).toEqual([])
     state = expectOk(undoHockeyCapture(state, at(22)))
     expect(hockeyPenaltyBoxNow(hockeySportState(state)!, at(22)).box.opponent[0].remainingMs).toBe(109_000)
+  })
+})
+
+describe('penalty-shot goals', () => {
+  const opponentBox = (state: GameState, seconds: number) => hockeyPenaltyBoxNow(hockeySportState(state)!, at(seconds)).box.opponent
+
+  it('never release a minor, whether the strength is derived or chosen', () => {
+    for (const strength of [undefined, 'pp'] as const) {
+      let state = opponentMinor(11)(running())
+      state = goal(state, { side: 'tracked', penaltyShot: true, ...(strength ? { strength } : {}) }, 21)
+      expect(storedStrength(state)).toBe('pp')
+      expect(projection(state).score.tracked).toBe(1)
+      expect(projection(state).powerPlayGoals).toEqual([])
+      expect(opponentBox(state, 21).map(entry => entry.remainingMs)).toEqual([110_000])
+      expect(hockeyPenaltyBoxNow(hockeySportState(state)!, at(21)).box.powerPlayReleases).toEqual([])
+    }
+  })
+
+  it('keep the minor through hydration and Undo, and a later power-play goal still releases it', () => {
+    let state = opponentMinor(11)(running())
+    state = goal(state, { side: 'tracked', penaltyShot: true }, 21)
+    const hydrated = gameReducer(createInitialState(), { type: 'HYDRATE_STATE', state: JSON.parse(JSON.stringify(state)) as GameState })
+    expect(projection(hydrated)).toEqual(projection(state))
+    expect(opponentBox(hydrated, 21)).toHaveLength(1)
+    const undone = expectOk(undoHockeyCapture(state, at(22)))
+    expect(opponentBox(undone, 22).map(entry => entry.remainingMs)).toEqual([109_000])
+    state = goal(state, { side: 'tracked' }, 31)
+    expect(opponentBox(state, 31)).toEqual([])
+  })
+})
+
+describe('power-play opportunities after assessment', () => {
+  const opportunities = (state: GameState) =>
+    hockeySpecialTeams(hockeySportState(state)!.setup, projection(state)).powerPlayOpportunities
+
+  it('counts a power play that begins when the earlier of two opposite minors expires', () => {
+    let state = trackedMinor('p2', 11)(running())
+    state = opponentMinor(61)(state)
+    expect(opportunities(state)).toEqual({ tracked: 0, opponent: 1 })
+    state = goal(state, { side: 'tracked' }, 141)
+    expect(storedStrength(state)).toBe('pp')
+    expect(opportunities(state)).toEqual({ tracked: 1, opponent: 1 })
+    // The opponent minor then ends by the power-play goal: nothing more to count.
+    state = goal(state, { side: 'opponent', shooter: { label: '#9' } }, 150)
+    expect(storedStrength(state)).toBe('ev')
+    expect(opportunities(state)).toEqual({ tracked: 1, opponent: 1 })
+  })
+
+  it('counts a power play that begins with an early release', () => {
+    let state = trackedMinor('p2', 11)(running())
+    const first = lastEvent(state).id
+    state = opponentMinor(61)(state)
+    state = expectOk(releaseHockeyPenalty(state, { penaltyEventId: first, reason: 'Wrong player' }, ctx(71)))
+    expect(opportunities(state)).toEqual({ tracked: 1, opponent: 1 })
+  })
+
+  it('does not count minors that end together', () => {
+    let state = trackedMinor('p2', 11)(running())
+    state = opponentMinor(11)(state)
+    state = goal(state, { side: 'tracked' }, 141)
+    expect(storedStrength(state)).toBe('ev')
+    expect(opportunities(state)).toEqual({ tracked: 0, opponent: 1 })
+  })
+
+  it('does not count a double minor twice when four on four ends or its second half starts', () => {
+    let state = penalty({ ...MINOR, class: 'double_minor', side: 'tracked', offender: { participantId: 'p2' } }, 11)(running())
+    state = opponentMinor(61)(state)
+    state = goal(state, { side: 'opponent', shooter: { label: '#9' } }, 191)
+    expect(storedStrength(state)).toBe('pp')
+    expect(opportunities(state)).toEqual({ tracked: 0, opponent: 1 })
   })
 })
 

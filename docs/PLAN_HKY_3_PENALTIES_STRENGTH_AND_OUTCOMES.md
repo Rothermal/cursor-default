@@ -336,10 +336,14 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 - Power-play goal release: the box simulation now takes goals confirmed as PP (in
   `powerPlayGoals`, replay order) and ends the short-handed side's running minor or
   double-minor segment with the least time left. Undoing the goal brings the minor back.
-- Special teams: `hockeySpecialTeams` gives PP opportunities (counted when a
-  non-cancelled strength penalty leaves the penalized side with more strength items open
-  than the other side), PP goals and SH goals; opportunities are null for clockless
-  games. The scoreboard shows `PP goals/opportunities` per side (`PPG n` when clockless).
+  A penalty-shot goal never releases a penalty (NHL rule 24.6), whatever its strength.
+- Special teams: `hockeySpecialTeams` gives PP opportunities, PP goals and SH goals;
+  opportunities are null for clockless games. An opportunity counts when a non-cancelled
+  strength penalty leaves the penalized side with more strength items open than the
+  other side, or when penalties end (expiry, early release, PP goal) and a side gains an
+  advantage while the short side serves a penalty that has not already given one. So an
+  earlier opposite minor expiring counts, while penalties ending together, a double
+  minor's second half, and a power play resuming after four on four do not. The scoreboard shows `PP goals/opportunities` per side (`PPG n` when clockless).
   New player stats `hky_ppg`, `hky_ppa`, `hky_shg`, `hky_sha`; team goals by strength in
   `goalsByStrength`.
 - Plus/minus: `hky_pm` counts EV and SH goals (empty-net included) with a complete on-ice
@@ -350,4 +354,4 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
   rejects one stored while the clock runs. The scoreboard shows the timeout count.
 - Deviations: PK percentage and the skipped plus/minus quality note have no screen yet;
   both are derivable from the projection and land with the Hockey Summary.
-- Tests: `specialTeams.test.ts` (19 cases).
+- Tests: `specialTeams.test.ts` (25 cases).
