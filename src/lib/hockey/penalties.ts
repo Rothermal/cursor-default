@@ -383,7 +383,8 @@ class BoxSimulation {
       if (!offender) continue
       chain.items[0].after = chains
         .filter(other => other !== chain && hockeyPenaltyAffectsStrength(other.record.class) && offenderKey(other.record) === offender)
-        .map(other => other.items[other.items.length - 1])
+        // Every segment, so releasing a waiting second half never starts the misconduct early.
+        .flatMap(other => other.items)
     }
     for (const chain of chains) this.tryStart(chain.items[0])
   }

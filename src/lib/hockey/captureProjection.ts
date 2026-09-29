@@ -153,8 +153,9 @@ export function checkHockeyOnIce(
     if (dressed.get(id)?.dressedAs !== 'skater') return 'On-ice skaters must be dressed skaters.'
     if (removedParticipantIds.includes(id)) return `${dressed.get(id)!.displayName} has left the game.`
   }
-  if (onIce.goalie !== null && onIce.goalie !== HOCKEY_EMPTY_NET && dressed.get(onIce.goalie)?.dressedAs !== 'goalie') {
-    return 'The on-ice goalie must be a dressed goalie.'
+  if (onIce.goalie !== null && onIce.goalie !== HOCKEY_EMPTY_NET) {
+    if (dressed.get(onIce.goalie)?.dressedAs !== 'goalie') return 'The on-ice goalie must be a dressed goalie.'
+    if (removedParticipantIds.includes(onIce.goalie)) return `${dressed.get(onIce.goalie)!.displayName} has left the game.`
   }
   if (onIce.status !== 'complete') return null
   const cap = hockeyPeriodSkaters(setup, period)

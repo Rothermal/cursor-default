@@ -5,7 +5,7 @@ section when it lands.
 
 ## HKY-3A Penalties, penalty box and strength
 
-Automated (`src/lib/hockey/penalties.test.ts`, 30 cases):
+Automated (`src/lib/hockey/penalties.test.ts`, 32 cases):
 
 | Case | Result |
 |---|---|
@@ -31,6 +31,8 @@ Automated (`src/lib/hockey/penalties.test.ts`, 30 cases):
 | One Undo removes the unit; Restore brings it back | Pass |
 | Group round-trips through `HYDRATE_STATE` with the same fingerprint | Pass |
 | Minor served by a teammate, misconduct starting after it; missing server rejected | Pass |
+| Releasing a double minor's waiting half keeps the misconduct waiting until the first half ends (hydration, Undo) | Pass |
+| Removed goalie rejected in an on-ice set at capture and on replay | Pass |
 | Game misconduct removes the player from shots, on-ice sets and penalties | Pass |
 | Match penalty: five minutes served by a teammate, offender removed | Pass |
 | Goalie in net cannot be removed until another goalie goes in | Pass |

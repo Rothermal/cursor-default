@@ -357,6 +357,53 @@ describe('misconducts and removal', () => {
     expect(playerStat(state, 'player-2', 'hky_pim')).toBe(12)
   })
 
+  it('keeps the misconduct waiting when a double minor\'s waiting half is released', () => {
+    let state = penalize(running(), {
+      penalties: [
+        { ...trackedMinor('p2'), class: 'double_minor', servedBy: { participantId: 'p4' } },
+        { side: 'tracked', class: 'misconduct', infraction: 'roughing', offenderKind: 'player', offender: { participantId: 'p2' } },
+      ],
+    }, 11)
+    const [doubleMinor] = penaltyIds(state)
+    state = expectOk(releaseHockeyPenalty(state, { penaltyEventId: doubleMinor, segment: 2, reason: 'Assessed in error' }, ctx(21)))
+    const classes = (reading: ReturnType<typeof boxAt>) => reading.box.tracked.map(entry => [entry.class, entry.segment, entry.status])
+    expect(classes(boxAt(state, 21))).toEqual([['double_minor', 1, 'running'], ['misconduct', 1, 'waiting']])
+    // Segment 1 ends normally at 131; only then does the misconduct start.
+    expect(classes(boxAt(state, 130))).toEqual([['double_minor', 1, 'running'], ['misconduct', 1, 'waiting']])
+    expect(boxAt(state, 131).box.tracked.map(entry => [entry.class, entry.status, entry.remainingMs])).toEqual([['misconduct', 'running', 600_000]])
+
+    const hydrated = gameReducer(createInitialState(), { type: 'HYDRATE_STATE', state: JSON.parse(JSON.stringify(state)) as GameState })
+    expect(classes(boxAt(hydrated, 21))).toEqual([['double_minor', 1, 'running'], ['misconduct', 1, 'waiting']])
+
+    const undone = expectOk(undoHockeyCapture(state, at(22)))
+    expect(classes(boxAt(undone, 22))).toEqual([['double_minor', 1, 'running'], ['double_minor', 2, 'waiting'], ['misconduct', 1, 'waiting']])
+  })
+
+  it('rejects a removed goalie in an on-ice set at capture and on replay', () => {
+    let state = expectOk(changeHockeyGoalie(running(), { side: 'tracked', inParticipantId: 'p30' }, ctx(5)))
+    state = penalize(state, { side: 'tracked', class: 'game_misconduct', infraction: 'abuse_of_officials', offenderKind: 'goalie', offender: { participantId: 'p1' } }, 6)
+    const onIce = { status: 'complete' as const, skaterParticipantIds: ['p2', 'p3', 'p4', 'p5', 'p6'], goalie: 'p1' }
+    expect(rejected(recordHockeyShot(state, { side: 'tracked', outcome: 'goal', onIce }, ctx(7)))).toBe('Player 1 has left the game.')
+
+    // A stored goal naming the removed goalie fails replay, so hydration quarantines it.
+    const setup = hockeySportState(state)!.setup
+    const goal = createHockeyEvent({
+      eventType: 'hockey.shot',
+      teamSide: 'tracked',
+      actors: [{ role: 'goalie', kind: 'unknown', label: '#35', participantId: 'opp-goalie' }],
+      payload: { captureCommandId: null, outcome: 'goal', missType: null, emptyNet: false, penaltyShot: false, strength: null, onIce },
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 6_000,
+      recorderUserId: null,
+      sequence: 300,
+      occurredAt: at(7),
+    }) as unknown as GameEvent
+    const replay = replayHockeyEvents(setup, [...events(state), goal])
+    expect(replay.diagnostics).toEqual([expect.objectContaining({ message: 'Player 1 has left the game.' })])
+    const valid = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'goal', onIce: { ...onIce, goalie: 'p30' } }, ctx(8)))
+    expect(projection(valid).score.tracked).toBe(1)
+  })
+
   it('removes a player with a game misconduct from every later capture', () => {
     let state = penalize(running(), { side: 'tracked', class: 'game_misconduct', infraction: 'abuse_of_officials', offenderKind: 'player', offender: { participantId: 'p2' } }, 11)
     expect(projection(state).removedParticipantIds).toEqual(['p2'])

@@ -321,6 +321,6 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
   scoreboard with the strength, each running or waiting segment and Release.
 - Deviations: an opponent server stays optional, because opponent players are labels;
   clockless games list this period's penalties under the scoreboard instead of a box.
-- Tests: `penalties.test.ts` (30 cases). Record:
+- Tests: `penalties.test.ts` (32 cases). Record:
   [REGRESSION_HKY_3_PENALTIES_AND_OUTCOMES.md](REGRESSION_HKY_3_PENALTIES_AND_OUTCOMES.md).
 
