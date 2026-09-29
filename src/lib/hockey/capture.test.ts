@@ -104,7 +104,8 @@ describe('hockey shots and goals', () => {
     expect(playerStats(state, 'player-5')).toMatchObject({ hky_a: 1, hky_a1: 0, hky_a2: 1, hky_pts: 1 })
     expect(playerStats(state, 'player-6')).toMatchObject({ hky_blk: 1 })
     expect(playerStats(state, 'player-1')).toMatchObject({ hky_sa: 2, hky_sv: 1, hky_ga: 1 })
-    expect(playerStats(state, 'player-1')).not.toHaveProperty('hky_pm')
+    // No on-ice set was recorded, so plus/minus stays at zero.
+    expect(playerStats(state, 'player-2').hky_pm).toBe(0)
   })
 
   it('credits the team when no shooter is given, and rejects assists without a scorer', () => {

@@ -120,8 +120,10 @@ export function hockeyEventLabel(
   }
   const payload = event.payload as Record<string, unknown>
   switch (event.eventType) {
-    case 'hockey.shot':
-      return `${side} ${HOCKEY_OUTCOME_LABELS[payload.outcome as HockeyShotOutcome].toLowerCase()}${by('shooter')}`
+    case 'hockey.shot': {
+      const strength = payload.strength === 'pp' ? ' (PP)' : payload.strength === 'sh' ? ' (SH)' : ''
+      return `${side} ${HOCKEY_OUTCOME_LABELS[payload.outcome as HockeyShotOutcome].toLowerCase()}${strength}${by('shooter')}`
+    }
     case 'hockey.goalie_change':
       return payload.inParticipantId === null ? `${side} goalie pulled` : `${side} goalie change`
     case 'hockey.score_adjustment':
@@ -141,6 +143,10 @@ export function hockeyEventLabel(
         : who('offender') ? ` on ${who('offender')}` : ''
       return `${side} ${hockeyPenaltyLabel(penalty)}${offender}`
     }
+    case 'hockey.timeout':
+      return `${side} timeout`
+    case 'hockey.team_event':
+      return `${side} ${payload.kind === 'icing' ? 'icing' : 'offside'}`
     case 'hockey.penalty_release':
       return `${side} penalty released early (${payload.reason as string})`
     default:
