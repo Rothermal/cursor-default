@@ -35,7 +35,7 @@ skater TOI (optional module HKY-M3), mercy rules.
 ### HKY-3A Penalties, penalty box and strength
 
 Files: `src/lib/hockey/penalties.ts` (new), `events.ts`, `projector.ts`, `stats.ts`,
-`captureCommands.ts`, `src/components/hockey/HockeyPenaltyDialog.tsx`,
+`captureCommands.ts`, `recentEvents.ts`, `src/components/hockey/HockeyPenaltyDialog.tsx`,
 `HockeyPenaltyBox.tsx`.
 
 **Event** `hockey.penalty`, `schemaVersion: 1`, side `tracked | opponent` (the penalized
@@ -49,10 +49,56 @@ side):
 - `durationMs`: stamped from the rules for the class, with an override allowed,
 - `offenderKind`: `player | goalie | bench | staff`,
 - `delayed`: boolean, context only,
-- `captureCommandId`,
+- `captureCommandId`: the capture unit, shared by every penalty recorded in one dialog
+  save, so Undo and Restore remove and bring back all of them together,
+- `coincidenceGroupId`: `string | null` (see Capture and coincidence below),
 - actors: `offender` (player or goalie), `served_by` (required when the offender cannot
-  serve: goalie, bench, staff, or a double penalty where the offender also sits a
-  misconduct), `drawn_by` (optional, other side).
+  serve: goalie, bench, staff, or a minor whose offender also sits a misconduct from the
+  same capture unit), `drawn_by` (optional, other side).
+
+**Capture and coincidence.** One dialog save records one or more penalties as one capture
+unit through a single atomic `applyGameEventAppendsAndMutations` call. Every penalty in
+it has the same `captureCommandId`, `occurredAt`, period and clock time.
+
+- Coincidence is never inferred from equal lengths or overlapping times. The recorder
+  ticks "Coincidental" in the dialog when the unit holds penalties for both sides, and
+  every penalty in the unit then gets `coincidenceGroupId = captureCommandId`. Otherwise
+  every penalty keeps `coincidenceGroupId: null`. Two equal minors saved separately are
+  therefore always unrelated, even at the same clock time.
+- Validation (capture and replay): a non-null group id must equal the event's own
+  `captureCommandId`; every event sharing it must have the same group id, period and
+  clock time; and the group must hold at least one penalty for each side. Anything
+  else is a replay error that quarantines the stream, as other invalid Hockey events do.
+- Within a group, strength effects cancel pairwise by class: minor with minor, double
+  minor with double minor, major with major (match counts as a major). Leftovers count
+  normally. Under `coincidentalMinors: 'play_short'` the one exception is a group of
+  exactly one minor per side recorded while both sides are at full strength: both
+  minors then count and the teams play 4v4. Every other group substitutes.
+- Cancelled penalties still run their box timers and still count as PIM. They never
+  count as power-play opportunities and are never released by a power-play goal.
+- Minor plus misconduct on one player is one unit with two events for the same
+  offender: the minor needs `served_by` (a teammate), and the offender's misconduct
+  timer starts when the minor's timer ends. It is not a coincidence group unless the
+  other side is in the same unit and the recorder ticks Coincidental.
+- Early release: see the `hockey.penalty_release` event below.
+
+**Event** `hockey.penalty_release`, `schemaVersion: 1`, side of the penalized team,
+anchored games only:
+
+- payload `captureCommandId`, `penaltyEventId`, `segment` (`1 | 2`; always `1` except for
+  a double minor), `reason` (short free text, required),
+- validation: the referenced event is an active `hockey.penalty` of the same side whose
+  segment has box time and is running or waiting at the release's clock time; a
+  segment is released at most once; majors, misconducts, game misconducts and match
+  penalties can be released too, since this is a recorder correction, not a rule.
+- Effective moment is the release's own period and clock time. The segment ends there,
+  and a waiting penalty behind it starts. Replay policy for clock corrections: when a
+  later correction makes the segment end naturally before the release's clock time,
+  the release is inert and shows a diagnostic note; it never extends a penalty.
+- Assessed `durationMs`, PIM and penalty counts never change; only box time served and
+  strength do.
+- It is its own capture unit, so Undo removes it and the segment runs again. Timeline
+  edit and remove come in HKY-4 with the other penalty events.
 
 **Penalty box projection** (`penalties.ts`), anchored games only:
 
@@ -83,9 +129,11 @@ penalties by side.
 **UI**:
 
 - A Penalty button in the quick row opens `HockeyPenaltyDialog` (side, offender, class,
-  infraction, served by when needed, drawn by, delayed flag).
+  infraction, served by when needed, drawn by, delayed flag). "Add another penalty"
+  adds rows to the same save, and "Coincidental" appears once both sides have a row.
 - A compact penalty box under the scoreboard shows each side's running and waiting
-  penalties with remaining time and the current strength (for example `5v4`).
+  penalties with remaining time and the current strength (for example `5v4`). Each
+  running or waiting penalty has Release early, which asks for a reason.
 - Recent Events labels penalties; Undo already covers new capture units.
 
 ### HKY-3B Goal strength, special teams, timeouts, icing and offside
@@ -117,12 +165,26 @@ Files: `penalties.ts`, `captureCommands.ts`, `projector.ts`, `stats.ts`,
 ### HKY-3C Overtime, shootout and outcomes
 
 Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
+`captureProjection.ts`, `HockeyShotDialog.tsx`,
 `src/components/hockey/HockeyShootoutPanel.tsx`.
 
 - **Overtime** already exists (HKY-1, HKY-2B sudden death). HKY-3C adds overtime
   strength: `overtime.skaters` sets skaters per side for the overtime period (3v3 in NHL
   regular season), and penalties in 3v3 add a skater to the other side instead of
-  removing one, as the NHL does (§7 Q3).
+  removing one, as the NHL does (§7 Q3), up to `skatersPerSide` (4v3, then 5v3).
+- **On-ice validation follows the event-time strength.** Today `checkHockeyOnIce`
+  (`captureProjection.ts`) caps a complete set at the period's skaters, plus one for an
+  empty net, so a complete 4-skater set in a 3v3 overtime is rejected. HKY-3C changes it
+  to take the side's allowed skater count at the event's clock time from the strength
+  projection:
+  - anchored games: minimum `min(minimumSkaters, allowed)`, maximum `allowed`, plus one
+    when that side's net is empty,
+  - clockless games (no derived strength): the period's skaters as today, widened in
+    overtime to `skatersPerSide`, because penalties can only add overtime skaters,
+  - capture and replay use the same function, and the on-ice picker in the shot dialog
+    reads the same limit, so the UI never offers a set that replay rejects.
+  Pre-HKY-3 games have no penalties, so the allowed count equals today's period cap and
+  every existing fixture validates unchanged.
 - **Shootout** when the rules have one, the game is tied after overtime, and ties are
   not allowed:
   - `hockey.shootout_started` (first shooting side), `hockey.shootout_attempt`
@@ -171,8 +233,19 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 
 - a minor expiring on the clock, a power-play goal releasing a minor, a major not
   released, a double minor released after its first half, stacked penalties (5v3 and the
-  third waiting), coincidental minors under both rules, a misconduct with a substitute,
-  a game misconduct removing the player,
+  third waiting), a misconduct with a substitute, a game misconduct removing the player,
+- coincidence: a grouped minor pair under `substitute` and under `play_short`, the same
+  two equal minors saved separately (unrelated, 5v4 then 4v5), a group of two minors
+  against one (one leftover), a group with only one side rejected, a group id that
+  differs from its capture id rejected, minor plus misconduct served by a teammate with
+  the misconduct starting after the minor; each case round-trips through
+  `HYDRATE_STATE`, and one Undo removes and Restore brings back the whole unit,
+- manual release: a released minor ends early with PIM unchanged; a released
+  double-minor segment 2; the release surviving hydration; a clock correction making the
+  release inert with its note; Undo of the release letting the segment run again,
+- overtime on-ice: complete tracked 4v3 and 5v3 overtime goal sets accepted at capture
+  and replay, hydrated, and scored in plus/minus under the plus/minus rule; a 4-skater
+  set rejected in 3v3 with no penalty; the shot dialog offering the same limits,
 - goal strength prefilled for EV, PP, SH and a pulled-goalie 6v5, and changed by the
   recorder; a clock correction not relabelling stored strength,
 - plus/minus with complete, partial and missing on-ice sets,
@@ -199,7 +272,7 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 | # | Question | Recommendation |
 |---|---|---|
 | Q1 | Clockless games: record penalties without timers or derived strength, and ask for goal strength each time? | Yes |
-| Q2 | Penalty expiry: derived from the game clock (no event, moves with clock corrections), rather than the recorder tapping "penalty over"? | Derived, with a Release early action in the penalty box for rare cases |
+| Q2 | Penalty expiry: derived from the game clock (no event, moves with clock corrections), rather than the recorder tapping "penalty over"? | Derived, with a Release early action in the penalty box for rare cases, recorded as a `hockey.penalty_release` event (HKY-3A) |
 | Q3 | 3v3 overtime: penalties add a skater to the other side (NHL style) rather than removing one? | Yes, when `overtime.skaters` is 3 |
 | Q4 | Timeouts: record without enforcing a per-game limit? | Yes; show the count, no rules field |
 | Q5 | Icing and offside: counts per side from the Play dialog, location optional? | Yes |
