@@ -145,11 +145,13 @@ Tracked side flow:
 2. Shooter chips: on-field tracked players in the existing S25 actor order
    (Forward, Midfielder, Defender, Goalkeeper, Custom), plus Team. No shooter is
    preselected (Question Q2).
-3. For Blocked, Off target, and Woodwork, tapping the shooter saves immediately
-   (Question Q3). For Goal and Saved, an optional step shows "Assisted by"
+3. For Saved, Blocked, Off target, and Woodwork, tapping the shooter saves
+   immediately (Question Q3). For Goal, an optional step shows "Assisted by"
    chips (teammates on the field, excluding the shooter) with Save and Skip.
    Penalty and direct-free-kick shots skip the assist step, matching today's
-   creator rule.
+   creator rule. A tracked Saved shot credits the save to the opponent keeper
+   as the label "<Opponent> goalkeeper" (field-test fix, 2026-09-29: the
+   assist step read as picking a tracked player for the save).
 
 Opponent side flow: outcome, then Save. The tracked goalkeeper defaults to the
 current on-field goalkeeper, as today, and the shooter is Unknown opponent.
@@ -302,8 +304,9 @@ both themes. No slice needs a Supabase migration.
 - `SoccerQuickShotSheet` opens for live Field shot taps, Quick Goal, and the
   penalty prompt. Edits, historical adds, Timeline, and the score history keep
   the full dialog. The tracker remounts the sheet per draft.
-- Tracked flow: outcome and shooter in either order; Blocked, Off target, and
-  Woodwork save on the second tap; Goal and Saved show "Assisted by" chips
+- Tracked flow: outcome and shooter in either order; Saved, Blocked, Off
+  target, and Woodwork save on the second tap (Saved credits the opponent
+  keeper label, changed 2026-09-29); Goal shows "Assisted by" chips
   (on-field teammates except the shooter) with Skip and Save, unless the
   situation is Penalty or Direct free kick. Opponent flow: outcome, then Save,
   with the on-field tracked goalkeeper and Unknown opponent shooter.
