@@ -20,6 +20,7 @@ import AppAccessPanel from '../components/settings/AppAccessPanel'
 import AppearanceSettings from '../components/settings/AppearanceSettings'
 import SoccerSettings from '../components/settings/SoccerSettings'
 import BasketballSettings from '../components/settings/BasketballSettings'
+import HockeySettings from '../components/settings/HockeySettings'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
@@ -728,7 +729,7 @@ export default function Admin() {
             </div>
             <div className="space-y-2">
               {sports.map(sport => {
-                const hasSettings = sport.id === 'basketball' || sport.id === 'soccer'
+                const hasSettings = sport.id === 'basketball' || sport.id === 'soccer' || sport.id === 'hockey'
                 const availability = getSportAvailabilityPolicy(
                   sport.id,
                   isSportEnabled(sport.id)
@@ -766,7 +767,8 @@ export default function Admin() {
 
         {settingsSection === 'sport' &&
           selectedSettingsSport?.id !== 'basketball' &&
-          selectedSettingsSport?.id !== 'soccer' && (
+          selectedSettingsSport?.id !== 'soccer' &&
+          selectedSettingsSport?.id !== 'hockey' && (
           <section className="card space-y-2">
             <p className="text-lg font-semibold text-content">
               {selectedSettingsSport ? `${selectedSettingsSport.icon} ${selectedSettingsSport.name}` : 'Sport'} settings
@@ -788,6 +790,10 @@ export default function Admin() {
 
         {settingsSection === 'sport' && selectedSettingsSport?.id === 'basketball' && (
           <BasketballSettings />
+        )}
+
+        {settingsSection === 'sport' && selectedSettingsSport?.id === 'hockey' && (
+          <HockeySettings />
         )}
 
         {settingsSection === 'data' && (

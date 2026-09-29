@@ -514,3 +514,42 @@ Deviations from the plan above:
 - Both players on a hit are optional, so a hit can be credited to the team only.
 - Faceoffs are not drawn as rink markers; their zone totals are in the projection.
 - Recent Events labels use the team names rather than "tracked" and "opponent".
+
+### HKY-2E (implemented)
+
+- `sportAvailability.ts` adds `SPORT_EVENT_RELEASE_STAGES` (the XS-1 per-sport table,
+  one `hockey: 'opt_in'` row) and `getHockeyEventCreationPolicy`. Production needs the
+  device toggle; development keeps the preview without it; `internal` is the one-line
+  rollback. Existing event games are never gated. `isHockeyEventPreviewAvailable` is
+  removed.
+- The toggle is `statkeeper_settings.hockey.eventTrackerEnabled`, default off, and only
+  an explicit `true` opts in. `HockeySettings` shows it under Settings -> Sports -> Hockey.
+- Entry: with the toggle on, Hockey New Game opens `/setup?sport=hockey&events=1`;
+  otherwise it opens the legacy setup. A `teamId` query parameter preselects a team.
+- `setupBuilder.ts` holds the pure draft: roster replacement, quick jersey entry,
+  dressed-as, starting goalie and skaters, match overrides for period length and clock
+  model (`rulesSource` is `match` only for changed fields), `buildHockeyMatchSetup`, and
+  `createHockeyEventGameState`, which starts period 1 paused.
+- `HockeyGameSetup` has teams (a read-only cloud hockey team roster or a local roster),
+  opponent, Home/Away, date, rules, the period 1 direction chosen on the rink, the lineup
+  and the opponent goalie number.
+- `HockeyGameTracker` replaces `HockeyEventPreview`: a sticky scoreboard strip (score, SOG,
+  clock with Start/Pause, and End period, Start next period or End game when due), the
+  rink, the quick row, and Recent Events. Set clock, End period, score adjustments,
+  Suspend, Abandon and Reopen live in the Game menu.
+- `releasePolicy.test.ts` replaces `previewGate.test.ts` as the audited consumer list.
+- PR #444 review:
+  - Local participants have no cloud `playerId`, so their stats and player rows share one
+    key, `hockeyLocalPlayerKey` (the player id, else the participant id). Cloud identity
+    stays null.
+  - `hockeySetupTeamGate` stops Start until a selected team resolves to one of the
+    recorder's Hockey teams and that team's own roster has loaded. A failed load offers
+    Retry or Local roster, and a selection is never turned into a local setup.
+- `docs/REGRESSION_HKY_2_CORE_CAPTURE.md` is the regression record.
+
+Deviations from the plan above:
+
+- Reasons still use the browser prompt, as the preview did. A shared reason dialog can
+  come with the HKY-3 correction work.
+- No Hockey Summary page yet; an ended game stays on the tracker, where Reopen lives.
+

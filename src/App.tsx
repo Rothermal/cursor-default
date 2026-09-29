@@ -40,10 +40,11 @@ import { isSoccerSummaryRoute } from './lib/soccer/summary'
 import BasketballSummary from './pages/BasketballSummary'
 import { isBasketballSummaryRoute } from './lib/basketball/summary'
 import PwaStatus from './components/PwaStatus'
-import HockeyEventPreview from './pages/HockeyEventPreview'
+import HockeyGameSetup from './pages/HockeyGameSetup'
+import HockeyGameTracker from './pages/HockeyGameTracker'
 import BaseballEventSetup from './pages/BaseballEventSetup'
 import BaseballEventGame from './pages/BaseballEventGame'
-import { isBaseballEventPreviewAvailable, isHockeyEventPreviewAvailable } from './lib/sportAvailability'
+import { isBaseballEventPreviewAvailable } from './lib/sportAvailability'
 const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/AppearancePreview')) : null
 
 function GameSetupRoute() {
@@ -51,11 +52,8 @@ function GameSetupRoute() {
   const [searchParams] = useSearchParams()
   const requestedSport = searchParams.get('sport')
   if (requestedSport === 'soccer') return <SoccerGameSetup />
-  if (
-    requestedSport === 'hockey' &&
-    searchParams.get('events') === '1' &&
-    isHockeyEventPreviewAvailable()
-  ) return <HockeyEventPreview />
+  // HockeyGameSetup applies the hockeyEvent creation policy and shows the notice when off.
+  if (requestedSport === 'hockey' && searchParams.get('events') === '1') return <HockeyGameSetup />
   if (
     requestedSport === 'baseball' &&
     searchParams.get('events') === '1' &&
@@ -77,7 +75,7 @@ function GameTrackerRoute() {
   const { state } = useGame()
   // Hockey event games never fall through to the legacy stat grid.
   if (state.sport?.id === 'hockey' && (state.sportGameState || state.eventStream)) {
-    return <HockeyEventPreview />
+    return <HockeyGameTracker />
   }
   // Baseball event games never fall through to the legacy stat grid either.
   if (state.sport?.id === 'baseball' && (state.sportGameState || state.eventStream)) {
