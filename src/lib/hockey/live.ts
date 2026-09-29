@@ -22,6 +22,7 @@ import type {
   HockeyPayloadByType,
   HockeySide,
   HockeySportGameState,
+  HockeyUndoReceipt,
 } from './types'
 
 export type HockeyCommandErrorCode =
@@ -466,7 +467,18 @@ export function runHockeyCommand(
     gameEventProjectors
   )
   if (!result.ok) return failure(state, 'rejected', result.error.message)
-  return { ok: true, state: result.state, events }
+  // Any new event ends the chance to restore the last undone capture.
+  return { ok: true, state: withHockeyUndoReceipt(result.state, null), events }
+}
+
+/** Sets or clears the Restore receipt; it lives in device preferences, outside fingerprints. */
+export function withHockeyUndoReceipt(state: GameState, receipt: HockeyUndoReceipt | null): GameState {
+  const sport = hockeySportState(state)
+  if (!sport || sport.capturePreferences.lastUndo === receipt) return state
+  return {
+    ...state,
+    sportGameState: { ...sport, capturePreferences: { ...sport.capturePreferences, lastUndo: receipt } },
+  }
 }
 
 function clockCommand(

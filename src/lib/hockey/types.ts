@@ -280,6 +280,17 @@ export interface HockeyScoreAdjustmentPayload extends HockeyCapturePayload {
   reason: string
 }
 
+// -- Capture events (HKY-2C) -------------------------------------------------
+
+export interface HockeyFaceoffPayload extends HockeyCapturePayload {
+  /** One of `HOCKEY_FACEOFF_DOT_IDS`; the envelope location is that dot's exact point. */
+  dotId: string
+  winner: HockeySide
+}
+
+/** Hits, takeaways and giveaways carry only actors and an optional location. */
+export type HockeyPlayPayload = HockeyCapturePayload
+
 /** Actor roles on `hockey.shot`. */
 export type HockeyShotActorRole = 'shooter' | 'assist_primary' | 'assist_secondary' | 'goalie' | 'blocker'
 
@@ -297,12 +308,26 @@ export interface HockeyPayloadByType {
   'hockey.shot': HockeyShotPayload
   'hockey.goalie_change': HockeyGoalieChangePayload
   'hockey.score_adjustment': HockeyScoreAdjustmentPayload
+  'hockey.faceoff': HockeyFaceoffPayload
+  'hockey.hit': HockeyPlayPayload
+  'hockey.takeaway': HockeyPlayPayload
+  'hockey.giveaway': HockeyPlayPayload
 }
 
 export type HockeyEventType = keyof HockeyPayloadByType
 
 /** Events that belong to one side; every other Hockey event is neutral. */
-export const HOCKEY_SIDED_EVENT_TYPES = ['hockey.shot', 'hockey.goalie_change', 'hockey.score_adjustment'] as const
+export const HOCKEY_SIDED_EVENT_TYPES = [
+  'hockey.shot',
+  'hockey.goalie_change',
+  'hockey.score_adjustment',
+  'hockey.hit',
+  'hockey.takeaway',
+  'hockey.giveaway',
+] as const
+
+/** Events the recorder captures, which Recent Events can undo. Faceoffs are neutral. */
+export const HOCKEY_CAPTURE_EVENT_TYPES = [...HOCKEY_SIDED_EVENT_TYPES, 'hockey.faceoff'] as const
 export type HockeySidedEventType = typeof HOCKEY_SIDED_EVENT_TYPES[number]
 export type HockeySide = 'tracked' | 'opponent'
 
@@ -372,6 +397,22 @@ export interface HockeyMatchProjection {
   /** Set when a goal decides a sudden-death overtime period. */
   decidedInPeriodId: string | null
   warnings: HockeyProjectionWarning[]
+  /** Faceoffs from the tracked side's view, in total and by the zone of the dot (HKY-2C). */
+  faceoffs: HockeyFaceoffTotals
+  /** The tracked taker of the latest faceoff that named one; the next faceoff's default. */
+  lastTrackedFaceoffTakerId: string | null
+  hits: { tracked: number; opponent: number }
+  takeaways: { tracked: number; opponent: number }
+  giveaways: { tracked: number; opponent: number }
+}
+
+export interface HockeyFaceoffRecord {
+  won: number
+  lost: number
+}
+
+export interface HockeyFaceoffTotals extends HockeyFaceoffRecord {
+  byZone: { offensive: HockeyFaceoffRecord; neutral: HockeyFaceoffRecord; defensive: HockeyFaceoffRecord }
 }
 
 export interface HockeyPeriodTotals {
@@ -405,6 +446,19 @@ export interface HockeyProjectionWarning {
 /** Device display choices; never part of fingerprints or cloud payloads. */
 export interface HockeyPreferences {
   rinkFlipped: boolean
+  /** The capture unit Undo just removed, so Restore can bring it back until the next capture. */
+  lastUndo: HockeyUndoReceipt | null
+}
+
+export interface HockeyUndoReceipt extends JsonObject {
+  createdAt: string
+  /** Each removed event with the revision its deletion gave it. */
+  entries: HockeyUndoReceiptEntry[]
+}
+
+export interface HockeyUndoReceiptEntry extends JsonObject {
+  eventId: string
+  expectedRevision: number
 }
 
 export interface HockeySportGameState {

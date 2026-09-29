@@ -1,10 +1,12 @@
 import { isPlainObject } from '../gameEvents/envelope'
 import { normalizeHockeyMatchSetup } from './setup'
 import type {
+  HockeyFaceoffTotals,
   HockeyMatchProjection,
   HockeyMatchSetup,
   HockeyPreferences,
   HockeySportGameState,
+  HockeyUndoReceipt,
 } from './types'
 import { HOCKEY_GAME_STATE_VERSION } from './types'
 
@@ -19,7 +21,7 @@ export function createHockeySportGameState(setup: HockeyMatchSetup): HockeySport
 }
 
 export function defaultHockeyPreferences(): HockeyPreferences {
-  return { rinkFlipped: false }
+  return { rinkFlipped: false, lastUndo: null }
 }
 
 export function createHockeyMatchProjection(setup: HockeyMatchSetup): HockeyMatchProjection {
@@ -50,6 +52,23 @@ export function createHockeyMatchProjection(setup: HockeyMatchSetup): HockeyMatc
     opponentGoalies: [structuredClone(setup.opponentGoalie)],
     decidedInPeriodId: null,
     warnings: [],
+    faceoffs: emptyHockeyFaceoffTotals(),
+    lastTrackedFaceoffTakerId: null,
+    hits: { tracked: 0, opponent: 0 },
+    takeaways: { tracked: 0, opponent: 0 },
+    giveaways: { tracked: 0, opponent: 0 },
+  }
+}
+
+export function emptyHockeyFaceoffTotals(): HockeyFaceoffTotals {
+  return {
+    won: 0,
+    lost: 0,
+    byZone: {
+      offensive: { won: 0, lost: 0 },
+      neutral: { won: 0, lost: 0 },
+      defensive: { won: 0, lost: 0 },
+    },
   }
 }
 
@@ -62,12 +81,13 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
   if (value.sportId !== 'hockey' || value.version !== HOCKEY_GAME_STATE_VERSION) return null
   const setup = normalizeHockeyMatchSetup(value.setup)
   if (!setup) return null
-  // A cache from before HKY-2B lacks the capture fields; the projector rebuilds it either way.
+  // A cache from before HKY-2B or HKY-2C lacks the capture fields; the projector rebuilds it either way.
   const cachedProjection = isPlainObject(value.projection) &&
     typeof value.projection.status === 'string' &&
     Array.isArray(value.projection.periods) &&
     isPlainObject(value.projection.goalieInNet) &&
-    Array.isArray(value.projection.warnings)
+    Array.isArray(value.projection.warnings) &&
+    isPlainObject(value.projection.faceoffs)
   return {
     sportId: 'hockey',
     version: HOCKEY_GAME_STATE_VERSION,
@@ -82,5 +102,25 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
 function normalizePreferences(value: unknown): HockeyPreferences {
   const defaults = defaultHockeyPreferences()
   if (!isPlainObject(value)) return defaults
-  return { rinkFlipped: typeof value.rinkFlipped === 'boolean' ? value.rinkFlipped : defaults.rinkFlipped }
+  return {
+    rinkFlipped: typeof value.rinkFlipped === 'boolean' ? value.rinkFlipped : defaults.rinkFlipped,
+    lastUndo: normalizeUndoReceipt(value.lastUndo),
+  }
+}
+
+/** A malformed receipt is dropped rather than trusted; Restore re-checks each event anyway. */
+function normalizeUndoReceipt(value: unknown): HockeyUndoReceipt | null {
+  if (!isPlainObject(value) || typeof value.createdAt !== 'string' || !Array.isArray(value.entries)) return null
+  if (value.entries.length === 0) return null
+  const entries: HockeyUndoReceipt['entries'] = []
+  for (const entry of value.entries) {
+    if (
+      !isPlainObject(entry) ||
+      typeof entry.eventId !== 'string' ||
+      typeof entry.expectedRevision !== 'number' ||
+      !Number.isInteger(entry.expectedRevision)
+    ) return null
+    entries.push({ eventId: entry.eventId, expectedRevision: entry.expectedRevision })
+  }
+  return { createdAt: value.createdAt, entries }
 }
