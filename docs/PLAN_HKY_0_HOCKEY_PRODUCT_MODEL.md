@@ -485,7 +485,7 @@ setup-snapshot version gate (069).
 | HKY-1 | Hockey domain foundation: types, rules v1 + profiles, setup snapshot, participants, roster positions, team Starter/Bench and starting-goalie defaults, sport-state union, event registry and projector skeleton, lifecycle and clock events, dev-only gate ([plan](PLAN_HKY_1_FOUNDATION_RULES_AND_ROSTER.md)) | A local dev-only hockey game can be set up, started, park/resumed, with period/clock replay tested; no UI release |
 | HKY-2 | Rink surface and core capture ([plan](PLAN_HKY_2_RINK_AND_CORE_CAPTURE.md)): rink SVG, direction per period, shots/goals/assists/goalie links, faceoffs, hits/takeaways/giveaways, goalie changes and empty net, score adjustments, Recent Events undo | A local hockey game's scoring and shot/faceoff stats can be tracked end-to-end on the rink |
 | HKY-3 | Penalties and strength: penalty events, penalty box, strength projection, PP/SH/EN classification, timeouts, icing/offside, overtime, shootout, structured outcomes | Complete core catalog tracked locally, including OT and shootout |
-| HKY-4 | Timeline and corrections: revisioned edit/remove/restore for every family, recorded-later additions, dependency-aware corrections (assist/goalie/strength links), lineup/on-ice correction | Every recorded event is reviewable and correctable locally |
+| HKY-4 | Timeline and corrections ([plan](PLAN_HKY_4_TIMELINE_AND_CORRECTIONS.md)): revisioned edit/remove/restore for every family, recorded-later additions, dependency-aware corrections (assist/goalie/strength links), lineup/on-ice correction | Every recorded event is reviewable and correctable locally |
 | HKY-5 | Cloud lifecycle: fixed hockey wrappers over event-platform cores (bind, recorders, primary, finalization policy, reopen, canonical read), transport routing, settings persistence, release capability handshake | Hockey games sync, finalize, and reopen canonically behind the gate |
 | HKY-6 | Summary, aggregates, settings UI, release: Summary tabs, `hky_*` canonical aggregates and five destinations, Team Manage rules/lines, production opt-in stage, regression matrix | Hockey ships as owner-only opt-in without regressing Soccer/Basketball |
 | HKY-M* | Modules after first live games (§14) | Planned separately from field-test evidence |
@@ -505,7 +505,8 @@ HKY-3A  penalty events, penalty box and strength projection
 HKY-3B  goal strength prefill/confirmation, PP/PK totals, timeouts, icing/offside
 HKY-3C  overtime and shootout (shared shootout core), outcomes
 HKY-4A  Timeline review and filters
-HKY-4B  revisioned corrections and recorded-later additions
+HKY-4B  revisioned edit, remove and restore
+HKY-4C  game-order replay, time corrections and recorded-later additions
 HKY-5A  server wrappers migration(s); shared allow-list widening if hockey reaches cloud first
 HKY-5B  client transport, recorders, finalization/reopen UI
 HKY-5C  settings persistence and release capability handshake
