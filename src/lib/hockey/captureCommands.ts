@@ -22,7 +22,7 @@ import {
   type HockeyStrengthState,
 } from './penalties'
 import { sortHockeyActors } from './positions'
-import { hockeyActivePeriod, hockeyClockMomentAt } from './projector'
+import { hockeyActivePeriod, hockeyClockMomentAt, lastHockeyPeriod } from './projector'
 import { HOCKEY_FACEOFF_DOTS, oppositeHockeyDirection, type HockeyFaceoffDotId } from './rinkGeometry'
 import type {
   HockeyGoalieChangeReason,
@@ -38,6 +38,7 @@ import type {
   HockeyMissType,
   HockeyOnIce,
   HockeyOpponentGoalie,
+  HockeyShootoutOutcome,
   HockeyShotOutcome,
   HockeySide,
 } from './types'
@@ -754,4 +755,63 @@ function cleanLabel(value: string | null | undefined): string | null {
 
 function clamp(value: number): number {
   return Math.min(1, Math.max(0, value))
+}
+
+// ---------------------------------------------------------------------------
+// Shootout (HKY-3C)
+
+/** Starts the shootout once overtime has ended tied and the rules need a winner. */
+export function startHockeyShootout(
+  state: GameState,
+  input: { firstSide: HockeySide },
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (_sport, projection) => {
+    if (!projection.shootoutAvailable) return 'A shootout starts after overtime ends tied, when the rules have one.'
+    const last = lastHockeyPeriod(projection)!
+    return [{
+      eventType: 'hockey.shootout_started',
+      payload: { captureCommandId: null, firstSide: input.firstSide },
+      period: { id: last.id, order: last.order },
+      elapsedMs: null,
+    }]
+  })
+}
+
+export interface RecordHockeyShootoutAttemptInput {
+  outcome: HockeyShootoutOutcome
+  /** Absent or null records an unnamed shooter. */
+  shooter?: HockeyActorChoice | null
+}
+
+/** Records the next attempt for the side whose turn it is; the defending goalie is stamped. */
+export function recordHockeyShootoutAttempt(
+  state: GameState,
+  input: RecordHockeyShootoutAttemptInput,
+  context: HockeyCommandContext
+): HockeyCommandResult {
+  return runHockeyCommand(state, context, (sport, projection) => {
+    const shootout = projection.shootout
+    if (projection.status !== 'in_progress' || !shootout) return 'Start the shootout first.'
+    if (!shootout.nextSide) return 'The shootout is decided.'
+    const side = shootout.nextSide
+    const defending = otherHockeySide(side)
+    const actors: GameEventActor[] = []
+    if (input.shooter) {
+      const actor = choiceActor(sport.setup, 'shooter', side, input.shooter)
+      if (typeof actor === 'string') return actor
+      actors.push(actor)
+    }
+    const goalie = projection.goalieInNet[defending]
+    if (goalie !== null) actors.push(goalieActor(sport.setup, projection, defending, goalie))
+    const last = lastHockeyPeriod(projection)!
+    return [{
+      eventType: 'hockey.shootout_attempt',
+      teamSide: side,
+      payload: { captureCommandId: null, outcome: input.outcome },
+      period: { id: last.id, order: last.order },
+      elapsedMs: null,
+      actors,
+    }]
+  })
 }

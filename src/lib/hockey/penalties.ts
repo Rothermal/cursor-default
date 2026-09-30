@@ -3,6 +3,7 @@ import type {
   HockeyInfraction,
   HockeyMatchProjection,
   HockeyMatchSetup,
+  HockeyPeriodRecord,
   HockeyPenaltyClass,
   HockeyPenaltyRecord,
   HockeyPenaltyReleaseRecord,
@@ -312,15 +313,63 @@ export function hockeyStrengthState(
   const period = projection.periods.find(entry => entry.id === projection.activePeriodId) ??
     projection.periods[projection.periods.length - 1] ??
     { kind: 'regulation' as const }
+  const rules = setup.rulesSnapshot
   const cap = hockeyPeriodSkaters(setup, period)
-  const floor = Math.min(setup.rulesSnapshot.minimumSkaters, cap)
+  const floor = Math.min(rules.minimumSkaters, cap)
+  const serving = (value: HockeySide) => box[value].filter(entry => entry.status === 'running' && entry.strength).length
+  // Reduced-skater overtime (3v3): a penalty adds a skater to the other side instead, up to
+  // full strength (4v3, then 5v3); only beyond that does the penalized side lose one (HKY-3C).
+  const addsSkaters = period.kind === 'overtime' && cap < rules.skatersPerSide
   const side = (value: HockeySide): HockeySideStrength => {
-    const serving = box[value].filter(entry => entry.status === 'running' && entry.strength).length
-    const baseSkaters = Math.max(floor, cap - serving)
+    const own = serving(value)
+    const other = serving(value === 'tracked' ? 'opponent' : 'tracked')
+    let baseSkaters: number
+    if (addsSkaters) {
+      const room = rules.skatersPerSide - cap
+      const lead = other - own
+      baseSkaters = lead >= 0
+        ? cap + Math.min(lead, room)
+        : Math.max(floor, cap - Math.max(0, -lead - room))
+    } else {
+      baseSkaters = Math.max(floor, cap - own)
+    }
     const emptyNet = projection.lineupRecorded && projection.goalieInNet[value] === null
     return { baseSkaters, skatersOnIce: baseSkaters + (emptyNet ? 1 : 0) }
   }
   return { tracked: side('tracked'), opponent: side('opponent') }
+}
+
+export interface HockeyOnIceLimits {
+  minimum: number
+  /** Skaters with a goalie in net; an empty net allows one more. */
+  maximum: number
+}
+
+/**
+ * How many skaters a complete on-ice set may name for a side (HKY-3C). Anchored games read
+ * the side's `baseSkaters` at the event's game time; clockless games use the period's
+ * skaters, widened in overtime to full strength because penalties can only add skaters there.
+ * The empty-net attacker is added once, by `checkHockeyOnIce`, from the set's own goalie.
+ */
+export function hockeyOnIceLimits(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  period: Pick<HockeyPeriodRecord, 'id' | 'kind'>,
+  elapsedMs: number | null,
+  side: HockeySide = 'tracked'
+): HockeyOnIceLimits {
+  const rules = setup.rulesSnapshot
+  const cap = hockeyPeriodSkaters(setup, period)
+  const gameTimeMs = projection.clock ? hockeyGameTimeMs(projection, period.id, elapsedMs) : null
+  if (gameTimeMs === null) {
+    return {
+      minimum: Math.min(rules.minimumSkaters, cap),
+      maximum: period.kind === 'overtime' ? Math.max(cap, rules.skatersPerSide) : cap,
+    }
+  }
+  const strength = hockeyStrengthState(setup, projection, hockeyPenaltyBoxAt(setup, projection, gameTimeMs))
+  const base = strength[side].baseSkaters
+  return { minimum: Math.min(rules.minimumSkaters, base), maximum: base }
 }
 
 /** `5v4` from the tracked side's view. */

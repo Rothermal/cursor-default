@@ -86,6 +86,20 @@ export function checkHockeyPlayActors(
   return null
 }
 
+/** Shootout actors (HKY-3C): the shooter for the shooting side, the goalie for the other. */
+export function checkHockeyShootoutActors(
+  setup: HockeyMatchSetup,
+  projection: HockeyMatchProjection,
+  event: HockeyEvent<'hockey.shootout_attempt'>
+): string | null {
+  for (const actor of event.actors) {
+    const owner = actor.role === 'goalie' ? otherHockeySide(event.teamSide) : event.teamSide
+    const message = owner === 'tracked' ? checkTrackedActor(setup, projection, actor) : checkOpponentActor(projection, actor)
+    if (message) return message
+  }
+  return null
+}
+
 /** True when a game misconduct or match penalty removed the tracked participant (HKY-3A). */
 export function hockeyParticipantRemoved(
   projection: Pick<HockeyMatchProjection, 'removedParticipantIds'>,
@@ -141,12 +155,14 @@ function actorIdentity(actor: GameEventActor): string {
   return actor.participantId ?? `label:${(actor.label ?? '').trim().toLowerCase()}`
 }
 
-/** Structural possibility of the tracked side's on-ice set for this period (HKY-2 on-ice prompt). */
+/** Whether the tracked side's on-ice set is possible at the event (HKY-2 on-ice prompt, HKY-3C limits). */
 export function checkHockeyOnIce(
   setup: HockeyMatchSetup,
   period: Pick<HockeyPeriodRecord, 'kind'>,
   onIce: HockeyOnIce,
-  removedParticipantIds: readonly string[] = []
+  removedParticipantIds: readonly string[] = [],
+  /** From `hockeyOnIceLimits`; defaults to the period's full strength. */
+  limits: { minimum: number; maximum: number } | null = null
 ): string | null {
   const dressed = new Map<string, HockeyMatchParticipant>(setup.participants.map(entry => [entry.id, entry]))
   for (const id of onIce.skaterParticipantIds) {
@@ -159,8 +175,9 @@ export function checkHockeyOnIce(
   }
   if (onIce.status !== 'complete') return null
   const cap = hockeyPeriodSkaters(setup, period)
-  const minimum = Math.min(setup.rulesSnapshot.minimumSkaters, cap)
-  const maximum = onIce.goalie === HOCKEY_EMPTY_NET ? cap + 1 : cap
+  const minimum = limits?.minimum ?? Math.min(setup.rulesSnapshot.minimumSkaters, cap)
+  const withGoalie = limits?.maximum ?? cap
+  const maximum = onIce.goalie === HOCKEY_EMPTY_NET ? withGoalie + 1 : withGoalie
   const count = onIce.skaterParticipantIds.length
   if (count < minimum || count > maximum) {
     return `A complete set has ${minimum}-${maximum} skaters in this period.`

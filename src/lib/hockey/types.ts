@@ -355,6 +355,19 @@ export interface HockeyTeamEventPayload extends HockeyCapturePayload {
   kind: HockeyTeamEventKind
 }
 
+// -- Shootout (HKY-3C) --------------------------------------------------------
+
+export interface HockeyShootoutStartedPayload extends HockeyCapturePayload {
+  firstSide: HockeySide
+}
+
+export type HockeyShootoutOutcome = 'goal' | 'saved' | 'missed'
+
+/** Actors: `shooter` (shooting side) and `goalie` (defending side), both optional. */
+export interface HockeyShootoutAttemptPayload extends HockeyCapturePayload {
+  outcome: HockeyShootoutOutcome
+}
+
 /** Actor roles on `hockey.penalty`. */
 export type HockeyPenaltyActorRole = 'offender' | 'served_by' | 'drawn_by'
 
@@ -383,6 +396,8 @@ export interface HockeyPayloadByType {
   'hockey.penalty_release': HockeyPenaltyReleasePayload
   'hockey.timeout': HockeyTimeoutPayload
   'hockey.team_event': HockeyTeamEventPayload
+  'hockey.shootout_started': HockeyShootoutStartedPayload
+  'hockey.shootout_attempt': HockeyShootoutAttemptPayload
 }
 
 export type HockeyEventType = keyof HockeyPayloadByType
@@ -399,10 +414,11 @@ export const HOCKEY_SIDED_EVENT_TYPES = [
   'hockey.penalty_release',
   'hockey.timeout',
   'hockey.team_event',
+  'hockey.shootout_attempt',
 ] as const
 
-/** Events the recorder captures, which Recent Events can undo. Faceoffs are neutral. */
-export const HOCKEY_CAPTURE_EVENT_TYPES = [...HOCKEY_SIDED_EVENT_TYPES, 'hockey.faceoff'] as const
+/** Events the recorder captures, which Recent Events can undo. Faceoffs and the shootout start are neutral. */
+export const HOCKEY_CAPTURE_EVENT_TYPES = [...HOCKEY_SIDED_EVENT_TYPES, 'hockey.faceoff', 'hockey.shootout_started'] as const
 export type HockeySidedEventType = typeof HOCKEY_SIDED_EVENT_TYPES[number]
 export type HockeySide = 'tracked' | 'opponent'
 
@@ -494,6 +510,50 @@ export interface HockeyMatchProjection {
   timeouts: { tracked: number; opponent: number }
   icings: { tracked: number; opponent: number }
   offsides: { tracked: number; opponent: number }
+  /** True when a tied game may go to a shootout now (HKY-3C). */
+  shootoutAvailable: boolean
+  shootout: HockeyShootoutProjection | null
+  /** Set only once the match has ended; suspended and abandoned games have none. */
+  result: HockeyMatchResult | null
+  /** The tracked goalie credited with the decision, for HKY-6 W/L/OTL; null for a tie. */
+  goalieOfRecord: string | null
+}
+
+export interface HockeyShootoutAttemptRecord {
+  eventId: string
+  side: HockeySide
+  /** 1-based round of this side's attempt. */
+  round: number
+  shooterParticipantId: string | null
+  shooterLabel: string | null
+  /** The defending goalie: a tracked participant or an opponent goalie id. */
+  goalieId: string | null
+  outcome: HockeyShootoutOutcome
+}
+
+export interface HockeyShootoutProjection {
+  startedEventId: string
+  firstSide: HockeySide
+  attempts: HockeyShootoutAttemptRecord[]
+  goals: { tracked: number; opponent: number }
+  /** The side shooting next; null once decided. */
+  nextSide: HockeySide | null
+  /** The round of the next attempt. */
+  round: number
+  /** True once the rules' rounds are used up and the next attempt is sudden death. */
+  suddenDeath: boolean
+  winner: HockeySide | null
+}
+
+export type HockeyResultOutcome = 'win' | 'loss' | 'tie'
+export type HockeyDecidedIn = 'regulation' | 'overtime' | 'shootout'
+
+export interface HockeyMatchResult {
+  /** From the tracked side's view. */
+  outcome: HockeyResultOutcome
+  decidedIn: HockeyDecidedIn
+  /** The score with one goal added for the shootout winner; player totals never include it. */
+  finalScore: { tracked: number; opponent: number }
 }
 
 export interface HockeyGoalStrengthTotals {
