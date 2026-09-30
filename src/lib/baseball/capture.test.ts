@@ -11,7 +11,13 @@ import type { GameState } from '../../types'
 import type { GameEvent } from '../gameEvents/types'
 import {
   BASEBALL_IN_PLAY_RESULT_OPTIONS,
+  BASEBALL_PITCH_RUNNING_REASONS,
+  BASEBALL_PLAY_REASONS,
   BASEBALL_QUICK_RESULT_OPTIONS,
+  BASEBALL_RUNNING_REASONS,
+  baseballBaserunningPlayOptions,
+  baseballCaptureFallbackReason,
+  baseballCaptureReasons,
   baseballCaptureTerminal,
   baseballDroppedThirdStrikeAvailable,
   baseballFallbackReason,
@@ -24,8 +30,10 @@ import {
   createBaseballResolutionRows,
   cycleBaseballResolutionRow,
   emptyBaseballInPlayDraft,
+  proposeBaseballBaserunning,
   proposeBaseballCaptureMovements,
   setBaseballResolutionDestination,
+  updateBaseballResolutionDraftRow,
   type BaseballPendingCapture,
   type BaseballResolutionDraft,
   type BaseballResolutionRow,
@@ -33,7 +41,7 @@ import {
 } from './capture'
 import { baseballMovement, baseballSportState } from './commands'
 import { baseballDiamondView } from './trackerView'
-import type { BaseballInPlayResult, BaseballPitchResult } from './types'
+import type { BaseballBaserunningPlay, BaseballInPlayResult, BaseballPitchResult } from './types'
 import { baseballSetup, ctx, pitch, pitches, projection, startedGame, strikeout, walk } from './testFixtures'
 
 const sportOf = (state: GameState) => baseballSportState(state)!
@@ -396,7 +404,7 @@ describe('Baseball capture panels render', () => {
       draft: { rows, activeRunnerId: 'lead' },
       onChange: noop,
       names: { lead: '#4 Lee', batter: '#12 Garcia' },
-      terminal: 'strikeout',
+      reasons: BASEBALL_PLAY_REASONS,
       fielderCount: 9,
       error: 'The engine said no.',
       onCancel: noop,
@@ -450,7 +458,7 @@ describe('Baseball runner resolution interactions', () => {
       draft,
       onChange: transition => emitted.push(transition),
       names: {},
-      terminal: null,
+      reasons: BASEBALL_PITCH_RUNNING_REASONS,
       fielderCount: sport.setup.rulesSnapshot.defensivePlayers,
       error: null,
       onCancel: () => {},
@@ -503,5 +511,162 @@ describe('Baseball runner resolution interactions', () => {
     const result = commitBaseballCapture(state, pending, baseballResolutionMovements(draft.rows), ctx())
     if (!result.ok) throw new Error(result.message)
     expect(projection(result.state)).toMatchObject({ outs: 1, bases: { first: null } })
+  })
+})
+
+describe('Baseball runner plays between pitches', () => {
+  const runnerCapture = (play: BaseballBaserunningPlay, runnerId: string): BaseballPendingCapture => ({ source: 'baserunning', play, runnerId })
+  /** Mirrors the tracker's runner menu: preset rows, optional edits, one checked baserunning event. */
+  function runnerPlay(
+    state: GameState,
+    play: BaseballBaserunningPlay,
+    runnerId: string,
+    edit?: (rows: BaseballResolutionRow[]) => BaseballResolutionRow[]
+  ): GameState {
+    const sport = sportOf(state)
+    const pending = runnerCapture(play, runnerId)
+    expect(baseballCaptureTerminal(sport, pending)).toBeNull()
+    let rows = createBaseballResolutionRows(sport.projection, proposeBaseballCaptureMovements(sport, pending), false, baseballCaptureFallbackReason(sport, pending))
+    if (edit) rows = edit(rows)
+    expect(baseballResolutionIssues(rows)).toEqual({})
+    const result = commitBaseballCapture(state, pending, baseballResolutionMovements(rows), ctx())
+    if (!result.ok) throw new Error(result.message)
+    return result.state
+  }
+  const firstAndThird = () => {
+    let state = walk(startedGame())
+    state = pitch(state, { result: 'ball', movements: [baseballMovement(projection(state).bases.first!.runnerId, 'first', 'third', 'wild_pitch')] })
+    return walk(state)
+  }
+
+  it('offers steals only with stealing and a balk only when balks are called', () => {
+    const plays = (rules: Partial<Parameters<typeof baseballSetup>[0] & object>['rules']) =>
+      baseballBaserunningPlayOptions(baseballSetup({ rules }).rulesSnapshot).map(option => option.play)
+    expect(plays({})).toContain('stolen_base')
+    expect(plays({})).toContain('balk')
+    const slowpitch = baseballBaserunningPlayOptions(baseballSetup({ profile: 'softball_slowpitch' }).rulesSnapshot).map(option => option.play)
+    expect(slowpitch).not.toContain('stolen_base')
+    expect(slowpitch).not.toContain('caught_stealing')
+    expect(slowpitch).not.toContain('defensive_indifference')
+    expect(slowpitch).not.toContain('balk')
+    expect(slowpitch).toEqual(expect.arrayContaining(['pickoff', 'wild_pitch', 'passed_ball', 'error', 'appeal', 'other']))
+  })
+
+  it('offers the engine running reasons, without stolen base when stealing is off', () => {
+    const state = walk(startedGame())
+    const runner = projection(state).bases.first!.runnerId
+    expect(baseballCaptureReasons(sportOf(state), runnerCapture('other', runner))).toEqual(BASEBALL_RUNNING_REASONS)
+    const slow = walk(startedGame(baseballSetup({ profile: 'softball_slowpitch' })))
+    const slowRunner = projection(slow).bases.first!.runnerId
+    expect(baseballCaptureReasons(sportOf(slow), runnerCapture('other', slowRunner))).not.toContain('stolen_base')
+  })
+
+  it('presets the tapped runner for a steal or pickoff and every runner for a wild pitch or balk', () => {
+    const state = firstAndThird()
+    const bases = projection(state).bases
+    const first = bases.first!.runnerId
+    const third = bases.third!.runnerId
+    expect(proposeBaseballBaserunning(projection(state), 'stolen_base', first)).toEqual([baseballMovement(first, 'first', 'second', 'stolen_base')])
+    expect(proposeBaseballBaserunning(projection(state), 'pickoff', third)).toEqual([baseballMovement(third, 'third', 'out', 'pickoff')])
+    expect(proposeBaseballBaserunning(projection(state), 'other', first)).toEqual([baseballMovement(first, 'first', 'second', 'awarded')])
+    expect(proposeBaseballBaserunning(projection(state), 'balk', first)).toEqual([
+      baseballMovement(first, 'first', 'second', 'balk'),
+      baseballMovement(third, 'third', 'home', 'balk'),
+    ])
+  })
+
+  it('records a steal without changing the count', () => {
+    let state = pitch(walk(startedGame()), { result: 'ball' })
+    const runner = projection(state).bases.first!.runnerId
+    const count = events(state).length
+    state = runnerPlay(state, 'stolen_base', runner)
+    expect(events(state).length).toBe(count + 1)
+    expect(lastEvent(state).eventType).toBe('baseball.baserunning')
+    expect(projection(state)).toMatchObject({ balls: 1, strikes: 0, bases: { first: null, second: { runnerId: runner } } })
+  })
+
+  it('records a double steal as one play', () => {
+    let state = firstAndThird()
+    const { first, third } = projection(state).bases
+    const count = events(state).length
+    state = runnerPlay(state, 'stolen_base', first!.runnerId, rows => move(rows, 'third', 'home', { reason: 'stolen_base' }))
+    expect(events(state).length).toBe(count + 1)
+    expect(projection(state).bases.second?.runnerId).toBe(first!.runnerId)
+    expect(projection(state).bases.third).toBeNull()
+    expect(projection(state).score.opponent).toBe(1)
+    expect(third).not.toBeNull()
+  })
+
+  it('records caught stealing and a pickoff with their fielders', () => {
+    let state = walk(startedGame())
+    state = runnerPlay(state, 'caught_stealing', projection(state).bases.first!.runnerId, rows =>
+      rows.map(row => ({ ...row, fielders: [2, 6] })))
+    expect(projection(state)).toMatchObject({ outs: 1, bases: { first: null } })
+    state = walk(state)
+    state = runnerPlay(state, 'pickoff', projection(state).bases.first!.runnerId, rows =>
+      rows.map(row => ({ ...row, fielders: [1, 3] })))
+    expect(projection(state)).toMatchObject({ outs: 2, bases: { first: null } })
+  })
+
+  it('moves every runner up on a wild pitch and scores the runner from third on a balk', () => {
+    let state = firstAndThird()
+    const { first, third } = projection(state).bases
+    state = runnerPlay(state, 'wild_pitch', first!.runnerId)
+    expect(projection(state).bases.second?.runnerId).toBe(first!.runnerId)
+    expect(projection(state).score.opponent).toBe(1)
+    expect(third).not.toBeNull()
+    state = runnerPlay(state, 'balk', first!.runnerId)
+    expect(projection(state).bases.third?.runnerId).toBe(first!.runnerId)
+    expect(projection(state).score.opponent).toBe(1)
+  })
+
+  it('stores the erring fielder on an advance and run overrides only for a runner who scores', () => {
+    let state = firstAndThird()
+    const { first, third } = projection(state).bases
+    state = runnerPlay(state, 'error', first!.runnerId, rows =>
+      move(rows, 'third', 'home', { reason: 'error', errorBy: 2, earned: true, rbi: false, runCounts: true })
+        .map(row => (row.runnerId === first!.runnerId ? { ...row, errorBy: 2 } : row)))
+    const movements = (lastEvent(state).payload as { movements: Array<Record<string, unknown>> }).movements
+    expect(movements.find(movement => movement.runnerId === third!.runnerId)).toMatchObject({ to: 'home', errorBy: 2, earned: true, rbi: false, runCounts: true })
+    expect(movements.find(movement => movement.runnerId === first!.runnerId)).toMatchObject({ to: 'second', errorBy: 2, earned: null, rbi: null, runCounts: null })
+  })
+
+  it('clears run overrides when the destination leaves home', () => {
+    const state = firstAndThird()
+    const third = projection(state).bases.third!.runnerId
+    let draft: BaseballResolutionDraft = {
+      rows: createBaseballResolutionRows(projection(state), proposeBaseballBaserunning(projection(state), 'other', third), false, 'awarded'),
+      activeRunnerId: null,
+    }
+    draft = updateBaseballResolutionDraftRow(third, { earned: false, rbi: true, runCounts: false })(draft)
+    expect(draft.rows.find(row => row.runnerId === third)).toMatchObject({ to: 'home', earned: false, rbi: true, runCounts: false })
+    const moved = draft.rows.map(row => (row.runnerId === third ? setBaseballResolutionDestination(row, 'stay') : row))
+    expect(moved.find(row => row.runnerId === third)).toMatchObject({ earned: null, rbi: null, runCounts: null })
+    expect(baseballResolutionMovements(moved)).toEqual([])
+  })
+
+  it('renders the Advanced overrides only for moving rows and opens them when changed', () => {
+    const state = firstAndThird()
+    const { first, third } = projection(state).bases
+    const rows = createBaseballResolutionRows(projection(state), [
+      baseballMovement(third!.runnerId, 'third', 'home', 'awarded', { rbi: false }),
+    ], false, 'awarded')
+    const html = renderToStaticMarkup(createElement(BaseballRunnerResolution, {
+      title: 'Other advance',
+      draft: { rows, activeRunnerId: null },
+      onChange: () => {},
+      names: { [first!.runnerId]: 'First runner', [third!.runnerId]: 'Third runner' },
+      reasons: BASEBALL_RUNNING_REASONS,
+      fielderCount: 9,
+      error: null,
+      onCancel: () => {},
+      onConfirm: () => {},
+    }))
+    expect(html.match(/Advanced/g)).toHaveLength(1)
+    expect(html).toContain('Advanced (changed)')
+    expect(html).toContain('<details class="rounded-md border border-line px-2 py-1 text-sm" open="">')
+    expect(html).toContain('Earned run')
+    expect(html).toContain('Run counts')
+    expect(html).toContain('Error by')
   })
 })
