@@ -149,6 +149,13 @@ export function hockeyEventLabel(
       return `${side} ${payload.kind === 'icing' ? 'icing' : 'offside'}`
     case 'hockey.penalty_release':
       return `${side} penalty released early (${payload.reason as string})`
+    case 'hockey.shootout_started':
+      return `Shootout started, ${payload.firstSide === 'tracked' ? sideLabels.tracked : sideLabels.opponent} first`
+    case 'hockey.shootout_attempt': {
+      const result = payload.outcome === 'goal' ? 'goal' : payload.outcome === 'saved' ? 'saved' : 'missed'
+      const shooter = who('shooter')
+      return `${side} shootout${shooter ? ` ${shooter}` : ''}: ${result}`
+    }
     default:
       return event.eventType.replace('hockey.', '').replace(/_/g, ' ')
   }

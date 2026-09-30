@@ -10,12 +10,14 @@ import {
   checkHockeyGoalieChange,
   checkHockeyOnIce,
   checkHockeyPenaltyActors,
+  checkHockeyShootoutActors,
   checkHockeyPlayActors,
   checkHockeyShotActors,
   otherHockeySide,
 } from './captureProjection'
 import {
   hockeyGameTimeMs,
+  hockeyOnIceLimits,
   hockeyPenaltyAffectsStrength,
   hockeyPenaltyHasBoxTime,
   hockeyPenaltyReleaseExists,
@@ -26,6 +28,7 @@ import { hockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './perio
 import { HOCKEY_FACEOFF_DOTS, hockeyZone, type HockeyFaceoffDotId } from './rinkGeometry'
 import { hockeyOvertimeSuddenDeath } from './rules'
 import { hockeyTrackedAttackingDirection } from './setup'
+import { checkHockeyShootoutShooter, refreshHockeyShootout } from './shootout'
 import { createHockeyMatchProjection } from './state'
 import {
   accumulateHockeyPenaltyStats,
@@ -236,6 +239,10 @@ class HockeyReplay {
         return this.timeout(event)
       case 'hockey.team_event':
         return this.teamEvent(event)
+      case 'hockey.shootout_started':
+        return this.shootoutStarted(event)
+      case 'hockey.shootout_attempt':
+        return this.shootoutAttempt(event)
       default:
         fail('Unknown Hockey event type.')
     }
@@ -439,6 +446,8 @@ class HockeyReplay {
     p.statusReason = event.payload.reason
     p.nextPeriod = null
     p.canEndWithoutReason = false
+    p.shootoutAvailable = false
+    this.settleResult()
   }
 
   private matchInterrupted(event: HockeyEvent<'hockey.match_suspended' | 'hockey.match_abandoned'>): void {
@@ -447,6 +456,7 @@ class HockeyReplay {
     if (p.clock?.running) fail('Pause the clock first.')
     p.status = event.eventType === 'hockey.match_suspended' ? 'suspended' : 'abandoned'
     p.statusReason = event.payload.reason
+    p.shootoutAvailable = false
   }
 
   private matchReopened(event: HockeyEvent<'hockey.match_reopened'>): void {
@@ -456,6 +466,8 @@ class HockeyReplay {
     }
     p.status = 'in_progress'
     p.statusReason = event.payload.reason
+    p.result = null
+    p.goalieOfRecord = null
     if (!p.activePeriodId) this.refreshBetweenPeriods()
   }
 
@@ -469,7 +481,8 @@ class HockeyReplay {
     if (actorMessage) fail(actorMessage)
     const payload = event.payload
     if (payload.onIce) {
-      const onIceMessage = checkHockeyOnIce(this.setup, active, payload.onIce, p.removedParticipantIds)
+      const limits = hockeyOnIceLimits(this.setup, p, active, event.elapsedMs)
+      const onIceMessage = checkHockeyOnIce(this.setup, active, payload.onIce, p.removedParticipantIds, limits)
       if (onIceMessage) fail(onIceMessage)
     }
     const side = event.teamSide
@@ -487,6 +500,7 @@ class HockeyReplay {
     if (payload.outcome === 'goal') {
       p.score[side] += 1
       totals.goals[side] += 1
+      this.goalLog.push({ side, trackedGoalie: this.trackedGoalieNow() })
       p.goalsByStrength[side][payload.strength ?? 'unrecorded'] += 1
       const gameTimeMs = hockeyGameTimeMs(p, active.id, event.elapsedMs)
       // A penalty-shot goal never ends a penalty (NHL rule 24.6), whatever its strength.
@@ -521,6 +535,7 @@ class HockeyReplay {
   private scoreAdjustment(event: HockeyEvent<'hockey.score_adjustment'>): void {
     const p = this.projection
     if (p.status !== 'in_progress') fail('Reopen the match to adjust the score.')
+    if (p.shootout) fail('Undo the shootout before adjusting the score.')
     const side: HockeySide = event.teamSide
     const next = p.score[side] + event.payload.delta
     if (next < 0) fail('A score cannot go below zero.')
@@ -756,6 +771,99 @@ class HockeyReplay {
     })
   }
 
+  // -- shootout (HKY-3C) ----------------------------------------------------
+
+  private shootoutStarted(event: HockeyEvent<'hockey.shootout_started'>): void {
+    const p = this.projection
+    if (p.status !== 'in_progress' || !p.shootoutAvailable) {
+      fail('A shootout starts after overtime ends tied, when the rules have one and ties are not allowed.')
+    }
+    const rounds = this.setup.rulesSnapshot.shootout!.rounds
+    p.shootout = {
+      startedEventId: event.id,
+      firstSide: event.payload.firstSide,
+      attempts: [],
+      goals: { tracked: 0, opponent: 0 },
+      nextSide: event.payload.firstSide,
+      round: 1,
+      suddenDeath: false,
+      winner: null,
+    }
+    refreshHockeyShootout(p.shootout, rounds)
+    p.shootoutAvailable = false
+    p.canEndWithoutReason = false
+  }
+
+  private shootoutAttempt(event: HockeyEvent<'hockey.shootout_attempt'>): void {
+    const p = this.projection
+    const shootout = p.shootout
+    if (p.status !== 'in_progress' || !shootout) fail('Start the shootout first.')
+    if (shootout.winner) fail('The shootout is decided.')
+    const side = event.teamSide
+    if (side !== shootout.nextSide) fail('Shootout attempts alternate between the teams.')
+    const message = checkHockeyShootoutActors(this.setup, p, event)
+    if (message) fail(message)
+    const shooter = event.actors.find(actor => actor.role === 'shooter')
+    const eligibility = checkHockeyShootoutShooter(this.setup, p, side, shooter)
+    if (eligibility) fail(eligibility)
+    shootout.attempts.push({
+      eventId: event.id,
+      side,
+      round: shootout.round,
+      shooterParticipantId: side === 'tracked' ? shooter?.participantId ?? null : null,
+      shooterLabel: side === 'opponent' ? shooter?.label ?? null : null,
+      goalieId: event.actors.find(actor => actor.role === 'goalie')?.participantId ?? null,
+      outcome: event.payload.outcome,
+    })
+    if (event.payload.outcome === 'goal') shootout.goals[side] += 1
+    refreshHockeyShootout(shootout, this.setup.rulesSnapshot.shootout!.rounds)
+    if (side === 'opponent') this.shootoutGoalie = shootout.attempts[shootout.attempts.length - 1].goalieId
+    this.refreshBetweenPeriods()
+  }
+
+  // -- result (HKY-3C) ------------------------------------------------------
+
+  /** Goals in capture order, with the tracked goalie in net (or last in net) when each was scored. */
+  private readonly goalLog: Array<{ side: HockeySide; trackedGoalie: string | null }> = []
+  private shootoutGoalie: string | null = null
+
+  private trackedGoalieNow(): string | null {
+    const p = this.projection
+    if (p.goalieInNet.tracked) return p.goalieInNet.tracked
+    // A pulled goalie keeps the decision: the last tracked goalie who was in net.
+    const last = [...p.goalieIntervals].reverse().find(entry => entry.side === 'tracked' && entry.participantId !== null)
+    return last?.participantId ?? null
+  }
+
+  /**
+   * The result from the tracked side's view. The shootout winner gets one goal in the final
+   * score only. The goalie of record is the tracked goalie in net (or last in net, if pulled)
+   * when the winner scored its (loser's final goals + 1)th goal, or the goalie who faced the
+   * shootout. The rule reads the final score, not the lead: at 1-0, 2-0, 2-1 the winner's
+   * second goal decides even though its lead never changed hands.
+   */
+  private settleResult(): void {
+    const p = this.projection
+    const shootoutWinner = p.shootout?.winner ?? null
+    const finalScore = { ...p.score }
+    if (shootoutWinner) finalScore[shootoutWinner] += 1
+    const winner: HockeySide | null = finalScore.tracked === finalScore.opponent
+      ? null
+      : finalScore.tracked > finalScore.opponent ? 'tracked' : 'opponent'
+    const last = lastHockeyPeriod(p)
+    const decidedIn = shootoutWinner ? 'shootout' : winner && last?.kind === 'overtime' ? 'overtime' : 'regulation'
+    p.result = { outcome: winner === null ? 'tie' : winner === 'tracked' ? 'win' : 'loss', decidedIn, finalScore }
+    if (!winner) {
+      p.goalieOfRecord = null
+    } else if (shootoutWinner) {
+      p.goalieOfRecord = this.shootoutGoalie ?? this.trackedGoalieNow()
+    } else {
+      const loserGoals = p.score[winner === 'tracked' ? 'opponent' : 'tracked']
+      const winning = this.goalLog.filter(goal => goal.side === winner)[loserGoals]
+      p.goalieOfRecord = winning?.trackedGoalie ?? null
+    }
+  }
+
   // -- derived -------------------------------------------------------------
 
   /** Decides what may follow the last ended period (HKY-1 §2.1, overtime only on a tie). */
@@ -779,8 +887,11 @@ class HockeyReplay {
     const regulationDone = p.periods.some(
       period => period.kind === 'regulation' && period.number === rules.regulation.periods && period.endedEventId
     )
-    // A tie that the rules do not allow still needs a shootout (HKY-3C), so it is not complete.
-    p.canEndWithoutReason = regulationDone && next === null && (!tied || rules.tiesAllowed)
+    // A tie the rules do not allow is complete only once a shootout decides it (HKY-3C).
+    const shootoutDecided = Boolean(p.shootout?.winner)
+    p.canEndWithoutReason = regulationDone && next === null && (!tied || rules.tiesAllowed || shootoutDecided)
+    p.shootoutAvailable = regulationDone && next === null && tied && p.status === 'in_progress' &&
+      rules.shootout !== null && !rules.tiesAllowed && p.shootout === null
   }
 }
 

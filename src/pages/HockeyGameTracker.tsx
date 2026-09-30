@@ -8,6 +8,7 @@ import HockeyPenaltyDialog from '../components/hockey/HockeyPenaltyDialog'
 import HockeyPlayDialog, { type HockeyPlayDraft, type HockeyTeamPlayInput } from '../components/hockey/HockeyPlayDialog'
 import HockeyRecentEvents from '../components/hockey/HockeyRecentEvents'
 import HockeyRink from '../components/hockey/HockeyRink'
+import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -19,10 +20,13 @@ import {
   endHockeyPeriod,
   finishDecidedHockeyGame,
   formatHockeyClock,
+  formatHockeyFinalScore,
+  HOCKEY_RESULT_LABELS,
   formatHockeyPeriod,
   hockeyActivePeriod,
   hockeyClockDisplay,
   hockeyGoalStrengthFor,
+  hockeyOnIceLimits,
   hockeyPenaltyBoxNow,
   hockeyPlayMarkers,
   hockeyRecentEvents,
@@ -37,6 +41,7 @@ import {
   recordHockeyFaceoff,
   recordHockeyPenalties,
   recordHockeyPlay,
+  recordHockeyShootoutAttempt,
   recordHockeyShot,
   recordHockeyTeamEvent,
   recordHockeyTimeout,
@@ -47,6 +52,7 @@ import {
   setHockeyRinkFlipped,
   startHockeyClock,
   startHockeyGame,
+  startHockeyShootout,
   startNextHockeyPeriod,
   undoHockeyCapture,
   HOCKEY_FACEOFF_DOTS,
@@ -315,6 +321,11 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
               : undefined}
           />
         )}
+        {projection.result && (
+          <p className="text-center text-sm font-semibold text-content" aria-label="Final result">
+            Final: {HOCKEY_RESULT_LABELS[projection.result.outcome]} {formatHockeyFinalScore(projection.result)}
+          </p>
+        )}
         {projection.status === 'pregame' && (
           <button type="button" className="btn-primary w-full" onClick={() => apply(startHockeyGame(state, context()))}>
             Start game
@@ -353,6 +364,24 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             End game
           </button>
         </section>
+      )}
+
+      {(projection.shootout || projection.shootoutAvailable) && (
+        <HockeyShootoutPanel
+          sport={sport}
+          sideLabel={sideLabel}
+          recentOpponentLabels={recentLabels}
+          canRecord={inProgress}
+          onStart={firstSide => apply(startHockeyShootout(state, { firstSide }, context()))}
+          onAttempt={input => {
+            const result = recordHockeyShootoutAttempt(state, input, context())
+            if (!result.ok) return result.message
+            apply(result)
+            return null
+          }}
+          onEnd={() => apply(endHockeyMatch(state, {}, context()))}
+          onChangeGoalie={() => setGoalieOpen(true)}
+        />
       )}
 
       {projection.statusReason && (
@@ -519,11 +548,15 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           trackedLabel={trackedLabel}
           opponentLabel={opponentLabel}
           derivedStrength={side => (penaltyBox.strength ? hockeyGoalStrengthFor(penaltyBox.strength, side) : null)}
+          onIceLimits={(() => {
+            const activePeriod = hockeyActivePeriod(projection)
+            return activePeriod ? hockeyOnIceLimits(sport.setup, projection, activePeriod, reading?.elapsedMs ?? null) : null
+          })()}
           onSubmit={recordShot}
           onClose={() => setShotDraft(null)}
         />
       )}
-      {goalieOpen && (
+      {goalieOpen && inProgress && (
         <HockeyGoalieDialog
           sport={sport}
           trackedLabel={trackedLabel}

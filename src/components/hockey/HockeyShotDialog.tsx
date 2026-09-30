@@ -19,6 +19,7 @@ import {
   type HockeyShotOutcome,
   type HockeySide,
   type HockeySportGameState,
+  type HockeyOnIceLimits,
   type HockeyStrength,
   type RecordHockeyShotInput,
 } from '../../lib/hockey'
@@ -38,6 +39,8 @@ interface HockeyShotDialogProps {
   opponentLabel: string
   /** Goal strength read from the penalty box for a scoring side; null when there is no clock. */
   derivedStrength: (side: HockeySide) => HockeyStrength | null
+  /** Skaters a complete tracked set may name right now, from the penalty box (HKY-3C). */
+  onIceLimits: HockeyOnIceLimits | null
   /** Returns an error message, or null once the shot is recorded. */
   onSubmit: (input: RecordHockeyShotInput) => string | null
   onClose: () => void
@@ -69,6 +72,7 @@ export default function HockeyShotDialog({
   trackedLabel,
   opponentLabel,
   derivedStrength,
+  onIceLimits,
   onSubmit,
   onClose,
 }: HockeyShotDialogProps) {
@@ -257,6 +261,7 @@ export default function HockeyShotDialog({
               selected={onIceSkaters}
               goalie={onIceGoalie}
               confirmed={onIceConfirmed}
+              limits={onIceLimits}
               onChange={next => {
                 setOnIceTouched(true)
                 if (next.selected) setOnIceSkaters(next.selected)
@@ -286,6 +291,7 @@ function OnIceSection({
   selected,
   goalie,
   confirmed,
+  limits,
   onChange,
 }: {
   trackedLabel: string
@@ -295,6 +301,7 @@ function OnIceSection({
   selected: string[]
   goalie: string
   confirmed: boolean
+  limits: HockeyOnIceLimits | null
   onChange: (next: { selected?: string[]; goalie?: string; confirmed?: boolean }) => void
 }) {
   const goalieId = useId()
@@ -332,6 +339,11 @@ function OnIceSection({
         <input type="checkbox" checked={confirmed} onChange={event => onChange({ confirmed: event.target.checked })} />
         This is everyone on the ice
       </label>
+      {limits && (
+        <p className="mt-1 text-xs text-content-muted">
+          {limits.minimum === limits.maximum ? limits.maximum : `${limits.minimum}-${limits.maximum}`} skaters now, one more with the net empty.
+        </p>
+      )}
     </details>
   )
 }

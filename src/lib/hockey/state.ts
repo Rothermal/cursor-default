@@ -67,6 +67,10 @@ export function createHockeyMatchProjection(setup: HockeyMatchSetup): HockeyMatc
     timeouts: { tracked: 0, opponent: 0 },
     icings: { tracked: 0, opponent: 0 },
     offsides: { tracked: 0, opponent: 0 },
+    shootoutAvailable: false,
+    shootout: null,
+    result: null,
+    goalieOfRecord: null,
   }
 }
 
@@ -95,7 +99,7 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
   if (value.sportId !== 'hockey' || value.version !== HOCKEY_GAME_STATE_VERSION) return null
   const setup = normalizeHockeyMatchSetup(value.setup)
   if (!setup) return null
-  // A cache from before HKY-2B, HKY-2C, HKY-3A or HKY-3B lacks the capture fields; the projector rebuilds it either way.
+  // A cache from before HKY-2B, HKY-2C or HKY-3A-C lacks the capture fields; the projector rebuilds it either way.
   const cachedProjection = isPlainObject(value.projection) &&
     typeof value.projection.status === 'string' &&
     Array.isArray(value.projection.periods) &&
@@ -104,7 +108,8 @@ export function normalizeHockeySportGameState(value: unknown): HockeySportGameSt
     isPlainObject(value.projection.faceoffs) &&
     Array.isArray(value.projection.penalties) &&
     Array.isArray(value.projection.removedParticipantIds) &&
-    isPlainObject(value.projection.goalsByStrength)
+    isPlainObject(value.projection.goalsByStrength) &&
+    typeof value.projection.shootoutAvailable === 'boolean'
   return {
     sportId: 'hockey',
     version: HOCKEY_GAME_STATE_VERSION,
