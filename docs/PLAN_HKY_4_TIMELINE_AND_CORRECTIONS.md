@@ -123,11 +123,15 @@ Events that belong earlier in the game than when they were recorded.
 
 - **Game-order replay.** Replay today follows capture order. HKY-4C keeps live captures
   in capture order and places each recorded-later or re-timed event at its game time:
-  - anchored games: in its period, after every live event of that period whose clock
-    time is the same or earlier, and before the first live event whose clock time is
-    later; otherwise before the period's end. So an addition at 0:00 still goes after
-    shots already captured at 0:00 while the opening clock was paused. Among placed
-    events, order is period, clock time, then capture order,
+  - anchored games: scan the period's live events in capture order and insert before
+    the first one whose clock time is strictly later; if none is, insert before the
+    period's end. Live events at the same clock time that come earlier in that scan stay
+    before the addition, so an addition at 0:00 still goes after shots already captured
+    at 0:00 while the opening clock was paused. With a clock set backwards, the first
+    strictly later event wins even if earlier-time events follow it: live shots at 10,
+    20, then a clock set to 5 and a shot at 6 put an addition at 15 before the 20 shot.
+    Placed events at the same insertion point are ordered by clock time, then capture
+    order. Timeline and replay use this same rule,
   - clockless games: at the end of its period, just before the period ends (§7 Q1),
   - period start (goalie changes only, see Starting goalie below): right after the
     period's start boundary (the opening lineup and period start for Period 1, the
@@ -229,7 +233,9 @@ owner wants it tracked.
 - corrections after the game ended re-settling the result and goalie of record,
 - anchored game: a goal added in Period 1 while Period 3 runs, placed correctly; a
   penalty added in Period 2 changing the box and strength after it; an addition at 0:00
-  going after shots already captured at 0:00,
+  going after shots already captured at 0:00; a backward clock set (shots at 10 and
+  20, clock set to 5, shot at 6) placing an addition at 15 before the 20 shot, with the
+  Timeline showing it in the same position,
 - starting goalie: a period-start goalie change in Period 1 supplying the goalie for
   every later shot, including shots captured at 0:00 (anchored) and all Period 1 shots
   (clockless), after reload and `HYDRATE_STATE`,
@@ -253,8 +259,8 @@ owner wants it tracked.
   §5 and the rule that live captures keep capture order limit the change to events that
   carry the new flags.
 - **A clock set backwards** mid-period makes clock times non-monotonic. Placement uses
-  the first later live event, which is deterministic but may place an addition before a
-  clock correction. The Timeline shows the placed row, and the recorder can re-time it.
+  the first strictly later live event in capture order (§2 HKY-4C), which is
+  deterministic but may place an addition before a clock correction. The Timeline shows the placed row, and the recorder can re-time it.
 - **Refused corrections** can frustrate: a goal that cannot be added because a later
   event contradicts it. The refusal names the conflicting event so it can be corrected
   first.
