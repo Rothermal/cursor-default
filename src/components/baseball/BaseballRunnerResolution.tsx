@@ -24,6 +24,8 @@ interface BaseballRunnerResolutionProps {
   /** Reason choices for runner rows (running reasons between pitches, play reasons on a completed plate appearance). */
   reasons: readonly BaseballMovementReason[]
   fielderCount: number
+  /** Whether RBI overrides take effect; only on the event that completes a plate appearance. */
+  allowRbi: boolean
   /** The engine's message after a rejected Confirm; the choices stay in place. */
   error: string | null
   onCancel: () => void
@@ -47,19 +49,21 @@ const OVERRIDE_FROM = (value: string): boolean | null => (value === 'yes' ? true
 
 /**
  * Per-row overrides (BSB-3C), collapsed by default: the erring fielder on an advance, and
- * for a runner who scores, earned, RBI and whether the run counts. "By the rules" leaves
- * the engine's documented rules in charge.
+ * for a runner who scores, earned, RBI (only when it can take effect) and whether the run
+ * counts. "By the rules" leaves the engine's documented rules in charge.
  */
 function Advanced({
   row,
   fielderCount,
+  allowRbi,
   onChange,
 }: {
   row: BaseballResolutionRow
   fielderCount: number
+  allowRbi: boolean
   onChange: (transition: BaseballResolutionTransition) => void
 }) {
-  const overridden = row.errorBy !== null || [row.earned, row.rbi, row.runCounts].some(value => value !== null && value !== undefined)
+  const overridden = row.errorBy !== null || [row.earned, allowRbi ? row.rbi : null, row.runCounts].some(value => value !== null && value !== undefined)
   const set = (patch: Parameters<typeof updateBaseballResolutionDraftRow>[1]) => onChange(updateBaseballResolutionDraftRow(row.runnerId, patch))
   return (
     <details className="rounded-md border border-line px-2 py-1 text-sm" open={overridden || undefined}>
@@ -78,7 +82,7 @@ function Advanced({
         {row.to === 'home' && (
           <>
             <OverrideSelect label="Earned run" value={OVERRIDE_VALUE(row.earned)} options={TRI_STATE} onChange={value => set({ earned: OVERRIDE_FROM(value) })} />
-            <OverrideSelect label="RBI" value={OVERRIDE_VALUE(row.rbi)} options={TRI_STATE} onChange={value => set({ rbi: OVERRIDE_FROM(value) })} />
+            {allowRbi && <OverrideSelect label="RBI" value={OVERRIDE_VALUE(row.rbi)} options={TRI_STATE} onChange={value => set({ rbi: OVERRIDE_FROM(value) })} />}
             <OverrideSelect label="Run counts" value={OVERRIDE_VALUE(row.runCounts)} options={TRI_STATE} onChange={value => set({ runCounts: OVERRIDE_FROM(value) })} />
           </>
         )}
@@ -123,6 +127,7 @@ export default function BaseballRunnerResolution({
   names,
   reasons,
   fielderCount,
+  allowRbi,
   error,
   onCancel,
   onConfirm,
@@ -202,7 +207,7 @@ export default function BaseballRunnerResolution({
               )}
 
               {row.to !== 'stay' && (
-                <Advanced row={row} fielderCount={fielderCount} onChange={onChange} />
+                <Advanced row={row} fielderCount={fielderCount} allowRbi={allowRbi} onChange={onChange} />
               )}
 
               {issues[row.runnerId] && (

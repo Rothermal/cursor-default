@@ -16,6 +16,7 @@ import {
   BASEBALL_QUICK_RESULT_OPTIONS,
   BASEBALL_RUNNING_REASONS,
   baseballBaserunningPlayOptions,
+  baseballCaptureAllowsRbi,
   baseballCaptureFallbackReason,
   baseballCaptureReasons,
   baseballCaptureTerminal,
@@ -405,6 +406,7 @@ describe('Baseball capture panels render', () => {
       onChange: noop,
       names: { lead: '#4 Lee', batter: '#12 Garcia' },
       reasons: BASEBALL_PLAY_REASONS,
+      allowRbi: true,
       fielderCount: 9,
       error: 'The engine said no.',
       onCancel: noop,
@@ -459,6 +461,7 @@ describe('Baseball runner resolution interactions', () => {
       onChange: transition => emitted.push(transition),
       names: {},
       reasons: BASEBALL_PITCH_RUNNING_REASONS,
+      allowRbi: false,
       fielderCount: sport.setup.rulesSnapshot.defensivePlayers,
       error: null,
       onCancel: () => {},
@@ -529,7 +532,7 @@ describe('Baseball runner plays between pitches', () => {
     let rows = createBaseballResolutionRows(sport.projection, proposeBaseballCaptureMovements(sport, pending), false, baseballCaptureFallbackReason(sport, pending))
     if (edit) rows = edit(rows)
     expect(baseballResolutionIssues(rows)).toEqual({})
-    const result = commitBaseballCapture(state, pending, baseballResolutionMovements(rows), ctx())
+    const result = commitBaseballCapture(state, pending, baseballResolutionMovements(rows, { rbi: baseballCaptureAllowsRbi(sport, pending) }), ctx())
     if (!result.ok) throw new Error(result.message)
     return result.state
   }
@@ -620,14 +623,14 @@ describe('Baseball runner plays between pitches', () => {
     expect(projection(state).score.opponent).toBe(1)
   })
 
-  it('stores the erring fielder on an advance and run overrides only for a runner who scores', () => {
+  it('stores the erring fielder on an advance and earned/run-counts overrides only for a runner who scores', () => {
     let state = firstAndThird()
     const { first, third } = projection(state).bases
     state = runnerPlay(state, 'error', first!.runnerId, rows =>
       move(rows, 'third', 'home', { reason: 'error', errorBy: 2, earned: true, rbi: false, runCounts: true })
         .map(row => (row.runnerId === first!.runnerId ? { ...row, errorBy: 2 } : row)))
     const movements = (lastEvent(state).payload as { movements: Array<Record<string, unknown>> }).movements
-    expect(movements.find(movement => movement.runnerId === third!.runnerId)).toMatchObject({ to: 'home', errorBy: 2, earned: true, rbi: false, runCounts: true })
+    expect(movements.find(movement => movement.runnerId === third!.runnerId)).toMatchObject({ to: 'home', errorBy: 2, earned: true, rbi: null, runCounts: true })
     expect(movements.find(movement => movement.runnerId === first!.runnerId)).toMatchObject({ to: 'second', errorBy: 2, earned: null, rbi: null, runCounts: null })
   })
 
@@ -645,28 +648,69 @@ describe('Baseball runner plays between pitches', () => {
     expect(baseballResolutionMovements(moved)).toEqual([])
   })
 
-  it('renders the Advanced overrides only for moving rows and opens them when changed', () => {
+  it('renders the Advanced overrides only for moving rows, with RBI only when it can take effect', () => {
     const state = firstAndThird()
     const { first, third } = projection(state).bases
-    const rows = createBaseballResolutionRows(projection(state), [
-      baseballMovement(third!.runnerId, 'third', 'home', 'awarded', { rbi: false }),
-    ], false, 'awarded')
-    const html = renderToStaticMarkup(createElement(BaseballRunnerResolution, {
+    const render = (movement: ReturnType<typeof baseballMovement>, allowRbi: boolean) => renderToStaticMarkup(createElement(BaseballRunnerResolution, {
       title: 'Other advance',
-      draft: { rows, activeRunnerId: null },
+      draft: { rows: createBaseballResolutionRows(projection(state), [movement], false, 'awarded'), activeRunnerId: null },
       onChange: () => {},
       names: { [first!.runnerId]: 'First runner', [third!.runnerId]: 'Third runner' },
       reasons: BASEBALL_RUNNING_REASONS,
+      allowRbi,
       fielderCount: 9,
       error: null,
       onCancel: () => {},
       onConfirm: () => {},
     }))
-    expect(html.match(/Advanced/g)).toHaveLength(1)
-    expect(html).toContain('Advanced (changed)')
-    expect(html).toContain('<details class="rounded-md border border-line px-2 py-1 text-sm" open="">')
-    expect(html).toContain('Earned run')
-    expect(html).toContain('Run counts')
-    expect(html).toContain('Error by')
+    const earned = render(baseballMovement(third!.runnerId, 'third', 'home', 'awarded', { earned: false }), false)
+    expect(earned.match(/Advanced/g)).toHaveLength(1)
+    expect(earned).toContain('Advanced (changed)')
+    expect(earned).toContain('<details class="rounded-md border border-line px-2 py-1 text-sm" open="">')
+    expect(earned).toContain('Earned run')
+    expect(earned).toContain('Run counts')
+    expect(earned).toContain('Error by')
+    expect(earned).not.toContain('RBI')
+    // An RBI value the capture cannot apply is neither shown nor counted as a change.
+    const ignored = render(baseballMovement(third!.runnerId, 'third', 'home', 'awarded', { rbi: true }), false)
+    expect(ignored).not.toContain('RBI')
+    expect(ignored).not.toContain('Advanced (changed)')
+    const offered = render(baseballMovement(third!.runnerId, 'third', 'home', 'awarded', { rbi: false }), true)
+    expect(offered).toContain('RBI')
+    expect(offered).toContain('Advanced (changed)')
+  })
+
+  it('offers no RBI override on a runner play or a pitch that continues the plate appearance', () => {
+    let state = firstAndThird()
+    const third = projection(state).bases.third!.runnerId
+    const batter = projection(state).currentBatterId!
+    const sport = sportOf(state)
+    const pending = runnerCapture('other', third)
+    expect(baseballCaptureAllowsRbi(sport, pending)).toBe(false)
+    expect(baseballCaptureAllowsRbi(sport, pitchCapture('ball'))).toBe(false)
+    const rows = createBaseballResolutionRows(sport.projection, proposeBaseballCaptureMovements(sport, pending), false, 'awarded')
+      .map(row => ({ ...row, rbi: true }))
+    const movements = baseballResolutionMovements(rows, { rbi: baseballCaptureAllowsRbi(sport, pending) })
+    expect(movements[0]).toMatchObject({ to: 'home', rbi: null })
+    const result = commitBaseballCapture(state, pending, movements, ctx())
+    if (!result.ok) throw new Error(result.message)
+    state = result.state
+    expect(projection(state).score.opponent).toBe(1)
+    expect(projection(state).battingLines[batter]?.rbi ?? 0).toBe(0)
+  })
+
+  it('applies an RBI override on the pitch that completes the plate appearance', () => {
+    const loaded = () => toCount(walk(walk(walk(startedGame()))), 3, 0)
+    const batterOf = (state: GameState) => projection(state).currentBatterId!
+    expect(baseballCaptureAllowsRbi(sportOf(loaded()), pitchCapture('ball'))).toBe(true)
+    const byRule = loaded()
+    const ruleBatter = batterOf(byRule)
+    expect(projection(capture(byRule, pitchCapture('ball'))).battingLines[ruleBatter]).toMatchObject({ bb: 1, rbi: 1 })
+    const overridden = loaded()
+    const batter = batterOf(overridden)
+    const after = capture(overridden, pitchCapture('ball'), rows =>
+      rows.map(row => (row.to === 'home' ? { ...row, rbi: false } : row)))
+    expect(projection(after).score.opponent).toBe(1)
+    expect(projection(after).battingLines[batter]).toMatchObject({ bb: 1, rbi: 0 })
   })
 })

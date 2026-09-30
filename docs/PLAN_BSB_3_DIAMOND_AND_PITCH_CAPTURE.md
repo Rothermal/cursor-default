@@ -525,13 +525,18 @@ or merged.
   pitch location and the "Runners moved" chip as they were, since no pitch was thrown.
 - Resolution rows carry optional `earned`, `rbi` and `runCounts`. Each moving row has a
   collapsed **Advanced** disclosure: "Error by" (non-out rows) and, for a runner who
-  scores, Earned run, RBI and Run counts as "By the rules", Yes or No. It opens and reads
-  "Advanced (changed)" when any override is set. Moving a row off home clears the run
-  overrides; only home movements send them.
+  scores, Earned run and Run counts as "By the rules", Yes or No. RBI is offered only on
+  the event that completes a plate appearance (`baseballCaptureAllowsRbi`), because the
+  projector credits RBIs only there; runner plays and continuing pitches never show it
+  and send `rbi: null`. It opens and reads "Advanced (changed)" when any applicable
+  override is set. Moving a row off home clears the run overrides; only home movements
+  send them.
 - Tests: play filtering by rules, the reason list, presets, a steal that leaves the count
   alone, a double steal as one event, caught stealing and a pickoff with fielders, a wild
   pitch and a balk moving every runner, error-by and run overrides written only for the
-  runner who scores, overrides cleared off home, and the Advanced render.
+  runner who scores, overrides cleared off home, no RBI override on a runner play or
+  continuing pitch, an RBI override on a bases-loaded walk changing the batter's RBI, and
+  the Advanced render.
 - Browser check at 390 px (development build, light and dark), driven through the UI: a
   steal of second after a strike (count kept), a double steal from first and second, an
   error scoring the runner from third with "Error by 6" and "Earned run: No" (checked in

@@ -497,14 +497,22 @@ export function baseballResolutionIssues(rows: readonly BaseballResolutionRow[])
   return issues
 }
 
-export function baseballResolutionMovements(rows: readonly BaseballResolutionRow[]): BaseballRunnerMovement[] {
+/**
+ * The movements for a resolution. `rbi: false` drops RBI overrides for a capture whose
+ * projection cannot apply them (see `baseballCaptureAllowsRbi`).
+ */
+export function baseballResolutionMovements(
+  rows: readonly BaseballResolutionRow[],
+  options: { rbi?: boolean } = {}
+): BaseballRunnerMovement[] {
+  const allowRbi = options.rbi ?? true
   return rows
     .filter(row => row.to !== 'stay')
     .map(row =>
       baseballMovement(row.runnerId, row.from, row.to as BaseballMovementTo, row.reason, {
         fielders: row.to === 'out' || row.errorBy !== null ? row.fielders : [],
         errorBy: row.errorBy,
-        ...(row.to === 'home' ? { earned: row.earned ?? null, rbi: row.rbi ?? null, runCounts: row.runCounts ?? null } : {}),
+        ...(row.to === 'home' ? { earned: row.earned ?? null, rbi: allowRbi ? row.rbi ?? null : null, runCounts: row.runCounts ?? null } : {}),
       })
     )
 }
@@ -598,6 +606,15 @@ export function baseballCaptureReasons(sport: BaseballSportGameState, capture: B
     return BASEBALL_RUNNING_REASONS.filter(reason => sport.setup.rulesSnapshot.stealing || reason !== 'stolen_base')
   }
   return baseballResolutionReasons(baseballCaptureTerminal(sport, capture))
+}
+
+/**
+ * Whether an RBI override can take effect: the projector credits RBIs only on the event
+ * that completes a plate appearance, so runner plays and pitches that continue the plate
+ * appearance never offer one.
+ */
+export function baseballCaptureAllowsRbi(sport: BaseballSportGameState, capture: BaseballPendingCapture): boolean {
+  return baseballCaptureTerminal(sport, capture) !== null
 }
 
 /** The fallback reason for runners the recorder moves beyond a capture's proposal. */

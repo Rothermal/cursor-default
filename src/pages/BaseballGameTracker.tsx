@@ -14,6 +14,7 @@ import {
   baseballDiamondView,
   baseballDroppedThirdStrikeAvailable,
   baseballBaserunningPlayOptions,
+  baseballCaptureAllowsRbi,
   baseballCaptureFallbackReason,
   baseballCaptureReasons,
   baseballFieldingPositionCode,
@@ -245,7 +246,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       setFlow({ ...flow, error: issues[0]! })
       return
     }
-    const result = commitBaseballCapture(state, flow.capture, baseballResolutionMovements(flow.draft.rows), context())
+    const result = commitBaseballCapture(state, flow.capture, baseballResolutionMovements(flow.draft.rows, { rbi: baseballCaptureAllowsRbi(sport, flow.capture) }), context())
     if (!result.ok) {
       // Keep every choice in place so the recorder can fix what the engine rejected.
       setFlow({ ...flow, error: result.message })
@@ -459,6 +460,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               onChange={updateResolution}
               names={rowNames(flow.draft.rows)}
               reasons={baseballCaptureReasons(sport, flow.capture)}
+              allowRbi={baseballCaptureAllowsRbi(sport, flow.capture)}
               fielderCount={fielderCount}
               error={flow.error}
               // Cancel writes nothing; the "Runners moved" chip stays armed.
