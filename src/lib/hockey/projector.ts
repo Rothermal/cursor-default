@@ -837,8 +837,10 @@ class HockeyReplay {
 
   /**
    * The result from the tracked side's view. The shootout winner gets one goal in the final
-   * score only. The goalie of record is the tracked goalie in net when the winner scored the
-   * goal that put them ahead for good, or the goalie who faced the shootout.
+   * score only. The goalie of record is the tracked goalie in net (or last in net, if pulled)
+   * when the winner scored its (loser's final goals + 1)th goal, or the goalie who faced the
+   * shootout. The rule reads the final score, not the lead: at 1-0, 2-0, 2-1 the winner's
+   * second goal decides even though its lead never changed hands.
    */
   private settleResult(): void {
     const p = this.projection

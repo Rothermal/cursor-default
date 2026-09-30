@@ -160,6 +160,41 @@ describe('shootout', () => {
     state = expectOk(undoHockeyCapture(state, at(102)))
     expect(projection(state)).toMatchObject({ shootout: null, shootoutAvailable: true })
   })
+
+  it('changes either goalie after overtime and during the shootout, stamping the next attempt', () => {
+    let state = expectOk(startHockeyGame(initializedHockeyGame(hockeySetup({ profile: 'nhl_regular', rules: CLOCKLESS })), ctx(0)))
+    for (let period = 1; period <= 4; period++) {
+      if (period > 1) state = expectOk(startNextHockeyPeriod(state, ctx(period * 10)))
+      // Overtime ends with the tracked goalie pulled.
+      if (period === 4) state = expectOk(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: null, reason: 'pulled' }, ctx(period * 10 + 2)))
+      state = expectOk(endHockeyPeriod(state, {}, ctx(period * 10 + 5)))
+    }
+    expect(projection(state)).toMatchObject({ activePeriodId: null, shootoutAvailable: true, goalieInNet: { tracked: null } })
+
+    // Before the start: the backup takes the net in place of the pulled starter.
+    state = expectOk(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: 'p30' }, ctx(90)))
+    expect(projection(state).goalieInNet.tracked).toBe('p30')
+    state = expectOk(startHockeyShootout(state, { firstSide: 'opponent' }, ctx(91)))
+    state = attempt(state, 'saved', { label: '#9' }, 92)
+    expect(shootout(state).attempts[0].goalieId).toBe('p30')
+
+    // During the shootout: the opponent pulls its goalie, then a backup returns before the next attempt.
+    state = expectOk(changeHockeyGoalie(state, { side: 'opponent', inParticipantId: null, reason: 'pulled' }, ctx(93)))
+    const backup = { id: 'opp-backup', label: null, number: '1' }
+    state = expectOk(changeHockeyGoalie(state, { side: 'opponent', inParticipantId: backup.id, newOpponentGoalie: backup }, ctx(94)))
+    state = attempt(state, 'saved', { participantId: 'p2' }, 95)
+    expect(shootout(state).attempts[1].goalieId).toBe('opp-backup')
+
+    state = attempt(state, 'saved', { label: '#10' }, 96)
+    state = attempt(state, 'goal', { participantId: 'p3' }, 97)
+    state = attempt(state, 'missed', { label: '#11' }, 98)
+    expect(shootout(state).winner).toBe('tracked')
+    state = expectOk(endHockeyMatch(state, {}, ctx(100)))
+    expect(projection(state).goalieOfRecord).toBe('p30')
+    expect(hydrate(state).eventStream).toEqual(state.eventStream)
+    expect(rejected(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: 'p1' }, ctx(101))))
+      .toBe('Goalie changes are recorded while the match is in progress.')
+  })
 })
 
 describe('result and goalie of record', () => {
@@ -176,7 +211,7 @@ describe('result and goalie of record', () => {
     return expectOk(endHockeyMatch(state, {}, ctx(80)))
   }
 
-  it('credits the goalie in net when the winning goal put the winner ahead for good', () => {
+  it("credits the goalie in net at the winner's (loser's final goals + 1)th goal", () => {
     const win = youthToEnd(state => {
       state = goal(state, { side: 'tracked' }, 1)
       state = expectOk(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: 'p30' }, ctx(2)))
@@ -194,6 +229,19 @@ describe('result and goalie of record', () => {
     })
     expect(projection(loss).result!.outcome).toBe('loss')
     expect(projection(loss).goalieOfRecord).toBe('p1')
+  })
+
+  it('picks the goal by the final score, not by when the lead was taken', () => {
+    // 1-0 (p1), change to p30, 2-0, 2-1: the winner's second goal decides, although the
+    // tracked side led from the first goal on.
+    const win = youthToEnd(state => {
+      state = goal(state, { side: 'tracked' }, 1)
+      state = expectOk(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: 'p30' }, ctx(2)))
+      state = goal(state, { side: 'tracked' }, 3)
+      return goal(state, { side: 'opponent' }, 4)
+    })
+    expect(projection(win).result!.finalScore).toEqual({ tracked: 2, opponent: 1 })
+    expect(projection(win).goalieOfRecord).toBe('p30')
   })
 
   it('keeps a pulled goalie as the goalie of record', () => {

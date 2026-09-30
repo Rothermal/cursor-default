@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  hockeyOpponentGoalieLabel,
   hockeyShootoutEligibleShooters,
   type HockeyActorChoice,
   type HockeyShootoutOutcome,
@@ -19,6 +20,8 @@ interface HockeyShootoutPanelProps {
   /** Returns an error message, or null once recorded. */
   onAttempt: (input: RecordHockeyShootoutAttemptInput) => string | null
   onEnd: () => void
+  /** Opens the goalie dialog: a backup can take over, or a pulled goalie return, before any attempt. */
+  onChangeGoalie: () => void
 }
 
 const OUTCOMES: Array<{ value: HockeyShootoutOutcome; label: string }> = [
@@ -39,17 +42,35 @@ export default function HockeyShootoutPanel({
   onStart,
   onAttempt,
   onEnd,
+  onChangeGoalie,
 }: HockeyShootoutPanelProps) {
   const { setup, projection } = sport
   const shootout = projection.shootout
   const [shooter, setShooter] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  const netName = (side: HockeySide) => {
+    const id = projection.goalieInNet[side]
+    if (id === null) return 'empty net'
+    if (side === 'tracked') return setup.participants.find(entry => entry.id === id)?.displayName ?? 'Goalie'
+    const goalie = projection.opponentGoalies.find(entry => entry.id === id)
+    return goalie ? hockeyOpponentGoalieLabel(goalie) : 'Opponent goalie'
+  }
+  const goalies = (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <p className="min-w-0 text-content-muted">
+        In net: {sideLabel('tracked')} {netName('tracked')}, {sideLabel('opponent')} {netName('opponent')}
+      </p>
+      <button type="button" className="btn-secondary shrink-0 px-3 text-sm" onClick={onChangeGoalie}>Goalie</button>
+    </div>
+  )
+
   if (!shootout) {
     if (!projection.shootoutAvailable || !canRecord) return null
     return (
       <section className="space-y-2 rounded-md border border-line p-3" aria-label="Shootout">
         <h2 className="font-bold text-content">Shootout</h2>
+        {goalies}
         <p className="text-sm text-content-muted">Still tied after overtime. Who shoots first?</p>
         <div className="grid grid-cols-2 gap-2">
           {(['tracked', 'opponent'] as const).map(side => (
@@ -114,6 +135,7 @@ export default function HockeyShootoutPanel({
         </div>
       ) : canRecord && next ? (
         <div className="space-y-2">
+          {goalies}
           <p className="text-sm text-content-muted">
             {shootout.suddenDeath ? 'Sudden death, ' : ''}round {shootout.round}: {sideLabel(next)} shooting
           </p>

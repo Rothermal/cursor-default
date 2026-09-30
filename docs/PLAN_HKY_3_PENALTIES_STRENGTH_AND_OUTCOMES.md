@@ -208,7 +208,8 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
   shootout winner gets one goal in the final score only. Suspended and abandoned games
   keep no result.
 - **Goalie of record**: the goalie in net for the tracked side when the deciding goal was
-  scored (or the goalie who played the shootout), exposed for HKY-6 W/L/OTL.
+  scored (or the goalie who played the shootout), exposed for HKY-6 W/L/OTL. The deciding
+  goal is the winner's (loser's final goals + 1)th goal (see §8 HKY-3C).
 - The HKY-1 projector comment ("a tie that the rules do not allow still needs a shootout")
   is resolved: `canEndWithoutReason` becomes true once the shootout decides.
 
@@ -383,8 +384,13 @@ Files: `src/lib/hockey/shootout.ts` (new), `projector.ts`, `live.ts`,
 - Result: once the match ends, `result` holds `win | loss | tie`, `decidedIn` and the
   final score with one goal for the shootout winner (`formatHockeyFinalScore`: `1-0 (SO)`).
   Suspended, abandoned and reopened games have none. `goalieOfRecord` is the tracked
-  goalie in net (or last in net, when pulled) when the winner scored the goal that put
-  them ahead for good, or the goalie who faced the shootout; null for a tie.
+  goalie in net (or last in net, when pulled) when the winner scored its (loser's final
+  goals + 1)th goal, or the goalie who faced the shootout; null for a tie. The rule reads
+  the final score, not who led: at 1-0 (p1), a change to p30, then 2-0 and 2-1, the
+  second goal decides, so p30 has the decision.
+- Goalie changes stay available after overtime ends tied and during the shootout (both
+  sides, from the shootout panel), so a backup who takes over or a pulled goalie who
+  returns is stamped on the next attempt. Ended games stay read-only.
 - UI: `HockeyShootoutPanel` (first side, per-side marks, shooter picker limited to
   eligible skaters, Goal/Save/Miss, End game once decided) and a Final line on the
   scoreboard.

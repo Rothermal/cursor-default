@@ -380,6 +380,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             return null
           }}
           onEnd={() => apply(endHockeyMatch(state, {}, context()))}
+          onChangeGoalie={() => setGoalieOpen(true)}
         />
       )}
 
@@ -555,7 +556,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           onClose={() => setShotDraft(null)}
         />
       )}
-      {goalieOpen && (
+      {goalieOpen && inProgress && (
         <HockeyGoalieDialog
           sport={sport}
           trackedLabel={trackedLabel}
