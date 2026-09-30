@@ -1,7 +1,7 @@
 # Plan: BSB-3 Baseball Diamond Tracker and Pitch Pad
 
-Status: approved and merged 2026-09-29 (PR #448; owner answers in section 9). BSB-3A is
-implemented (section 10); BSB-3B to BSB-3D follow.
+Status: approved and merged 2026-09-29 (PR #448; owner answers in section 9). BSB-3A
+(PR #450) and BSB-3B are implemented (section 10); BSB-3C and BSB-3D follow.
 Builds on the BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)) and BSB-2 roster,
 defaults and setup ([plan](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 4, 8 and 12.
@@ -459,3 +459,49 @@ or merged.
   count dots, the pitch count and the line score; turning off pitch location hides the
   zone and survives reload; no horizontal scroll and no console errors.
 
+### BSB-3B Pitches and plate appearances
+
+- `src/lib/baseball/capture.ts` (pure): `baseballPitchTerminal` mirrors the projector's
+  walk, strikeout (including the two-strike foul and foul-bunt rules), HBP and in-play
+  endings; `proposeBaseballCaptureMovements` gives the standard movements (a dropped
+  third strike reuses the walk proposal with the batter reason `dropped_third_strike`);
+  `commitBaseballCapture` writes one `recordBaseballPitch` or
+  `recordBaseballPlateAppearance` event. The in-play draft (`buildBaseballBattedBall`)
+  needs fielders for Out, Fielder's choice, Sac bunt, Sac fly, DP and TP and the erring
+  fielder for Error; an untapped spray location is stored as null. Resolution rows
+  (`createBaseballResolutionRows`, lead runner first, then the batter) carry destination,
+  reason and fielders; `baseballResolutionIssues` flags the trailing runner on a shared
+  base, a runner passing the one ahead and an out without fielders, and the engine still
+  decides on Confirm.
+- **Runner resolution pulled forward from BSB-3C.** The in-play sheet, the dropped third
+  strike and the "Runners moved" chip all need it, so `BaseballRunnerResolution` ships
+  here with destinations, reasons (running reasons only on a pitch that continues the
+  plate appearance) and fielder sequences for outs (number buttons, or taps on the
+  diamond markers; tapping a runner chip cycles that runner). BSB-3C keeps the
+  between-pitch runner menu and the Advanced per-row overrides (error by, earned, RBI,
+  run counts).
+- Tracker: pad results write at once when the proposal is unambiguous (non-terminal
+  pitches, ball four, HBP, a caught strike three). In play opens the in-play sheet, then
+  runner resolution; strike three with a dropped third strike possible asks Strikeout or
+  Dropped third strike first. The "Runners moved" chip shows when a runner is on base or
+  a dropped third strike is possible, sends the next result through resolution, stays
+  armed on Cancel and disarms after the write. Quick PA (results plus an optional final
+  count, both or neither) is disabled once a pitch was tracked for the batter. Pad
+  results and Quick PA are disabled while `pendingEnd` is set. Each capture gets its own
+  `captureCommandId` for BSB-3D Undo. An engine rejection keeps the sheet open with the
+  message and every choice.
+- The opponent batter card has a pencil that sets the slot's label and number through the
+  `opponent_slot` substitution; position and bats are kept.
+- Tests: `capture.test.ts` covers terminal detection for every pitch result, one-tap
+  captures, the dropped third strike, the four "Runners moved" examples from this plan
+  as single events (including a third out moving to the next half and a forced winning
+  run setting `pendingEnd` only after the whole pitch), a rejected draft staying intact,
+  every in-play result chip, every Quick PA result, the refusal after a tracked pitch,
+  resolution rows and issues, and static renders of the pad chip, in-play sheet,
+  resolution, Quick PA and batter pencil.
+- Browser check at 390 px (development build, light and dark), driven through the UI:
+  ball four with a pitch location, a double to center with fielder 8, a Quick PA
+  strikeout, an armed ball with the runner from third scoring on a wild pitch, an
+  opponent slot relabelled "#21 Tall lefty", a dropped third strike with the batter to
+  first, and DP blocked until fielders are tapped. Score, count, outs and bases matched
+  the projection after each step; no horizontal scroll and no console errors.

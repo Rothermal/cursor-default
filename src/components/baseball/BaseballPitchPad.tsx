@@ -18,6 +18,8 @@ interface BaseballPitchPadProps {
   /** Without it the result buttons are shown but disabled, with `disabledReason`. */
   onResult?: (result: BaseballPitchResult) => void
   disabledReason?: string
+  /** The "Runners moved" chip: armed, the next result opens runner resolution first. */
+  runnersMoved?: { armed: boolean; onToggle: () => void }
 }
 
 const V = 100
@@ -28,9 +30,9 @@ const ZONE = {
 }
 
 /**
- * The pitch pad (BSB-3A): a catcher's-view strike zone with a ball area around it, and
- * the pitch results. A location is optional and waits for a result before anything is
- * written.
+ * The pitch pad (BSB-3A, results live in BSB-3B): a catcher's-view strike zone with a
+ * ball area around it, the pitch results and the "Runners moved" chip. A location is
+ * optional and waits for a result before anything is written.
  */
 export default function BaseballPitchPad({
   showZone,
@@ -38,6 +40,7 @@ export default function BaseballPitchPad({
   onLocation,
   onResult,
   disabledReason,
+  runnersMoved,
 }: BaseballPitchPadProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const pending = pendingLocation ? baseballPitchPadDisplay(pendingLocation) : null
@@ -95,6 +98,16 @@ export default function BaseballPitchPad({
         )}
 
         <div className="space-y-2">
+          {runnersMoved && !disabled && (
+            <button
+              type="button"
+              aria-pressed={runnersMoved.armed}
+              className={`${runnersMoved.armed ? 'btn-primary' : 'btn-secondary'} min-h-11 w-full px-1 text-sm leading-tight`}
+              onClick={runnersMoved.onToggle}
+            >
+              {runnersMoved.armed ? 'Runners moved: on' : 'Runners moved'}
+            </button>
+          )}
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Pitch result">
             {BASEBALL_PRIMARY_PITCH_RESULTS.map(entry => (
               <button
