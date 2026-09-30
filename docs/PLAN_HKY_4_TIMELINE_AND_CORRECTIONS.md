@@ -52,8 +52,11 @@ editable.
   - grouped by period, oldest first, in game order (§2 HKY-4C). Until HKY-4C lands, game
     order equals capture order,
   - each row: period, clock time (anchored games only), side, label (the existing
-    `hockeyEventLabel`), strength for goals, and badges for Removed, Edited
-    (`revision > 0`) and Recorded later,
+    `hockeyEventLabel`), strength for goals, and badges for Removed, Revised and
+    Recorded later. The shared engine appends events at revision 1, so Revised means
+    `revision > 1` (the Basketball baseline). It covers any change after capture:
+    an edit, a removal or a restore, which revision alone cannot tell apart. A
+    freshly captured event shows no badge,
   - families, matching HKY-0 §9: Goals, Shots, Faceoffs, Physical (hits, takeaways,
     giveaways), Penalties (penalties and early releases), Goalies, Team (timeouts,
     icing, offside, score adjustments), Shootout, and Game flow (lifecycle and clock),
@@ -120,21 +123,41 @@ Events that belong earlier in the game than when they were recorded.
 
 - **Game-order replay.** Replay today follows capture order. HKY-4C keeps live captures
   in capture order and places each recorded-later or re-timed event at its game time:
-  - anchored games: in its period, before the first live event of that period whose
-    clock time is later; otherwise before the period's end. Among placed events, order
-    is period, clock time, then capture order,
+  - anchored games: in its period, after every live event of that period whose clock
+    time is the same or earlier, and before the first live event whose clock time is
+    later; otherwise before the period's end. So an addition at 0:00 still goes after
+    shots already captured at 0:00 while the opening clock was paused. Among placed
+    events, order is period, clock time, then capture order,
   - clockless games: at the end of its period, just before the period ends (§7 Q1),
+  - period start (goalie changes only, see Starting goalie below): right after the
+    period's start boundary (the opening lineup and period start for Period 1, the
+    period start otherwise) and before every other event of that period. Several
+    period-start events keep their capture order,
   - live captures are already checked in game order, so a stream with no placed events
     replays exactly as before. Literal pre-HKY-4 fixtures prove it.
   With placed events in game order, everything the projector derives in order stays
   right without special cases: goalie in net, players removed by a penalty, the penalty
   box and strength, power-play opportunities, goal order for the goalie of record,
   sudden death, and the result.
-- **Payload flags.** Correctable payloads gain two optional flags: `recordedLater: true`
-  on an added event, and `retimed: true` on a live event whose period or time was
-  corrected. A placed event's clock time is checked against its period's bounds (from
-  zero to the period's end, or to the current clock for the running period), not against
-  the live clock at its recorded moment. Old payloads without the flags stay valid.
+- **Payload fields.** Placeable payloads gain optional fields, stored with the event so
+  replay places it the same way after a reload:
+  - `placement: 'game_time' | 'period_start'` says how replay places the event. Without
+    it, the event is a live capture and keeps its capture order,
+  - `recordedLater: true` marks an added event, and `retimed: true` marks a live event
+    whose period or time was corrected. Both drive the Timeline badges, and either one
+    requires `placement`,
+  - `period_start` is accepted only on goalie changes. It means elapsed zero on
+    anchored games, whatever the count-down or count-up display, and null elapsed on
+    clockless games.
+  A placed event's clock time is checked against its period's bounds (from zero to the
+  period's end, or to the current clock for the running period), not against the live
+  clock at its recorded moment. Old payloads without these fields stay valid.
+- **Timeouts are statistical when placed.** A live timeout keeps today's behavior:
+  capture pauses a running clock first, and replay rejects a live timeout while the
+  clock runs. A placed timeout (added or re-timed) only counts the timeout. It pauses
+  nothing, and replay skips the stopped-clock check for it, so clock anchors and every
+  later clock check stay as they were. Re-timing a live timeout leaves its original
+  clock pause where it is: that pause is a clock row, and clock rows stay read-only.
 - **Families that can be placed:** shots and goals, faceoffs, hits, takeaways,
   giveaways, penalties, goalie changes, timeouts, icing and offside. Penalty releases,
   score adjustments, the shootout and lifecycle events cannot be placed: releases
@@ -148,9 +171,11 @@ Events that belong earlier in the game than when they were recorded.
 - **Re-time.** The edit dialog of a placeable family gains the same time field. Moving
   an event to another period or time sets `retimed`.
 - **Starting goalie.** The setup and opening lineup stay immutable. A wrong starting
-  goalie is fixed by adding a goalie change at 0:00 of Period 1 (or at the start of the
-  period for clockless games). The preview then offers to update the goalie on the
-  shots that follow.
+  goalie is fixed by adding a goalie change with "At the start of the period" ticked.
+  It is stored with `placement: 'period_start'`, so it replays before any shot of the
+  period, including shots captured at 0:00 and every shot of a clockless period. The
+  same option fixes the goalie who started a later period. The preview then offers to
+  update the goalie on the shots that follow.
 - **Quick Undo** is unchanged. It still removes the newest capture unit by capture
   order, so an addition just made can be undone from Recent Events.
 
@@ -160,8 +185,9 @@ Events that belong earlier in the game than when they were recorded.
 
 - No migration and no cloud route; event hockey stays local-only.
 - No setup or rules change. The opening lineup and setup stay immutable.
-- No new event types. Two optional payload flags (`recordedLater`, `retimed`) are added
-  to the placeable families; payloads without them are unchanged and still valid.
+- No new event types. Optional payload fields (`placement`, `recordedLater`,
+  `retimed`) are added to the placeable families; payloads without them are unchanged
+  and still valid.
 - Revisions use the shared engine: `update` raises `revision`, and `delete` and `restore`
   keep the event in the stream. Prior values are not kept (the Basketball engine rule).
 - HKY-1 to HKY-3 games load and replay unchanged, with the same fingerprint. Literal
@@ -190,8 +216,8 @@ owner wants it tracked.
 `docs/REGRESSION_HKY_4_TIMELINE_AND_CORRECTIONS.md` when implementation lands:
 
 - Timeline rows for every family, in period order, with filters by family, side, period
-  and player, the Removed / Edited / Recorded later badges, and a failing history marked
-  on its row,
+  and player, the Removed / Revised / Recorded later badges (a fresh capture showing
+  none), and a failing history marked on its row,
 - edit of each family in the §2 HKY-4B table, each round-tripping through
   `HYDRATE_STATE`,
 - remove and restore of a capture unit, a coincidence group, a penalty with an early
@@ -202,9 +228,16 @@ owner wants it tracked.
   differing and updated on request, a player removed and no longer removed,
 - corrections after the game ended re-settling the result and goalie of record,
 - anchored game: a goal added in Period 1 while Period 3 runs, placed correctly; a
-  penalty added in Period 2 changing the box and strength after it; a goalie change added
-  at 0:00 of Period 1 fixing the starting goalie and updating later shots,
-- clockless game: an addition placed at the end of its period,
+  penalty added in Period 2 changing the box and strength after it; an addition at 0:00
+  going after shots already captured at 0:00,
+- starting goalie: a period-start goalie change in Period 1 supplying the goalie for
+  every later shot, including shots captured at 0:00 (anchored) and all Period 1 shots
+  (clockless), after reload and `HYDRATE_STATE`,
+- clockless game: an ordinary addition placed at the end of its period,
+- timeouts: a timeout added inside an interval where the clock ran, and a live timeout
+  re-timed away from its pause, both leaving the clock, later clock checks and the
+  current clock state unchanged after replay and hydration; a live timeout still
+  pausing a running clock,
 - re-timing a live event to another period and back,
 - quick Undo removing a just-added event, and Restore after it,
 - HKY-1 to HKY-3 fixtures replaying unchanged; park and resume with Soccer and Basketball
