@@ -1,7 +1,8 @@
-import { createElement } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import BaseballDiamond from '../../components/baseball/BaseballDiamond'
+import BaseballFielderPicker from '../../components/baseball/BaseballFielderPicker'
 import BaseballInPlaySheet from '../../components/baseball/BaseballInPlaySheet'
 import BaseballPitchPad from '../../components/baseball/BaseballPitchPad'
 import BaseballQuickPlateAppearance from '../../components/baseball/BaseballQuickPlateAppearance'
@@ -26,7 +27,9 @@ import {
   proposeBaseballCaptureMovements,
   setBaseballResolutionDestination,
   type BaseballPendingCapture,
+  type BaseballResolutionDraft,
   type BaseballResolutionRow,
+  type BaseballResolutionTransition,
 } from './capture'
 import { baseballMovement, baseballSportState } from './commands'
 import { baseballDiamondView } from './trackerView'
@@ -390,13 +393,11 @@ describe('Baseball capture panels render', () => {
     ]
     const markup = renderToStaticMarkup(createElement(BaseballRunnerResolution, {
       title: 'Runners on this pitch',
-      rows,
+      draft: { rows, activeRunnerId: 'lead' },
       onChange: noop,
       names: { lead: '#4 Lee', batter: '#12 Garcia' },
       terminal: 'strikeout',
       fielderCount: 9,
-      activeRunnerId: 'lead',
-      onActivate: noop,
       error: 'The engine said no.',
       onCancel: noop,
       onConfirm: noop,
@@ -425,5 +426,82 @@ describe('Baseball capture panels render', () => {
     const props = { view: baseballDiamondView(sport), battingLabel: 'Away', fieldingLabel: 'Home' }
     expect(renderToStaticMarkup(createElement(BaseballDiamond, props))).not.toContain('Edit label for')
     expect(renderToStaticMarkup(createElement(BaseballDiamond, { ...props, onEditBatter: noop }))).toContain('Edit label for')
+  })
+})
+
+/** Every element in a rendered tree, without expanding child components. */
+function elements(node: ReactNode): ReactElement[] {
+  if (Array.isArray(node)) return node.flatMap(elements)
+  if (!isValidElement(node)) return []
+  const props = node.props as { children?: ReactNode }
+  return [node, ...elements(props.children)]
+}
+
+describe('Baseball runner resolution interactions', () => {
+  /**
+   * Drives the real component handlers the way the tracker does: every transition an
+   * interaction emits is applied to the same previous draft in order, as batched React
+   * functional updates would be.
+   */
+  function interact(sport: ReturnType<typeof sportOf>, draft: BaseballResolutionDraft, act: (tree: ReactElement[]) => void) {
+    const emitted: BaseballResolutionTransition[] = []
+    const tree = elements(BaseballRunnerResolution({
+      title: 'Runners',
+      draft,
+      onChange: transition => emitted.push(transition),
+      names: {},
+      terminal: null,
+      fielderCount: sport.setup.rulesSnapshot.defensivePlayers,
+      error: null,
+      onCancel: () => {},
+      onConfirm: () => {},
+    }))
+    act(tree)
+    return emitted.reduce((current, transition) => transition(current), draft)
+  }
+  const chooseOut = (runnerId: string) => (tree: ReactElement[]) => {
+    const select = tree.find(element => (element.props as { id?: string }).id === `destination-${runnerId}`)!
+    ;(select.props as { onChange: (event: { target: { value: string } }) => void }).onChange({ target: { value: 'out' } })
+  }
+  const pickFielders = (fielders: number[]) => (tree: ReactElement[]) => {
+    const picker = tree.find(element => element.type === BaseballFielderPicker)!
+    ;(picker.props as { onChange: (sequence: number[]) => void }).onChange(fielders)
+  }
+  const openDraft = (state: GameState, pending: BaseballPendingCapture): BaseballResolutionDraft => {
+    const sport = sportOf(state)
+    const terminal = baseballCaptureTerminal(sport, pending)
+    return {
+      rows: createBaseballResolutionRows(sport.projection, proposeBaseballCaptureMovements(sport, pending), terminal !== null, baseballFallbackReason(terminal)),
+      activeRunnerId: null,
+    }
+  }
+
+  it('keeps Out on a base runner, takes its fielders and writes the caught stealing', () => {
+    const state = walk(startedGame())
+    const sport = sportOf(state)
+    const runner = sport.projection.bases.first!.runnerId
+    const pending = pitchCapture('ball')
+    let draft = interact(sport, openDraft(state, pending), chooseOut(runner))
+    expect(draft.rows.find(row => row.runnerId === runner)).toMatchObject({ to: 'out' })
+    expect(draft.activeRunnerId).toBe(runner)
+    draft = interact(sport, draft, pickFielders([2, 6]))
+    draft = { ...draft, rows: draft.rows.map(row => ({ ...row, reason: 'caught_stealing' as const })) }
+    expect(baseballResolutionIssues(draft.rows)).toEqual({})
+    const result = commitBaseballCapture(state, pending, baseballResolutionMovements(draft.rows), ctx())
+    if (!result.ok) throw new Error(result.message)
+    expect(projection(result.state)).toMatchObject({ outs: 1, balls: 1, bases: { first: null } })
+  })
+
+  it('keeps Out on a dropped-third-strike batter thrown out at first', () => {
+    const state = toCount(startedGame(), 0, 2)
+    const sport = sportOf(state)
+    const batter = sport.projection.currentBatterId!
+    const pending = pitchCapture('swinging_strike', { droppedThirdStrike: true })
+    let draft = interact(sport, openDraft(state, pending), chooseOut(batter))
+    expect(draft.rows.find(row => row.runnerId === batter)).toMatchObject({ to: 'out' })
+    draft = interact(sport, draft, pickFielders([2, 3]))
+    const result = commitBaseballCapture(state, pending, baseballResolutionMovements(draft.rows), ctx())
+    if (!result.ok) throw new Error(result.message)
+    expect(projection(result.state)).toMatchObject({ outs: 1, bases: { first: null } })
   })
 })

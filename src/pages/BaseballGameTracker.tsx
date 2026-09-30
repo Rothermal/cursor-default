@@ -23,7 +23,8 @@ import {
   baseballSportState,
   commitBaseballCapture,
   createBaseballResolutionRows,
-  cycleBaseballResolutionRow,
+  addBaseballResolutionFielder,
+  cycleBaseballResolutionDraftRow,
   emptyBaseballInPlayDraft,
   findBaseballRulesProfile,
   proposeBaseballCaptureMovements,
@@ -39,7 +40,9 @@ import {
   type BaseballPitchLocation,
   type BaseballPitchResult,
   type BaseballQuickPlateAppearanceResult,
+  type BaseballResolutionDraft,
   type BaseballResolutionRow,
+  type BaseballResolutionTransition,
   type BaseballSportGameState,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
@@ -60,7 +63,7 @@ type CaptureFlow =
   | { step: 'dropped_third'; capture: Extract<BaseballPendingCapture, { source: 'pitch' }> }
   | { step: 'in_play'; capture: BaseballPendingCapture; draft: BaseballInPlayDraft }
   | { step: 'quick' }
-  | { step: 'resolve'; capture: BaseballPendingCapture; rows: BaseballResolutionRow[]; activeRunnerId: string | null; error: string | null }
+  | { step: 'resolve'; capture: BaseballPendingCapture; draft: BaseballResolutionDraft; error: string | null }
   | { step: 'opponent_label'; slotId: string; label: string; number: string }
 
 /**
@@ -154,11 +157,16 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     setFlow({
       step: 'resolve',
       capture,
-      rows,
-      activeRunnerId: rows.find(row => row.to === 'out' && row.fielders.length === 0)?.runnerId ?? null,
+      draft: { rows, activeRunnerId: rows.find(row => row.to === 'out' && row.fielders.length === 0)?.runnerId ?? null },
       error: null,
     })
   }
+
+  // Functional updates so several edits in one event never overwrite each other.
+  const updateResolution = (transition: BaseballResolutionTransition) =>
+    setFlow(previous => (previous.step === 'resolve' ? { ...previous, draft: transition(previous.draft), error: null } : previous))
+  const updateInPlay = (edit: (draft: BaseballInPlayDraft) => BaseballInPlayDraft) =>
+    setFlow(previous => (previous.step === 'in_play' ? { ...previous, draft: edit(previous.draft) } : previous))
 
   const finishCapture = () => {
     setFlow({ step: 'idle' })
@@ -213,12 +221,12 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
 
   const confirmResolution = () => {
     if (flow.step !== 'resolve') return
-    const issues = Object.values(baseballResolutionIssues(flow.rows))
+    const issues = Object.values(baseballResolutionIssues(flow.draft.rows))
     if (issues.length > 0) {
       setFlow({ ...flow, error: issues[0]! })
       return
     }
-    const result = commitBaseballCapture(state, flow.capture, baseballResolutionMovements(flow.rows), context())
+    const result = commitBaseballCapture(state, flow.capture, baseballResolutionMovements(flow.draft.rows), context())
     if (!result.ok) {
       // Keep every choice in place so the recorder can fix what the engine rejected.
       setFlow({ ...flow, error: result.message })
@@ -306,25 +314,17 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               fieldingLabel={sideName(diamond.fieldingSide)}
               pendingLocation={flow.step === 'in_play' ? flow.draft.location : null}
               onLocation={flow.step === 'in_play' && capturePreferences.trackBattedBallLocation
-                ? location => setFlow({ ...flow, draft: { ...flow.draft, location: { x: location.x, y: location.y } } })
+                ? location => updateInPlay(draft => ({ ...draft, location: { x: location.x, y: location.y } }))
                 : undefined}
               onFielder={flow.step === 'in_play'
-                ? position => setFlow({ ...flow, draft: { ...flow.draft, fielders: [...flow.draft.fielders, position] } })
-                : flow.step === 'resolve' && flow.activeRunnerId
-                  ? position => setFlow({
-                    ...flow,
-                    rows: flow.rows.map(row => (row.runnerId === flow.activeRunnerId && row.to === 'out'
-                      ? { ...row, fielders: [...row.fielders, position] }
-                      : row)),
-                  })
+                ? position => updateInPlay(draft => ({ ...draft, fielders: [...draft.fielders, position] }))
+                : flow.step === 'resolve' && flow.draft.activeRunnerId
+                  ? position => updateResolution(addBaseballResolutionFielder(position))
                   : undefined}
               onRunner={flow.step === 'resolve'
                 ? base => {
                   const runnerId = projection.bases[base]?.runnerId
-                  setFlow({
-                    ...flow,
-                    rows: flow.rows.map(row => (row.runnerId === runnerId ? cycleBaseballResolutionRow(row) : row)),
-                  })
+                  if (runnerId) updateResolution(cycleBaseballResolutionDraftRow(runnerId))
                 }
                 : undefined}
               onEditBatter={flow.step === 'idle' && canCapture && batterSlot
@@ -385,7 +385,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           {flow.step === 'in_play' && (
             <BaseballInPlaySheet
               draft={flow.draft}
-              onChange={draft => setFlow({ ...flow, draft })}
+              onChange={draft => updateInPlay(() => draft)}
               trackLocation={capturePreferences.trackBattedBallLocation}
               fielderCount={fielderCount}
               onCancel={() => setFlow({ step: 'idle' })}
@@ -405,13 +405,11 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           {flow.step === 'resolve' && (
             <BaseballRunnerResolution
               title={baseballCaptureTerminal(sport, flow.capture) === null ? 'Runners on this pitch' : 'Where everyone ends up'}
-              rows={flow.rows}
-              onChange={rows => setFlow({ ...flow, rows, error: null })}
-              names={rowNames(flow.rows)}
+              draft={flow.draft}
+              onChange={updateResolution}
+              names={rowNames(flow.draft.rows)}
               terminal={baseballCaptureTerminal(sport, flow.capture)}
               fielderCount={fielderCount}
-              activeRunnerId={flow.activeRunnerId}
-              onActivate={runnerId => setFlow({ ...flow, activeRunnerId: runnerId })}
               error={flow.error}
               // Cancel writes nothing; the "Runners moved" chip stays armed.
               onCancel={() => setFlow({ step: 'idle' })}

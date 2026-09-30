@@ -380,6 +380,54 @@ export function setBaseballResolutionDestination(row: BaseballResolutionRow, to:
   }
 }
 
+/** The rows being edited plus the out row that fielder taps add to. */
+export interface BaseballResolutionDraft {
+  rows: BaseballResolutionRow[]
+  activeRunnerId: string | null
+}
+
+/** One edit to the resolution draft. Each interaction is a single transition, so edits are never lost to a stale copy. */
+export type BaseballResolutionTransition = (draft: BaseballResolutionDraft) => BaseballResolutionDraft
+
+function editRow(draft: BaseballResolutionDraft, runnerId: string, edit: (row: BaseballResolutionRow) => BaseballResolutionRow) {
+  return draft.rows.map(row => (row.runnerId === runnerId ? edit(row) : row))
+}
+
+/** Sets a row's destination; choosing Out also makes that row take the fielder taps. */
+export function setBaseballResolutionDraftDestination(runnerId: string, to: BaseballResolutionDestination): BaseballResolutionTransition {
+  return draft => ({
+    rows: editRow(draft, runnerId, row => setBaseballResolutionDestination(row, to)),
+    activeRunnerId: to === 'out' ? runnerId : draft.activeRunnerId,
+  })
+}
+
+/** Cycles a row's destination (a tap on the runner chip); landing on Out activates it. */
+export function cycleBaseballResolutionDraftRow(runnerId: string): BaseballResolutionTransition {
+  return draft => {
+    const rows = editRow(draft, runnerId, cycleBaseballResolutionRow)
+    const cycled = rows.find(row => row.runnerId === runnerId)
+    return { rows, activeRunnerId: cycled?.to === 'out' ? runnerId : draft.activeRunnerId }
+  }
+}
+
+export function updateBaseballResolutionDraftRow(runnerId: string, patch: Partial<Pick<BaseballResolutionRow, 'reason' | 'fielders'>>): BaseballResolutionTransition {
+  return draft => ({ ...draft, rows: editRow(draft, runnerId, row => ({ ...row, ...patch })) })
+}
+
+export function activateBaseballResolutionRow(runnerId: string): BaseballResolutionTransition {
+  return draft => ({ ...draft, activeRunnerId: runnerId })
+}
+
+/** Adds a fielder tap on the diamond to the active out row. */
+export function addBaseballResolutionFielder(position: number): BaseballResolutionTransition {
+  return draft => draft.activeRunnerId === null
+    ? draft
+    : {
+        ...draft,
+        rows: editRow(draft, draft.activeRunnerId, row => (row.to === 'out' ? { ...row, fielders: [...row.fielders, position] } : row)),
+      }
+}
+
 function finalPosition(row: BaseballResolutionRow): number | null {
   if (row.to === 'out') return null
   if (row.to === 'stay') return ORDER.indexOf(row.from)

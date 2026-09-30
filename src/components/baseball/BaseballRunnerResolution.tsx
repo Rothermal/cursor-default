@@ -3,27 +3,28 @@ import {
   baseballResolutionDestinations,
   baseballResolutionIssues,
   baseballResolutionReasons,
-  setBaseballResolutionDestination,
+  activateBaseballResolutionRow,
+  setBaseballResolutionDraftDestination,
+  updateBaseballResolutionDraftRow,
   type BaseballMovementFrom,
   type BaseballMovementReason,
   type BaseballResolutionDestination,
-  type BaseballResolutionRow,
+  type BaseballResolutionDraft,
+  type BaseballResolutionTransition,
   type BaseballTerminalKind,
 } from '../../lib/baseball'
 import BaseballFielderPicker from './BaseballFielderPicker'
 
 interface BaseballRunnerResolutionProps {
   title: string
-  rows: BaseballResolutionRow[]
-  onChange: (rows: BaseballResolutionRow[]) => void
+  draft: BaseballResolutionDraft
+  /** Each interaction sends one transition, applied to the latest draft. */
+  onChange: (transition: BaseballResolutionTransition) => void
   /** Runner and batter names by id. */
   names: Record<string, string>
   /** What the capture does to the plate appearance; decides the reason choices. */
   terminal: BaseballTerminalKind | null
   fielderCount: number
-  /** The out row that fielder taps on the diamond add to. */
-  activeRunnerId: string | null
-  onActivate: (runnerId: string) => void
   /** The engine's message after a rejected Confirm; the choices stay in place. */
   error: string | null
   onCancel: () => void
@@ -46,27 +47,25 @@ const TO_LABELS: Record<BaseballResolutionDestination, string> = {
  */
 export default function BaseballRunnerResolution({
   title,
-  rows,
+  draft,
   onChange,
   names,
   terminal,
   fielderCount,
-  activeRunnerId,
-  onActivate,
   error,
   onCancel,
   onConfirm,
 }: BaseballRunnerResolutionProps) {
+  const { rows, activeRunnerId } = draft
   const issues = baseballResolutionIssues(rows)
   const reasons = baseballResolutionReasons(terminal)
-  const update = (index: number, row: BaseballResolutionRow) => onChange(rows.map((entry, at) => (at === index ? row : entry)))
 
   return (
     <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Runners">
       <h2 className="font-bold text-content">{title}</h2>
       {rows.length === 0 && <p className="text-sm text-content-muted">No runners on base.</p>}
       <ul className="space-y-2">
-        {rows.map((row, index) => {
+        {rows.map(row => {
           const isBatter = row.from === 'batter'
           const active = row.to === 'out' && row.runnerId === activeRunnerId
           const reasonChoices: readonly BaseballMovementReason[] = reasons.includes(row.reason) ? reasons : [row.reason, ...reasons]
@@ -87,11 +86,8 @@ export default function BaseballRunnerResolution({
                   id={`destination-${row.runnerId}`}
                   className="input-field min-h-11 w-28 px-2 py-2 text-sm font-semibold"
                   value={row.to}
-                  onChange={event => {
-                    const next = setBaseballResolutionDestination(row, event.target.value as BaseballResolutionDestination)
-                    update(index, next)
-                    if (next.to === 'out') onActivate(row.runnerId)
-                  }}
+                  onChange={event =>
+                    onChange(setBaseballResolutionDraftDestination(row.runnerId, event.target.value as BaseballResolutionDestination))}
                 >
                   {baseballResolutionDestinations(row.from).map(destination => (
                     <option key={destination} value={destination}>{TO_LABELS[destination]}</option>
@@ -105,7 +101,7 @@ export default function BaseballRunnerResolution({
                   <select
                     className="input-field min-h-11 flex-1 px-2 py-2 text-sm"
                     value={row.reason}
-                    onChange={event => update(index, { ...row, reason: event.target.value as BaseballMovementReason })}
+                    onChange={event => onChange(updateBaseballResolutionDraftRow(row.runnerId, { reason: event.target.value as BaseballMovementReason }))}
                   >
                     {reasonChoices.map(reason => (
                       <option key={reason} value={reason}>{BASEBALL_REASON_LABELS[reason]}</option>
@@ -121,13 +117,13 @@ export default function BaseballRunnerResolution({
                     hint="Tap the fielders on the diamond, or their position numbers."
                     fielderCount={fielderCount}
                     sequence={row.fielders}
-                    onChange={fielders => update(index, { ...row, fielders })}
+                    onChange={fielders => onChange(updateBaseballResolutionDraftRow(row.runnerId, { fielders }))}
                   />
                 ) : (
                   <button
                     type="button"
                     className="flex min-h-11 w-full items-center justify-between rounded-md border border-line px-3 text-sm"
-                    onClick={() => onActivate(row.runnerId)}
+                    onClick={() => onChange(activateBaseballResolutionRow(row.runnerId))}
                   >
                     <span className="text-content-muted">Fielders</span>
                     <span className="font-semibold tabular-nums text-content">{row.fielders.length ? row.fielders.join('-') : 'Add'}</span>
