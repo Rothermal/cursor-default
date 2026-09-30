@@ -43,7 +43,7 @@ import PwaStatus from './components/PwaStatus'
 import HockeyGameSetup from './pages/HockeyGameSetup'
 import HockeyGameTracker from './pages/HockeyGameTracker'
 import BaseballEventSetup from './pages/BaseballEventSetup'
-import BaseballEventGame from './pages/BaseballEventGame'
+import BaseballGameTracker from './pages/BaseballGameTracker'
 import { isBaseballEventPreviewAvailable } from './lib/sportAvailability'
 const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/AppearancePreview')) : null
 
@@ -79,7 +79,7 @@ function GameTrackerRoute() {
   }
   // Baseball event games never fall through to the legacy stat grid either.
   if (state.sport?.id === 'baseball' && (state.sportGameState || state.eventStream)) {
-    return <BaseballEventGame />
+    return <BaseballGameTracker />
   }
   if (state.sport?.id !== 'soccer') return <GameTracker />
   return state.eventStream?.events.length

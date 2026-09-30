@@ -17,6 +17,7 @@ export default {
         'court-surface', 'court-line', 'court-hint', 'court-made', 'court-miss', 'court-tracked', 'court-opponent',
         'pitch-surface', 'pitch-line', 'pitch-tracked', 'pitch-opponent', 'pitch-ink', 'pitch-yellow-card', 'pitch-red-card',
         'rink-ice', 'rink-board', 'rink-red', 'rink-blue', 'rink-crease', 'rink-tracked', 'rink-opponent', 'rink-ink',
+        'diamond-grass', 'diamond-dirt', 'diamond-line', 'diamond-ink', 'diamond-tracked', 'diamond-opponent',
         ...['amber', 'sky', 'emerald', 'violet', 'rose', 'slate', 'orange', 'red', 'blue', 'green', 'indigo', 'teal', 'cyan', 'pink']
           .flatMap(color => ['surface', 'active', 'content', 'badge', 'badge-content'].map(part => `stat-${color}-${part}`)),
       ].map(name => [name, `rgb(var(--${name}) / <alpha-value>)`])),
