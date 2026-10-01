@@ -7,7 +7,8 @@ faceoffs, plays, Recent Events Undo) and
 [HKY-3](PLAN_HKY_3_PENALTIES_STRENGTH_AND_OUTCOMES.md) (penalties, strength, timeouts,
 icing and offside, shootout, result).
 
-Status: proposed. Implementation starts only after this plan's PR is approved.
+Status: approved (plan PR #453 merged 2026-09-30) with the §7 recommendations. HKY-4A
+implemented; HKY-4B and HKY-4C follow in their own PRs. §8 is the delivery record.
 
 ---
 
@@ -279,3 +280,36 @@ owner wants it tracked.
 | Q4 | When a goalie correction changes who was in net, update the goalie stamped on later shots? | Offer it in the preview, checked by default, in the same save. Unticked, the shots keep their stamp and the existing mismatch warning shows |
 | Q5 | A wrong starting goalie: fix it with a goalie change added at the start of Period 1, keeping the setup immutable? | Yes |
 | Q6 | Slices: HKY-4A review, HKY-4B edit/remove/restore, HKY-4C game order and additions, each its own PR? | Yes |
+
+---
+
+## 8. Delivery Record
+
+### HKY-4A Timeline review (implemented)
+
+- `src/lib/hockey/timeline.ts`: `hockeyTimeline(state, sideLabels)` builds rows from the
+  inspected stream (active and removed events), grouped into capture units with the
+  exported `groupHockeyCaptureUnits` from `recentEvents.ts`. A unit whose events differ in
+  removal splits into an active and a removed row. Rows are stable-sorted by period
+  order, capture order within a period. Clock time uses the projection's period
+  durations, so count-down rules show the time left; a period missing from a replay that
+  stopped early takes its length from the frozen rules, and an unresolvable count-down time
+  shows no clock. The first replay diagnostic marks
+  the row holding its event; a diagnostic without a row, or unreadable stored events,
+  becomes the Timeline's history message. Helpers: `filterHockeyTimelineRows`,
+  `groupHockeyTimelineByPeriod`, `hockeyTimelinePeriods`,
+  `activeHockeyTimelineFilterCount`.
+- `HockeyTimeline` component: collapsed filters (family chips, side, period, tracked
+  player, Show removed, Clear) with a one-line summary, period groups, badges (PP, SH,
+  Removed, Revised, Recorded later) and a "Stops the replay" line on the failing row.
+  Tapping a row opens a read-only detail sheet built from the pure
+  `hockeyTimelineEventFields` (`timelineDetail.ts`): actors and every recorded payload
+  field, with participant and opponent goalie ids named through `hockeyTimelineNames`
+  (setup plus every goalie change in the stream, removed ones included), on-ice set,
+  recorded time, revision and removal time. A value it does not recognize is shown as
+  stored, never dropped. `hockeyParticipantLabel` no longer repeats the number of a
+  number-only player.
+- `HockeyGameTracker`: a Track / Timeline tab switch below the sticky scoreboard. Timeline
+  replaces the rink, quick row and Recent Events; the clock and scoreboard stay.
+- No event, schema, fingerprint or migration change.
+- Record: `docs/REGRESSION_HKY_4_TIMELINE_AND_CORRECTIONS.md`.

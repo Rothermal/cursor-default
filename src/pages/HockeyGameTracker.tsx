@@ -8,6 +8,7 @@ import HockeyPenaltyDialog from '../components/hockey/HockeyPenaltyDialog'
 import HockeyPlayDialog, { type HockeyPlayDraft, type HockeyTeamPlayInput } from '../components/hockey/HockeyPlayDialog'
 import HockeyRecentEvents from '../components/hockey/HockeyRecentEvents'
 import HockeyRink from '../components/hockey/HockeyRink'
+import HockeyTimeline from '../components/hockey/HockeyTimeline'
 import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { useAuth } from '../context/AuthContext'
@@ -30,6 +31,7 @@ import {
   hockeyPenaltyBoxNow,
   hockeyPlayMarkers,
   hockeyRecentEvents,
+  hockeyTimeline,
   hockeyShotMarkers,
   hockeySpecialTeams,
   hockeySportState,
@@ -101,6 +103,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [faceoffDot, setFaceoffDot] = useState<HockeyFaceoffDotId | null>(null)
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
+  const [tab, setTab] = useState<'track' | 'timeline'>('track')
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -400,81 +403,106 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         </p>
       )}
 
-      <section className="space-y-2" aria-label="Rink capture">
-        <HockeyRink
-          trackedDirection={direction}
-          flipped={flipped}
-          trapezoid={sport.setup.rulesSnapshot.trapezoid}
-          trackedLabel={trackedLabel}
-          opponentLabel={opponentLabel}
-          disabled={!canCapture}
-          markers={[...hockeyShotMarkers(sport.setup, streamEvents), ...hockeyPlayMarkers(sport.setup, streamEvents)]}
-          highlightDotId={faceoffDot}
-          onFaceoffDot={dotId => {
-            setTap(null)
-            setFaceoffDot(dotId)
-          }}
-          onFlip={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
-          onLocation={location => {
-            setFaceoffDot(null)
-            setTap(location)
-          }}
+      <div className="grid grid-cols-2 gap-1 rounded-md border border-line bg-surface p-1" role="tablist" aria-label="Tracker view">
+        {(['track', 'timeline'] as const).map(id => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`min-h-10 rounded text-sm font-semibold ${tab === id ? 'bg-accent text-accent-content' : 'text-content-muted'}`}
+            onClick={() => setTab(id)}
+          >
+            {id === 'track' ? 'Track' : 'Timeline'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'timeline' ? (
+        <HockeyTimeline
+          {...hockeyTimeline(state, { tracked: trackedLabel, opponent: opponentLabel })}
+          participants={sport.setup.participants}
+          sideLabel={sideLabel}
         />
-        {canCapture && tap && (
-          <div className="rounded-md border border-line bg-surface p-3" role="group" aria-label="Record at this spot">
-            <p className="text-xs font-bold uppercase text-content-muted">Record at this spot</p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <button type="button" className="btn-primary" onClick={() => choose('shot')}>Shot</button>
-              <button type="button" className="btn-secondary" onClick={() => choose('faceoff')}>Faceoff</button>
-              <button type="button" className="btn-secondary" onClick={() => choose('hit')}>Hit</button>
-              <button type="button" className="btn-secondary" onClick={() => choose('takeaway')}>Takeaway</button>
-              <button type="button" className="btn-secondary" onClick={() => choose('giveaway')}>Giveaway</button>
-              <button type="button" className="btn-secondary" onClick={() => setTap(null)}>Cancel</button>
-            </div>
-          </div>
-        )}
-        {canCapture && faceoffDot && (
-          <HockeyFaceoffControl
-            key={faceoffDot}
-            sport={sport}
-            dotId={faceoffDot}
+      ) : (
+        <>
+        <section className="space-y-2" aria-label="Rink capture">
+          <HockeyRink
+            trackedDirection={direction}
+            flipped={flipped}
+            trapezoid={sport.setup.rulesSnapshot.trapezoid}
             trackedLabel={trackedLabel}
-            recentOpponentLabels={recentLabels}
-            onRecord={recordFaceoff}
-            onCancel={() => setFaceoffDot(null)}
-            onOther={() => {
-              setTap({ ...HOCKEY_FACEOFF_DOTS[faceoffDot], attackingDirection: direction })
+            opponentLabel={opponentLabel}
+            disabled={!canCapture}
+            markers={[...hockeyShotMarkers(sport.setup, streamEvents), ...hockeyPlayMarkers(sport.setup, streamEvents)]}
+            highlightDotId={faceoffDot}
+            onFaceoffDot={dotId => {
+              setTap(null)
+              setFaceoffDot(dotId)
+            }}
+            onFlip={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
+            onLocation={location => {
               setFaceoffDot(null)
+              setTap(location)
             }}
           />
-        )}
-        {canCapture && (
-          <div className="grid grid-cols-5 gap-2" role="group" aria-label="Quick capture">
-            {(['tracked', 'opponent'] as const).map(side => (
-              <button
-                key={side}
-                type="button"
-                className="btn-secondary flex min-w-0 flex-col items-center px-1 py-1 leading-tight"
-                onClick={() => setShotDraft({ side, location: null })}
-                aria-label={`${sideLabel(side)} shot`}
-              >
-                <span className="w-full truncate text-[11px] font-semibold text-content-muted">{sideLabel(side)}</span>
-                <span>Shot</span>
-              </button>
-            ))}
-            <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPenaltyOpen(true)}>Penalty</button>
-            <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setGoalieOpen(true)}>Goalie</button>
-            <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPlayDraft({ kind: 'hit', location: null })}>Play</button>
-          </div>
-        )}
-      </section>
+          {canCapture && tap && (
+            <div className="rounded-md border border-line bg-surface p-3" role="group" aria-label="Record at this spot">
+              <p className="text-xs font-bold uppercase text-content-muted">Record at this spot</p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <button type="button" className="btn-primary" onClick={() => choose('shot')}>Shot</button>
+                <button type="button" className="btn-secondary" onClick={() => choose('faceoff')}>Faceoff</button>
+                <button type="button" className="btn-secondary" onClick={() => choose('hit')}>Hit</button>
+                <button type="button" className="btn-secondary" onClick={() => choose('takeaway')}>Takeaway</button>
+                <button type="button" className="btn-secondary" onClick={() => choose('giveaway')}>Giveaway</button>
+                <button type="button" className="btn-secondary" onClick={() => setTap(null)}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {canCapture && faceoffDot && (
+            <HockeyFaceoffControl
+              key={faceoffDot}
+              sport={sport}
+              dotId={faceoffDot}
+              trackedLabel={trackedLabel}
+              recentOpponentLabels={recentLabels}
+              onRecord={recordFaceoff}
+              onCancel={() => setFaceoffDot(null)}
+              onOther={() => {
+                setTap({ ...HOCKEY_FACEOFF_DOTS[faceoffDot], attackingDirection: direction })
+                setFaceoffDot(null)
+              }}
+            />
+          )}
+          {canCapture && (
+            <div className="grid grid-cols-5 gap-2" role="group" aria-label="Quick capture">
+              {(['tracked', 'opponent'] as const).map(side => (
+                <button
+                  key={side}
+                  type="button"
+                  className="btn-secondary flex min-w-0 flex-col items-center px-1 py-1 leading-tight"
+                  onClick={() => setShotDraft({ side, location: null })}
+                  aria-label={`${sideLabel(side)} shot`}
+                >
+                  <span className="w-full truncate text-[11px] font-semibold text-content-muted">{sideLabel(side)}</span>
+                  <span>Shot</span>
+                </button>
+              ))}
+              <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPenaltyOpen(true)}>Penalty</button>
+              <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setGoalieOpen(true)}>Goalie</button>
+              <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPlayDraft({ kind: 'hit', location: null })}>Play</button>
+            </div>
+          )}
+        </section>
 
-      <HockeyRecentEvents
-        rows={hockeyRecentEvents(state, { tracked: trackedLabel, opponent: opponentLabel })}
-        canRestore={canRestoreHockeyCapture(state)}
-        onUndo={() => apply(undoHockeyCapture(state, new Date().toISOString()))}
-        onRestore={() => apply(restoreHockeyCapture(state, new Date().toISOString()))}
-      />
+        <HockeyRecentEvents
+          rows={hockeyRecentEvents(state, { tracked: trackedLabel, opponent: opponentLabel })}
+          canRestore={canRestoreHockeyCapture(state)}
+          onUndo={() => apply(undoHockeyCapture(state, new Date().toISOString()))}
+          onRestore={() => apply(restoreHockeyCapture(state, new Date().toISOString()))}
+        />
+        </>
+      )}
 
       {menuOpen && (
         <GameMenu onClose={() => setMenuOpen(false)}>

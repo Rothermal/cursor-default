@@ -602,34 +602,6 @@ export default function SoccerGameTracker() {
           </div>
         ) : null}
 
-        {state.cloudSync.gameId && (
-          <button
-            type="button"
-            onClick={() => {
-              setRecordersOpen(true)
-              void refreshRecorders()
-            }}
-            className="mx-4 mt-4 flex min-h-12 items-center gap-3 border-y border-line bg-surface px-1 text-left"
-          >
-            <Users size={19} className="shrink-0 text-success-content" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-content">
-                {recordersLoading
-                  ? 'Loading recorder streams...'
-                  : `${recorders.length} ${recorders.length === 1 ? 'recorder' : 'recorders'}`}
-              </span>
-              <span className="block truncate text-xs text-content-muted">
-                {primaryRecorder
-                  ? `Primary: ${primaryRecorder.displayName}`
-                  : 'Primary recorder pending'}
-              </span>
-            </span>
-            {recorders.some(recorder => !recorder.checkpointCurrent) && (
-              <BadgeAlert size={17} className="shrink-0 text-warning-content" />
-            )}
-          </button>
-        )}
-
         {!healthy && mainTab !== 'timeline' && (
           <div className="mx-4 mt-4 rounded-md border border-danger-line bg-danger px-3 py-3">
             <p className="text-sm font-bold text-danger-content">Live controls are locked</p>
@@ -904,6 +876,34 @@ export default function SoccerGameTracker() {
             />
           )}
         </div>
+
+        {state.cloudSync.gameId && (
+          <button
+            type="button"
+            onClick={() => {
+              setRecordersOpen(true)
+              void refreshRecorders()
+            }}
+            className="mx-4 mb-4 flex min-h-12 items-center gap-3 border-y border-line bg-surface px-1 text-left"
+          >
+            <Users size={19} className="shrink-0 text-success-content" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-content">
+                {recordersLoading
+                  ? 'Loading recorder streams...'
+                  : `${recorders.length} ${recorders.length === 1 ? 'recorder' : 'recorders'}`}
+              </span>
+              <span className="block truncate text-xs text-content-muted">
+                {primaryRecorder
+                  ? `Primary: ${primaryRecorder.displayName}`
+                  : 'Primary recorder pending'}
+              </span>
+            </span>
+            {recorders.some(recorder => !recorder.checkpointCurrent) && (
+              <BadgeAlert size={17} className="shrink-0 text-warning-content" />
+            )}
+          </button>
+        )}
       </main>
 
       {actionsOpen && (

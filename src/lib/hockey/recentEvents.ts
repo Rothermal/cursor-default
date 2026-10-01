@@ -46,7 +46,7 @@ export function hockeyRecentEvents(
   if (!sport || !state.eventStream) return []
   const active = activeEvents(state)
   const rows: HockeyRecentEventRow[] = []
-  const units = groupUnits(active)
+  const units = groupHockeyCaptureUnits(active)
   for (let index = units.length - 1; index >= 0 && rows.length < limit; index--) {
     const unit = units[index]
     const first = unit[0]
@@ -68,7 +68,7 @@ export function hockeyRecentEvents(
 export function undoHockeyCapture(state: GameState, now: string): HockeyCommandResult {
   const sport = hockeySportState(state)
   if (!sport || !state.eventStream) return failure(state, 'This is not a Hockey event game.')
-  const units = groupUnits(activeEvents(state))
+  const units = groupHockeyCaptureUnits(activeEvents(state))
   const newest = units[units.length - 1]
   if (!newest || !CAPTURE_TYPES.has(newest[0].eventType)) {
     return failure(state, 'Nothing to undo: the latest event is part of the game flow.')
@@ -170,7 +170,7 @@ function activeEvents(state: GameState): GameEvent[] {
 }
 
 /** Consecutive events sharing a non-null `captureCommandId` form one unit. */
-function groupUnits(events: readonly GameEvent[]): GameEvent[][] {
+export function groupHockeyCaptureUnits(events: readonly GameEvent[]): GameEvent[][] {
   const units: GameEvent[][] = []
   for (const event of events) {
     const commandId = captureCommandId(event)
