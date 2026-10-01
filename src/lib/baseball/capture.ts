@@ -2,6 +2,7 @@ import type { GameState } from '../../types'
 import {
   baseballMovement,
   proposeBaseballMovements,
+  recordBaseballBaserunning,
   recordBaseballPitch,
   recordBaseballPlateAppearance,
   type BaseballCommandContext,
@@ -9,6 +10,7 @@ import {
 } from './commands'
 import type {
   BaseballBase,
+  BaseballBaserunningPlay,
   BaseballInPlay,
   BaseballInPlayResult,
   BaseballMatchProjection,
@@ -51,6 +53,12 @@ export type BaseballPendingCapture =
       battedBall: BaseballBattedBall | null
       finalBalls: number | null
       finalStrikes: number | null
+    }
+  | {
+      /** A running play between pitches (BSB-3C), started from the runner chip that was tapped. */
+      source: 'baserunning'
+      play: BaseballBaserunningPlay
+      runnerId: string
     }
 
 /**
@@ -102,9 +110,14 @@ export function baseballQuickTerminal(result: BaseballQuickPlateAppearanceResult
 }
 
 export function baseballCaptureTerminal(sport: BaseballSportGameState, capture: BaseballPendingCapture): BaseballTerminalKind | null {
-  return capture.source === 'pitch'
-    ? baseballPitchTerminal(sport.projection, sport.setup.rulesSnapshot, capture.result)
-    : baseballQuickTerminal(capture.result)
+  switch (capture.source) {
+    case 'pitch':
+      return baseballPitchTerminal(sport.projection, sport.setup.rulesSnapshot, capture.result)
+    case 'quick':
+      return baseballQuickTerminal(capture.result)
+    case 'baserunning':
+      return null
+  }
 }
 
 /** The batter may run on a dropped third strike when the rules allow it and first is open or there are two outs. */
@@ -119,6 +132,7 @@ export function proposeBaseballCaptureMovements(
   capture: BaseballPendingCapture
 ): BaseballRunnerMovement[] {
   const { projection } = sport
+  if (capture.source === 'baserunning') return proposeBaseballBaserunning(projection, capture.play, capture.runnerId)
   const terminal = baseballCaptureTerminal(sport, capture)
   switch (terminal) {
     case null:
@@ -161,6 +175,7 @@ export function commitBaseballCapture(
       context
     )
   }
+  if (capture.source === 'baserunning') return recordBaseballBaserunning(state, capture.play, movements, context)
   return recordBaseballPlateAppearance(
     state,
     {
@@ -218,6 +233,10 @@ export interface BaseballInPlayDraft {
   location: { x: number; y: number } | null
   fielders: number[]
   errorBy: number | null
+  /** Advanced overrides (BSB-3C) for a runner who scores; absent or null means the engine's rules decide. */
+  earned?: boolean | null
+  rbi?: boolean | null
+  runCounts?: boolean | null
 }
 
 export function emptyBaseballInPlayDraft(): BaseballInPlayDraft {
@@ -258,6 +277,10 @@ export interface BaseballResolutionRow {
   reason: BaseballMovementReason
   fielders: number[]
   errorBy: number | null
+  /** Advanced overrides (BSB-3C) for a runner who scores; absent or null means the engine's rules decide. */
+  earned?: boolean | null
+  rbi?: boolean | null
+  runCounts?: boolean | null
 }
 
 const ORDER: readonly BaseballMovementFrom[] = ['batter', 'first', 'second', 'third']
@@ -347,7 +370,17 @@ export function createBaseballResolutionRows(
   const fromMovement = (runnerId: string, from: BaseballMovementFrom, fallbackReason: BaseballMovementReason) => {
     const movement = movements.find(entry => entry.runnerId === runnerId)
     return movement
-      ? { runnerId, from, to: movement.to, reason: movement.reason, fielders: [...movement.fielders], errorBy: movement.errorBy }
+      ? {
+          runnerId,
+          from,
+          to: movement.to,
+          reason: movement.reason,
+          fielders: [...movement.fielders],
+          errorBy: movement.errorBy,
+          earned: movement.earned,
+          rbi: movement.rbi,
+          runCounts: movement.runCounts,
+        }
       : { runnerId, from, to: 'stay' as const, reason: fallbackReason, fielders: [], errorBy: null }
   }
   for (const base of [...BASES].reverse()) {
@@ -377,6 +410,8 @@ export function setBaseballResolutionDestination(row: BaseballResolutionRow, to:
     to,
     // Only an out keeps a putout sequence; an advance keeps fielders only with an error.
     fielders: to === 'out' || row.errorBy !== null ? row.fielders : [],
+    // Scoring overrides only mean something for a runner who scores.
+    ...(to === 'home' ? {} : { earned: null, rbi: null, runCounts: null }),
   }
 }
 
@@ -410,7 +445,7 @@ export function cycleBaseballResolutionDraftRow(runnerId: string): BaseballResol
   }
 }
 
-export function updateBaseballResolutionDraftRow(runnerId: string, patch: Partial<Pick<BaseballResolutionRow, 'reason' | 'fielders'>>): BaseballResolutionTransition {
+export function updateBaseballResolutionDraftRow(runnerId: string, patch: Partial<Pick<BaseballResolutionRow, 'reason' | 'fielders' | 'errorBy' | 'earned' | 'rbi' | 'runCounts'>>): BaseballResolutionTransition {
   return draft => ({ ...draft, rows: editRow(draft, runnerId, row => ({ ...row, ...patch })) })
 }
 
@@ -462,13 +497,22 @@ export function baseballResolutionIssues(rows: readonly BaseballResolutionRow[])
   return issues
 }
 
-export function baseballResolutionMovements(rows: readonly BaseballResolutionRow[]): BaseballRunnerMovement[] {
+/**
+ * The movements for a resolution. `rbi: false` drops RBI overrides for a capture whose
+ * projection cannot apply them (see `baseballCaptureAllowsRbi`).
+ */
+export function baseballResolutionMovements(
+  rows: readonly BaseballResolutionRow[],
+  options: { rbi?: boolean } = {}
+): BaseballRunnerMovement[] {
+  const allowRbi = options.rbi ?? true
   return rows
     .filter(row => row.to !== 'stay')
     .map(row =>
       baseballMovement(row.runnerId, row.from, row.to as BaseballMovementTo, row.reason, {
         fielders: row.to === 'out' || row.errorBy !== null ? row.fielders : [],
         errorBy: row.errorBy,
+        ...(row.to === 'home' ? { earned: row.earned ?? null, rbi: allowRbi ? row.rbi ?? null : null, runCounts: row.runCounts ?? null } : {}),
       })
     )
 }
@@ -485,3 +529,96 @@ export const BASEBALL_QUICK_RESULT_OPTIONS: ReadonlyArray<{ result: BaseballQuic
   { result: 'catcher_interference', label: "Catcher's interference" },
   { result: 'in_play', label: 'In play' },
 ]
+
+// ---------------------------------------------------------------------------
+// Between-pitch running (BSB-3C)
+
+export const BASEBALL_BASERUNNING_PLAY_OPTIONS: ReadonlyArray<{ play: BaseballBaserunningPlay; label: string }> = [
+  { play: 'stolen_base', label: 'Steal' },
+  { play: 'caught_stealing', label: 'Caught stealing' },
+  { play: 'pickoff', label: 'Pickoff' },
+  { play: 'wild_pitch', label: 'Wild pitch' },
+  { play: 'passed_ball', label: 'Passed ball' },
+  { play: 'balk', label: 'Balk' },
+  { play: 'error', label: 'Error' },
+  { play: 'defensive_indifference', label: 'Defensive indifference' },
+  { play: 'appeal', label: 'Appeal out' },
+  { play: 'other', label: 'Other advance' },
+]
+
+const BASERUNNING_REASON: Record<BaseballBaserunningPlay, BaseballMovementReason> = {
+  stolen_base: 'stolen_base',
+  caught_stealing: 'caught_stealing',
+  pickoff: 'pickoff',
+  wild_pitch: 'wild_pitch',
+  passed_ball: 'passed_ball',
+  balk: 'balk',
+  error: 'error',
+  defensive_indifference: 'defensive_indifference',
+  appeal: 'appeal',
+  other: 'awarded',
+}
+
+/** The runner menu's plays under these rules: no steals without stealing, no balk unless balks are called. */
+export function baseballBaserunningPlayOptions(rules: BaseballMatchRules) {
+  const stealing = new Set<BaseballBaserunningPlay>(['stolen_base', 'caught_stealing', 'defensive_indifference'])
+  return BASEBALL_BASERUNNING_PLAY_OPTIONS.filter(option =>
+    (rules.stealing || !stealing.has(option.play)) && (rules.balks || option.play !== 'balk'))
+}
+
+/** The reason a runner the recorder moves on this play starts with. */
+export function baseballBaserunningReason(play: BaseballBaserunningPlay): BaseballMovementReason {
+  return BASERUNNING_REASON[play]
+}
+
+/**
+ * The preset for a runner play: the tapped runner moves up one base on a steal, error,
+ * indifference or other advance, is out on caught stealing, a pickoff or an appeal, and
+ * every runner moves up one base on a wild pitch, passed ball or balk.
+ */
+export function proposeBaseballBaserunning(
+  projection: BaseballMatchProjection,
+  play: BaseballBaserunningPlay,
+  runnerId: string
+): BaseballRunnerMovement[] {
+  const reason = BASERUNNING_REASON[play]
+  const runners = BASES.flatMap((base, index) => {
+    const runner = projection.bases[base]
+    return runner ? [{ base, next: index === 2 ? ('home' as const) : BASES[index + 1]!, id: runner.runnerId }] : []
+  })
+  switch (play) {
+    case 'wild_pitch':
+    case 'passed_ball':
+    case 'balk':
+      return runners.map(runner => baseballMovement(runner.id, runner.base, runner.next, reason))
+    case 'caught_stealing':
+    case 'pickoff':
+    case 'appeal':
+      return runners.filter(runner => runner.id === runnerId).map(runner => baseballMovement(runner.id, runner.base, 'out', reason))
+    default:
+      return runners.filter(runner => runner.id === runnerId).map(runner => baseballMovement(runner.id, runner.base, runner.next, reason))
+  }
+}
+
+/** Reason choices for a capture: the engine's running reasons between pitches, else by what the pitch does. */
+export function baseballCaptureReasons(sport: BaseballSportGameState, capture: BaseballPendingCapture): readonly BaseballMovementReason[] {
+  if (capture.source === 'baserunning') {
+    return BASEBALL_RUNNING_REASONS.filter(reason => sport.setup.rulesSnapshot.stealing || reason !== 'stolen_base')
+  }
+  return baseballResolutionReasons(baseballCaptureTerminal(sport, capture))
+}
+
+/**
+ * Whether an RBI override can take effect: the projector credits RBIs only on the event
+ * that completes a plate appearance, so runner plays and pitches that continue the plate
+ * appearance never offer one.
+ */
+export function baseballCaptureAllowsRbi(sport: BaseballSportGameState, capture: BaseballPendingCapture): boolean {
+  return baseballCaptureTerminal(sport, capture) !== null
+}
+
+/** The fallback reason for runners the recorder moves beyond a capture's proposal. */
+export function baseballCaptureFallbackReason(sport: BaseballSportGameState, capture: BaseballPendingCapture): BaseballMovementReason {
+  return capture.source === 'baserunning' ? BASERUNNING_REASON[capture.play] : baseballFallbackReason(baseballCaptureTerminal(sport, capture))
+}
+

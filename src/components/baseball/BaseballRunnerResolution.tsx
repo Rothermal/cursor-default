@@ -2,7 +2,6 @@ import {
   BASEBALL_REASON_LABELS,
   baseballResolutionDestinations,
   baseballResolutionIssues,
-  baseballResolutionReasons,
   activateBaseballResolutionRow,
   setBaseballResolutionDraftDestination,
   updateBaseballResolutionDraftRow,
@@ -10,8 +9,8 @@ import {
   type BaseballMovementReason,
   type BaseballResolutionDestination,
   type BaseballResolutionDraft,
+  type BaseballResolutionRow,
   type BaseballResolutionTransition,
-  type BaseballTerminalKind,
 } from '../../lib/baseball'
 import BaseballFielderPicker from './BaseballFielderPicker'
 
@@ -22,9 +21,11 @@ interface BaseballRunnerResolutionProps {
   onChange: (transition: BaseballResolutionTransition) => void
   /** Runner and batter names by id. */
   names: Record<string, string>
-  /** What the capture does to the plate appearance; decides the reason choices. */
-  terminal: BaseballTerminalKind | null
+  /** Reason choices for runner rows (running reasons between pitches, play reasons on a completed plate appearance). */
+  reasons: readonly BaseballMovementReason[]
   fielderCount: number
+  /** Whether RBI overrides take effect; only on the event that completes a plate appearance. */
+  allowRbi: boolean
   /** The engine's message after a rejected Confirm; the choices stay in place. */
   error: string | null
   onCancel: () => void
@@ -41,6 +42,80 @@ const TO_LABELS: Record<BaseballResolutionDestination, string> = {
   out: 'Out',
 }
 
+type Override = boolean | null | undefined
+
+const OVERRIDE_VALUE = (value: Override) => (value === true ? 'yes' : value === false ? 'no' : 'rules')
+const OVERRIDE_FROM = (value: string): boolean | null => (value === 'yes' ? true : value === 'no' ? false : null)
+
+/**
+ * Per-row overrides (BSB-3C), collapsed by default: the erring fielder on an advance, and
+ * for a runner who scores, earned, RBI (only when it can take effect) and whether the run
+ * counts. "By the rules" leaves the engine's documented rules in charge.
+ */
+function Advanced({
+  row,
+  fielderCount,
+  allowRbi,
+  onChange,
+}: {
+  row: BaseballResolutionRow
+  fielderCount: number
+  allowRbi: boolean
+  onChange: (transition: BaseballResolutionTransition) => void
+}) {
+  const overridden = row.errorBy !== null || [row.earned, allowRbi ? row.rbi : null, row.runCounts].some(value => value !== null && value !== undefined)
+  const set = (patch: Parameters<typeof updateBaseballResolutionDraftRow>[1]) => onChange(updateBaseballResolutionDraftRow(row.runnerId, patch))
+  return (
+    <details className="rounded-md border border-line px-2 py-1 text-sm" open={overridden || undefined}>
+      <summary className="flex min-h-9 cursor-pointer items-center font-semibold text-content-muted">
+        Advanced{overridden ? ' (changed)' : ''}
+      </summary>
+      <div className="space-y-2 pb-1 pt-1">
+        {row.to !== 'out' && (
+          <OverrideSelect
+            label="Error by"
+            value={row.errorBy === null ? '' : String(row.errorBy)}
+            options={[['', 'No error'], ...Array.from({ length: fielderCount }, (_, index) => [String(index + 1), `Fielder ${index + 1}`] as [string, string])]}
+            onChange={value => set({ errorBy: value === '' ? null : Number(value) })}
+          />
+        )}
+        {row.to === 'home' && (
+          <>
+            <OverrideSelect label="Earned run" value={OVERRIDE_VALUE(row.earned)} options={TRI_STATE} onChange={value => set({ earned: OVERRIDE_FROM(value) })} />
+            {allowRbi && <OverrideSelect label="RBI" value={OVERRIDE_VALUE(row.rbi)} options={TRI_STATE} onChange={value => set({ rbi: OVERRIDE_FROM(value) })} />}
+            <OverrideSelect label="Run counts" value={OVERRIDE_VALUE(row.runCounts)} options={TRI_STATE} onChange={value => set({ runCounts: OVERRIDE_FROM(value) })} />
+          </>
+        )}
+      </div>
+    </details>
+  )
+}
+
+const TRI_STATE: Array<[string, string]> = [['rules', 'By the rules'], ['yes', 'Yes'], ['no', 'No']]
+
+function OverrideSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: Array<[string, string]>
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="flex items-center gap-2 text-content-muted">
+      <span className="w-24 shrink-0">{label}</span>
+      <select className="input-field min-h-11 flex-1 px-2 py-2 text-sm" value={value} onChange={event => onChange(event.target.value)}>
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 /**
  * Runner resolution (BSB-3B, shared with BSB-3C): one row per runner and the batter, each
  * with a destination, a reason and, for an out, the fielder sequence.
@@ -50,15 +125,15 @@ export default function BaseballRunnerResolution({
   draft,
   onChange,
   names,
-  terminal,
+  reasons,
   fielderCount,
+  allowRbi,
   error,
   onCancel,
   onConfirm,
 }: BaseballRunnerResolutionProps) {
   const { rows, activeRunnerId } = draft
   const issues = baseballResolutionIssues(rows)
-  const reasons = baseballResolutionReasons(terminal)
 
   return (
     <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Runners">
@@ -129,6 +204,10 @@ export default function BaseballRunnerResolution({
                     <span className="font-semibold tabular-nums text-content">{row.fielders.length ? row.fielders.join('-') : 'Add'}</span>
                   </button>
                 )
+              )}
+
+              {row.to !== 'stay' && (
+                <Advanced row={row} fielderCount={fielderCount} allowRbi={allowRbi} onChange={onChange} />
               )}
 
               {issues[row.runnerId] && (

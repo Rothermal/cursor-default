@@ -578,7 +578,9 @@ export function hockeyActorSide(event: GameEvent, actor: GameEventActor): Hockey
 }
 
 export function hockeyParticipantLabel(participant: HockeyMatchParticipant): string {
-  return participant.number ? `#${participant.number} ${participant.displayName}` : participant.displayName
+  // Setup names a number-only player "#7", which must not read "#7 #7".
+  if (!participant.number || participant.displayName === `#${participant.number}`) return participant.displayName
+  return `#${participant.number} ${participant.displayName}`
 }
 
 export function hockeyOpponentGoalieLabel(goalie: HockeyOpponentGoalie): string {
