@@ -44,7 +44,6 @@ import HockeyGameSetup from './pages/HockeyGameSetup'
 import HockeyGameTracker from './pages/HockeyGameTracker'
 import BaseballEventSetup from './pages/BaseballEventSetup'
 import BaseballGameTracker from './pages/BaseballGameTracker'
-import { isBaseballEventPreviewAvailable } from './lib/sportAvailability'
 const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/AppearancePreview')) : null
 
 function GameSetupRoute() {
@@ -54,11 +53,8 @@ function GameSetupRoute() {
   if (requestedSport === 'soccer') return <SoccerGameSetup />
   // HockeyGameSetup applies the hockeyEvent creation policy and shows the notice when off.
   if (requestedSport === 'hockey' && searchParams.get('events') === '1') return <HockeyGameSetup />
-  if (
-    requestedSport === 'baseball' &&
-    searchParams.get('events') === '1' &&
-    isBaseballEventPreviewAvailable()
-  ) return <BaseballEventSetup />
+  // BaseballEventSetup applies the baseballEvent creation policy and shows the notice when off.
+  if (requestedSport === 'baseball' && searchParams.get('events') === '1') return <BaseballEventSetup />
   if (requestedSport) return <GameSetup />
   if (searchParams.has('teamId') && state.sport?.id !== 'soccer') return <GameSetup />
   if (state.sport?.id !== 'soccer') return <GameSetup />

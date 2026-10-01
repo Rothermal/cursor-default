@@ -16,7 +16,11 @@ import {
   sportTeamsPath,
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
-import { getHockeyEventCreationPolicy, getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import {
+  getBaseballEventCreationPolicy,
+  getHockeyEventCreationPolicy,
+  getSportAvailabilityPolicy,
+} from '../lib/sportAvailability'
 import { gameSideDisplayName } from '../lib/display'
 import {
   basketballSetupAccountScope,
@@ -53,7 +57,7 @@ export default function SportDashboard() {
   const { sportId } = useParams()
   const navigate = useNavigate()
   const { isConfigured, user } = useAuth()
-  const { isSportEnabled, hockeyEventTrackerEnabled } = useSettings()
+  const { isSportEnabled, hockeyEventTrackerEnabled, baseballEventTrackerEnabled } = useSettings()
   const {
     state,
     activeLocalGameId,
@@ -146,6 +150,15 @@ export default function SportDashboard() {
       getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame
     ) {
       navigate('/setup?sport=hockey&events=1')
+      return
+    }
+    // BSB-3D: the same for Baseball, whose diamond tracker replaces the stat grid on this device.
+    if (
+      sport.id === 'baseball' &&
+      baseballEventTrackerEnabled &&
+      getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame
+    ) {
+      navigate('/setup?sport=baseball&events=1')
       return
     }
     if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
