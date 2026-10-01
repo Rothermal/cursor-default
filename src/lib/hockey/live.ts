@@ -54,6 +54,11 @@ export interface HockeyCommandContext {
   replaceEventIds?: readonly string[]
   /** When a correction is saved; the update time of revised events. */
   correctedAt?: string
+  /**
+   * Correction mode only: amends the whole candidate history before it is checked, for
+   * dependent repairs saved in the same batch (goalie restamping).
+   */
+  amendCorrection?: (candidate: GameEvent[]) => { events: GameEvent[]; mutations: GameEventMutation[] }
 }
 
 export type HockeyPendingEvent = {
@@ -564,7 +569,12 @@ function runHockeyCorrection(
     const check = gameEventRegistry.inspect(event)
     if (!check.ok) return failure(state, 'rejected', check.diagnostic.message)
   }
-  const candidate = [...ordered.slice(0, first), ...revised, ...ordered.slice(first + unit.length)]
+  let candidate: GameEvent[] = [...ordered.slice(0, first), ...revised, ...ordered.slice(first + unit.length)]
+  if (context.amendCorrection) {
+    const amended = context.amendCorrection(candidate)
+    candidate = amended.events
+    mutations.push(...amended.mutations)
+  }
   const replay = replayHockeyEvents(sport.setup, candidate)
   if (replay.diagnostics.length > 0) return failure(state, 'rejected', replay.diagnostics[0].message)
   const result = applyGameEventMutations(state, mutations, now, gameEventRegistry, gameEventProjectors)

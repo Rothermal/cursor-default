@@ -329,7 +329,11 @@ owner wants it tracked.
   from its events, `correctHockeyEvents` applies an edit, `removeHockeyEvents` and
   `restoreHockeyEvents` work on whole capture units with their dependents (a penalty's
   releases, a shootout start's attempts; restoring a penalty offers its releases), and
-  `updateHockeyGoalieStamps` restamps shots to the goalie in net (or empty net).
+  `updateGoalies: true` on an edit, remove or restore restamps later shots to the goalie in net
+  (or an empty net) in the same checked batch and returns them as `goalieRepairs`; a shot
+  whose opponent goalie the change removes can only be saved that way, and a mismatch the
+  recorder chose before stays. `hockeyGoalieChangeCorrection` keeps an introduced opponent
+  goalie only while it is still the goalie going in.
   `hockeyCorrectionConsequences` diffs the before and after states: score, result once
   ended, new strength mismatches, new goalie mismatches, players removed or returned, and a
   sudden-death decision appearing or disappearing. `hockeyCorrectionScene` gives edit
@@ -340,7 +344,7 @@ owner wants it tracked.
   rows); the shot dialog adds Goalie faced. `HockeyLocationField` moves or clears a
   location. `HockeyTimelineEditor` adds small editors for goalie changes, faceoffs, score
   adjustments and shootout rows, and a preview sheet with "Update the goalie on these
-  shots" (on by default, §7 Q4) and "Also restore" for releases. The Timeline detail sheet
+  shots" (on by default, locked on when the change needs it, §7 Q4) and "Also restore" for releases. The Timeline detail sheet
   shows Edit and Remove, or Restore for a removed row; game flow and clock rows stay
   read-only, and suspended or abandoned games point to Reopen.
 - No event type, schema, fingerprint or migration change.

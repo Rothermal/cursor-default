@@ -24,7 +24,7 @@ import {
   type RecordHockeyShootoutAttemptInput,
   type RecordHockeyShotInput,
 } from './captureCommands'
-import { hockeySportState, withHockeyUndoReceipt, type HockeyCommandResult } from './live'
+import { hockeySportState, withHockeyUndoReceipt, type HockeyCommandContext, type HockeyCommandResult } from './live'
 import { hockeyOnIceLimits, type HockeyOnIceLimits } from './penalties'
 import { hockeyActivePeriod, replayHockeyEvents } from './projector'
 import type { HockeyFaceoffDotId } from './rinkGeometry'
@@ -79,7 +79,20 @@ export interface HockeyCorrectionOptions {
   recorderUserId: string | null
   /** When the correction is saved. */
   now: string
+  /** Restamp later shots to the goalie in net in the same batch (§7 Q4). Default false. */
+  updateGoalies?: boolean
 }
+
+/** A shot whose stamped goalie a correction moves to the goalie actually in net. */
+export interface HockeyGoalieRepair {
+  eventId: string
+  recordedParticipantId: string | null
+  /** The goalie in net, or null for an empty net. */
+  resolvedParticipantId: string | null
+}
+
+/** A correction candidate and the shots restamped with it (empty unless asked for). */
+export type HockeyCorrectionResult = HockeyCommandResult & { goalieRepairs: HockeyGoalieRepair[] }
 
 /**
  * The editable values of a Timeline row, in the input of the command that recorded it, or
@@ -198,21 +211,62 @@ export function hockeyCorrectionInput(events: readonly GameEvent[]): HockeyCorre
   }
 }
 
+type HockeyGoalieChangeEdit = Extract<HockeyCorrectionInput, { kind: 'goalie_change' }>['input']
+
+/**
+ * The goalie-change correction for the editor's choices. A goalie this change introduced keeps
+ * its edited label and number only while it is still the goalie going in; choosing another
+ * goalie or an empty net drops it.
+ */
+export function hockeyGoalieChangeCorrection(
+  initial: HockeyGoalieChangeEdit,
+  choice: { inParticipantId: string | null; reason: HockeyGoalieChangeReason; label: string; number: string }
+): HockeyCorrectionInput {
+  const added = initial.newOpponentGoalie
+  const keepsAdded = added !== null && choice.inParticipantId === added.id
+  return {
+    kind: 'goalie_change',
+    input: {
+      side: initial.side,
+      inParticipantId: choice.inParticipantId,
+      reason: choice.inParticipantId === null ? 'pulled' : choice.reason,
+      newOpponentGoalie: keepsAdded ? { id: added.id, label: choice.label.trim() || null, number: choice.number.trim() || null } : null,
+    },
+  }
+}
+
 /** Rebuilds one capture unit with new values; the result is a candidate to preview and save. */
 export function correctHockeyEvents(
   state: GameState,
   eventIds: readonly string[],
   correction: HockeyCorrectionInput,
   options: HockeyCorrectionOptions
-): HockeyCommandResult {
+): HockeyCorrectionResult {
+  const sport = hockeySportState(state)
   const first = activeEvent(state, eventIds[0])
-  if (!first) return rejected(state, 'That event is no longer active.')
-  const context = {
+  if (!sport || !first) return { ...rejected(state, 'That event is no longer active.'), goalieRepairs: [] }
+  let goalieRepairs: HockeyGoalieRepair[] = []
+  const baseline = options.updateGoalies ? goalieMismatches(sport, activeEvents(state)) : null
+  const context: HockeyCommandContext = {
     recorderUserId: options.recorderUserId,
     occurredAt: first.occurredAt,
     replaceEventIds: eventIds,
     correctedAt: options.now,
+    ...(baseline
+      ? {
+          amendCorrection: (candidate: GameEvent[]) => {
+            const repaired = repairGoalieStamps(sport, candidate, baseline, new Set(eventIds))
+            goalieRepairs = repaired.repairs
+            return repaired
+          },
+        }
+      : {}),
   }
+  const result = buildCorrection(state, correction, context)
+  return { ...result, goalieRepairs: result.ok ? goalieRepairs : [] }
+}
+
+function buildCorrection(state: GameState, correction: HockeyCorrectionInput, context: HockeyCommandContext): HockeyCommandResult {
   switch (correction.kind) {
     case 'shot':
       return recordHockeyShot(state, correction.input, context)
@@ -326,38 +380,43 @@ export function hockeyRestoreDependents(
 }
 
 /** Removes a whole capture unit and its dependents in one checked batch. */
-export function removeHockeyEvents(state: GameState, eventIds: readonly string[], now: string): HockeyCommandResult {
+export function removeHockeyEvents(
+  state: GameState,
+  eventIds: readonly string[],
+  now: string,
+  options: { updateGoalies?: boolean } = {}
+): HockeyCorrectionResult {
   const sport = hockeySportState(state)
-  if (!sport || !state.eventStream) return rejected(state, 'This is not a Hockey event game.')
+  if (!sport || !state.eventStream) return refused(state, 'This is not a Hockey event game.')
   const unit = eventIds.map(id => activeEvent(state, id))
-  if (unit.length === 0 || unit.some(event => !event)) return rejected(state, 'That event is no longer active.')
-  if (!canRemoveHockeyEvents(unit as GameEvent[])) return rejected(state, 'Game flow and clock rows cannot be removed.')
+  if (unit.length === 0 || unit.some(event => !event)) return refused(state, 'That event is no longer active.')
+  if (!canRemoveHockeyEvents(unit as GameEvent[])) return refused(state, 'Game flow and clock rows cannot be removed.')
   const statusMessage = correctableStatus(sport, state)
-  if (statusMessage) return rejected(state, statusMessage)
+  if (statusMessage) return refused(state, statusMessage)
   const targets = [...(unit as GameEvent[]), ...hockeyRemovalDependents(state, eventIds)]
-  return applyChecked(state, sport, targets.map(event => ({ type: 'delete', eventId: event.id })), now)
+  return applyChecked(state, sport, targets.map(event => ({ type: 'delete', eventId: event.id })), now, options.updateGoalies === true)
 }
 
 /** Restores a removed unit, its shootout attempts, and its early releases when asked. */
 export function restoreHockeyEvents(
   state: GameState,
   eventIds: readonly string[],
-  options: { withReleases: boolean },
+  options: { withReleases: boolean; updateGoalies?: boolean },
   now: string
-): HockeyCommandResult {
+): HockeyCorrectionResult {
   const sport = hockeySportState(state)
-  if (!sport || !state.eventStream) return rejected(state, 'This is not a Hockey event game.')
+  if (!sport || !state.eventStream) return refused(state, 'This is not a Hockey event game.')
   const events = streamEvents(state)
   const unit = eventIds.map(id => events.find(event => event.id === id))
   if (unit.length === 0 || unit.some(event => !event || event.deletedAt === null)) {
-    return rejected(state, 'That event is not removed.')
+    return refused(state, 'That event is not removed.')
   }
-  if (!canRemoveHockeyEvents(unit as GameEvent[])) return rejected(state, 'Game flow and clock rows cannot be restored.')
+  if (!canRemoveHockeyEvents(unit as GameEvent[])) return refused(state, 'Game flow and clock rows cannot be restored.')
   const statusMessage = correctableStatus(sport, state)
-  if (statusMessage) return rejected(state, statusMessage)
+  if (statusMessage) return refused(state, statusMessage)
   const dependents = hockeyRestoreDependents(state, eventIds)
   const targets = [...(unit as GameEvent[]), ...dependents.attempts, ...(options.withReleases ? dependents.releases : [])]
-  return applyChecked(state, sport, targets.map(event => ({ type: 'restore', eventId: event.id })), now)
+  return applyChecked(state, sport, targets.map(event => ({ type: 'restore', eventId: event.id })), now, options.updateGoalies === true)
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +447,7 @@ export function updateHockeyGoalieStamps(state: GameState, eventIds: readonly st
     })
   }
   if (mutations.length === 0) return rejected(state, 'No shot needs a new goalie.')
-  return applyChecked(state, sport, mutations, now)
+  return applyChecked(state, sport, mutations, now, false)
 }
 
 // ---------------------------------------------------------------------------
@@ -519,23 +578,86 @@ function applyChecked(
   state: GameState,
   sport: HockeySportGameState,
   mutations: GameEventMutation[],
-  now: string
-): HockeyCommandResult {
+  now: string,
+  updateGoalies: boolean
+): HockeyCorrectionResult {
   const byId = new Map(mutations.map(mutation => [mutation.eventId, mutation]))
-  const candidate = streamEvents(state).flatMap(event => {
+  let candidate = streamEvents(state).flatMap(event => {
     const mutation = byId.get(event.id)
     if (!mutation) return event.deletedAt === null ? [event] : []
     if (mutation.type === 'delete') return []
     if (mutation.type === 'restore') return [{ ...event, deletedAt: null }]
     return [{ ...event, ...mutation.changes } as GameEvent]
   })
+  let batch = mutations
+  let goalieRepairs: HockeyGoalieRepair[] = []
+  if (updateGoalies) {
+    // The repair is staged with the change, so only the final candidate is ever checked or saved.
+    const repaired = repairGoalieStamps(sport, candidate, goalieMismatches(sport, activeEvents(state)), new Set(byId.keys()))
+    candidate = repaired.events
+    batch = [...mutations, ...repaired.mutations]
+    goalieRepairs = repaired.repairs
+  }
   const replay = replayHockeyEvents(sport.setup, candidate)
-  if (replay.diagnostics.length > 0) return rejected(state, replay.diagnostics[0].message)
-  const result = applyGameEventMutations(state, mutations, now, gameEventRegistry, gameEventProjectors)
-  if (!result.ok) return rejected(state, result.error.message)
-  if (!result.inspection.complete) return rejected(state, 'The change would leave an incomplete Hockey history.')
+  if (replay.diagnostics.length > 0) return refused(state, replay.diagnostics[0].message)
+  const result = applyGameEventMutations(state, batch, now, gameEventRegistry, gameEventProjectors)
+  if (!result.ok) return refused(state, result.error.message)
+  if (!result.inspection.complete) return refused(state, 'The change would leave an incomplete Hockey history.')
   // A correction ends the chance to restore the last undone capture (the Basketball rule).
-  return { ok: true, state: withHockeyUndoReceipt(result.state, null), events: [] }
+  return { ok: true, state: withHockeyUndoReceipt(result.state, null), events: [], goalieRepairs }
+}
+
+/** The goalie a shot is stamped against (null: none, an empty net) and the defending side. */
+function shotGoalie(event: GameEvent): { defending: HockeySide; stamped: string | null } | null {
+  if (event.eventType !== 'hockey.shot') return null
+  if (event.teamSide !== 'tracked' && event.teamSide !== 'opponent') return null
+  const defending: HockeySide = event.teamSide === 'tracked' ? 'opponent' : 'tracked'
+  return { defending, stamped: event.actors.find(actor => actor.role === 'goalie')?.participantId ?? null }
+}
+
+/** Shots already stamped against a goalie who was not in net; the recorder chose those. */
+function goalieMismatches(sport: HockeySportGameState, events: readonly GameEvent[]): Set<string> {
+  const mismatched = new Set<string>()
+  replayHockeyEvents(sport.setup, events, (event, projection) => {
+    const shot = shotGoalie(event)
+    if (shot && shot.stamped !== projection.goalieInNet[shot.defending]) mismatched.add(event.id)
+  })
+  return mismatched
+}
+
+/**
+ * Walks a candidate history and restamps each shot the change leaves against a goalie who was
+ * not in net. A mismatch the recorder chose before stays, unless its opponent goalie no longer
+ * exists, and the corrected unit itself is never restamped.
+ */
+function repairGoalieStamps(
+  sport: HockeySportGameState,
+  candidate: readonly GameEvent[],
+  baseline: ReadonlySet<string>,
+  exclude: ReadonlySet<string>
+): { events: GameEvent[]; mutations: GameEventMutation[]; repairs: HockeyGoalieRepair[] } {
+  // Copies, so a restamp is replayed in place without touching the stored events.
+  const events = candidate.map(event => ({ ...event }))
+  const mutations: GameEventMutation[] = []
+  const repairs: HockeyGoalieRepair[] = []
+  replayHockeyEvents(sport.setup, events, (event, projection) => {
+    const shot = shotGoalie(event)
+    if (!shot || exclude.has(event.id)) return
+    const inNet = projection.goalieInNet[shot.defending]
+    if (shot.stamped === inNet) return
+    const unknown = shot.defending === 'opponent' && shot.stamped !== null &&
+      !projection.opponentGoalies.some(goalie => goalie.id === shot.stamped)
+    if (baseline.has(event.id) && !unknown) return
+    const actors: GameEventActor[] = event.actors.filter(actor => actor.role !== 'goalie')
+    if (inNet !== null) actors.push(hockeyGoalieActor(sport.setup, projection, shot.defending, inNet))
+    const payload = { ...event.payload, emptyNet: inNet === null }
+    const copy = event as { actors: GameEventActor[]; payload: GameEvent['payload'] }
+    copy.actors = actors
+    copy.payload = payload
+    mutations.push({ type: 'update', eventId: event.id, changes: { actors, payload } })
+    repairs.push({ eventId: event.id, recordedParticipantId: shot.stamped, resolvedParticipantId: inNet })
+  })
+  return { events, mutations, repairs }
 }
 
 function streamEvents(state: GameState): GameEvent[] {
@@ -565,4 +687,8 @@ function point(event: GameEvent): { x: number; y: number } | null {
 
 function rejected(state: GameState, message: string): HockeyCommandResult {
   return { ok: false, state, code: 'rejected', message }
+}
+
+function refused(state: GameState, message: string): HockeyCorrectionResult {
+  return { ...rejected(state, message), goalieRepairs: [] }
 }

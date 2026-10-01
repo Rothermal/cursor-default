@@ -4,6 +4,7 @@ import type { GameState } from '../../types'
 import {
   correctHockeyEvents,
   formatHockeyFinalScore,
+  hockeyGoalieChangeCorrection,
   hasHockeyCorrectionConsequences,
   hockeyAvailableParticipants,
   hockeyCorrectionConsequences,
@@ -19,9 +20,9 @@ import {
   hockeyTimeline,
   removeHockeyEvents,
   restoreHockeyEvents,
-  updateHockeyGoalieStamps,
   type HockeyActorChoice,
-  type HockeyCommandResult,
+  type HockeyCorrectionResult,
+  type HockeyGoalieRepair,
   type HockeyCorrectionConsequences,
   type HockeyCorrectionInput,
   type HockeyCorrectionScene,
@@ -50,18 +51,50 @@ interface HockeyTimelineEditorProps {
   onClose: () => void
 }
 
+/**
+ * A change built twice: with the later shots restamped to the goalie in net, and without.
+ * Each is a whole checked candidate; nothing in between is ever saved.
+ */
+interface Staged {
+  repaired: HockeyCorrectionResult
+  plain: HockeyCorrectionResult
+  consequences: HockeyCorrectionConsequences
+  repairs: HockeyGoalieRepair[]
+  /** The change only replays with the restamp (a shot names a goalie it takes out of the game). */
+  repairRequired: boolean
+  /** Set when the change itself is refused. */
+  error?: string
+}
+
 interface Pending {
   title: string
-  next: GameState
-  consequences: HockeyCorrectionConsequences
+  staged: Staged
   /** Other rows that change with this one (dependents), as labels. */
   alsoChanges: string[]
   /** Restore only: removed early releases that can come back too. */
   releases: string[]
   withReleases: boolean
   updateGoalies: boolean
-  /** Set when the remove or restore itself is refused. */
-  error?: string
+}
+
+function stage(before: GameState, run: (updateGoalies: boolean) => HockeyCorrectionResult): Staged {
+  const repaired = run(true)
+  const plain = run(false)
+  const usable = repaired.ok ? repaired : plain
+  return {
+    repaired,
+    plain,
+    consequences: hockeyCorrectionConsequences(before, usable.state),
+    repairs: repaired.ok ? repaired.goalieRepairs : [],
+    repairRequired: repaired.ok && !plain.ok,
+    ...(usable.ok ? {} : { error: repaired.ok ? undefined : repaired.message }),
+  }
+}
+
+function stagedNext(pending: Pending): GameState | null {
+  const { repaired, plain, repairRequired } = pending.staged
+  const chosen = pending.updateGoalies || repairRequired ? repaired : plain
+  return chosen.ok ? chosen.state : null
 }
 
 /**
@@ -88,29 +121,22 @@ export default function HockeyTimelineEditor({
 
   const labelOf = (eventId: string) => timeline.rows.find(entry => entry.events.some(event => event.id === eventId))?.label ?? 'An event'
 
-  const review = (title: string, result: HockeyCommandResult): string | null => {
-    if (!result.ok) return result.message
-    const consequences = hockeyCorrectionConsequences(state, result.state)
-    if (!hasHockeyCorrectionConsequences(consequences)) {
-      onApply(result.state)
+  const edit = (correction: HockeyCorrectionInput): string | null => {
+    const now = new Date().toISOString()
+    const staged = stage(state, updateGoalies => correctHockeyEvents(state, ids, correction, { recorderUserId, now, updateGoalies }))
+    if (staged.error) return staged.error
+    if (!hasHockeyCorrectionConsequences(staged.consequences) && staged.repairs.length === 0) {
+      onApply((staged.plain.ok ? staged.plain : staged.repaired).state)
       return null
     }
-    setPending({ title, next: result.state, consequences, alsoChanges: [], releases: [], withReleases: false, updateGoalies: true })
+    setPending({ title: 'Save this change?', staged, alsoChanges: [], releases: [], withReleases: false, updateGoalies: true })
     return null
   }
 
-  const edit = (correction: HockeyCorrectionInput) =>
-    review('Save this change?', correctHockeyEvents(state, ids, correction, { recorderUserId, now: new Date().toISOString() }))
-
   const save = () => {
     if (!pending) return
-    const now = new Date().toISOString()
-    let next = pending.next
-    if (pending.updateGoalies && pending.consequences.goalies.length > 0) {
-      const result = updateHockeyGoalieStamps(next, pending.consequences.goalies.map(entry => entry.eventId), now)
-      if (!result.ok) return setError(result.message)
-      next = result.state
-    }
+    const next = stagedNext(pending)
+    if (!next) return setError('This change cannot be saved without updating those shots.')
     onApply(next)
   }
 
@@ -126,13 +152,12 @@ export default function HockeyTimelineEditor({
           if (!current) return current
           if (action !== 'restore' || change.withReleases === undefined) return { ...current, ...change }
           // Early releases change the box, so the preview is rebuilt with or without them.
-          const result = restoreHockeyEvents(state, ids, { withReleases: change.withReleases }, new Date().toISOString())
+          const withReleases = change.withReleases
+          const now = new Date().toISOString()
           return {
             ...current,
             ...change,
-            next: result.state,
-            consequences: hockeyCorrectionConsequences(state, result.state),
-            error: result.ok ? undefined : result.message,
+            staged: stage(state, updateGoalies => restoreHockeyEvents(state, ids, { withReleases, updateGoalies }, now)),
           }
         })}
         onSave={save}
@@ -216,30 +241,25 @@ function confirmation(
   const timeline = hockeyTimeline(state, labels)
   const labelOf = (eventId: string) => timeline.rows.find(entry => entry.events.some(event => event.id === eventId))?.label ?? 'An event'
   if (action === 'remove') {
-    const result = removeHockeyEvents(state, ids, now)
+    const staged = stage(state, updateGoalies => removeHockeyEvents(state, ids, now, { updateGoalies }))
     return {
       title: `Remove ${row.label}?`,
-      next: result.state,
-      consequences: hockeyCorrectionConsequences(state, result.state),
-      alsoChanges: result.ok ? unique(hockeyRemovalDependents(state, ids).map(event => labelOf(event.id))) : [],
+      staged,
+      alsoChanges: staged.error ? [] : unique(hockeyRemovalDependents(state, ids).map(event => labelOf(event.id))),
       releases: [],
       withReleases: false,
       updateGoalies: true,
-      ...(result.ok ? {} : { error: result.message }),
     }
   }
   const dependents = hockeyRestoreDependents(state, ids)
   const withReleases = dependents.releases.length > 0
-  const result = restoreHockeyEvents(state, ids, { withReleases }, now)
   return {
     title: `Restore ${row.label}?`,
-    next: result.state,
-    consequences: hockeyCorrectionConsequences(state, result.state),
+    staged: stage(state, updateGoalies => restoreHockeyEvents(state, ids, { withReleases, updateGoalies }, now)),
     alsoChanges: unique(dependents.attempts.map(event => labelOf(event.id))),
     releases: unique(dependents.releases.map(event => labelOf(event.id))),
     withReleases,
     updateGoalies: true,
-    ...(result.ok ? {} : { error: result.message }),
   }
 }
 
@@ -262,8 +282,8 @@ function HockeyCorrectionPreview({
   onSave: () => void
   onClose: () => void
 }) {
-  const { consequences } = pending
-  const blocked = pending.error ?? null
+  const { consequences, repairs, repairRequired } = pending.staged
+  const blocked = pending.staged.error ?? null
   const name = (id: string | null) => (id === null ? 'an empty net' : names[id] ?? 'Unknown player')
   const strengthName = { ev: 'even strength', pp: 'power play', sh: 'short-handed' } as const
   const items: ReactNode[] = []
@@ -311,21 +331,30 @@ function HockeyCorrectionPreview({
               {items.map((item, index) => <li key={index}>{item}</li>)}
             </ul>
           )}
-          {consequences.goalies.length > 0 && (
+          {repairs.length > 0 && (
             <div className="space-y-1 rounded-md border border-line p-3 text-sm">
               <p className="font-semibold text-content">Shots now recorded against a goalie who was not in net</p>
               <ul className="list-disc space-y-0.5 pl-5 text-content-muted">
-                {consequences.goalies.map(entry => (
-                  <li key={entry.eventId}>{labelOf(entry.eventId)}: {name(entry.recordedParticipantId)}, in net {name(entry.resolvedParticipantId)}</li>
+                {repairs.map(entry => (
+                  <li key={entry.eventId}>{labelOf(entry.eventId)}: {name(entry.recordedParticipantId)}, {entry.resolvedParticipantId === null ? 'net empty' : `in net ${name(entry.resolvedParticipantId)}`}</li>
                 ))}
               </ul>
               <label className="flex items-start gap-2 pt-1 text-content">
-                <input type="checkbox" className="mt-1" checked={pending.updateGoalies} onChange={event => onChange({ updateGoalies: event.target.checked })} />
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={pending.updateGoalies || repairRequired}
+                  disabled={repairRequired}
+                  onChange={event => onChange({ updateGoalies: event.target.checked })}
+                />
                 <span>Update the goalie on these shots</span>
               </label>
+              {repairRequired && (
+                <p className="text-xs text-content-muted">Needed: these shots name a goalie this change takes out of the game.</p>
+              )}
             </div>
           )}
-          {items.length === 0 && consequences.goalies.length === 0 && pending.alsoChanges.length === 0 && pending.releases.length === 0 && (
+          {items.length === 0 && repairs.length === 0 && pending.alsoChanges.length === 0 && pending.releases.length === 0 && (
             <p className="text-sm text-content-muted">Nothing else changes.</p>
           )}
         </>
@@ -440,15 +469,12 @@ function GoalieEdit({
         ...projection.opponentGoalies.map(goalie => ({ id: goalie.id, label: hockeyOpponentGoalieLabel(goalie) })),
         ...(added ? [{ id: added.id, label: 'The goalie added here' }] : []),
       ]
-  const submit = () => onSubmit({
-    kind: 'goalie_change',
-    input: {
-      side: initial.side,
-      inParticipantId: inNet || null,
-      reason: inNet ? reason : 'pulled',
-      newOpponentGoalie: added ? { id: added.id, label: newLabel.trim() || null, number: newNumber.trim() || null } : null,
-    },
-  })
+  const submit = () => onSubmit(hockeyGoalieChangeCorrection(initial, {
+    inParticipantId: inNet || null,
+    reason: reason === 'pulled' ? 'tactical' : reason,
+    label: newLabel,
+    number: newNumber,
+  }))
   return (
     <EditSheet title={`Edit ${labels[initial.side]} goalie change`} onClose={onClose}>
       <label className="block text-sm font-semibold text-content">
@@ -463,7 +489,7 @@ function GoalieEdit({
           <Choices options={GOALIE_REASONS.filter(entry => entry.value !== 'pulled')} value={reason === 'pulled' ? 'tactical' : reason} onChange={setReason} columns={2} />
         </Group>
       )}
-      {added && (
+      {added && inNet === added.id && (
         <fieldset className="rounded-md border border-line p-3">
           <legend className="px-1 text-xs font-bold uppercase text-content-muted">Goalie added here</legend>
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2">

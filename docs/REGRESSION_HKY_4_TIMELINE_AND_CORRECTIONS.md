@@ -35,7 +35,7 @@ Screenshots: `/mnt/project-files/hockey/hky4a-timeline-filters-phone.png`,
 
 ## HKY-4B Edit, remove and restore
 
-Automated (`src/lib/hockey/corrections.test.ts`, 14 cases):
+Automated (`src/lib/hockey/corrections.test.ts`, 17 cases):
 
 | Case | Result |
 |---|---|
@@ -52,9 +52,12 @@ Automated (`src/lib/hockey/corrections.test.ts`, 14 cases):
 | Ended game: side swap re-settles the result | Pass |
 | Sudden death decided and undecided; refused when a later event exists | Pass |
 | Suspended games are refused | Pass |
+| Removing a goalie change with "Update the goalie" restamps its shots in the same batch (review fix) | Pass |
+| Removing an introduced opponent goalie: refused without the restamp ("not known to this game"), saved with it; the recorder's deliberate stamp stays; restore offers the reverse; hydration round trip (review fix) | Pass |
+| Editing an introduced opponent goalie to Empty net drops the introduction (`hockeyGoalieChangeCorrection`), keeps edited label and number while still selected, and with a later shot saves only with the restamp to an empty net (review fix) | Pass |
 
-Checks: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (254 files, 2364 tests) and
-`pnpm build` pass.
+Checks after the review fixes: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (255 files,
+2398 tests) and `pnpm build` pass.
 
 Browser (390 x 844, dev server, clockless game with two goalies): goalie change to #35,
 opponent save, home goal. Editing the goal to Saved previews "Home 1-0 Wolves becomes 0-0"
@@ -65,3 +68,10 @@ it previews the reverse mismatch. No console errors.
 Screenshots: `/mnt/project-files/hockey/hky4b-edit-shot-phone.png`,
 `/mnt/project-files/hockey/hky4b-preview-score-phone.png`,
 `/mnt/project-files/hockey/hky4b-preview-goalie-phone.png`.
+
+Review fixes (browser, same setup): add opponent goalie #1 Backup, record a home saved shot.
+Editing the change to Empty net previews "Home saved: #1 Backup, net empty" with the update
+ticked and locked ("Needed: these shots name a goalie this change takes out of the game").
+Removing the change previews the shot moving back to the starting opponent goalie; Remove
+saves, and the shot shows Revised. Screenshot:
+`/mnt/project-files/hockey/hky4b-remove-opponent-goalie-phone.png`.

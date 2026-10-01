@@ -19,6 +19,7 @@ import {
   hasHockeyCorrectionConsequences,
   hockeyCorrectionConsequences,
   hockeyCorrectionInput,
+  hockeyGoalieChangeCorrection,
   hockeyRemovalDependents,
   hockeyRestoreDependents,
   removeHockeyEvents,
@@ -301,6 +302,94 @@ describe('Hockey Timeline corrections', () => {
     const goal = row(restamped, 'Rivals goal').events[0]
     expect(goal.actors.find(actor => actor.role === 'goalie')?.participantId).toBe('p1')
     expect(rows(hydrate(restamped))).toEqual(rows(restamped))
+  })
+
+  it('restamps in the same batch when a goalie change shots depend on is removed', () => {
+    let state = clockless()
+    state = expectOk(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: 'p30' }, ctx(1)))
+    state = expectOk(recordHockeyShot(state, { side: 'opponent', outcome: 'saved' }, ctx(2)))
+    const shotId = row(state, 'Rivals saved').id
+
+    const result = removeHockeyEvents(state, ids(row(state, 'Blades goalie change')), at(10), { updateGoalies: true })
+    expect(result.goalieRepairs).toEqual([{ eventId: shotId, recordedParticipantId: 'p30', resolvedParticipantId: 'p1' }])
+    const removed = expectOk(result)
+    expect(projection(removed).warnings).toEqual([])
+    expect(row(removed, 'Rivals saved').events[0].revision).toBe(2)
+    expect(hockeyCorrectionConsequences(state, removed).goalies).toEqual([])
+  })
+
+  it('removes an opponent goalie introduction with its later shots restamped, never saving a broken history', () => {
+    let state = clockless()
+    state = expectOk(changeHockeyGoalie(state, {
+      side: 'opponent',
+      inParticipantId: 'opp-2',
+      newOpponentGoalie: { id: 'opp-2', label: 'Backup', number: '1' },
+    }, ctx(1)))
+    state = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'saved', shooter: { participantId: 'p2' } }, ctx(2)))
+    // A shot the recorder deliberately stamped against the starter keeps that choice.
+    state = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'missed', goalieId: 'opp-goalie' }, ctx(3)))
+    const saved = row(state, 'Blades saved by Player 2')
+    const unit = ids(row(state, 'Rivals goalie change'))
+
+    // Without the restamp the saved shot names a goalie the game no longer knows.
+    const plain = removeHockeyEvents(state, unit, at(10))
+    expect(rejected(plain)).toBe('The opponent goalie is not known to this game.')
+    expect(plain.state).toBe(state)
+
+    const result = removeHockeyEvents(state, unit, at(10), { updateGoalies: true })
+    expect(result.goalieRepairs).toEqual([{ eventId: saved.id, recordedParticipantId: 'opp-2', resolvedParticipantId: 'opp-goalie' }])
+    const removed = expectOk(result)
+    expect(row(removed, 'Blades saved by Player 2').events[0].actors.find(actor => actor.role === 'goalie')?.participantId).toBe('opp-goalie')
+    expect(projection(removed).opponentGoalies.map(goalie => goalie.id)).toEqual(['opp-goalie'])
+    expect(rows(hydrate(removed))).toEqual(rows(removed))
+
+    // Restoring the introduction offers to move both shots back; the plain restore keeps them.
+    const missed = row(state, 'Blades missed').id
+    const restored = restoreHockeyEvents(removed, unit, { withReleases: false, updateGoalies: true }, at(20))
+    expect(restored.goalieRepairs.map(entry => [entry.eventId, entry.resolvedParticipantId])).toEqual([[saved.id, 'opp-2'], [missed, 'opp-2']])
+    const plainRestore = expectOk(restoreHockeyEvents(removed, unit, { withReleases: false }, at(20)))
+    expect(projection(plainRestore).warnings.map(warning => warning.eventId)).toEqual([saved.id, missed])
+  })
+
+  it('edits an introduced opponent goalie to an empty net, dropping the introduction and restamping later shots', () => {
+    let state = clockless()
+    state = expectOk(changeHockeyGoalie(state, {
+      side: 'opponent',
+      inParticipantId: 'opp-2',
+      newOpponentGoalie: { id: 'opp-2', label: 'Backup', number: '1' },
+    }, ctx(1)))
+    const target = row(state, 'Rivals goalie change')
+    const initial = hockeyCorrectionInput(target.events)
+    if (initial?.kind !== 'goalie_change') throw new Error('Expected a goalie change')
+
+    // The editor's choices: Empty net, with the introduced goalie's fields still filled in.
+    const pulled = hockeyGoalieChangeCorrection(initial.input, { inParticipantId: null, reason: 'tactical', label: 'Backup', number: '1' })
+    expect(pulled).toEqual({ kind: 'goalie_change', input: { side: 'opponent', inParticipantId: null, reason: 'pulled', newOpponentGoalie: null } })
+    // Keeping the introduction is what the validator refuses.
+    expect(rejected(correctHockeyEvents(state, ids(target), {
+      kind: 'goalie_change',
+      input: { ...initial.input, inParticipantId: null, reason: 'pulled' },
+    }, OPTIONS))).toBe('A new opponent goalie must be the goalie going in.')
+    const edited = expectOk(correctHockeyEvents(state, ids(target), pulled, OPTIONS))
+    expect(projection(edited).goalieInNet.opponent).toBeNull()
+
+    // Still the introduced goalie: edited label and number are kept.
+    const renamed = hockeyGoalieChangeCorrection(initial.input, { inParticipantId: 'opp-2', reason: 'tactical', label: ' Reserve ', number: '30' })
+    expect(renamed.kind === 'goalie_change' && renamed.input.newOpponentGoalie).toEqual({ id: 'opp-2', label: 'Reserve', number: '30' })
+    expect(projection(expectOk(correctHockeyEvents(state, ids(target), renamed, OPTIONS))).opponentGoalies[1]).toMatchObject({ number: '30' })
+
+    // With a later shot on the introduced goalie, the edit saves only with the restamp.
+    state = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'saved' }, ctx(2)))
+    const shot = row(state, 'Blades saved')
+    expect(rejected(correctHockeyEvents(state, ids(target), pulled, OPTIONS))).toBe('The opponent goalie is not known to this game.')
+    const result = correctHockeyEvents(state, ids(target), pulled, { ...OPTIONS, updateGoalies: true })
+    expect(result.goalieRepairs).toEqual([{ eventId: shot.id, recordedParticipantId: 'opp-2', resolvedParticipantId: null }])
+    const repaired = expectOk(result)
+    const restamped = row(repaired, /Blades saved/).events[0]
+    expect(restamped.actors.some(actor => actor.role === 'goalie')).toBe(false)
+    expect(restamped.payload.emptyNet).toBe(true)
+    expect(row(repaired, 'Rivals goalie pulled').events[0].revision).toBe(2)
+    expect(rows(hydrate(repaired))).toEqual(rows(repaired))
   })
 
   it('previews a stored goal strength the box no longer supports, and removed players', () => {
