@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useId, useMemo, useState } from 'react'
+import HockeyLocationField from './HockeyLocationField'
 import { ActorField, Choices, Group } from './hockeyFields'
 import {
   HOCKEY_EMPTY_NET,
@@ -41,6 +42,11 @@ interface HockeyShotDialogProps {
   derivedStrength: (side: HockeySide) => HockeyStrength | null
   /** Skaters a complete tracked set may name right now, from the penalty box (HKY-3C). */
   onIceLimits: HockeyOnIceLimits | null
+  /**
+   * Edit mode (HKY-4B): the stored values. `sport` and `events` are then the game just before
+   * the shot, so the goalie in net and available players are those of that moment.
+   */
+  initial?: RecordHockeyShotInput
   /** Returns an error message, or null once the shot is recorded. */
   onSubmit: (input: RecordHockeyShotInput) => string | null
   onClose: () => void
@@ -73,27 +79,33 @@ export default function HockeyShotDialog({
   opponentLabel,
   derivedStrength,
   onIceLimits,
+  initial,
   onSubmit,
   onClose,
 }: HockeyShotDialogProps) {
   const titleId = useId()
   const { setup, projection } = sport
-  const [side, setSide] = useState<HockeySide>(draft.side)
-  const [outcome, setOutcome] = useState<HockeyShotOutcome>('saved')
-  const [missType, setMissType] = useState<HockeyMissType | null>(null)
-  const [shooter, setShooter] = useState('')
-  const [assist1, setAssist1] = useState('')
-  const [assist2, setAssist2] = useState('')
-  const [blocker, setBlocker] = useState('')
-  const [penaltyShot, setPenaltyShot] = useState(false)
-  const [emptyNetOverride, setEmptyNetOverride] = useState<boolean | null>(null)
-  const [strengthOverride, setStrengthOverride] = useState<HockeyStrength | null>(null)
+  const editing = initial !== undefined
+  const [side, setSide] = useState<HockeySide>(initial?.side ?? draft.side)
+  const [outcome, setOutcome] = useState<HockeyShotOutcome>(initial?.outcome ?? 'saved')
+  const [missType, setMissType] = useState<HockeyMissType | null>(initial?.missType ?? null)
+  const [shooter, setShooter] = useState(choiceValue(initial?.shooter))
+  const [assist1, setAssist1] = useState(choiceValue(initial?.assists?.[0]))
+  const [assist2, setAssist2] = useState(choiceValue(initial?.assists?.[1]))
+  const [blocker, setBlocker] = useState(choiceValue(initial?.blocker))
+  const [penaltyShot, setPenaltyShot] = useState(initial?.penaltyShot ?? false)
+  const [emptyNetOverride, setEmptyNetOverride] = useState<boolean | null>(initial?.emptyNet ?? null)
+  const [strengthOverride, setStrengthOverride] = useState<HockeyStrength | null>(initial?.strength ?? null)
+  const [location, setLocation] = useState(initial ? initial.location ?? null : draft.location)
+  // Edit mode keeps the stored goalie; undefined means the goalie in net at the time.
+  const [goalieFaced, setGoalieFaced] = useState<string | null | undefined>(initial?.goalieId)
   const [error, setError] = useState<string | null>(null)
   const prefill = useMemo(() => hockeyOnIcePrefill(setup, projection, events), [setup, projection, events])
-  const [onIceTouched, setOnIceTouched] = useState(false)
-  const [onIceSkaters, setOnIceSkaters] = useState<string[]>(prefill.skaterParticipantIds)
-  const [onIceGoalie, setOnIceGoalie] = useState<string>(prefill.goalie)
-  const [onIceConfirmed, setOnIceConfirmed] = useState(false)
+  const storedOnIce = initial?.onIce ?? null
+  const [onIceTouched, setOnIceTouched] = useState(storedOnIce !== null && storedOnIce.status !== 'not_recorded')
+  const [onIceSkaters, setOnIceSkaters] = useState<string[]>(storedOnIce && onIceTouched ? storedOnIce.skaterParticipantIds : prefill.skaterParticipantIds)
+  const [onIceGoalie, setOnIceGoalie] = useState<string>(storedOnIce && onIceTouched ? storedOnIce.goalie ?? '' : prefill.goalie)
+  const [onIceConfirmed, setOnIceConfirmed] = useState(storedOnIce?.status === 'complete')
 
   const defending = otherHockeySide(side)
   const netGoalie = projection.goalieInNet[defending]
@@ -117,6 +129,7 @@ export default function HockeyShotDialog({
     setBlocker('')
     setEmptyNetOverride(null)
     setStrengthOverride(null)
+    setGoalieFaced(undefined)
   }
 
   const choice = (owner: HockeySide, value: string): HockeyActorChoice | null => {
@@ -143,9 +156,10 @@ export default function HockeyShotDialog({
       shooter: choice(side, shooter),
       assists,
       blocker: outcome === 'blocked' ? choice(defending, blocker) : null,
-      location: draft.location,
-      onIce,
+      location,
+      onIce: onIce ?? (goal && editing ? storedOnIce : null),
       ...(goal ? { strength } : {}),
+      ...(editing && goalieFaced !== undefined ? { goalieId: emptyNet ? null : goalieFaced } : {}),
     })
     if (message) setError(message)
   }
@@ -161,8 +175,8 @@ export default function HockeyShotDialog({
       >
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate font-bold text-content">{sideName(side)} shot</h2>
-            <p className="text-xs text-content-muted">{draft.location ? 'Located on the rink' : 'No location'}</p>
+            <h2 id={titleId} className="truncate font-bold text-content">{editing ? 'Edit ' : ''}{sideName(side)} shot</h2>
+            <p className="text-xs text-content-muted">{location ? 'Located on the rink' : 'No location'}</p>
           </div>
           <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close">
             <X size={20} />
@@ -240,6 +254,38 @@ export default function HockeyShotDialog({
             </Group>
           )}
 
+          {editing && !emptyNet && (
+            <Group label="Goalie faced">
+              <select
+                className="input-field w-full"
+                value={goalieFaced === undefined ? netGoalie ?? '' : goalieFaced ?? ''}
+                onChange={event => setGoalieFaced(event.target.value || null)}
+              >
+                {defending === 'tracked'
+                  ? hockeyGoalieChoices(setup).map(participant => (
+                    <option key={participant.id} value={participant.id}>{hockeyParticipantLabel(participant)}</option>
+                  ))
+                  : projection.opponentGoalies.map(entry => (
+                    <option key={entry.id} value={entry.id}>{hockeyOpponentGoalieLabel(entry)}</option>
+                  ))}
+              </select>
+              <p className="mt-1 text-xs text-content-muted">{netGoalieName} was in net at the time.</p>
+            </Group>
+          )}
+
+          {editing && (
+            <HockeyLocationField
+              value={location}
+              onChange={setLocation}
+              trackedDirection={projection.trackedAttackingDirection ?? setup.firstPeriodAttackingDirection}
+              side={side}
+              kind={outcome}
+              trapezoid={setup.rulesSnapshot.trapezoid}
+              trackedLabel={trackedLabel}
+              opponentLabel={opponentLabel}
+            />
+          )}
+
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={emptyNet} onChange={event => setEmptyNetOverride(event.target.checked)} />
@@ -275,12 +321,17 @@ export default function HockeyShotDialog({
             <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>
           )}
           <button type="button" className="btn-primary w-full" onClick={submit}>
-            Record {HOCKEY_OUTCOME_LABELS[outcome].toLowerCase()}
+            {editing ? 'Review changes' : `Record ${HOCKEY_OUTCOME_LABELS[outcome].toLowerCase()}`}
           </button>
         </div>
       </div>
     </div>
   )
+}
+
+function choiceValue(choice: HockeyActorChoice | null | undefined): string {
+  if (!choice) return ''
+  return 'participantId' in choice ? choice.participantId : choice.label
 }
 
 function OnIceSection({

@@ -7,8 +7,8 @@ faceoffs, plays, Recent Events Undo) and
 [HKY-3](PLAN_HKY_3_PENALTIES_STRENGTH_AND_OUTCOMES.md) (penalties, strength, timeouts,
 icing and offside, shootout, result).
 
-Status: approved (plan PR #453 merged 2026-09-30) with the §7 recommendations. HKY-4A
-implemented; HKY-4B and HKY-4C follow in their own PRs. §8 is the delivery record.
+Status: approved (plan PR #453 merged 2026-09-30) with the §7 recommendations. HKY-4A and
+HKY-4B implemented; HKY-4C follows in its own PR. §8 is the delivery record.
 
 ---
 
@@ -313,3 +313,34 @@ owner wants it tracked.
   replaces the rink, quick row and Recent Events; the clock and scoreboard stay.
 - No event, schema, fingerprint or migration change.
 - Record: `docs/REGRESSION_HKY_4_TIMELINE_AND_CORRECTIONS.md`.
+
+### HKY-4B Edit, remove and restore (implemented)
+
+- `src/lib/hockey/live.ts`: `runHockeyCommand` takes `replaceEventIds` and `correctedAt`.
+  A correction replays the events before the unit, runs the same capture builder against
+  that projection (so edits get exactly the live validation), and keeps each event's id,
+  sequence, period and time. The rebuilt unit must have the same event count and types;
+  otherwise the recorder is told to remove the row and record it again (a different count
+  would move events to the end of capture order until HKY-4C). Unchanged events are
+  skipped, "Nothing changed" is refused, the whole candidate must replay, and the batch of
+  `update` mutations clears the quick-Undo Restore receipt. Suspended and abandoned games
+  are refused until Reopen; ended local games can be corrected (§7 Q2).
+- `src/lib/hockey/corrections.ts`: `hockeyCorrectionInput` prefills each family's input
+  from its events, `correctHockeyEvents` applies an edit, `removeHockeyEvents` and
+  `restoreHockeyEvents` work on whole capture units with their dependents (a penalty's
+  releases, a shootout start's attempts; restoring a penalty offers its releases), and
+  `updateHockeyGoalieStamps` restamps shots to the goalie in net (or empty net).
+  `hockeyCorrectionConsequences` diffs the before and after states: score, result once
+  ended, new strength mismatches, new goalie mismatches, players removed or returned, and a
+  sudden-death decision appearing or disappearing. `hockeyCorrectionScene` gives edit
+  dialogs the projection, strength and on-ice limits at the event's time. Shots gain an
+  optional explicit `goalieId`. `replayHockeyEvents` accepts a `beforeEach` visitor.
+- UI: the shot, penalty and play dialogs gain an edit mode prefilled from the event (side
+  swaps allowed, §7 Q3; a coincidence group edits together without adding or removing
+  rows); the shot dialog adds Goalie faced. `HockeyLocationField` moves or clears a
+  location. `HockeyTimelineEditor` adds small editors for goalie changes, faceoffs, score
+  adjustments and shootout rows, and a preview sheet with "Update the goalie on these
+  shots" (on by default, §7 Q4) and "Also restore" for releases. The Timeline detail sheet
+  shows Edit and Remove, or Restore for a removed row; game flow and clock rows stay
+  read-only, and suspended or abandoned games point to Reopen.
+- No event type, schema, fingerprint or migration change.

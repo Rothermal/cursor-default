@@ -28,6 +28,11 @@ interface HockeyPenaltyDialogProps {
   recentOpponentLabels: string[]
   trackedLabel: string
   opponentLabel: string
+  /**
+   * Edit mode (HKY-4B): the stored unit, edited together. Rows cannot be added or removed,
+   * since a correction keeps the unit's events; remove the row and record it again instead.
+   */
+  initial?: RecordHockeyPenaltiesInput
   /** Returns an error message, or null once the penalties are recorded. */
   onSubmit: (input: RecordHockeyPenaltiesInput) => string | null
   onClose: () => void
@@ -64,12 +69,16 @@ export default function HockeyPenaltyDialog({
   recentOpponentLabels,
   trackedLabel,
   opponentLabel,
+  initial,
   onSubmit,
   onClose,
 }: HockeyPenaltyDialogProps) {
   const titleId = useId()
-  const [rows, setRows] = useState<PenaltyRow[]>([newRow(0, 'tracked')])
-  const [coincidental, setCoincidental] = useState(false)
+  const editing = initial !== undefined
+  const [rows, setRows] = useState<PenaltyRow[]>(() =>
+    initial ? initial.penalties.map((penalty, index) => storedRow(index, penalty, sport)) : [newRow(0, 'tracked')]
+  )
+  const [coincidental, setCoincidental] = useState(initial?.coincidental ?? false)
   const [error, setError] = useState<string | null>(null)
   const sides = new Set(rows.map(row => row.side))
   const canBeCoincidental = sides.size === 2
@@ -111,7 +120,11 @@ export default function HockeyPenaltyDialog({
         delayed: row.delayed,
       })
     }
-    const message = onSubmit({ penalties, coincidental: canBeCoincidental && coincidental })
+    const message = onSubmit({
+      penalties,
+      coincidental: canBeCoincidental && coincidental,
+      ...(initial?.captureCommandId ? { captureCommandId: initial.captureCommandId } : {}),
+    })
     if (message) setError(message)
   }
 
@@ -129,7 +142,7 @@ export default function HockeyPenaltyDialog({
       >
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <h2 id={titleId} className="min-w-0 flex-1 truncate font-bold text-content">
-            {rows.length > 1 ? `${rows.length} penalties` : 'Penalty'}
+            {editing ? 'Edit ' : ''}{rows.length > 1 ? `${rows.length} penalties` : editing ? 'penalty' : 'Penalty'}
           </h2>
           <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close">
             <X size={20} />
@@ -149,7 +162,7 @@ export default function HockeyPenaltyDialog({
                     <span>Penalty {index + 1}</span>
                   </legend>
                 )}
-                {rows.length > 1 && (
+                {rows.length > 1 && !editing && (
                   <div className="flex justify-end">
                     <button
                       type="button"
@@ -259,9 +272,11 @@ export default function HockeyPenaltyDialog({
             )
           })}
 
-          <button type="button" className="btn-secondary inline-flex w-full items-center justify-center gap-1" onClick={addRow}>
-            <Plus size={16} aria-hidden="true" /> Add another penalty
-          </button>
+          {!editing && (
+            <button type="button" className="btn-secondary inline-flex w-full items-center justify-center gap-1" onClick={addRow}>
+              <Plus size={16} aria-hidden="true" /> Add another penalty
+            </button>
+          )}
 
           {canBeCoincidental && (
             <label className="flex min-h-10 items-start gap-2 text-sm text-content">
@@ -277,7 +292,7 @@ export default function HockeyPenaltyDialog({
             <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>
           )}
           <button type="button" className="btn-primary w-full" onClick={submit}>
-            {rows.length > 1 ? `Record ${rows.length} penalties` : 'Record penalty'}
+            {editing ? 'Review changes' : rows.length > 1 ? `Record ${rows.length} penalties` : 'Record penalty'}
           </button>
         </div>
       </div>
@@ -299,6 +314,32 @@ function newRow(key: number, side: HockeySide): PenaltyRow {
     drawnBy: '',
     delayed: false,
   }
+}
+
+function storedRow(key: number, penalty: HockeyPenaltyInput, sport: HockeySportGameState): PenaltyRow {
+  const defaultMs = penalty.class === 'penalty_shot'
+    ? 0
+    : hockeyPenaltyDefaultDurationMs(sport.setup.rulesSnapshot.penalties, penalty.class)
+  // A rules-length penalty stays blank, so changing its class picks up the new length.
+  const minutes = penalty.durationMs === undefined || penalty.durationMs === defaultMs ? '' : String(penalty.durationMs / 60_000)
+  return {
+    key,
+    side: penalty.side,
+    penaltyClass: penalty.class,
+    infraction: penalty.infraction,
+    infractionLabel: penalty.infractionLabel ?? '',
+    minutes,
+    offenderKind: penalty.offenderKind,
+    offender: choiceText(penalty.offender),
+    servedBy: choiceText(penalty.servedBy),
+    drawnBy: choiceText(penalty.drawnBy),
+    delayed: penalty.delayed ?? false,
+  }
+}
+
+function choiceText(choice: HockeyActorChoice | null | undefined): string {
+  if (!choice) return ''
+  return 'participantId' in choice ? choice.participantId : choice.label
 }
 
 function choice(owner: HockeySide, value: string): HockeyActorChoice | null {

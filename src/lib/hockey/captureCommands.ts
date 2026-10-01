@@ -54,6 +54,11 @@ export interface RecordHockeyShotInput {
   penaltyShot?: boolean
   /** Overrides the empty-net value prefilled from the goalie in net. */
   emptyNet?: boolean
+  /**
+   * Corrections only (HKY-4B): the goalie the shot was recorded against, kept as stored even
+   * when goalie changes now put someone else in net. Absent means the goalie in net.
+   */
+  goalieId?: string | null
   /** Absent or null credits the team, unattributed. */
   shooter?: HockeyActorChoice | null
   /** Primary first; at most two, goals only. */
@@ -115,7 +120,11 @@ export function recordHockeyShot(
       push('assist_secondary', side, assists[1]) ??
       push('blocker', defending, input.blocker)
     if (problem) return problem
-    if (!emptyNet && netGoalie !== null) actors.push(goalieActor(sport.setup, projection, defending, netGoalie))
+    const facedGoalie = input.goalieId === undefined ? netGoalie : input.goalieId
+    if (facedGoalie !== null && !emptyNet) {
+      if (!knownHockeyGoalie(sport.setup, projection, defending, facedGoalie)) return 'Pick a goalie from that side.'
+      actors.push(hockeyGoalieActor(sport.setup, projection, defending, facedGoalie))
+    }
 
     const location = sideLocation(projection, side, input.location)
     if (input.strength && !goal) return 'Only a goal records its strength.'
@@ -703,7 +712,12 @@ function participantActor(role: string, participant: HockeyMatchParticipant): Ga
     : { role, kind: 'unknown', label: participant.displayName, participantId: participant.id }
 }
 
-function goalieActor(
+function knownHockeyGoalie(setup: HockeyMatchSetup, projection: HockeyMatchProjection, side: HockeySide, goalieId: string): boolean {
+  if (side === 'opponent') return projection.opponentGoalies.some(entry => entry.id === goalieId)
+  return setup.participants.some(entry => entry.id === goalieId)
+}
+
+export function hockeyGoalieActor(
   setup: HockeyMatchSetup,
   projection: HockeyMatchProjection,
   side: HockeySide,
@@ -805,7 +819,7 @@ export function recordHockeyShootoutAttempt(
       actors.push(actor)
     }
     const goalie = projection.goalieInNet[defending]
-    if (goalie !== null) actors.push(goalieActor(sport.setup, projection, defending, goalie))
+    if (goalie !== null) actors.push(hockeyGoalieActor(sport.setup, projection, defending, goalie))
     const last = lastHockeyPeriod(projection)!
     return [{
       eventType: 'hockey.shootout_attempt',

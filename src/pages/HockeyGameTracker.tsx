@@ -9,6 +9,7 @@ import HockeyPlayDialog, { type HockeyPlayDraft, type HockeyTeamPlayInput } from
 import HockeyRecentEvents from '../components/hockey/HockeyRecentEvents'
 import HockeyRink from '../components/hockey/HockeyRink'
 import HockeyTimeline from '../components/hockey/HockeyTimeline'
+import HockeyTimelineEditor, { type HockeyTimelineAction } from '../components/hockey/HockeyTimelineEditor'
 import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { useAuth } from '../context/AuthContext'
@@ -63,6 +64,7 @@ import {
   type HockeyFaceoffDotId,
   type HockeyPlayKind,
   type HockeySide,
+  type HockeyTimelineRow,
   type HockeySportGameState,
   type RecordHockeyPenaltiesInput,
   type RecordHockeyPlayInput,
@@ -104,6 +106,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
   const [tab, setTab] = useState<'track' | 'timeline'>('track')
+  const [correction, setCorrection] = useState<{ row: HockeyTimelineRow; action: HockeyTimelineAction } | null>(null)
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -423,6 +426,10 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           {...hockeyTimeline(state, { tracked: trackedLabel, opponent: opponentLabel })}
           participants={sport.setup.participants}
           sideLabel={sideLabel}
+          correctionBlocked={projection.status === 'suspended' || projection.status === 'abandoned'
+            ? 'Reopen the game from the Game menu to correct it.'
+            : null}
+          onCorrect={(row, action) => setCorrection({ row, action })}
         />
       ) : (
         <>
@@ -567,6 +574,23 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         </GameMenu>
       )}
 
+      {correction && (
+        <HockeyTimelineEditor
+          key={`${correction.row.id}-${correction.action}`}
+          state={state}
+          row={correction.row}
+          action={correction.action}
+          labels={{ tracked: trackedLabel, opponent: opponentLabel }}
+          recentOpponentLabels={recentLabels}
+          recorderUserId={user?.id ?? null}
+          onApply={next => {
+            setError(null)
+            dispatch({ type: 'HYDRATE_STATE', state: next })
+            setCorrection(null)
+          }}
+          onClose={() => setCorrection(null)}
+        />
+      )}
       {shotDraft && (
         <HockeyShotDialog
           draft={shotDraft}

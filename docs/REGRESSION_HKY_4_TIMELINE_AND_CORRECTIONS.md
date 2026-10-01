@@ -32,3 +32,36 @@ lineup's detail lists the goalie and all five skaters by name (number-only playe
 Screenshots: `/mnt/project-files/hockey/hky4a-timeline-filters-phone.png`,
 `/mnt/project-files/hockey/hky4a-detail-phone.png`,
 `/mnt/project-files/hockey/hky4a-lineup-detail-phone.png`.
+
+## HKY-4B Edit, remove and restore
+
+Automated (`src/lib/hockey/corrections.test.ts`, 14 cases):
+
+| Case | Result |
+|---|---|
+| Prefill round trip for every editable family is "Nothing changed"; lifecycle rows are read-only | Pass |
+| Shot edited to a goal keeps id, time and sequence, bumps the revision, stamps the goalie, previews the score; survives `HYDRATE_STATE` | Pass |
+| An on-ice set over the limit is refused and nothing changes | Pass |
+| A correction clears the quick-Undo Restore receipt | Pass |
+| Hit side swap | Pass |
+| Penalty with an early release: remove takes the release; restore with and without it | Pass |
+| Coincidence group removed and edited together; adding a penalty in an edit is refused; lifecycle removal refused | Pass |
+| Shootout start removal takes its attempts and restore brings them back; attempt edit | Pass |
+| Removing a goalie change lists goalie mismatches and restamping fixes them | Pass |
+| Strength mismatch and a newly removed player (game misconduct) in the preview | Pass |
+| Ended game: side swap re-settles the result | Pass |
+| Sudden death decided and undecided; refused when a later event exists | Pass |
+| Suspended games are refused | Pass |
+
+Checks: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (254 files, 2364 tests) and
+`pnpm build` pass.
+
+Browser (390 x 844, dev server, clockless game with two goalies): goalie change to #35,
+opponent save, home goal. Editing the goal to Saved previews "Home 1-0 Wolves becomes 0-0"
+and saves. Removing the goalie change previews "Wolves saved: #35 Ray, in net #31 Gil" with
+"Update the goalie on these shots" ticked; after Remove the shot shows Revised. Restoring
+it previews the reverse mismatch. No console errors.
+
+Screenshots: `/mnt/project-files/hockey/hky4b-edit-shot-phone.png`,
+`/mnt/project-files/hockey/hky4b-preview-score-phone.png`,
+`/mnt/project-files/hockey/hky4b-preview-goalie-phone.png`.

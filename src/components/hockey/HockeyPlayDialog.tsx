@@ -11,6 +11,7 @@ import {
   type HockeyTeamEventKind,
   type RecordHockeyPlayInput,
 } from '../../lib/hockey'
+import HockeyLocationField from './HockeyLocationField'
 import { ActorField, Choices, Group } from './hockeyFields'
 
 /** Plays by a player, plus team-only events: timeouts (HKY-3B), icing and offside. */
@@ -27,12 +28,22 @@ export interface HockeyPlayDraft {
   location: { x: number; y: number } | null
 }
 
+/** Edit mode (HKY-4B): the stored values. The kind is fixed, except icing and offside. */
+export interface HockeyPlayEditInitial {
+  kind: HockeyPlayDialogKind
+  side: HockeySide
+  player: HockeyActorChoice | null
+  hitPlayer: HockeyActorChoice | null
+  location: { x: number; y: number } | null
+}
+
 interface HockeyPlayDialogProps {
   draft: HockeyPlayDraft
   sport: HockeySportGameState
   recentOpponentLabels: string[]
   trackedLabel: string
   opponentLabel: string
+  initial?: HockeyPlayEditInitial
   /** Returns an error message, or null once the play is recorded. */
   onSubmit: (input: RecordHockeyPlayInput) => string | null
   /** Timeouts, icing and offside; returns an error message, or null once recorded. */
@@ -62,15 +73,21 @@ export default function HockeyPlayDialog({
   recentOpponentLabels,
   trackedLabel,
   opponentLabel,
+  initial,
   onSubmit,
   onTeamSubmit,
   onClose,
 }: HockeyPlayDialogProps) {
   const titleId = useId()
-  const [kind, setKind] = useState<HockeyPlayDialogKind>(draft.kind)
-  const [side, setSide] = useState<HockeySide>('tracked')
-  const [player, setPlayer] = useState('')
-  const [hitPlayer, setHitPlayer] = useState('')
+  const editing = initial !== undefined
+  const [kind, setKind] = useState<HockeyPlayDialogKind>(initial?.kind ?? draft.kind)
+  const [side, setSide] = useState<HockeySide>(initial?.side ?? 'tracked')
+  const [player, setPlayer] = useState(choiceText(initial?.player))
+  const [hitPlayer, setHitPlayer] = useState(choiceText(initial?.hitPlayer))
+  const [location, setLocation] = useState(initial ? initial.location : draft.location)
+  const kinds: HockeyPlayDialogKind[] = !editing
+    ? KINDS
+    : kind === 'icing' || kind === 'offside' ? ['icing', 'offside'] : []
   const [error, setError] = useState<string | null>(null)
   const sideName = (value: HockeySide) => (value === 'tracked' ? trackedLabel : opponentLabel)
   const choices = hockeyAvailableParticipants(hockeyScorerChoices(sport.setup), sport.projection)
@@ -84,7 +101,7 @@ export default function HockeyPlayDialog({
   const team = isTeamKind(kind)
   const submit = () => {
     if (isTeamKind(kind)) {
-      const message = onTeamSubmit({ kind, side, location: kind === 'timeout' ? null : draft.location })
+      const message = onTeamSubmit({ kind, side, location: kind === 'timeout' ? null : location })
       if (message) setError(message)
       return
     }
@@ -93,7 +110,7 @@ export default function HockeyPlayDialog({
       side,
       player: choice(side, player),
       hitPlayer: kind === 'hit' ? choice(otherHockeySide(side), hitPlayer) : null,
-      location: draft.location,
+      location,
     })
     if (message) setError(message)
   }
@@ -109,9 +126,9 @@ export default function HockeyPlayDialog({
       >
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate font-bold text-content">{TITLES[kind]}</h2>
+            <h2 id={titleId} className="truncate font-bold text-content">{editing ? `Edit ${TITLES[kind].toLowerCase()}` : TITLES[kind]}</h2>
             <p className="text-xs text-content-muted">
-              {kind === 'timeout' ? 'Pauses a running clock' : draft.location ? 'Located on the rink' : 'No location'}
+              {kind === 'timeout' ? (editing ? 'Counts the timeout' : 'Pauses a running clock') : location ? 'Located on the rink' : 'No location'}
             </p>
           </div>
           <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close">
@@ -119,14 +136,16 @@ export default function HockeyPlayDialog({
           </button>
         </header>
         <div className="space-y-4 p-4">
-          <Group label="Play">
-            <Choices
-              options={KINDS.map(value => ({ value, label: TITLES[value] }))}
-              value={kind}
-              onChange={value => { setKind(value); setError(null) }}
-              columns={3}
-            />
-          </Group>
+          {kinds.length > 0 && (
+            <Group label="Play">
+              <Choices
+                options={kinds.map(value => ({ value, label: TITLES[value] }))}
+                value={kind}
+                onChange={value => { setKind(value); setError(null) }}
+                columns={kinds.length === 2 ? 2 : 3}
+              />
+            </Group>
+          )}
           <Group label={kind === 'hit' ? 'Hitting side' : kind === 'timeout' ? 'Timeout for' : team ? 'Called against' : 'Side'}>
             <Choices
               options={(['tracked', 'opponent'] as const).map(value => ({ value, label: sideName(value) }))}
@@ -154,12 +173,31 @@ export default function HockeyPlayDialog({
               emptyLabel="Unknown"
             />
           )}
+          {editing && kind !== 'timeout' && (
+            <HockeyLocationField
+              value={location}
+              onChange={setLocation}
+              trackedDirection={sport.projection.trackedAttackingDirection ?? sport.setup.firstPeriodAttackingDirection}
+              side={side}
+              kind="event"
+              trapezoid={sport.setup.rulesSnapshot.trapezoid}
+              trackedLabel={trackedLabel}
+              opponentLabel={opponentLabel}
+            />
+          )}
           {error && (
             <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>
           )}
-          <button type="button" className="btn-primary w-full" onClick={submit}>Record {TITLES[kind].toLowerCase()}</button>
+          <button type="button" className="btn-primary w-full" onClick={submit}>
+            {editing ? 'Review changes' : `Record ${TITLES[kind].toLowerCase()}`}
+          </button>
         </div>
       </div>
     </div>
   )
+}
+
+function choiceText(choice: HockeyActorChoice | null | undefined): string {
+  if (!choice) return ''
+  return 'participantId' in choice ? choice.participantId : choice.label
 }
