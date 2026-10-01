@@ -38,7 +38,12 @@ const FIELD_LABELS: Record<string, string> = {
   skaterParticipantIds: 'Skaters',
   opponentGoalieId: 'Opponent goalie',
   inParticipantId: 'Goalie in',
+  placement: 'Placed',
+  recordedLater: 'Recorded later',
+  retimed: 'Re-timed',
 }
+
+const PLACEMENT_LABELS: Record<string, string> = { game_time: 'At its game time', period_start: 'At the start of the period' }
 
 const STRENGTH_LABELS: Record<string, string> = { ev: 'Even strength', pp: 'Power play', sh: 'Short-handed' }
 
@@ -83,6 +88,7 @@ function formatValue(key: string, value: unknown, name: (id: string) => string):
   if (typeof value === 'string') {
     if (isIdKey(key)) return name(value)
     if (key === 'strength') return STRENGTH_LABELS[value] ?? value.toUpperCase()
+    if (key === 'placement') return PLACEMENT_LABELS[value] ?? humanize(value)
     return key === 'reason' || key.endsWith('Label') ? value : humanize(value)
   }
   if (Array.isArray(value)) {

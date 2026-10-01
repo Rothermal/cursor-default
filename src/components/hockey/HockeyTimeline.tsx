@@ -173,13 +173,14 @@ export default function HockeyTimeline({
                     <span className={`block ${row.removed ? 'text-content-muted line-through' : row.capture ? 'text-content' : 'text-content-muted'}`}>
                       {row.label}
                     </span>
-                    {(row.strength === 'pp' || row.strength === 'sh' || row.removed || row.revised || row.recordedLater) && (
+                    {(row.strength === 'pp' || row.strength === 'sh' || row.removed || row.revised || row.recordedLater || row.retimed) && (
                       <span className="mt-0.5 flex flex-wrap gap-1">
                         {row.strength === 'pp' && <Badge>PP</Badge>}
                         {row.strength === 'sh' && <Badge>SH</Badge>}
                         {row.removed && <Badge>Removed</Badge>}
                         {row.revised && !row.removed && <Badge>Revised</Badge>}
                         {row.recordedLater && <Badge>Recorded later</Badge>}
+                        {row.retimed && <Badge>Re-timed</Badge>}
                       </span>
                     )}
                     {row.diagnostic && (

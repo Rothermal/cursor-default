@@ -24,7 +24,16 @@ import {
   type RecordHockeyShootoutAttemptInput,
   type RecordHockeyShotInput,
 } from './captureCommands'
-import { hockeySportState, withHockeyUndoReceipt, type HockeyCommandContext, type HockeyCommandResult } from './live'
+import {
+  hockeyEventsBeforePlacement,
+  hockeyPlacedFrame,
+  hockeySportState,
+  withHockeyUndoReceipt,
+  type HockeyCommandContext,
+  type HockeyCommandResult,
+  type HockeyPlaceTarget,
+} from './live'
+import { hockeyEventPlacement, orderHockeyEvents } from './placement'
 import { hockeyOnIceLimits, type HockeyOnIceLimits } from './penalties'
 import { hockeyActivePeriod, replayHockeyEvents } from './projector'
 import type { HockeyFaceoffDotId } from './rinkGeometry'
@@ -81,6 +90,8 @@ export interface HockeyCorrectionOptions {
   now: string
   /** Restamp later shots to the goalie in net in the same batch (§7 Q4). Default false. */
   updateGoalies?: boolean
+  /** Edits only: moves the unit to this game time (HKY-4C re-time). */
+  place?: HockeyPlaceTarget
 }
 
 /** A shot whose stamped goalie a correction moves to the goalie actually in net. */
@@ -252,6 +263,7 @@ export function correctHockeyEvents(
     occurredAt: first.occurredAt,
     replaceEventIds: eventIds,
     correctedAt: options.now,
+    ...(options.place ? { place: options.place } : {}),
     ...(baseline
       ? {
           amendCorrection: (candidate: GameEvent[]) => {
@@ -264,6 +276,49 @@ export function correctHockeyEvents(
   }
   const result = buildCorrection(state, correction, context)
   return { ...result, goalieRepairs: result.ok ? goalieRepairs : [] }
+}
+
+/**
+ * Adds an event recorded later (HKY-4C) at a game time, built from the game as it stood then.
+ * Score adjustments and the shootout have no game time and cannot be added this way.
+ */
+export function addHockeyEvents(
+  state: GameState,
+  correction: HockeyCorrectionInput,
+  place: HockeyPlaceTarget,
+  options: Omit<HockeyCorrectionOptions, 'place'>
+): HockeyCorrectionResult {
+  const sport = hockeySportState(state)
+  if (!sport) return refused(state, 'This is not a Hockey event game.')
+  let goalieRepairs: HockeyGoalieRepair[] = []
+  const existing = activeEvents(state)
+  const known = new Set(existing.map(event => event.id))
+  const baseline = options.updateGoalies ? goalieMismatches(sport, existing) : null
+  const context: HockeyCommandContext = {
+    recorderUserId: options.recorderUserId,
+    occurredAt: options.now,
+    place,
+    ...(baseline
+      ? {
+          amendCorrection: (candidate: GameEvent[]) => {
+            const added = new Set(candidate.filter(event => !known.has(event.id)).map(event => event.id))
+            const repaired = repairGoalieStamps(sport, candidate, baseline, added)
+            goalieRepairs = repaired.repairs
+            return repaired
+          },
+        }
+      : {}),
+  }
+  const result = buildCorrection(state, correction, context)
+  return { ...result, goalieRepairs: result.ok ? goalieRepairs : [] }
+}
+
+/** Where a unit replays now: its placement, or null for a live capture. */
+export function hockeyUnitPlacement(events: readonly GameEvent[]): HockeyPlaceTarget | null {
+  const placed = events.find(event => hockeyEventPlacement(event) !== null)
+  return placed
+    ? { periodId: placed.period.id, elapsedMs: placed.elapsedMs, placement: hockeyEventPlacement(placed)! }
+    : null
 }
 
 function buildCorrection(state: GameState, correction: HockeyCorrectionInput, context: HockeyCommandContext): HockeyCommandResult {
@@ -297,31 +352,53 @@ function buildCorrection(state: GameState, correction: HockeyCorrectionInput, co
  */
 export interface HockeyCorrectionScene {
   sport: HockeySportGameState
-  /** Active events before the unit, in capture order. */
+  /** Active events before the unit, in game order. */
   events: GameEvent[]
   derivedStrength: (side: HockeySide) => HockeyStrength | null
   onIceLimits: HockeyOnIceLimits | null
 }
 
-export function hockeyCorrectionScene(state: GameState, eventIds: readonly string[]): HockeyCorrectionScene | null {
+export function hockeyCorrectionScene(
+  state: GameState,
+  eventIds: readonly string[],
+  /** A re-time target; defaults to where the unit replays now. */
+  place?: HockeyPlaceTarget | null
+): HockeyCorrectionScene | null {
   const sport = hockeySportState(state)
   if (!sport || !state.eventStream) return null
-  const ordered = activeEvents(state)
+  const ordered = orderHockeyEvents(activeEvents(state))
   const index = ordered.findIndex(event => event.id === eventIds[0])
   if (index < 0) return null
-  const target = ordered[index]
-  const events = ordered.slice(0, index)
+  const unit = new Set(eventIds)
+  const target = place ?? hockeyUnitPlacement(ordered.filter(event => unit.has(event.id)))
+  if (target) return sceneAt(sport, hockeyEventsBeforePlacement(ordered.filter(event => !unit.has(event.id)), target), target)
+  const first = ordered[index]
+  return sceneAt(sport, ordered.slice(0, index), { periodId: first.period.id, elapsedMs: first.elapsedMs, placement: null })
+}
+
+/** The game as it stood at a game time, for the Add dialogs (HKY-4C). */
+export function hockeyAdditionScene(state: GameState, place: HockeyPlaceTarget): HockeyCorrectionScene | null {
+  const sport = hockeySportState(state)
+  if (!sport || !state.eventStream) return null
+  return sceneAt(sport, hockeyEventsBeforePlacement(orderHockeyEvents(activeEvents(state)), place), place)
+}
+
+function sceneAt(
+  sport: HockeySportGameState,
+  events: GameEvent[],
+  at: { periodId: string; elapsedMs: number | null; placement: HockeyPlaceTarget['placement'] | null }
+): HockeyCorrectionScene | null {
   const replay = replayHockeyEvents(sport.setup, events)
   if (replay.diagnostics.length > 0) return null
-  const projection = replay.projection
+  const projection = at.placement ? hockeyPlacedFrame(replay.projection, { ...at, placement: at.placement }) : replay.projection
   const active = hockeyActivePeriod(projection)
   return {
     sport: { ...sport, projection },
     events,
     derivedStrength: side => projection.clock
-      ? hockeyDerivedGoalStrength(sport.setup, projection, target.period.id, target.elapsedMs, side)
+      ? hockeyDerivedGoalStrength(sport.setup, projection, at.periodId, at.elapsedMs, side)
       : null,
-    onIceLimits: active ? hockeyOnIceLimits(sport.setup, projection, active, target.elapsedMs) : null,
+    onIceLimits: active ? hockeyOnIceLimits(sport.setup, projection, active, at.elapsedMs) : null,
   }
 }
 

@@ -1,9 +1,10 @@
 import type { GameState } from '../../types'
 import { gameEventRegistry } from '../gameEvents/runtime'
-import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
+import { inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEvent } from '../gameEvents/types'
 import { hockeySportState } from './live'
 import { formatHockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './periods'
+import { hockeyPlacementFields, orderHockeyEvents } from './placement'
 import { replayHockeyEvents } from './projector'
 import { hockeyTimelineNames } from './timelineDetail'
 import { groupHockeyCaptureUnits, hockeyEventLabel, type HockeySideLabels } from './recentEvents'
@@ -62,6 +63,8 @@ export interface HockeyTimelineRow {
   /** Changed after capture: edited, removed or restored. Appended events start at revision 1. */
   revised: boolean
   recordedLater: boolean
+  /** A live capture whose period or time was corrected (HKY-4C). */
+  retimed: boolean
   /** The replay message when this row is where the stored history stops replaying. */
   diagnostic: string | null
 }
@@ -100,7 +103,7 @@ export interface HockeyTimelinePeriodGroup {
 const CAPTURE_TYPES = new Set<string>(HOCKEY_CAPTURE_EVENT_TYPES)
 const DEFAULT_SIDE_LABELS: HockeySideLabels = { tracked: 'Tracked', opponent: 'Opponent' }
 
-/** Every row of the game in period order; within a period, capture order (game order until HKY-4C). */
+/** Every row of the game in period order; within a period, game order (HKY-4C). */
 export function hockeyTimeline(state: GameState, sideLabels: HockeySideLabels = DEFAULT_SIDE_LABELS): HockeyTimeline {
   const sport = hockeySportState(state)
   if (!sport || !state.eventStream) return { rows: [], historyMessage: null, names: {} }
@@ -111,7 +114,8 @@ export function hockeyTimeline(state: GameState, sideLabels: HockeySideLabels = 
   const countDown = sport.setup.rulesSnapshot.clock?.display === 'count_down'
   const trackedIds = new Set(sport.setup.participants.map(participant => participant.id))
 
-  const all = [...inspection.activeEvents, ...inspection.deletedEvents].sort(compareGameEventCaptureOrder)
+  // Game order (HKY-4C): placed events sit at their game time, as replay applies them.
+  const all = orderHockeyEvents([...inspection.activeEvents, ...inspection.deletedEvents])
   // Removed and active events never share a unit: Undo and Timeline removal act on whole units.
   const units = groupHockeyCaptureUnits(all).flatMap(unit => splitByRemoval(unit))
   const rows = units.map((unit): HockeyTimelineRow => {
@@ -140,7 +144,8 @@ export function hockeyTimeline(state: GameState, sideLabels: HockeySideLabels = 
       capture: CAPTURE_TYPES.has(first.eventType),
       removed: first.deletedAt !== null,
       revised: unit.some(event => event.revision > 1),
-      recordedLater: unit.some(event => (event.payload as { recordedLater?: unknown }).recordedLater === true),
+      recordedLater: unit.some(event => hockeyPlacementFields(event).recordedLater),
+      retimed: unit.some(event => hockeyPlacementFields(event).retimed),
       diagnostic: failing && unit.some(event => event.id === failing.eventId) ? failing.message : null,
     }
   })
