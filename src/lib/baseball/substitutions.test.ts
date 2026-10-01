@@ -5,6 +5,7 @@ import { baseballSportState, substituteBaseball } from './commands'
 import {
   baseballBatterHand,
   baseballCanEnter,
+  baseballDesignatedHitterId,
   baseballOpponentLineupView,
   baseballPlayerGameDetail,
   baseballTrackedLineupView,
@@ -31,12 +32,12 @@ import type { BaseballMatchSetup, BaseballSubstitution } from './types'
 
 const sportOf = (state: GameState) => baseballSportState(state)!
 const choices = (state: GameState) => baseballSubstitutionChoices(sportOf(state))
-const sub = (state: GameState, substitution: BaseballSubstitution) =>
-  expectOk(substituteBaseball(state, 'tracked', substitution, ctx()))
+const sub = (state: GameState, changes: BaseballSubstitution | BaseballSubstitution[]) =>
+  expectOk(substituteBaseball(state, 'tracked', changes, ctx()))
 
 function listed(all: BaseballSubstitutionChoices): Set<string> {
   return new Set(
-    Object.values(all).flatMap(groups => groups.flatMap(group => group.options.map(option => stableJson(option.substitution))))
+    Object.values(all).flatMap(groups => groups.flatMap(group => group.options.map(option => stableJson(option.changes))))
   )
 }
 
@@ -58,6 +59,7 @@ function candidates(state: GameState): BaseballSubstitution[] {
       list.push({ kind: 'pinch_hitter', incomingId, outgoingId })
       list.push({ kind: 'pinch_runner', incomingId, outgoingId })
       list.push({ kind: 'courtesy_runner', incomingId, outgoingId })
+      list.push({ kind: 'batting_slot', incomingId, outgoingId })
     }
     for (const position of positions) {
       list.push({ kind: 'defensive', position, incomingId, outgoingId: null })
@@ -98,10 +100,19 @@ function deliberatelyOmitted(state: GameState, substitution: BaseballSubstitutio
       if (occupant !== null) return substitution.outgoingId !== occupant
       return substitution.outgoingId !== null && Object.values(lineup.defense).includes(substitution.outgoingId)
     }
-    case 'position_change':
+    case 'position_change': {
       // A batter without a position joining the field through a position change is the
-      // defensive "stays in the game" choice instead.
-      return substitution.assignments.some(entry => !Object.values(lineup.defense).includes(entry.participantId))
+      // defensive "stays in the game" choice instead. Moving onto a fielder who does not
+      // move (a non-batting pitcher leaves, or an EH stays in) is not offered either.
+      const movers = new Set(substitution.assignments.map(entry => entry.participantId))
+      return substitution.assignments.some(entry => {
+        const occupant = lineup.defense[String(entry.position)]
+        return !Object.values(lineup.defense).includes(entry.participantId) || (occupant !== undefined && !movers.has(occupant))
+      })
+    }
+    case 'batting_slot':
+      // Only the pitcher batting for the DH is offered (End the DH).
+      return substitution.outgoingId !== baseballDesignatedHitterId(sport)
     default:
       return false
   }
@@ -110,13 +121,13 @@ function deliberatelyOmitted(state: GameState, substitution: BaseballSubstitutio
 function expectMatchesEngine(state: GameState) {
   const offered = listed(choices(state))
   for (const key of offered) {
-    const result = substituteBaseball(state, 'tracked', JSON.parse(key) as BaseballSubstitution, ctx())
+    const result = substituteBaseball(state, 'tracked', JSON.parse(key) as BaseballSubstitution[], ctx())
     expect(result.ok ? 'ok' : `${key}: ${result.message}`).toBe('ok')
   }
   for (const substitution of candidates(state)) {
     const accepted = substituteBaseball(state, 'tracked', substitution, ctx()).ok
     if (!accepted || deliberatelyOmitted(state, substitution)) continue
-    expect(offered.has(stableJson(substitution)) ? 'listed' : stableJson(substitution)).toBe('listed')
+    expect(offered.has(stableJson([substitution])) ? 'listed' : stableJson(substitution)).toBe('listed')
   }
 }
 
@@ -178,7 +189,7 @@ describe('Baseball substitution options match the engine', { timeout: 30_000 }, 
 
 describe('Baseball substitutions', () => {
   it('offers only the kinds that are legal now', () => {
-    expect(baseballAvailableSubstitutionKinds(choices(startedGame()))).toEqual(['defensive', 'position_change'])
+    expect(baseballAvailableSubstitutionKinds(choices(startedGame()))).toEqual(['defensive', 'position_change', 'double_switch'])
     expect(baseballAvailableSubstitutionKinds(choices(runnerOnFirst()))).toEqual([
       'pinch_hitter',
       'pinch_runner',
@@ -198,7 +209,7 @@ describe('Baseball substitutions', () => {
       '#2 Player 2 leaves the game and may re-enter once, in the 2nd slot.',
     ])
     const before = state.eventStream!.events.length
-    state = sub(state, choice.substitution)
+    state = sub(state, choice.changes)
     expect(state.eventStream!.events.length).toBe(before + 1)
     const lineup = projection(state).lineups.tracked
     expect(lineup.battingOrder[1]).toBe('t10')
@@ -208,7 +219,7 @@ describe('Baseball substitutions', () => {
 
   it('pinch runner takes the base and the batting slot', () => {
     let state = runnerOnFirst()
-    state = sub(state, option(state, 'pinch_runner', summary => summary[0].startsWith('#11 Player 11')).substitution)
+    state = sub(state, option(state, 'pinch_runner', summary => summary[0].startsWith('#11 Player 11')).changes)
     expect(projection(state).bases.first?.runnerId).toBe('t11')
     expect(projection(state).lineups.tracked.battingOrder[0]).toBe('t11')
   })
@@ -218,7 +229,7 @@ describe('Baseball substitutions', () => {
     const groups = choices(state).courtesy_runner
     expect(groups.map(group => group.title)).toEqual(['For #1 Player 1 (pitcher) on first'])
     expect(groups[0].options.map(entry => entry.label)).toEqual(['#10 Player 10', '#11 Player 11', '#12 Player 12'])
-    state = sub(state, groups[0].options[0].substitution)
+    state = sub(state, groups[0].options[0].changes)
     expect(projection(state).bases.first?.runnerId).toBe('t10')
     expect(projection(state).lineups.tracked.battingOrder).toContain('t1')
     expect(baseballTrackedLineupView(sportOf(state)).bench.find(entry => entry.id === 't10')).toMatchObject({
@@ -237,7 +248,7 @@ describe('Baseball substitutions', () => {
       '#11 Player 11 for #10 Player 10',
       '#12 Player 12 for #10 Player 10',
     ])
-    const returned = sub(state, catcher.options[1].substitution)
+    const returned = sub(state, catcher.options[1].changes)
     const lineup = projection(returned).lineups.tracked
     expect(lineup.defense['2']).toBe('t2')
     expect(lineup.reenteredIds).toEqual(['t2'])
@@ -251,7 +262,7 @@ describe('Baseball substitutions', () => {
     // t2 started 2nd; the pitcher bats 1st, so t2 cannot replace the pitcher.
     expect(baseballPitchingChangeOptions(sport).bench.map(entry => entry.incomingId)).toEqual(['t11', 't12'])
     const firstBase = choices(state).defensive.find(group => group.key === 'def:3')!
-    expect(firstBase.options.map(entry => entry.substitution)).not.toContainEqual(
+    expect(firstBase.options.map(entry => entry.changes)).not.toContainEqual(
       expect.objectContaining({ incomingId: 't2' })
     )
   })
@@ -264,13 +275,13 @@ describe('Baseball substitutions', () => {
       '#4 Player 4 moves from 2B to SS.',
       'Batting slots do not change.',
     ])
-    state = sub(state, swap.substitution)
+    state = sub(state, swap.changes)
     expect(projection(state).lineups.tracked.defense).toMatchObject({ '4': 't6', '6': 't4' })
   })
 
   it('survives reload', () => {
     let state = openCatcher()
-    state = sub(state, choices(state).defensive.find(group => group.title === 'C (open)')!.options[0].substitution)
+    state = sub(state, choices(state).defensive.find(group => group.title === 'C (open)')!.options[0].changes)
     const reloaded = normalizeBaseballSportGameState(JSON.parse(JSON.stringify(state.sportGameState)))
     expect(reloaded?.projection.lineups.tracked).toEqual(projection(state).lineups.tracked)
   })

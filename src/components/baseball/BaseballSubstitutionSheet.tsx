@@ -1,10 +1,13 @@
 import {
   BASEBALL_SUBSTITUTION_KIND_LABELS,
   baseballAvailableSubstitutionKinds,
+  baseballDoubleSwitchPicker,
   baseballSubstitutionGroup,
+  pickBaseballDoubleSwitch,
   selectedBaseballSubstitution,
   type BaseballSubstitutionChoices,
   type BaseballSubstitutionDraft,
+  type BaseballSubstitutionGroup,
 } from '../../lib/baseball'
 
 interface BaseballSubstitutionSheetProps {
@@ -19,10 +22,21 @@ interface BaseballSubstitutionSheetProps {
   onConfirm: () => void
 }
 
+const GROUP_LEGENDS = {
+  pinch_hitter: 'Batter',
+  pinch_runner: 'Runner',
+  courtesy_runner: 'Runner',
+  defensive: 'Position',
+  position_change: 'Who moves',
+  double_switch: 'Position',
+  designated_hitter: 'How',
+} as const
+
 /**
- * One substitution for the tracked team (BSB-4A): pick the kind, then who or where, then
- * the player. Only legal choices are listed, and the summary says exactly what happens
- * before Confirm. Engine rejections stay in the sheet, word for word.
+ * One substitution for the tracked team: pick the kind, then who or where, then the
+ * player (BSB-4A). A double switch picks the new pitcher, the new fielder and the batting
+ * slots (BSB-4B). Only legal choices are listed, and the summary says exactly what
+ * happens before Confirm. Engine rejections stay in the sheet, word for word.
  */
 export default function BaseballSubstitutionSheet({
   teamName,
@@ -72,7 +86,7 @@ export default function BaseballSubstitutionSheet({
       {draft.kind && groups.length > 1 && (
         <fieldset className="space-y-1">
           <legend className="text-xs font-semibold uppercase text-content-muted">
-            {draft.kind === 'defensive' ? 'Position' : draft.kind === 'position_change' ? 'Who moves' : 'Runner'}
+            {GROUP_LEGENDS[draft.kind]}
           </legend>
           <div className="grid grid-cols-2 gap-2">
             {groups.map(entry => (
@@ -81,7 +95,7 @@ export default function BaseballSubstitutionSheet({
                 type="button"
                 aria-pressed={group?.key === entry.key}
                 className={`${group?.key === entry.key ? 'btn-primary' : 'btn-secondary'} min-h-11 px-2 text-left text-sm leading-tight`}
-                onClick={() => onChange({ ...draft, groupKey: entry.key, optionKey: null })}
+                onClick={() => onChange({ kind: draft.kind, groupKey: entry.key, optionKey: null })}
               >
                 {entry.title}
               </button>
@@ -90,7 +104,11 @@ export default function BaseballSubstitutionSheet({
         </fieldset>
       )}
 
-      {group && (
+      {group && draft.kind === 'double_switch' && (
+        <DoubleSwitchPickers group={group} draft={draft} onChange={onChange} />
+      )}
+
+      {group && draft.kind !== 'double_switch' && (
         <fieldset className="space-y-1">
           <legend className="text-xs font-semibold uppercase text-content-muted">{group.title}</legend>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -115,8 +133,6 @@ export default function BaseballSubstitutionSheet({
         </div>
       )}
 
-      <p className="text-xs text-content-muted">A double switch comes with a later update.</p>
-
       {error && (
         <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
           {error}
@@ -128,5 +144,66 @@ export default function BaseballSubstitutionSheet({
         <button type="button" className="btn-primary" disabled={!selected} onClick={onConfirm}>Confirm</button>
       </div>
     </section>
+  )
+}
+
+function DoubleSwitchPickers({
+  group,
+  draft,
+  onChange,
+}: {
+  group: BaseballSubstitutionGroup
+  draft: BaseballSubstitutionDraft
+  onChange: (draft: BaseballSubstitutionDraft) => void
+}) {
+  const parts = draft.parts ?? {}
+  const picker = baseballDoubleSwitchPicker(group, parts)
+  const pick = (patch: Parameters<typeof pickBaseballDoubleSwitch>[2]) => onChange(pickBaseballDoubleSwitch(group, draft, patch))
+  return (
+    <>
+      <PickerRow legend="New pitcher" entries={picker.pitchers.map(entry => ({ key: entry.id, label: entry.label }))} selected={parts.pitcherId} onPick={id => pick({ pitcherId: id })} />
+      {picker.fielders.length > 0 && (
+        <PickerRow legend={`New fielder (${group.title.split(' (')[0]})`} entries={picker.fielders.map(entry => ({ key: entry.id, label: entry.label }))} selected={parts.fielderId} onPick={id => pick({ fielderId: id })} />
+      )}
+      {picker.slots.length > 0 && (
+        <PickerRow
+          legend="Batting slots"
+          entries={picker.slots.map(entry => ({ key: entry.value, label: entry.label }))}
+          selected={parts.pitcherBats}
+          onPick={value => pick({ pitcherBats: value as 'fielder_slot' | 'pitcher_slot' })}
+        />
+      )}
+    </>
+  )
+}
+
+function PickerRow({
+  legend,
+  entries,
+  selected,
+  onPick,
+}: {
+  legend: string
+  entries: Array<{ key: string; label: string }>
+  selected: string | undefined
+  onPick: (key: string) => void
+}) {
+  return (
+    <fieldset className="space-y-1">
+      <legend className="text-xs font-semibold uppercase text-content-muted">{legend}</legend>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {entries.map(entry => (
+          <button
+            key={entry.key}
+            type="button"
+            aria-pressed={entry.key === selected}
+            className={`${entry.key === selected ? 'btn-primary' : 'btn-secondary'} min-h-11 px-2 text-left text-sm leading-tight`}
+            onClick={() => onPick(entry.key)}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   )
 }

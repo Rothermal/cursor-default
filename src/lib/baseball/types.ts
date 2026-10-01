@@ -2,6 +2,13 @@ import type { GameEvent, GameEventLocation, JsonObject } from '../gameEvents/typ
 
 export const BASEBALL_GAME_STATE_VERSION = 1
 export const BASEBALL_EVENT_SCHEMA_VERSION = 1
+/**
+ * `baseball.substitution` moved to schema 2 in BSB-4B: one event carries `changes`, applied
+ * in order and checked as a whole. Schema 1 events (`substitution`) migrate on read.
+ */
+export const BASEBALL_SUBSTITUTION_SCHEMA_VERSION = 2
+/** Enough for a double switch plus the moves around it. */
+export const BASEBALL_MAX_SUBSTITUTION_CHANGES = 6
 export const BASEBALL_RULES_SCHEMA_VERSION = 1
 export const BASEBALL_SETUP_VERSION = 1
 
@@ -269,6 +276,8 @@ export type BaseballSubstitution =
   /** `outgoingId` names who leaves the game when it is not simply the player at that position. */
   | { kind: 'defensive'; position: number; incomingId: string; outgoingId: string | null }
   | { kind: 'position_change'; assignments: Array<{ participantId: string; position: number }> }
+  /** A fielder who does not bat (the pitcher in a DH game) takes `outgoingId`'s batting slot; `outgoingId` leaves. */
+  | { kind: 'batting_slot'; incomingId: string; outgoingId: string }
   | { kind: 'opponent_pitcher'; pitcher: BaseballOpponentPitcher }
   | {
       kind: 'opponent_slot'
@@ -280,6 +289,11 @@ export type BaseballSubstitution =
     }
 
 export interface BaseballSubstitutionPayload extends BaseballCapturePayload {
+  changes: Array<BaseballSubstitution & JsonObject>
+}
+
+/** Schema 1 shape, read only through the migration. */
+export interface BaseballSubstitutionPayloadV1 extends BaseballCapturePayload {
   substitution: BaseballSubstitution & JsonObject
 }
 

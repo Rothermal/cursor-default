@@ -11,6 +11,7 @@ import {
   BASEBALL_REASON_LABELS,
 } from './capture'
 import { baseballSportState, withBaseballUndoReceipt, type BaseballCommandResult } from './commands'
+import { baseballSubstitutionChanges } from './events'
 import { formatBaseballHalf, parseBaseballPeriod } from './periods'
 import { baseballFieldingPositionCode } from './positions'
 import { replayBaseballEvents, replayBaseballRunsByEvent } from './projector'
@@ -210,7 +211,7 @@ export function baseballEventLabel(
       return `${RUNNER_PLAY_LABELS[payload.play as string] ?? 'Runner play'}${who ? `: ${who}` : ''}${runs(scoredRunnerIds)}`
     }
     case 'baseball.substitution':
-      return substitutionLabel(sport, payload.substitution as BaseballSubstitution, names, person)
+      return substitutionEventLabel(sport, baseballSubstitutionChanges(payload), names, person)
     case 'baseball.score_adjustment': {
       const side = event.teamSide === 'tracked' ? names.tracked : names.opponent
       const delta = payload.delta as number
@@ -225,6 +226,26 @@ export function baseballEventLabel(
     default:
       return 'Event'
   }
+}
+
+/** A double switch and a DH forfeiture read as one move (BSB-4B); other lists join their parts. */
+function substitutionEventLabel(
+  sport: BaseballSportGameState,
+  changes: BaseballSubstitution[],
+  names: BaseballSideNames,
+  person: (id: string) => string
+): string {
+  const [first, second] = changes
+  if (
+    changes.length === 2 &&
+    first?.kind === 'defensive' && second?.kind === 'defensive' &&
+    first.position === 1 && second.position !== 1 && first.outgoingId && second.outgoingId
+  ) {
+    const where = baseballFieldingPositionCode(second.position) ?? `Fielder ${second.position}`
+    return `Double switch: ${person(first.incomingId)} pitches, ${person(second.incomingId)} to ${where}; ${person(second.outgoingId)} and ${person(first.outgoingId)} leave`
+  }
+  const label = changes.map(change => substitutionLabel(sport, change, names, person)).join('; ')
+  return changes.some(change => change.kind === 'batting_slot') ? `${label}; the DH role ends` : label
 }
 
 function substitutionLabel(
@@ -260,6 +281,8 @@ function substitutionLabel(
       return `Pinch runner: ${person(substitution.incomingId)} for ${person(substitution.outgoingId)}`
     case 'courtesy_runner':
       return `Courtesy runner: ${person(substitution.incomingId)} for ${person(substitution.outgoingId)}`
+    case 'batting_slot':
+      return `${person(substitution.incomingId)} bats in place of ${person(substitution.outgoingId)}`
   }
 }
 

@@ -64,7 +64,7 @@ export default function BaseballPitchingChangeSheet({
             </div>
           )}
           <p className="text-xs text-content-muted">
-            A double switch or moving the pitcher to another position is a defensive switch, which comes with substitutions.
+            For a double switch, use Substitute on the Lineup tab.
           </p>
         </>
       ) : (

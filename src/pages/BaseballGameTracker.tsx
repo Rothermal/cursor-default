@@ -377,7 +377,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   const confirmLineupSheet = () => {
     if (lineupSheet.type === 'substitute') {
       const option = selectedBaseballSubstitution(substitutionChoices, lineupSheet.draft)
-      if (option) commitLineupSheet(substituteBaseball(state, 'tracked', option.substitution, context()))
+      if (option) commitLineupSheet(substituteBaseball(state, 'tracked', option.changes, context()))
       return
     }
     if (lineupSheet.type === 'pitching') {
@@ -480,7 +480,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       />
 
       <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Preview. Double switches and the Timeline come next. This game stays on this device.
+        Preview. The Timeline comes next. This game stays on this device.
       </p>
 
       {error && (

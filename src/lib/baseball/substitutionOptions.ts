@@ -1,7 +1,9 @@
 import {
   baseballBaseOf,
   baseballCanEnter,
+  baseballDesignatedHitterId,
   baseballLeavingNote,
+  baseballNonBattingFielders,
   baseballOrdinal,
 } from './lineupView'
 import { baseballFieldingPositionCode } from './positions'
@@ -9,11 +11,12 @@ import { baseballPersonLabel } from './trackerView'
 import type { BaseballSportGameState, BaseballSubstitution } from './types'
 
 /**
- * The single-change substitutions the tracked team can make right now (BSB-4A). Each
- * option is one `baseball.substitution` event; the summary says exactly what happens
- * before Confirm, in the same style as the BSB-3D pitching change. The lists follow the
- * projector's rules, so an illegal choice is never offered. Double switches and DH
- * forfeiture are multi-change substitutions and come with BSB-4B.
+ * The substitutions the tracked team can make right now. Each option is one
+ * `baseball.substitution` event: a single change (BSB-4A), or the ordered changes of a
+ * double switch or a DH forfeiture (BSB-4B), which the engine checks as a whole. The
+ * summary says exactly what happens before Confirm, in the same style as the BSB-3D
+ * pitching change. The lists follow the projector's rules, so an illegal choice is never
+ * offered.
  */
 export type BaseballSubstitutionKind =
   | 'pinch_hitter'
@@ -21,6 +24,8 @@ export type BaseballSubstitutionKind =
   | 'courtesy_runner'
   | 'defensive'
   | 'position_change'
+  | 'double_switch'
+  | 'designated_hitter'
 
 export const BASEBALL_SUBSTITUTION_KIND_LABELS: Record<BaseballSubstitutionKind, string> = {
   pinch_hitter: 'Pinch hitter',
@@ -28,6 +33,8 @@ export const BASEBALL_SUBSTITUTION_KIND_LABELS: Record<BaseballSubstitutionKind,
   courtesy_runner: 'Courtesy runner',
   defensive: 'Defensive replacement',
   position_change: 'Position switch',
+  double_switch: 'Double switch',
+  designated_hitter: 'End the DH',
 }
 
 export interface BaseballSubstitutionOption {
@@ -35,7 +42,23 @@ export interface BaseballSubstitutionOption {
   /** The choice as listed, usually the incoming player. */
   label: string
   summary: string[]
-  substitution: BaseballSubstitution
+  /** Applied in order as one event. */
+  changes: BaseballSubstitution[]
+  /** Double switch options are picked by their parts rather than from one long list. */
+  doubleSwitch?: BaseballDoubleSwitchOptionParts
+}
+
+export interface BaseballDoubleSwitchParts {
+  pitcherId: string
+  fielderId: string
+  /** Whose batting slot the new pitcher takes; the new fielder takes the other one. */
+  pitcherBats: 'fielder_slot' | 'pitcher_slot'
+}
+
+interface BaseballDoubleSwitchOptionParts extends BaseballDoubleSwitchParts {
+  pitcherLabel: string
+  fielderLabel: string
+  slotLabel: string
 }
 
 /** One "who or where" target, such as the current batter or the shortstop. */
@@ -53,6 +76,8 @@ export const BASEBALL_SUBSTITUTION_KINDS: readonly BaseballSubstitutionKind[] = 
   'courtesy_runner',
   'defensive',
   'position_change',
+  'double_switch',
+  'designated_hitter',
 ]
 
 export function baseballSubstitutionChoices(sport: BaseballSportGameState): BaseballSubstitutionChoices {
@@ -62,6 +87,8 @@ export function baseballSubstitutionChoices(sport: BaseballSportGameState): Base
     courtesy_runner: [],
     defensive: [],
     position_change: [],
+    double_switch: [],
+    designated_hitter: [],
   }
   const { projection } = sport
   if (projection.status !== 'in_progress' || projection.pendingEnd !== null) return empty
@@ -71,6 +98,8 @@ export function baseballSubstitutionChoices(sport: BaseballSportGameState): Base
     courtesy_runner: courtesyRunners(sport),
     defensive: defensive(sport),
     position_change: positionChanges(sport),
+    double_switch: doubleSwitches(sport),
+    designated_hitter: designatedHitter(sport),
   }
   for (const kind of BASEBALL_SUBSTITUTION_KINDS) {
     empty[kind] = groups[kind].filter(group => group.options.length > 0)
@@ -83,6 +112,8 @@ export interface BaseballSubstitutionDraft {
   kind: BaseballSubstitutionKind | null
   groupKey: string | null
   optionKey: string | null
+  /** Double switch picks so far; the option is chosen once all three are set. */
+  parts?: Partial<BaseballDoubleSwitchParts>
 }
 
 export function emptyBaseballSubstitutionDraft(kind: BaseballSubstitutionKind | null = null, groupKey: string | null = null): BaseballSubstitutionDraft {
@@ -146,7 +177,7 @@ function pinchHitter(sport: BaseballSportGameState): BaseballSubstitutionGroup[]
         ...(projection.balls + projection.strikes > 0 ? [`The count stays ${projection.balls}-${projection.strikes}.`] : []),
         baseballLeavingNote(sport, batterId),
       ],
-      substitution: { kind: 'pinch_hitter', incomingId: id, outgoingId: batterId },
+      changes: [{ kind: 'pinch_hitter', incomingId: id, outgoingId: batterId }],
     })),
   }]
 }
@@ -177,7 +208,7 @@ function pinchRunners(sport: BaseballSportGameState): BaseballSubstitutionGroup[
           `${name(sport, id)} runs for ${runner} on ${base} and takes the ${baseballOrdinal(slot)} batting slot.`,
           baseballLeavingNote(sport, runnerId),
         ],
-        substitution: { kind: 'pinch_runner', incomingId: id, outgoingId: runnerId },
+        changes: [{ kind: 'pinch_runner', incomingId: id, outgoingId: runnerId }],
       })),
     }]
   })
@@ -204,7 +235,7 @@ function courtesyRunners(sport: BaseballSportGameState): BaseballSubstitutionGro
           `${name(sport, id)} runs for ${runner} on ${base} (courtesy runner).`,
           `${runner} stays in the game, and ${name(sport, id)} does not take a batting slot.`,
         ],
-        substitution: { kind: 'courtesy_runner', incomingId: id, outgoingId: runnerId },
+        changes: [{ kind: 'courtesy_runner', incomingId: id, outgoingId: runnerId }],
       })),
     }]
   })
@@ -215,7 +246,10 @@ function defensive(sport: BaseballSportGameState): BaseballSubstitutionGroup[] {
   const lineup = projection.lineups.tracked
   const positions = Array.from({ length: setup.rulesSnapshot.defensivePlayers }, (_, index) => index + 1)
   // Batters with no position: a pinch hitter or runner still in the game, or a DH or EH.
-  const unplaced = lineup.battingOrder.filter(id => positionOf(sport, id) === null)
+  // The DH (or whoever replaces them) taking the field ends the DH role, which is the
+  // End the DH choice, because the pitcher has to bat.
+  const dhId = baseballDesignatedHitterId(sport)
+  const unplaced = lineup.battingOrder.filter(id => positionOf(sport, id) === null && id !== dhId)
   return positions.map<BaseballSubstitutionGroup>(position => {
     const occupant = lineup.defense[String(position)] ?? null
     const where = code(position)
@@ -234,7 +268,7 @@ function defensive(sport: BaseballSportGameState): BaseballSubstitutionGroup[] {
               : `${name(sport, id)} replaces ${leaving} at ${where} and does not bat.`,
             baseballLeavingNote(sport, occupant),
           ],
-          substitution: { kind: 'defensive', position, incomingId: id, outgoingId: occupant },
+          changes: [{ kind: 'defensive', position, incomingId: id, outgoingId: occupant }],
         }))
       return { key: `def:${position}`, title: `${where} (${leaving})`, options }
     }
@@ -246,7 +280,7 @@ function defensive(sport: BaseballSportGameState): BaseballSubstitutionGroup[] {
         summary: [
           `${name(sport, id)} stays in the game and plays ${where}, batting ${baseballOrdinal(lineup.battingOrder.indexOf(id))}.`,
         ],
-        substitution: { kind: 'defensive', position, incomingId: id, outgoingId: null },
+        changes: [{ kind: 'defensive', position, incomingId: id, outgoingId: null }],
       }))
     const replacing = unplaced
       .filter(leavingId => !baseballBaseOf(sport, leavingId))
@@ -259,7 +293,7 @@ function defensive(sport: BaseballSportGameState): BaseballSubstitutionGroup[] {
             `${name(sport, id)} replaces ${name(sport, leavingId)}, batting ${baseballOrdinal(slot)}, and plays ${where}.`,
             baseballLeavingNote(sport, leavingId),
           ],
-          substitution: { kind: 'defensive', position, incomingId: id, outgoingId: leavingId },
+          changes: [{ kind: 'defensive', position, incomingId: id, outgoingId: leavingId }],
         }))
       })
     return { key: `def:${position}`, title: `${where} (open)`, options: [...stays, ...replacing] }
@@ -283,7 +317,7 @@ function positionChanges(sport: BaseballSportGameState): BaseballSubstitutionGro
             key: `pos:${from}:${to}`,
             label: `Move to ${code(to)} (open)`,
             summary: [`${mover} moves from ${code(from)} to ${code(to)}.`, `${code(from)} is left open.`, 'Batting slots do not change.'],
-            substitution: { kind: 'position_change', assignments: [{ participantId: moverId, position: to }] },
+            changes: [{ kind: 'position_change', assignments: [{ participantId: moverId, position: to }] }],
           }
         }
         const other = name(sport, otherId)
@@ -291,15 +325,181 @@ function positionChanges(sport: BaseballSportGameState): BaseballSubstitutionGro
           key: `pos:${from}:${to}`,
           label: `Swap with ${other} (${code(to)})`,
           summary: [`${mover} moves from ${code(from)} to ${code(to)}.`, `${other} moves from ${code(to)} to ${code(from)}.`, 'Batting slots do not change.'],
-          substitution: {
+          changes: [{
             kind: 'position_change',
             assignments: [
               { participantId: moverId, position: to },
               { participantId: otherId, position: from },
             ],
-          },
+          }],
         }
       })
     return [{ key: `pos:${from}`, title: `${mover} (${code(from)})`, options }]
   })
+}
+
+/**
+ * Double switch (BSB-4B): a new pitcher and a new fielder enter together, and the
+ * outgoing pitcher and fielder leave, so the new pitcher can take the fielder's batting
+ * slot. One group per position; its options cover every new pitcher, new fielder and slot
+ * arrangement, picked by part in the sheet. Needs a pitcher who bats.
+ */
+function doubleSwitches(sport: BaseballSportGameState): BaseballSubstitutionGroup[] {
+  const { setup, projection } = sport
+  const lineup = projection.lineups.tracked
+  const pitcherId = lineup.defense['1'] ?? null
+  if (!pitcherId || baseballBaseOf(sport, pitcherId)) return []
+  const pitcherSlot = lineup.battingOrder.indexOf(pitcherId)
+  if (pitcherSlot < 0) return []
+  const pitcher = name(sport, pitcherId)
+  const positions = Array.from({ length: setup.rulesSnapshot.defensivePlayers }, (_, index) => index + 1).filter(position => position !== 1)
+  return positions.flatMap<BaseballSubstitutionGroup>(position => {
+    const fielderId = lineup.defense[String(position)] ?? null
+    if (!fielderId || baseballBaseOf(sport, fielderId)) return []
+    const fielderSlot = lineup.battingOrder.indexOf(fielderId)
+    if (fielderSlot < 0) return []
+    const fielder = name(sport, fielderId)
+    const where = code(position)
+    const options: BaseballSubstitutionOption[] = []
+    for (const pitcherBats of ['fielder_slot', 'pitcher_slot'] as const) {
+      const newPitcherSlot = pitcherBats === 'fielder_slot' ? fielderSlot : pitcherSlot
+      const newFielderSlot = pitcherBats === 'fielder_slot' ? pitcherSlot : fielderSlot
+      for (const inPitcher of benchFor(sport, newPitcherSlot)) {
+        for (const inFielder of benchFor(sport, newFielderSlot)) {
+          if (inFielder === inPitcher) continue
+          options.push({
+            key: `ds:${position}:${inPitcher}:${inFielder}:${pitcherBats}`,
+            label: `${name(sport, inPitcher)} pitches, ${name(sport, inFielder)} to ${where}`,
+            summary: [
+              `${name(sport, inPitcher)}${reentryTag(sport, inPitcher)} replaces ${pitcher} as pitcher, batting ${baseballOrdinal(newPitcherSlot)}.`,
+              `${name(sport, inFielder)}${reentryTag(sport, inFielder)} replaces ${fielder} at ${where}, batting ${baseballOrdinal(newFielderSlot)}.`,
+              baseballLeavingNote(sport, pitcherId),
+              baseballLeavingNote(sport, fielderId),
+            ],
+            changes: [
+              { kind: 'defensive', position: 1, incomingId: inPitcher, outgoingId: pitcherBats === 'fielder_slot' ? fielderId : pitcherId },
+              { kind: 'defensive', position, incomingId: inFielder, outgoingId: pitcherBats === 'fielder_slot' ? pitcherId : fielderId },
+            ],
+            doubleSwitch: {
+              pitcherId: inPitcher,
+              fielderId: inFielder,
+              pitcherBats,
+              pitcherLabel: `${name(sport, inPitcher)}${reentryTag(sport, inPitcher)}`,
+              fielderLabel: `${name(sport, inFielder)}${reentryTag(sport, inFielder)}`,
+              slotLabel: pitcherBats === 'fielder_slot'
+                ? `Pitcher bats ${baseballOrdinal(fielderSlot)}, ${where} bats ${baseballOrdinal(pitcherSlot)} (switched)`
+                : `Pitcher bats ${baseballOrdinal(pitcherSlot)}, ${where} bats ${baseballOrdinal(fielderSlot)} (unchanged)`,
+            },
+          })
+        }
+      }
+    }
+    return [{ key: `ds:${position}`, title: `${where} (${fielder}) with ${pitcher}`, options }]
+  })
+}
+
+/**
+ * DH forfeiture (BSB-4B): the DH takes the field and the pitcher bats in the place of the
+ * fielder who leaves, or the pitcher bats in the DH's place. Either way the DH role ends
+ * for the rest of the game, as every profile's DH rule says.
+ */
+function designatedHitter(sport: BaseballSportGameState): BaseballSubstitutionGroup[] {
+  const { setup, projection } = sport
+  const lineup = projection.lineups.tracked
+  const dhId = baseballDesignatedHitterId(sport)
+  const [pitcherId] = baseballNonBattingFielders(sport)
+  if (!dhId || !pitcherId) return []
+  const dh = name(sport, dhId)
+  const pitcher = name(sport, pitcherId)
+  const dhSlot = lineup.battingOrder.indexOf(dhId)
+  const ends = 'The DH role ends for the rest of the game.'
+  const pitcherCode = code(Number(Object.keys(lineup.defense).find(key => lineup.defense[key] === pitcherId)))
+  const positions = Array.from({ length: setup.rulesSnapshot.defensivePlayers }, (_, index) => index + 1)
+  const field = positions.flatMap<BaseballSubstitutionOption>(position => {
+    const occupant = lineup.defense[String(position)] ?? null
+    const where = code(position)
+    if (!occupant) return []
+    if (occupant === pitcherId) {
+      return [{
+        key: `dh:field:${position}`,
+        label: `${dh} to ${where}`,
+        summary: [`${dh} moves from DH to ${where} and keeps batting ${baseballOrdinal(dhSlot)}.`, `${pitcher} leaves the game.`, baseballLeavingNote(sport, pitcherId), ends],
+        changes: [{ kind: 'defensive', position, incomingId: dhId, outgoingId: null }],
+      }]
+    }
+    const slot = lineup.battingOrder.indexOf(occupant)
+    if (slot < 0 || baseballBaseOf(sport, occupant)) return []
+    const leaving = name(sport, occupant)
+    return [{
+      key: `dh:field:${position}`,
+      label: `${dh} to ${where} for ${leaving}`,
+      summary: [
+        `${dh} moves from DH to ${where} and keeps batting ${baseballOrdinal(dhSlot)}.`,
+        `${leaving} leaves the game; ${pitcher} (${pitcherCode}) bats ${baseballOrdinal(slot)} in that place.`,
+        baseballLeavingNote(sport, occupant),
+        ends,
+      ],
+      changes: [
+        { kind: 'defensive', position, incomingId: dhId, outgoingId: null },
+        { kind: 'batting_slot', incomingId: pitcherId, outgoingId: occupant },
+      ],
+    }]
+  })
+  const bats: BaseballSubstitutionOption[] = baseballBaseOf(sport, dhId)
+    ? []
+    : [{
+      key: 'dh:bats',
+      label: `${pitcher} bats for ${dh}`,
+      summary: [`${pitcher} (${pitcherCode}) bats ${baseballOrdinal(dhSlot)} in place of ${dh}.`, `${dh} leaves the game.`, baseballLeavingNote(sport, dhId), ends],
+      changes: [{ kind: 'batting_slot', incomingId: pitcherId, outgoingId: dhId }],
+    }]
+  return [
+    { key: 'dh:field', title: `${dh} takes the field`, options: field },
+    { key: 'dh:bats', title: `${pitcher} bats for the DH`, options: bats },
+  ]
+}
+
+export interface BaseballDoubleSwitchPicker {
+  pitchers: Array<{ id: string; label: string }>
+  /** Empty until a new pitcher is picked. */
+  fielders: Array<{ id: string; label: string }>
+  /** Empty until both players are picked. */
+  slots: Array<{ value: BaseballDoubleSwitchParts['pitcherBats']; label: string }>
+}
+
+/** The three double switch pickers, each narrowed by the picks before it. */
+export function baseballDoubleSwitchPicker(group: BaseballSubstitutionGroup, parts: Partial<BaseballDoubleSwitchParts> = {}): BaseballDoubleSwitchPicker {
+  const options = group.options.flatMap(entry => (entry.doubleSwitch ? [entry.doubleSwitch] : []))
+  const unique = <T extends { id: string }>(list: T[]) => list.filter((entry, index) => list.findIndex(other => other.id === entry.id) === index)
+  const pitchers = unique(options.map(entry => ({ id: entry.pitcherId, label: entry.pitcherLabel })))
+  const withPitcher = options.filter(entry => entry.pitcherId === parts.pitcherId)
+  const fielders = unique(withPitcher.map(entry => ({ id: entry.fielderId, label: entry.fielderLabel })))
+  const slots = withPitcher
+    .filter(entry => entry.fielderId === parts.fielderId)
+    .map(entry => ({ value: entry.pitcherBats, label: entry.slotLabel }))
+  return { pitchers, fielders, slots }
+}
+
+/**
+ * Applies one double switch pick: later picks that no longer fit are cleared, and the
+ * option is selected once all three parts match one.
+ */
+export function pickBaseballDoubleSwitch(
+  group: BaseballSubstitutionGroup,
+  draft: BaseballSubstitutionDraft,
+  patch: Partial<BaseballDoubleSwitchParts>
+): BaseballSubstitutionDraft {
+  let parts: Partial<BaseballDoubleSwitchParts> = { ...draft.parts, ...patch }
+  const picker = baseballDoubleSwitchPicker(group, parts)
+  if (!picker.fielders.some(entry => entry.id === parts.fielderId)) parts = { pitcherId: parts.pitcherId, pitcherBats: parts.pitcherBats }
+  const slots = baseballDoubleSwitchPicker(group, parts).slots
+  if (!slots.some(entry => entry.value === parts.pitcherBats)) {
+    parts = { ...parts, pitcherBats: slots.find(entry => entry.value === 'fielder_slot')?.value ?? slots[0]?.value }
+  }
+  const option = group.options.find(entry =>
+    entry.doubleSwitch?.pitcherId === parts.pitcherId &&
+    entry.doubleSwitch?.fielderId === parts.fielderId &&
+    entry.doubleSwitch?.pitcherBats === parts.pitcherBats
+  )
+  return { ...draft, groupKey: group.key, parts, optionKey: option?.key ?? null }
 }
