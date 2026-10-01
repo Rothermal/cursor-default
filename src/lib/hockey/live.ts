@@ -552,12 +552,11 @@ function runHockeyCorrection(
   }
   const moving = new Set(unit.map(event => event.id))
   const others = ordered.filter(event => !moving.has(event.id))
-  let prefixEvents: GameEvent[]
-  if (place) {
-    prefixEvents = hockeyEventsBeforePlacement(others, place)
-  } else {
-    prefixEvents = ordered.slice(0, first)
-  }
+  // A content edit keeps the unit where it replays now; a re-time finds its new point with
+  // the unit's own capture identity, so same-time placed events keep their order.
+  const prefixEvents = context.place
+    ? hockeyEventsBeforePlacement(others, context.place, unit[0])
+    : ordered.slice(0, first)
   const prefix = replayHockeyEvents(sport.setup, prefixEvents)
   if (prefix.diagnostics.length > 0) {
     return failure(state, 'history_invalid', 'The history before this event needs repair first.')
@@ -707,22 +706,30 @@ function unitPlacement(unit: readonly GameEvent[]): HockeyPlaceTarget | null {
   return { periodId: placed.period.id, elapsedMs: placed.elapsedMs, placement: hockeyEventPlacement(placed)! }
 }
 
-/** Active events that replay before an event placed at `place` (game order). */
-export function hockeyEventsBeforePlacement(events: readonly GameEvent[], place: HockeyPlaceTarget): GameEvent[] {
-  const probe = placeProbe(place)
+/**
+ * Active events that replay before an event placed at `place` (game order). A new addition
+ * goes after every placed event at the same point; an existing event being re-timed passes
+ * itself as `existing`, so it keeps its capture-order tie-break.
+ */
+export function hockeyEventsBeforePlacement(
+  events: readonly GameEvent[],
+  place: HockeyPlaceTarget,
+  existing?: Pick<GameEvent, 'id' | 'sequence'>
+): GameEvent[] {
+  const probe = placeProbe(place, existing)
   const ordered = orderHockeyEvents([...events, probe])
   return ordered.slice(0, ordered.indexOf(probe))
 }
 
 /** A stand-in for the placed event, to find its position in game order. */
-function placeProbe(place: HockeyPlaceTarget): GameEvent {
+function placeProbe(place: HockeyPlaceTarget, existing?: Pick<GameEvent, 'id' | 'sequence'>): GameEvent {
   return {
-    id: '\uffff-placement-probe',
+    id: existing?.id ?? '\uffff-placement-probe',
     sportId: 'hockey',
     eventType: 'hockey.shot',
     schemaVersion: 1,
     recorderUserId: '\uffff',
-    sequence: Number.MAX_SAFE_INTEGER,
+    sequence: existing?.sequence ?? Number.MAX_SAFE_INTEGER,
     period: { id: place.periodId, order: 0 },
     elapsedMs: place.elapsedMs,
     occurredAt: '9999-12-31T23:59:59.999Z',

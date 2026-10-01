@@ -370,10 +370,11 @@ export function hockeyCorrectionScene(
   const index = ordered.findIndex(event => event.id === eventIds[0])
   if (index < 0) return null
   const unit = new Set(eventIds)
-  const target = place ?? hockeyUnitPlacement(ordered.filter(event => unit.has(event.id)))
-  if (target) return sceneAt(sport, hockeyEventsBeforePlacement(ordered.filter(event => !unit.has(event.id)), target), target)
   const first = ordered[index]
-  return sceneAt(sport, ordered.slice(0, index), { periodId: first.period.id, elapsedMs: first.elapsedMs, placement: null })
+  if (place) return sceneAt(sport, hockeyEventsBeforePlacement(ordered.filter(event => !unit.has(event.id)), place, first), place)
+  // Where the unit replays now: the game-order prefix, with a placed unit's clock frame.
+  const stored = hockeyUnitPlacement(ordered.filter(event => unit.has(event.id)))
+  return sceneAt(sport, ordered.slice(0, index), stored ?? { periodId: first.period.id, elapsedMs: first.elapsedMs, placement: null })
 }
 
 /** The game as it stood at a game time, for the Add dialogs (HKY-4C). */

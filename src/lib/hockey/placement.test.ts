@@ -12,7 +12,7 @@ import {
   recordHockeyShot,
   recordHockeyTimeout,
 } from './captureCommands'
-import { addHockeyEvents, correctHockeyEvents, hockeyCorrectionConsequences, hockeyCorrectionInput, type HockeyCorrectionInput } from './corrections'
+import { addHockeyEvents, correctHockeyEvents, hockeyCorrectionConsequences, hockeyCorrectionInput, hockeyCorrectionScene, type HockeyCorrectionInput } from './corrections'
 import {
   endHockeyPeriod,
   pauseHockeyClock,
@@ -293,5 +293,73 @@ describe('Hockey game-order placement (HKY-4C)', () => {
     }, ctx(70)))
     const lifecycle = row(penalty, 'period started').events[0]
     expect(gameEventRegistry.inspect({ ...lifecycle, payload: { ...lifecycle.payload, placement: 'game_time', recordedLater: true } }).ok).toBe(false)
+  })
+
+  describe('edits of placed events that share a time slot (review fix)', () => {
+    const goalieIntro = (reason: 'tactical' | 'injury'): HockeyCorrectionInput => ({
+      kind: 'goalie_change',
+      input: { side: 'opponent', inParticipantId: 'og-backup', reason, newOpponentGoalie: { id: 'og-backup', label: 'Backup', number: '1' } },
+    })
+    const placedIds = (state: GameState) => active(state)
+      .filter(event => event.eventType === 'hockey.goalie_change' || event.eventType === 'hockey.shot')
+      .map(event => event.id)
+
+    function introThenShot(state: GameState, place: HockeyPlaceTarget) {
+      const withGoalie = expectOk(add(state, goalieIntro('tactical'), place))
+      const withShot = expectOk(add(withGoalie, shot('tracked', 'saved'), place))
+      const [goalieId, shotId] = placedIds(withShot)
+      return { state: withShot, goalieId, shotId }
+    }
+
+    it('edits a clockless goalie introduction that a later addition at the same point depends on', () => {
+      const place = { periodId: P1, elapsedMs: null, placement: 'game_time' } as const
+      const { state, goalieId, shotId } = introThenShot(clockless(), place)
+      const order = orderHockeyEvents(active(state)).map(event => event.id)
+      expect(order.indexOf(goalieId)).toBeLessThan(order.indexOf(shotId))
+      const edited = expectOk(correctHockeyEvents(state, [goalieId], goalieIntro('injury'), OPTIONS))
+      expect(orderHockeyEvents(active(edited)).map(event => event.id)).toEqual(order)
+      expect(projection(edited).goalieInNet.opponent).toBe('og-backup')
+      // The editor's scene is the game just before the change, without the later shot.
+      const scene = hockeyCorrectionScene(state, [goalieId])!
+      expect(scene.events.map(event => event.id)).not.toContain(shotId)
+      expect(rows(hydrate(edited))).toEqual(rows(edited))
+    })
+
+    it('edits same-time anchored additions in place and re-times a live event into the tie by its capture order', () => {
+      let state = running()
+      state = expectOk(recordHockeyShot(state, { side: 'opponent', outcome: 'saved' }, ctx(61)))
+      const { state: placed, goalieId, shotId } = introThenShot(state, gameTime(P1, 30))
+      const before = orderHockeyEvents(active(placed)).map(event => event.id)
+
+      // Content edits keep the unit where it replays, with the tie-break of its capture order.
+      const reason = expectOk(correctHockeyEvents(placed, [goalieId], goalieIntro('injury'), OPTIONS))
+      expect(orderHockeyEvents(active(reason)).map(event => event.id)).toEqual(before)
+      const goal = expectOk(correctHockeyEvents(placed, [shotId], shot('tracked', 'goal'), OPTIONS))
+      expect(orderHockeyEvents(active(goal)).map(event => event.id)).toEqual(before)
+      expect(projection(goal).score.tracked).toBe(1)
+      // Unchanged time is nothing to save.
+      const same = correctHockeyEvents(placed, [goalieId], goalieIntro('tactical'), { ...OPTIONS, place: gameTime(P1, 30) })
+      expect(same.ok ? '' : same.message).toBe('Nothing changed.')
+
+      // A live shot re-timed into the tie keeps its own capture order: it was captured
+      // before both additions, so it replays first among them.
+      const live = row(placed, 'Rivals saved')
+      const liveId = live.events[0].id
+      const moved = expectOk(correctHockeyEvents(placed, [liveId], hockeyCorrectionInput(live.events)!, { ...OPTIONS, place: gameTime(P1, 30) }))
+      const after = orderHockeyEvents(active(moved)).map(event => event.id)
+      expect(after.indexOf(liveId)).toBeLessThan(after.indexOf(goalieId))
+      expect(after.indexOf(goalieId)).toBeLessThan(after.indexOf(shotId))
+      // Its editor scene for that move holds neither addition; re-editing it in place works.
+      const scene = hockeyCorrectionScene(placed, [liveId], gameTime(P1, 30))!
+      expect(scene.events.map(event => event.id)).not.toContain(goalieId)
+      // The shot's scene, by contrast, includes the goalie introduced before it.
+      expect(hockeyCorrectionScene(placed, [shotId])!.events.map(event => event.id)).toContain(goalieId)
+      const regoal = expectOk(correctHockeyEvents(moved, [liveId], shot('opponent', 'goal'), OPTIONS))
+      expect(orderHockeyEvents(active(regoal)).map(event => event.id)).toEqual(after)
+
+      // Re-timing the earlier addition into the same slot again changes nothing about order.
+      const goalieAgain = expectOk(correctHockeyEvents(moved, [goalieId], goalieIntro('injury'), { ...OPTIONS, place: gameTime(P1, 30) }))
+      expect(orderHockeyEvents(active(goalieAgain)).map(event => event.id)).toEqual(after)
+    })
   })
 })

@@ -114,3 +114,15 @@ Screenshots: `/mnt/project-files/hockey/hky4c-add-when-phone.png`,
 `/mnt/project-files/hockey/hky4c-goalie-start-phone.png`,
 `/mnt/project-files/hockey/hky4c-goalie-preview-phone.png`.
 
+Review fix (#460): editing a placed event that shares its time slot used the new-addition
+probe, which sorts after every placed event at that point, so a later dependent addition
+could land in the edit's prefix ("The history before this event needs repair first").
+Content edits now take the game-order prefix before the unit, and re-times find the new
+point with the unit's own capture identity; new additions keep the last-in-slot probe. The
+editor scene uses the same rule. New cases in `placement.test.ts` (both failed before the
+fix): a clockless opponent goalie introduction edited after a same-point shot was stamped
+against it; same-time anchored additions edited in place, an unchanged re-time refused as
+"Nothing changed", and a live shot re-timed into the tie ordered by its capture order.
+Checks: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (257 files, 2415 tests) and
+`pnpm build` pass.
+
