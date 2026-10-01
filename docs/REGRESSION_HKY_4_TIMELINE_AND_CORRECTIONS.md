@@ -32,3 +32,46 @@ lineup's detail lists the goalie and all five skaters by name (number-only playe
 Screenshots: `/mnt/project-files/hockey/hky4a-timeline-filters-phone.png`,
 `/mnt/project-files/hockey/hky4a-detail-phone.png`,
 `/mnt/project-files/hockey/hky4a-lineup-detail-phone.png`.
+
+## HKY-4B Edit, remove and restore
+
+Automated (`src/lib/hockey/corrections.test.ts`, 17 cases):
+
+| Case | Result |
+|---|---|
+| Prefill round trip for every editable family is "Nothing changed"; lifecycle rows are read-only | Pass |
+| Shot edited to a goal keeps id, time and sequence, bumps the revision, stamps the goalie, previews the score; survives `HYDRATE_STATE` | Pass |
+| An on-ice set over the limit is refused and nothing changes | Pass |
+| A correction clears the quick-Undo Restore receipt | Pass |
+| Hit side swap | Pass |
+| Penalty with an early release: remove takes the release; restore with and without it | Pass |
+| Coincidence group removed and edited together; adding a penalty in an edit is refused; lifecycle removal refused | Pass |
+| Shootout start removal takes its attempts and restore brings them back; attempt edit | Pass |
+| Removing a goalie change lists goalie mismatches and restamping fixes them | Pass |
+| Strength mismatch and a newly removed player (game misconduct) in the preview | Pass |
+| Ended game: side swap re-settles the result | Pass |
+| Sudden death decided and undecided; refused when a later event exists | Pass |
+| Suspended games are refused | Pass |
+| Removing a goalie change with "Update the goalie" restamps its shots in the same batch (review fix) | Pass |
+| Removing an introduced opponent goalie: refused without the restamp ("not known to this game"), saved with it; the recorder's deliberate stamp stays; restore offers the reverse; hydration round trip (review fix) | Pass |
+| Editing an introduced opponent goalie to Empty net drops the introduction (`hockeyGoalieChangeCorrection`), keeps edited label and number while still selected, and with a later shot saves only with the restamp to an empty net (review fix) | Pass |
+
+Checks after the review fixes: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (255 files,
+2398 tests) and `pnpm build` pass.
+
+Browser (390 x 844, dev server, clockless game with two goalies): goalie change to #35,
+opponent save, home goal. Editing the goal to Saved previews "Home 1-0 Wolves becomes 0-0"
+and saves. Removing the goalie change previews "Wolves saved: #35 Ray, in net #31 Gil" with
+"Update the goalie on these shots" ticked; after Remove the shot shows Revised. Restoring
+it previews the reverse mismatch. No console errors.
+
+Screenshots: `/mnt/project-files/hockey/hky4b-edit-shot-phone.png`,
+`/mnt/project-files/hockey/hky4b-preview-score-phone.png`,
+`/mnt/project-files/hockey/hky4b-preview-goalie-phone.png`.
+
+Review fixes (browser, same setup): add opponent goalie #1 Backup, record a home saved shot.
+Editing the change to Empty net previews "Home saved: #1 Backup, net empty" with the update
+ticked and locked ("Needed: these shots name a goalie this change takes out of the game").
+Removing the change previews the shot moving back to the starting opponent goalie; Remove
+saves, and the shot shows Revised. Screenshot:
+`/mnt/project-files/hockey/hky4b-remove-opponent-goalie-phone.png`.

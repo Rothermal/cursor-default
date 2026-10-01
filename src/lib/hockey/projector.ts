@@ -67,8 +67,16 @@ export type HockeyClockMoment =
   | { ok: true; unboundedElapsedMs: number; elapsedMs: number }
   | { ok: false; message: string }
 
-/** Replays Hockey events in capture order and stops at the first invalid event. */
-export function replayHockeyEvents(setup: HockeyMatchSetup, events: readonly GameEvent[]): HockeyReplayOutput {
+/**
+ * Replays Hockey events in capture order and stops at the first invalid event. `beforeEach`
+ * sees the projection as it stands just before each event (HKY-4B consequence preview); it
+ * must read, never write.
+ */
+export function replayHockeyEvents(
+  setup: HockeyMatchSetup,
+  events: readonly GameEvent[],
+  beforeEach?: (event: GameEvent, projection: HockeyMatchProjection) => void
+): HockeyReplayOutput {
   const replay = new HockeyReplay(setup)
   const ordered = [...events].sort(compareGameEventCaptureOrder)
   const failed = (error: unknown, eventId: string): HockeyReplayOutput => {
@@ -81,6 +89,7 @@ export function replayHockeyEvents(setup: HockeyMatchSetup, events: readonly Gam
   }
   for (const event of ordered) {
     try {
+      beforeEach?.(event, replay.projection)
       // Each event is checked before it mutates anything, so the projection is the valid prefix.
       replay.apply(event as HockeyEvent)
     } catch (error) {

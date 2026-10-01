@@ -4,12 +4,13 @@ import { basketballWorkflowActionKind } from '../basketball/productionClockPolic
 import { isPlainObject } from '../gameEvents/envelope'
 import {
   applyGameEventAppendsAndMutations,
+  applyGameEventMutations,
   hasLegacyAggregateActivity,
   initializeGameEventStream,
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { inspectGameEventStream, stableJson } from '../gameEvents/stream'
-import type { GameEvent, GameEventActor, GameEventLocation, GameEventPeriod } from '../gameEvents/types'
+import { compareGameEventCaptureOrder, inspectGameEventStream, stableJson } from '../gameEvents/stream'
+import type { GameEvent, GameEventActor, GameEventLocation, GameEventMutation, GameEventPeriod } from '../gameEvents/types'
 import { createHockeyEvent, isHockeyReason } from './events'
 import { hockeyPeriod } from './periods'
 import { hockeyActivePeriod, hockeyClockMomentAt, lastHockeyPeriod, replayHockeyEvents } from './projector'
@@ -45,6 +46,19 @@ export interface HockeyCommandContext {
   occurredAt: string
   /** Optional deterministic ids, used in order, for tests and retries. */
   eventIds?: string[]
+  /**
+   * Correction mode (HKY-4B): rebuild these active events, one capture unit in capture order,
+   * from the game as it stood just before them. `occurredAt` must be the first event's capture
+   * time. The rebuilt events keep their ids, sequence and capture time.
+   */
+  replaceEventIds?: readonly string[]
+  /** When a correction is saved; the update time of revised events. */
+  correctedAt?: string
+  /**
+   * Correction mode only: amends the whole candidate history before it is checked, for
+   * dependent repairs saved in the same batch (goalie restamping).
+   */
+  amendCorrection?: (candidate: GameEvent[]) => { events: GameEvent[]; mutations: GameEventMutation[] }
 }
 
 export type HockeyPendingEvent = {
@@ -426,6 +440,7 @@ export function runHockeyCommand(
   const sport = hockeySportState(state)
   if (!sport || state.sport?.id !== 'hockey') return failure(state, 'not_hockey', 'This is not a Hockey event game.')
   if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Set up the Hockey game first.')
+  if (context.replaceEventIds) return runHockeyCorrection(state, sport, context, context.replaceEventIds, build)
   const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
   // Commands decide from a fresh replay, never from the cached projection.
   const replay = replayHockeyEvents(sport.setup, inspection.activeEvents)
@@ -469,6 +484,103 @@ export function runHockeyCommand(
   if (!result.ok) return failure(state, 'rejected', result.error.message)
   // Any new event ends the chance to restore the last undone capture.
   return { ok: true, state: withHockeyUndoReceipt(result.state, null), events }
+}
+
+/**
+ * Correction path (HKY-4B): the command's own builder runs against a replay of every active
+ * event before the unit, so edits get exactly the checks live capture gets. The unit's events
+ * are revised in place; the whole candidate history must then replay. A history that fails
+ * after the unit may be repaired this way, but the history before it must replay.
+ */
+function runHockeyCorrection(
+  state: GameState,
+  sport: HockeySportGameState,
+  context: HockeyCommandContext,
+  replaceEventIds: readonly string[],
+  build: (sport: HockeySportGameState, projection: HockeyMatchProjection) => Built
+): HockeyCommandResult {
+  const inspection = inspectGameEventStream(state.eventStream!, gameEventRegistry)
+  if (!inspection.complete) return failure(state, 'history_invalid', 'Some stored Hockey events cannot be read.')
+  const ordered = [...inspection.activeEvents].sort(compareGameEventCaptureOrder)
+  const current = replayHockeyEvents(sport.setup, ordered)
+  const status = current.projection.status
+  if (current.diagnostics.length === 0 && (status === 'suspended' || status === 'abandoned')) {
+    return failure(state, 'rejected', 'Reopen the game to correct it.')
+  }
+  const targets = replaceEventIds.map(id => ordered.find(event => event.id === id))
+  if (targets.length === 0 || targets.some(event => !event)) return failure(state, 'rejected', 'That event is no longer active.')
+  const unit = targets as GameEvent[]
+  if (context.occurredAt !== unit[0].occurredAt) {
+    return failure(state, 'rejected', 'A correction is built at the time the event was recorded.')
+  }
+  const first = ordered.indexOf(unit[0])
+  if (unit.some((event, index) => ordered[first + index] !== event)) {
+    return failure(state, 'rejected', 'Only one whole capture can be corrected at a time.')
+  }
+  const prefix = replayHockeyEvents(sport.setup, ordered.slice(0, first))
+  if (prefix.diagnostics.length > 0) {
+    return failure(state, 'history_invalid', 'The history before this event needs repair first.')
+  }
+  const built = build(sport, prefix.projection)
+  if (typeof built === 'string') return failure(state, 'rejected', built)
+  if (!Array.isArray(built)) return failure(state, built.code, built.message)
+  if (built.length !== unit.length || built.some((pending, index) => pending.eventType !== unit[index].eventType)) {
+    return failure(state, 'rejected', 'This change adds or removes events. Remove the row and record it again instead.')
+  }
+
+  const now = context.correctedAt ?? context.occurredAt
+  const mutations: GameEventMutation[] = []
+  const revised = unit.map((event, index) => {
+    const pending = built[index]
+    const next = createHockeyEvent({
+      id: event.id,
+      eventType: pending.eventType,
+      payload: pending.payload,
+      period: pending.period,
+      elapsedMs: pending.elapsedMs,
+      teamSide: pending.teamSide,
+      location: pending.location,
+      actors: pending.actors,
+      recorderUserId: event.recorderUserId,
+      sequence: event.sequence,
+      occurredAt: event.occurredAt,
+    }) as unknown as GameEvent
+    const changes = {
+      period: next.period,
+      elapsedMs: next.elapsedMs,
+      teamSide: next.teamSide,
+      location: next.location,
+      actors: next.actors,
+      payload: next.payload,
+    }
+    const same = stableJson(changes) === stableJson({
+      period: event.period,
+      elapsedMs: event.elapsedMs,
+      teamSide: event.teamSide,
+      location: event.location,
+      actors: event.actors,
+      payload: event.payload,
+    })
+    if (!same) mutations.push({ type: 'update', eventId: event.id, changes })
+    return { ...event, ...changes }
+  })
+  if (mutations.length === 0) return failure(state, 'rejected', 'Nothing changed.')
+  for (const event of revised) {
+    const check = gameEventRegistry.inspect(event)
+    if (!check.ok) return failure(state, 'rejected', check.diagnostic.message)
+  }
+  let candidate: GameEvent[] = [...ordered.slice(0, first), ...revised, ...ordered.slice(first + unit.length)]
+  if (context.amendCorrection) {
+    const amended = context.amendCorrection(candidate)
+    candidate = amended.events
+    mutations.push(...amended.mutations)
+  }
+  const replay = replayHockeyEvents(sport.setup, candidate)
+  if (replay.diagnostics.length > 0) return failure(state, 'rejected', replay.diagnostics[0].message)
+  const result = applyGameEventMutations(state, mutations, now, gameEventRegistry, gameEventProjectors)
+  if (!result.ok) return failure(state, 'rejected', result.error.message)
+  // A correction ends the chance to restore the last undone capture (the Basketball rule).
+  return { ok: true, state: withHockeyUndoReceipt(result.state, null), events: revised }
 }
 
 /** Sets or clears the Restore receipt; it lives in device preferences, outside fingerprints. */
