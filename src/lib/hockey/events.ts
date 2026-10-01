@@ -3,6 +3,7 @@ import type { GameEventDefinition } from '../gameEvents/registry'
 import type { GameEvent, GameEventActor, GameEventLocation, GameEventPeriod } from '../gameEvents/types'
 import { createHockeyUuid } from './id'
 import { parseHockeyPeriod } from './periods'
+import { splitHockeyPlacementPayload } from './placement'
 import { HOCKEY_FACEOFF_DOT_IDS, HOCKEY_FACEOFF_DOTS, type HockeyFaceoffDotId } from './rinkGeometry'
 import { HOCKEY_INFRACTIONS, HOCKEY_PENALTY_CLASSES } from './penalties'
 import type {
@@ -397,7 +398,10 @@ function captureDefinition(
       const actorMessage = validateActors(event.actors, options.roles)
       if (actorMessage) return { ok: false, message: actorMessage }
       if (!isPlainObject(event.payload)) return { ok: false, message: 'Payload must be an object.' }
-      const message = validatePayload(event.payload) ?? validateEvent(event)
+      // Placement fields (HKY-4C) are optional on placeable families; the rest is the family's.
+      const split = splitHockeyPlacementPayload(eventType, event.payload)
+      if ('message' in split) return { ok: false, message: split.message }
+      const message = validatePayload(split.rest) ?? validateEvent(event)
       return message ? { ok: false, message } : { ok: true, event }
     },
   }

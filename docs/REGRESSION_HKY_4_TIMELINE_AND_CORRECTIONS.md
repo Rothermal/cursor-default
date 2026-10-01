@@ -75,3 +75,54 @@ ticked and locked ("Needed: these shots name a goalie this change takes out of t
 Removing the change previews the shot moving back to the starting opponent goalie; Remove
 saves, and the shot shows Revised. Screenshot:
 `/mnt/project-files/hockey/hky4b-remove-opponent-goalie-phone.png`.
+
+## HKY-4C Game order, re-time and recorded-later additions
+
+Automated (`src/lib/hockey/placement.test.ts`, 11 cases; `placementForm.test.ts`, 4 cases):
+
+| Case | Result |
+|---|---|
+| Literal pre-HKY-4 fixtures keep capture order and replay, Timeline and fingerprint are unchanged after reload | Pass |
+| A Period 1 goal added while Period 3 runs sits at its game time, changes the score and period totals, Undo/Restore work, survives `HYDRATE_STATE` | Pass |
+| An addition at 0:00 goes after shots captured at 0:00 and before the first later shot | Pass |
+| After a backward clock set the first strictly later live event wins | Pass |
+| A penalty added in Period 2 changes the box after it while stored goal strength stays | Pass |
+| A period-start goalie change replays before every shot of the period (anchored and clockless) and restamps them with "Update the goalie" | Pass |
+| Clockless additions go at the end of their period, or after the last event of the running one; a clock time is refused | Pass |
+| Refused: a time not yet played, an unstarted period, a score adjustment, a period-start shot | Pass |
+| A placed timeout counts without touching the clock; re-timing a live timeout leaves its pause | Pass |
+| A live shot re-timed to Period 2 and back moves the period totals and shows Re-timed | Pass |
+| Placement fields are accepted only on placeable families with a reason to be placed | Pass |
+| Form helpers: played time per period, clock text parsing, count-down conversion, faceoff dot names | Pass |
+
+Checks: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (257 files, 2413 tests) and
+`pnpm build` pass.
+
+Browser (390 x 844, dev server, anchored youth game with goalies #35 Ray in net and #31 Gil
+on the bench): clock started, Wolves saved shot at 14:57. "Add a missed event", Shot,
+Period 1, 14:59, Goal previews "Home 0-0 Wolves becomes 1-0" and saves; the goal sits above
+the Wolves shot with Recorded later. Change time to 10:00 is refused ("That time has not been
+played yet in this period", with the played limit shown); 15:00 saves and the row shows
+Revised. Adding a Goalie change with "At the start of the period" to #31 previews "Wolves
+saved: #35 Ray, in net #31 Gil" and saves; the change sits right after period started.
+Reload keeps the same order. No console errors.
+
+Screenshots: `/mnt/project-files/hockey/hky4c-add-when-phone.png`,
+`/mnt/project-files/hockey/hky4c-add-preview-phone.png`,
+`/mnt/project-files/hockey/hky4c-timeline-phone.png`,
+`/mnt/project-files/hockey/hky4c-change-time-phone.png`,
+`/mnt/project-files/hockey/hky4c-goalie-start-phone.png`,
+`/mnt/project-files/hockey/hky4c-goalie-preview-phone.png`.
+
+Review fix (#460): editing a placed event that shares its time slot used the new-addition
+probe, which sorts after every placed event at that point, so a later dependent addition
+could land in the edit's prefix ("The history before this event needs repair first").
+Content edits now take the game-order prefix before the unit, and re-times find the new
+point with the unit's own capture identity; new additions keep the last-in-slot probe. The
+editor scene uses the same rule. New cases in `placement.test.ts` (both failed before the
+fix): a clockless opponent goalie introduction edited after a same-point shot was stamped
+against it; same-time anchored additions edited in place, an unchanged re-time refused as
+"Nothing changed", and a live shot re-timed into the tie ordered by its capture order.
+Checks: `pnpm typecheck`, `pnpm lint` (no errors), `pnpm test` (257 files, 2415 tests) and
+`pnpm build` pass.
+

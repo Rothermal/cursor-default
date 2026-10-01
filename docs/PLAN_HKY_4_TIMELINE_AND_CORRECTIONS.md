@@ -348,3 +348,38 @@ owner wants it tracked.
   shows Edit and Remove, or Restore for a removed row; game flow and clock rows stay
   read-only, and suspended or abandoned games point to Reopen.
 - No event type, schema, fingerprint or migration change.
+
+### HKY-4C Game order, time corrections and recorded-later additions (implemented)
+
+- `src/lib/hockey/placement.ts`: `orderHockeyEvents` keeps live captures in capture order
+  and inserts each placed event with `hockeyInsertionIndex` (before the first strictly later
+  live event of its period, else before its period ends or after the last event of the
+  running period; period-start goalie changes right after the period starts; placed events
+  at one point go period start first, then clock time, then capture order). A stream with no
+  placed events returns capture order unchanged, which the literal pre-HKY-4 fixtures check.
+  `splitHockeyPlacementPayload` validates `placement`, `recordedLater` and `retimed` before
+  each family's own validator: placeable families only, `period_start` only on goalie
+  changes, and one of the two flags required.
+- `src/lib/hockey/projector.ts`: replay runs in game order. A placed event's elapsed is
+  checked against its period (zero at the period start, never past the duration) instead of
+  the live clock moment, and a placed timeout skips the stopped-clock check.
+- `src/lib/hockey/live.ts`: `context.place` turns an append into a recorded-later addition
+  and a correction into a re-time. The capture builder runs against the replay just before
+  the placement with the clock paused at the placed time (`hockeyPlacedFrame`), so goalie in
+  net, prefilled strength, on-ice limits and removed players come from that moment.
+  `checkHockeyPlaceTarget` refuses an unstarted period, a time not yet played (the running
+  period is limited by the clock at the moment of the change), and clock times on clockless
+  games. A re-timed live timeout moves alone; its clock pause stays where it was.
+- `src/lib/hockey/corrections.ts`: `addHockeyEvents` (with the same goalie repair as edits,
+  never restamping the added event itself), `correctHockeyEvents` with `place`,
+  `hockeyAdditionScene` and `hockeyUnitPlacement`. `placementForm.ts` lists started periods
+  with what has been played, parses clock text and converts count-down readings, and names
+  faceoff dots by the side defending each end in that period.
+- Timeline: rows follow game order and show Recorded later or Re-timed. "Add a missed event"
+  opens a When step (event kind, period, clock time in the game's display, or "At the start
+  of the period" for a goalie), then the family's own capture dialog or short form, then the
+  same consequence preview as edits. Re-time is a separate "Change time" action in the detail
+  sheet rather than a field inside every edit dialog, so content edits and moves stay one
+  change each. Quick Undo is unchanged and removes an addition just made.
+- No event type, fingerprint or migration change; placement fields are optional payload
+  fields.

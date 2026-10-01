@@ -106,7 +106,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
   const [tab, setTab] = useState<'track' | 'timeline'>('track')
-  const [correction, setCorrection] = useState<{ row: HockeyTimelineRow; action: HockeyTimelineAction } | null>(null)
+  const [correction, setCorrection] = useState<{ row: HockeyTimelineRow | null; action: HockeyTimelineAction } | null>(null)
   const projection = sport.projection
   const running = projection.clock?.running === true
 
@@ -430,6 +430,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             ? 'Reopen the game from the Game menu to correct it.'
             : null}
           onCorrect={(row, action) => setCorrection({ row, action })}
+          onAdd={() => setCorrection({ row: null, action: 'add' })}
         />
       ) : (
         <>
@@ -576,7 +577,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
 
       {correction && (
         <HockeyTimelineEditor
-          key={`${correction.row.id}-${correction.action}`}
+          key={`${correction.row?.id ?? 'new'}-${correction.action}`}
           state={state}
           row={correction.row}
           action={correction.action}
