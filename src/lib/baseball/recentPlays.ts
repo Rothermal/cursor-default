@@ -1,8 +1,7 @@
 import type { GameState } from '../../types'
-import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
+import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
 import {
   BASEBALL_BASERUNNING_PLAY_OPTIONS,
@@ -12,10 +11,17 @@ import {
 } from './capture'
 import { baseballSportState, withBaseballUndoReceipt, type BaseballCommandResult } from './commands'
 import { baseballSubstitutionChanges } from './events'
-import { formatBaseballHalf, parseBaseballPeriod } from './periods'
+import { parseBaseballPeriod } from './periods'
 import { baseballFieldingPositionCode } from './positions'
 import { replayBaseballEvents, replayBaseballRunsByEvent } from './projector'
 import { baseballPersonLabel, BASEBALL_PRIMARY_PITCH_RESULTS, BASEBALL_MORE_PITCH_RESULTS } from './trackerView'
+import {
+  baseballActiveEvents as activeEvents,
+  findBaseballStoredEvent as findEvent,
+  formatBaseballEventHalf as formatPeriod,
+  groupBaseballUnits as groupUnits,
+  isBaseballCaptureEvent,
+} from './units'
 import type {
   BaseballEventType,
   BaseballGameEndOutcome,
@@ -50,15 +56,6 @@ export interface BaseballSideNames {
   opponent: string
 }
 
-/** Plays a recorder captures; everything else is game flow, shown but never undone. */
-const CAPTURE_TYPES = new Set<BaseballEventType>([
-  'baseball.pitch',
-  'baseball.plate_appearance',
-  'baseball.baserunning',
-  'baseball.substitution',
-  'baseball.score_adjustment',
-])
-
 export function baseballRecentPlays(
   state: GameState,
   names: BaseballSideNames,
@@ -78,7 +75,7 @@ export function baseballRecentPlays(
     if (divider) rows.push({ kind: 'divider', id: `divider-${first.id}`, label: divider })
     const halfLabel = formatPeriod(first)
     const label = unit.map(event => baseballEventLabel(sport, event, names, scored.get(event.id) ?? [])).join(' + ')
-    if (CAPTURE_TYPES.has(first.eventType as BaseballEventType)) {
+    if (isBaseballCaptureEvent(first)) {
       rows.push({
         kind: 'play',
         id: first.id,
@@ -99,7 +96,7 @@ export function canUndoBaseballPlay(state: GameState): boolean {
   if (!baseballSportState(state) || !state.eventStream) return false
   const units = groupUnits(activeEvents(state))
   const newest = units[units.length - 1]
-  return Boolean(newest && CAPTURE_TYPES.has(newest[0].eventType as BaseballEventType))
+  return Boolean(newest && isBaseballCaptureEvent(newest[0]))
 }
 
 /** Removes the newest play, keeping a receipt so Restore can bring it back. */
@@ -108,7 +105,7 @@ export function undoBaseballPlay(state: GameState, now: string): BaseballCommand
   if (!sport || !state.eventStream) return failure(state, 'This is not a Baseball event game.')
   const units = groupUnits(activeEvents(state))
   const newest = units[units.length - 1]
-  if (!newest || !CAPTURE_TYPES.has(newest[0].eventType as BaseballEventType)) {
+  if (!newest || !isBaseballCaptureEvent(newest[0])) {
     return failure(state, 'Nothing to undo: the latest entry is part of the game flow.')
   }
   const mutations: GameEventMutation[] = newest.map(event => ({ type: 'delete', eventId: event.id }))
@@ -303,11 +300,6 @@ function halfDivider(older: GameEvent, newer: GameEvent): string | null {
   return `${from.half === 'top' ? 'Middle' : 'End'} ${from.inning}`
 }
 
-function formatPeriod(event: GameEvent): string {
-  const period = parseBaseballPeriod(event.period)
-  return period ? formatBaseballHalf(period.inning, period.half) : ''
-}
-
 // ---------------------------------------------------------------------------
 // Read-only play details
 
@@ -331,7 +323,7 @@ export function baseballPlayDetail(state: GameState, playId: string, names: Base
   if (!sport || !state.eventStream) return null
   const events = activeEvents(state)
   const unit = groupUnits(events).find(candidate => candidate[0].id === playId)
-  if (!unit || !CAPTURE_TYPES.has(unit[0].eventType as BaseballEventType)) return null
+  if (!unit || !isBaseballCaptureEvent(unit[0])) return null
   const scored = replayBaseballRunsByEvent(sport.setup, events)
   const person = (id: string) => baseballPersonLabel(sport, id).name
   const fielder = (position: number) => `${baseballFieldingPositionCode(position) ?? 'Fielder'} (${position})`
@@ -406,28 +398,6 @@ export function baseballPlayDetail(state: GameState, playId: string, names: Base
 // ---------------------------------------------------------------------------
 // Internals
 
-function activeEvents(state: GameState): GameEvent[] {
-  const inspection = inspectGameEventStream(state.eventStream!, gameEventRegistry)
-  return [...inspection.activeEvents].sort(compareGameEventCaptureOrder)
-}
-
-/** Consecutive events sharing a non-null `captureCommandId` form one unit. */
-function groupUnits(events: readonly GameEvent[]): GameEvent[][] {
-  const units: GameEvent[][] = []
-  for (const event of events) {
-    const commandId = captureCommandId(event)
-    const last = units[units.length - 1]
-    if (commandId && last && captureCommandId(last[0]) === commandId) last.push(event)
-    else units.push([event])
-  }
-  return units
-}
-
-function captureCommandId(event: GameEvent): string | null {
-  const value = (event.payload as { captureCommandId?: unknown }).captureCommandId
-  return typeof value === 'string' ? value : null
-}
-
 function restoreMutations(state: GameState): GameEventMutation[] | null {
   const sport = baseballSportState(state)
   const receipt = sport?.capturePreferences.lastUndo
@@ -440,11 +410,6 @@ function restoreMutations(state: GameState): GameEventMutation[] | null {
   }
   // Every new event clears the receipt, so a surviving receipt means nothing was recorded since.
   return mutations
-}
-
-function findEvent(state: GameState, eventId: string): GameEvent | null {
-  const raw = state.eventStream?.events.find(candidate => isGameEventEnvelope(candidate) && candidate.id === eventId)
-  return raw && isGameEventEnvelope(raw) ? (raw as GameEvent) : null
 }
 
 function applyChecked(

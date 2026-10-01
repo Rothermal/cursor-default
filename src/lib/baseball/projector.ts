@@ -7,7 +7,7 @@ import type {
   SportGameEventProjector,
 } from '../gameEvents/types'
 import { basePosition, baseballSubstitutionChanges, baseballSubstitutionUsesLegacyRules } from './events'
-import { baseballPeriod } from './periods'
+import { baseballPeriod, formatBaseballHalf, parseBaseballPeriod } from './periods'
 import { createBaseballMatchProjection } from './state'
 import { baseballPlayerStatsById } from './stats'
 import type {
@@ -133,6 +133,39 @@ export function replayBaseballRunsByEvent(
   return scored
 }
 
+/**
+ * Who each play credits (BSB-4C): the batter and pitcher the replayed lineup charges, and the
+ * fielder each tracked fielding position credited, from the same replay that builds the lines.
+ * Corrections compare these before and after, so a moved credit is found even when no warning
+ * changes. Only pitches, quick plate appearances and runner plays credit anyone. Stops at the
+ * first invalid event, like `replayBaseballEvents`.
+ */
+export function replayBaseballCreditByEvent(
+  setup: BaseballMatchSetup,
+  events: readonly GameEvent[]
+): Map<string, BaseballEventCredit> {
+  const replay = new BaseballReplay(setup)
+  const credit = new Map<string, BaseballEventCredit>()
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    try {
+      replay.apply(event as BaseballEvent)
+    } catch (error) {
+      if (!(error instanceof BaseballReplayError)) throw error
+      break
+    }
+    if (replay.creditByLastEvent) credit.set(event.id, replay.creditByLastEvent)
+  }
+  return credit
+}
+
+export interface BaseballEventCredit {
+  /** Null on runner plays, which credit no batter. */
+  batterId: string | null
+  pitcherId: string | null
+  /** Tracked fielding credit by fielding number, as the replay resolved it. */
+  fielders: Record<string, string>
+}
+
 export const baseballGameEventProjector: SportGameEventProjector = {
   sportId: 'baseball',
   requiresSportGameState: true,
@@ -198,6 +231,8 @@ class BaseballReplay {
   private legacyLineupRules = false
   /** Runner ids whose runs counted on the event applied last. */
   runnersScoredByLastEvent: string[] = []
+  /** Who the event applied last credited; null for events that credit nobody. */
+  creditByLastEvent: BaseballEventCredit | null = null
 
   constructor(private readonly setup: BaseballMatchSetup) {
     this.projection = createBaseballMatchProjection(setup)
@@ -209,6 +244,7 @@ class BaseballReplay {
     const p = this.projection
     this.currentEventId = event.id
     this.runnersScoredByLastEvent = []
+    this.creditByLastEvent = null
     this.stamped = new Map(
       event.actors.flatMap(actor => (actor.participantId ? [[actor.role, actor.participantId] as const] : []))
     )
@@ -265,17 +301,20 @@ class BaseballReplay {
       case 'baseball.pitch':
         this.expectBattingSide(event)
         this.checkStampedBatterAndPitcher(true)
+        this.startCredit(true)
         this.applyPitch(event)
         return
       case 'baseball.plate_appearance':
         this.expectBattingSide(event)
         this.checkStampedBatterAndPitcher(true)
+        this.startCredit(true)
         this.applyQuickPlateAppearance(event)
         return
       case 'baseball.baserunning':
         this.expectBattingSide(event)
         this.requireDefense()
         this.checkStampedBatterAndPitcher(false)
+        this.startCredit(false)
         if (event.payload.play === 'balk' && !this.rules.balks) fail('Balks are not called under these rules.')
         this.applyMovements(event.payload.movements, null)
         this.afterPlay()
@@ -286,10 +325,20 @@ class BaseballReplay {
   // -------------------------------------------------------------------------
   // Lifecycle
 
+  private startCredit(withBatter: boolean): void {
+    this.creditByLastEvent = {
+      batterId: withBatter ? this.currentBatterId() : null,
+      pitcherId: this.fieldingLineup().pitcherId,
+      fielders: {},
+    }
+  }
+
   private expectPeriod(event: GameEvent, inning: number, half: 'top' | 'bottom'): void {
     const expected = baseballPeriod(inning, half)
     if (event.period.id !== expected.id || event.period.order !== expected.order) {
-      fail(`Expected an event in ${expected.id}.`)
+      const recorded = parseBaseballPeriod(event.period)
+      const where = recorded ? formatBaseballHalf(recorded.inning, recorded.half) : 'another half-inning'
+      fail(`Recorded in ${where}, but play is now in ${formatBaseballHalf(inning, half)}.`)
     }
   }
 
@@ -1320,6 +1369,7 @@ class BaseballReplay {
     if (known && stamped !== resolved) this.warnMismatch(role, stamped, resolved)
     const id = known ? stamped : resolved
     if (!id) return scratchFieldingLine()
+    if (this.creditByLastEvent) this.creditByLastEvent.fielders[String(position)] = id
     p.fieldingLines[id] ??= emptyFieldingLine()
     return p.fieldingLines[id]
   }

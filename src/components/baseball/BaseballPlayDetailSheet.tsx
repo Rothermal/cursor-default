@@ -1,15 +1,22 @@
 import type { BaseballPlayDetail } from '../../lib/baseball'
 
+interface BaseballPlayDetailSheetProps {
+  detail: BaseballPlayDetail
+  onClose: () => void
+  /** From the Timeline (BSB-4C): opens the removal preview. Nothing is removed yet. */
+  onRemove?: () => void
+}
+
 /**
- * A recorded play, read-only (BSB-3D): what was captured and how every runner moved. Closing
- * it changes nothing; corrections to older plays are the BSB-4 Timeline.
+ * A recorded play (BSB-3D): what was captured and how every runner moved. Closing it changes
+ * nothing. Opened from the Timeline, it offers Remove, which previews first (BSB-4C).
  */
-export default function BaseballPlayDetailSheet({ detail, onClose }: { detail: BaseballPlayDetail; onClose: () => void }) {
+export default function BaseballPlayDetailSheet({ detail, onClose, onRemove }: BaseballPlayDetailSheetProps) {
   return (
     <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Play details">
       <div>
         <h2 className="font-bold text-content">{detail.label}</h2>
-        <p className="text-xs text-content-muted">{detail.halfLabel} · read-only</p>
+        <p className="text-xs text-content-muted">{detail.halfLabel}{onRemove ? '' : ' · read-only'}</p>
       </div>
       {detail.sections.map((section, index) => (
         <div key={`${section.heading}-${index}`}>
@@ -19,8 +26,17 @@ export default function BaseballPlayDetailSheet({ detail, onClose }: { detail: B
           </ul>
         </div>
       ))}
-      <p className="text-xs text-content-muted">Undo changes the newest play. Editing older plays comes with the Timeline.</p>
-      <button type="button" className="btn-secondary w-full" onClick={onClose} autoFocus>Close</button>
+      {onRemove ? (
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="btn-secondary" onClick={onClose} autoFocus>Close</button>
+          <button type="button" className="btn-secondary text-danger-content" onClick={onRemove}>Remove…</button>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-content-muted">Undo changes the newest play. Older plays are corrected on the Timeline tab.</p>
+          <button type="button" className="btn-secondary w-full" onClick={onClose} autoFocus>Close</button>
+        </>
+      )}
     </section>
   )
 }

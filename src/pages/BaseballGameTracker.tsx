@@ -1,6 +1,7 @@
 import { ChevronLeft, Menu, X } from 'lucide-react'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import BaseballCorrectionPreviewSheet from '../components/baseball/BaseballCorrectionPreviewSheet'
 import BaseballDiamond from '../components/baseball/BaseballDiamond'
 import {
   BaseballEndGameSheet,
@@ -21,9 +22,19 @@ import BaseballRecentPlays from '../components/baseball/BaseballRecentPlays'
 import BaseballRunnerResolution from '../components/baseball/BaseballRunnerResolution'
 import BaseballScoreboard from '../components/baseball/BaseballScoreboard'
 import BaseballSubstitutionSheet from '../components/baseball/BaseballSubstitutionSheet'
+import BaseballTimeline from '../components/baseball/BaseballTimeline'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
+  BASEBALL_TIMELINE_DEFAULT_FILTER,
+  baseballTimeline,
+  previewBaseballRemoval,
+  previewBaseballRestore,
+  removeBaseballPlay,
+  restoreBaseballCorrection,
+  type BaseballCorrectionPreview,
+  type BaseballCorrectionPreviewResult,
+  type BaseballTimelineFilter,
   BASEBALL_GAME_END_LABELS,
   baseballCanEndHalf,
   baseballCanReopen,
@@ -136,7 +147,15 @@ type LineupSheet =
   | { type: 'opponent_slot'; draft: OpponentSlotDraft; error: string | null }
   | { type: 'player'; id: string }
 
-type TrackerTab = 'track' | 'lineup'
+type TrackerTab = 'track' | 'lineup' | 'timeline'
+
+const TAB_LABELS: Record<TrackerTab, string> = { track: 'Track', lineup: 'Lineup', timeline: 'Timeline' }
+
+/** What the Timeline tab has open. Nothing is written until a preview confirms. */
+type TimelineSheet =
+  | { type: 'none' }
+  | { type: 'detail'; playId: string }
+  | { type: 'preview'; preview: BaseballCorrectionPreview; error: string | null }
 
 /**
  * The live Baseball tracker: the scoreboard strip, the diamond and the pitch pad showing
@@ -172,6 +191,8 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   // Switching tabs writes nothing, and a sheet open on Track stays open (BSB-4A).
   const [tab, setTab] = useState<TrackerTab>('track')
   const [lineupSheet, setLineupSheet] = useState<LineupSheet>({ type: 'none' })
+  const [timelineSheet, setTimelineSheet] = useState<TimelineSheet>({ type: 'none' })
+  const [timelineFilter, setTimelineFilter] = useState<BaseballTimelineFilter>(BASEBALL_TIMELINE_DEFAULT_FILTER)
   const { setup, projection, capturePreferences } = sport
   const fielderCount = setup.rulesSnapshot.defensivePlayers
 
@@ -424,6 +445,31 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     applied(endBaseballGame(state, baseballPendingEndOutcome(projection.pendingEnd), context()))
   }
 
+  /** Opens a Timeline preview, or shows why the correction is refused. */
+  const openPreview = (result: BaseballCorrectionPreviewResult) => {
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    setError(null)
+    setTimelineSheet({ type: 'preview', preview: result.preview, error: null })
+  }
+
+  const confirmCorrection = (preview: BaseballCorrectionPreview, confirmed: boolean) => {
+    const options = { now: new Date().toISOString(), confirmed }
+    const result = preview.action === 'remove'
+      ? removeBaseballPlay(state, preview, names, options)
+      : restoreBaseballCorrection(state, preview, names, options)
+    if (!result.ok) {
+      setTimelineSheet({ type: 'preview', preview, error: result.message })
+      return
+    }
+    applied(result)
+    // Whatever was open on Track was built against the old history.
+    setFlow({ step: 'idle' })
+    setTimelineSheet({ type: 'none' })
+  }
+
   const undo = () => {
     if (applied(undoBaseballPlay(state, new Date().toISOString()))) finishCapture()
   }
@@ -480,7 +526,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       />
 
       <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Preview. The Timeline comes next. This game stays on this device.
+        Preview. Editing plays comes next. This game stays on this device.
       </p>
 
       {error && (
@@ -501,8 +547,8 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       )}
 
       {projection.status !== 'pregame' && (
-        <div role="tablist" aria-label="Tracker views" className="grid grid-cols-2 gap-1 rounded-md border border-line p-1">
-          {(['track', 'lineup'] as const).map(entry => (
+        <div role="tablist" aria-label="Tracker views" className="grid grid-cols-3 gap-1 rounded-md border border-line p-1">
+          {(['track', 'lineup', 'timeline'] as const).map(entry => (
             <button
               key={entry}
               type="button"
@@ -511,7 +557,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               className={`min-h-10 rounded text-sm font-semibold ${tab === entry ? 'bg-accent text-accent-content' : 'text-content'}`}
               onClick={() => setTab(entry)}
             >
-              {entry === 'track' ? 'Track' : 'Lineup'}
+              {TAB_LABELS[entry]}
             </button>
           ))}
         </div>
@@ -576,6 +622,50 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               if (draft) setLineupSheet({ type: 'opponent_slot', draft, error: null })
             }}
           />
+        </section>
+      )}
+
+      {projection.status !== 'pregame' && tab === 'timeline' && (
+        <section className="space-y-3" aria-label="Timeline">
+          {timelineSheet.type === 'detail' && (() => {
+            const detail = baseballPlayDetail(state, timelineSheet.playId, names)
+            return detail
+              ? (
+                <BaseballPlayDetailSheet
+                  detail={detail}
+                  onClose={() => setTimelineSheet({ type: 'none' })}
+                  onRemove={() => openPreview(previewBaseballRemoval(state, timelineSheet.playId, names))}
+                />
+              )
+              : (
+                <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Play details">
+                  <p className="text-sm text-content-muted">This play is no longer recorded.</p>
+                  <button type="button" className="btn-secondary w-full" onClick={() => setTimelineSheet({ type: 'none' })}>Close</button>
+                </section>
+              )
+          })()}
+          {timelineSheet.type === 'preview' && (
+            <BaseballCorrectionPreviewSheet
+              preview={timelineSheet.preview}
+              error={timelineSheet.error}
+              onCancel={() => setTimelineSheet({ type: 'none' })}
+              onConfirm={confirmed => confirmCorrection(timelineSheet.preview, confirmed)}
+            />
+          )}
+          {timelineSheet.type === 'none' && (
+            <BaseballTimeline
+              timeline={baseballTimeline(state, names, timelineFilter)}
+              filter={timelineFilter}
+              names={names}
+              onFilter={setTimelineFilter}
+              onSelect={playId => {
+                setError(null)
+                setTimelineSheet({ type: 'detail', playId })
+              }}
+              onRestore={unitId => openPreview(previewBaseballRestore(state, { kind: 'restore_unit', unitId }, names))}
+              onRestoreGroup={receiptId => openPreview(previewBaseballRestore(state, { kind: 'restore_group', receiptId }, names))}
+            />
+          )}
         </section>
       )}
 
