@@ -21,6 +21,8 @@ import {
   hockeyTimelinePeriods,
   type HockeyTimelineFilters,
 } from './timeline'
+import { hockeyParticipantLabel } from './captureCommands'
+import { hockeyTimelineEventFields } from './timelineDetail'
 
 const LABELS = { tracked: 'Blades', opponent: 'Rivals' }
 
@@ -153,6 +155,61 @@ describe('Hockey Timeline rows', () => {
     const failing = rows.filter(row => row.diagnostic)
     expect(failing.map(row => row.label)).toEqual(['Blades goalie change'])
     expect(failing[0].diagnostic).toMatch(/current period|match is not in progress|period/i)
+  })
+
+  it('keeps count-down times for rows after the point where replay stops', () => {
+    let state = expectOk(startHockeyGame(initializedHockeyGame(hockeySetup()), ctx(0)))
+    state = expectOk(endHockeyPeriod(state, { reason: 'Test' }, ctx(5)))
+    state = expectOk(startNextHockeyPeriod(state, ctx(10)))
+    state = expectOk(startHockeyClock(state, ctx(20)))
+    state = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'saved' }, ctx(80)))
+    const shotBefore = hockeyTimeline(state, LABELS).rows.find(row => row.label === 'Blades saved')!
+    expect(shotBefore.displayMs).toBe(840_000)
+
+    const events = (state.eventStream!.events as GameEvent[]).map(event =>
+      event.eventType === 'hockey.period_started' && event.period.id === 'regulation-2'
+        ? { ...event, deletedAt: at(90), revision: event.revision + 1 }
+        : event
+    )
+    const broken: GameState = { ...state, eventStream: { ...state.eventStream!, events } }
+    const { rows } = hockeyTimeline(broken, LABELS)
+    expect(rows.some(row => row.diagnostic)).toBe(true)
+    // Period 2 is missing from the stopped replay; the rules still give its length.
+    expect(rows.find(row => row.label === 'Blades saved')!.displayMs).toBe(840_000)
+  })
+
+  it('shows every recorded field in the detail, with ids as names', () => {
+    let state = clocklessGame()
+    state = expectOk(changeHockeyGoalie(state, {
+      side: 'opponent',
+      inParticipantId: 'opp-2',
+      newOpponentGoalie: { id: 'opp-2', label: 'Backup', number: '1' },
+    }, ctx(9)))
+    const timeline = hockeyTimeline(state, LABELS)
+    const field = (label: string, fields: Array<{ label: string; value: string }>) => fields.find(entry => entry.label === label)?.value
+
+    const lineup = hockeyTimelineEventFields(timeline.rows[0].events[0], timeline.names)
+    expect(field('Goalie', lineup)).toBe('#1 Player 1')
+    expect(field('Skaters', lineup)).toBe('#2 Player 2, #3 Player 3, #4 Player 4, #5 Player 5, #6 Player 6')
+    expect(field('Opponent goalie', lineup)).toBe('#35')
+
+    const change = hockeyTimelineEventFields(timeline.rows.slice(-1)[0].events[0], timeline.names)
+    expect(field('Goalie in', change)).toBe('#1 Backup')
+    // Undo keeps the historical label: removed goalie changes still name their goalie.
+    const undone = undoHockeyCapture(state, at(10))
+    if (!undone.ok) throw new Error(undone.message)
+    expect(hockeyTimeline(undone.state, LABELS).names['opp-2']).toBe('#1 Backup')
+
+    // Setup names a number-only player "#7"; the label shows the number once.
+    expect(hockeyParticipantLabel({ ...hockeySetup().participants[0], number: '7', displayName: '#7' })).toBe('#7')
+
+    const goal = hockeyTimelineEventFields(timeline.rows[2].events[0], timeline.names)
+    expect(goal).toEqual(expect.arrayContaining([
+      { label: 'Shooter', value: '#2 Player 2' },
+      { label: 'Assist', value: '#3 Player 3' },
+      { label: 'Goalie', value: '#35' },
+      { label: 'Strength', value: 'Even strength' },
+    ]))
   })
 
   it('survives hydration unchanged', () => {

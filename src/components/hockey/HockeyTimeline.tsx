@@ -8,9 +8,10 @@ import {
   groupHockeyTimelineByPeriod,
   hockeyTimelinePeriods,
   HOCKEY_TIMELINE_FAMILIES,
-  hockeyOpponentGoalieLabel,
+  hockeyParticipantLabel,
+  hockeyTimelineEventFields,
   type HockeyMatchParticipant,
-  type HockeyOpponentGoalie,
+  type HockeyTimelineNames,
   type HockeySide,
   type HockeyTimelineFamily,
   type HockeyTimelineFilters,
@@ -22,8 +23,8 @@ interface HockeyTimelineProps {
   rows: HockeyTimelineRow[]
   historyMessage: string | null
   participants: HockeyMatchParticipant[]
-  /** Every opponent goalie the game knows, so a stamped goalie reads as a name. */
-  opponentGoalies: HockeyOpponentGoalie[]
+  /** Participant and opponent goalie names by id, from `hockeyTimeline`. */
+  names: HockeyTimelineNames
   sideLabel: (side: HockeySide) => string
 }
 
@@ -31,7 +32,7 @@ interface HockeyTimelineProps {
  * The Timeline tab (HKY-4A): the whole game oldest first by period, with collapsed filters
  * and a read-only detail sheet per row. Editing arrives in HKY-4B.
  */
-export default function HockeyTimeline({ rows, historyMessage, participants, opponentGoalies, sideLabel }: HockeyTimelineProps) {
+export default function HockeyTimeline({ rows, historyMessage, names, participants, sideLabel }: HockeyTimelineProps) {
   const [filters, setFilters] = useState<HockeyTimelineFilters>(DEFAULT_HOCKEY_TIMELINE_FILTERS)
   const [detail, setDetail] = useState<HockeyTimelineRow | null>(null)
   const visible = filterHockeyTimelineRows(rows, filters)
@@ -106,7 +107,7 @@ export default function HockeyTimeline({ rows, historyMessage, participants, opp
               >
                 <option value="">All players</option>
                 {namedParticipants.map(participant => (
-                  <option key={participant.id} value={participant.id}>{participantName(participant)}</option>
+                  <option key={participant.id} value={participant.id}>{hockeyParticipantLabel(participant)}</option>
                 ))}
               </select>
             </label>
@@ -178,8 +179,7 @@ export default function HockeyTimeline({ rows, historyMessage, participants, opp
       {detail && (
         <HockeyTimelineDetail
           row={detail}
-          participants={participants}
-          opponentGoalies={opponentGoalies}
+          names={names}
           sideLabel={sideLabel}
           onClose={() => setDetail(null)}
         />
@@ -194,47 +194,18 @@ function Badge({ children }: { children: string }) {
   )
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  shooter: 'Shooter',
-  assist_primary: 'Assist',
-  assist_secondary: 'Second assist',
-  goalie: 'Goalie',
-  blocker: 'Blocked by',
-  taker: 'Faceoff taker',
-  hitter: 'Hitter',
-  hit_player: 'Player hit',
-  player: 'Player',
-  offender: 'Offender',
-  served_by: 'Served by',
-  drawn_by: 'Drawn by',
-}
-
-/** Payload keys that are plumbing rather than something the recorder chose. */
-const STRENGTH_LABELS: Record<string, string> = { ev: 'Even strength', pp: 'Power play', sh: 'Short-handed' }
-
-const HIDDEN_PAYLOAD_KEYS = new Set(['captureCommandId', 'coincidenceGroupId', 'newOpponentGoalie'])
-
 function HockeyTimelineDetail({
   row,
-  participants,
-  opponentGoalies,
+  names,
   sideLabel,
   onClose,
 }: {
   row: HockeyTimelineRow
-  participants: HockeyMatchParticipant[]
-  opponentGoalies: HockeyOpponentGoalie[]
+  names: HockeyTimelineNames
   sideLabel: (side: HockeySide) => string
   onClose: () => void
 }) {
   const titleId = useId()
-  const name = (id: string) => {
-    if (id === 'empty_net') return 'Empty net'
-    const participant = participants.find(entry => entry.id === id)
-    if (participant) return participantName(participant)
-    const goalie = opponentGoalies.find(entry => entry.id === id)
-    return goalie ? hockeyOpponentGoalieLabel(goalie) : 'Unknown player'
-  }
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
       <div
@@ -273,7 +244,7 @@ function HockeyTimelineDetail({
             </p>
           )}
           {row.events.map(event => (
-            <EventDetail key={event.id} event={event} name={name} sideLabel={sideLabel} multiple={row.events.length > 1} />
+            <EventDetail key={event.id} event={event} names={names} sideLabel={sideLabel} multiple={row.events.length > 1} />
           ))}
           <p className="text-xs text-content-muted">Editing arrives in a later update. Use Undo in Recent Events for the latest capture.</p>
         </div>
@@ -284,20 +255,16 @@ function HockeyTimelineDetail({
 
 function EventDetail({
   event,
-  name,
+  names,
   sideLabel,
   multiple,
 }: {
   event: GameEvent
-  name: (id: string) => string
+  names: HockeyTimelineNames
   sideLabel: (side: HockeySide) => string
   multiple: boolean
 }) {
-  const payload = event.payload as Record<string, unknown>
-  const fields = Object.entries(payload)
-    .filter(([key, value]) => !HIDDEN_PAYLOAD_KEYS.has(key) && value !== null && value !== undefined)
-    .map(([key, value]) => [humanize(key), formatValue(key, value, name)] as const)
-    .filter(([, value]) => value !== '')
+  const fields = hockeyTimelineEventFields(event, names)
   return (
     <section className="space-y-1 rounded-md border border-line p-3">
       {multiple && (
@@ -307,14 +274,7 @@ function EventDetail({
         </h3>
       )}
       <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1">
-        {event.actors.map(actor => (
-          <FieldRow
-            key={`${actor.role}-${actor.participantId ?? actor.label ?? ''}`}
-            label={ROLE_LABELS[actor.role] ?? humanize(actor.role)}
-            value={actor.participantId ? name(actor.participantId) : actor.label ?? 'Not named'}
-          />
-        ))}
-        {fields.map(([label, value]) => <FieldRow key={label} label={label} value={value} />)}
+        {fields.map((field, index) => <FieldRow key={`${field.label}-${index}`} label={field.label} value={field.value} />)}
         {event.location && <FieldRow label="Location" value="On the rink" />}
         <FieldRow label="Recorded" value={new Date(event.occurredAt).toLocaleTimeString()} />
         {event.revision > 1 && <FieldRow label="Revision" value={String(event.revision)} />}
@@ -333,9 +293,6 @@ function FieldRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function participantName(participant: HockeyMatchParticipant): string {
-  return participant.number ? `#${participant.number} ${participant.displayName}` : participant.displayName
-}
 
 function humanize(key: string): string {
   const words = key
@@ -347,20 +304,3 @@ function humanize(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-function formatValue(key: string, value: unknown, name: (id: string) => string): string {
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  if (typeof value === 'number') return key.endsWith('Ms') ? formatHockeyClock(value) : String(value)
-  if (typeof value === 'string') {
-    if (key.endsWith('ParticipantId') || key === 'inParticipantId') return name(value)
-    if (key === 'strength') return STRENGTH_LABELS[value] ?? value.toUpperCase()
-    return key === 'reason' || key.endsWith('Label') ? value : humanize(value)
-  }
-  if (key === 'onIce' && typeof value === 'object') {
-    const onIce = value as { skaterParticipantIds?: string[]; goalie?: string | null; status?: string }
-    if (onIce.status === 'not_recorded') return 'Not recorded'
-    const skaters = (onIce.skaterParticipantIds ?? []).map(name).join(', ')
-    const goalie = onIce.goalie ? `, goalie ${name(onIce.goalie)}` : ''
-    return `${skaters || 'No skaters'}${goalie}${onIce.status === 'partial' ? ' (partial)' : ''}`
-  }
-  return ''
-}

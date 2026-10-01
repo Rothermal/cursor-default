@@ -422,7 +422,6 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         <HockeyTimeline
           {...hockeyTimeline(state, { tracked: trackedLabel, opponent: opponentLabel })}
           participants={sport.setup.participants}
-          opponentGoalies={projection.opponentGoalies}
           sideLabel={sideLabel}
         />
       ) : (

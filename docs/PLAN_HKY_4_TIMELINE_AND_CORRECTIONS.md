@@ -292,7 +292,9 @@ owner wants it tracked.
   exported `groupHockeyCaptureUnits` from `recentEvents.ts`. A unit whose events differ in
   removal splits into an active and a removed row. Rows are stable-sorted by period
   order, capture order within a period. Clock time uses the projection's period
-  durations, so count-down rules show the time left. The first replay diagnostic marks
+  durations, so count-down rules show the time left; a period missing from a replay that
+  stopped early takes its length from the frozen rules, and an unresolvable count-down time
+  shows no clock. The first replay diagnostic marks
   the row holding its event; a diagnostic without a row, or unreadable stored events,
   becomes the Timeline's history message. Helpers: `filterHockeyTimelineRows`,
   `groupHockeyTimelineByPeriod`, `hockeyTimelinePeriods`,
@@ -300,8 +302,13 @@ owner wants it tracked.
 - `HockeyTimeline` component: collapsed filters (family chips, side, period, tracked
   player, Show removed, Clear) with a one-line summary, period groups, badges (PP, SH,
   Removed, Revised, Recorded later) and a "Stops the replay" line on the failing row.
-  Tapping a row opens a read-only detail sheet: actors (opponent goalies by their label),
-  payload fields, on-ice set, recorded time, revision and removal time.
+  Tapping a row opens a read-only detail sheet built from the pure
+  `hockeyTimelineEventFields` (`timelineDetail.ts`): actors and every recorded payload
+  field, with participant and opponent goalie ids named through `hockeyTimelineNames`
+  (setup plus every goalie change in the stream, removed ones included), on-ice set,
+  recorded time, revision and removal time. A value it does not recognize is shown as
+  stored, never dropped. `hockeyParticipantLabel` no longer repeats the number of a
+  number-only player.
 - `HockeyGameTracker`: a Track / Timeline tab switch below the sticky scoreboard. Timeline
   replaces the rink, quick row and Recent Events; the clock and scoreboard stay.
 - No event, schema, fingerprint or migration change.

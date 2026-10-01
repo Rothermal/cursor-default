@@ -3,8 +3,9 @@ import { gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEvent } from '../gameEvents/types'
 import { hockeySportState } from './live'
-import { formatHockeyPeriod, parseHockeyPeriod } from './periods'
+import { formatHockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './periods'
 import { replayHockeyEvents } from './projector'
+import { hockeyTimelineNames } from './timelineDetail'
 import { groupHockeyCaptureUnits, hockeyEventLabel, type HockeySideLabels } from './recentEvents'
 import type { HockeySide, HockeyStrength } from './types'
 import { HOCKEY_CAPTURE_EVENT_TYPES } from './types'
@@ -69,6 +70,8 @@ export interface HockeyTimeline {
   rows: HockeyTimelineRow[]
   /** A problem with the stream itself (malformed events), not tied to one row. */
   historyMessage: string | null
+  /** Display names by participant or opponent goalie id, for the detail sheet. */
+  names: Record<string, string>
 }
 
 export interface HockeyTimelineFilters {
@@ -100,7 +103,7 @@ const DEFAULT_SIDE_LABELS: HockeySideLabels = { tracked: 'Tracked', opponent: 'O
 /** Every row of the game in period order; within a period, capture order (game order until HKY-4C). */
 export function hockeyTimeline(state: GameState, sideLabels: HockeySideLabels = DEFAULT_SIDE_LABELS): HockeyTimeline {
   const sport = hockeySportState(state)
-  if (!sport || !state.eventStream) return { rows: [], historyMessage: null }
+  if (!sport || !state.eventStream) return { rows: [], historyMessage: null, names: {} }
   const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
   const replay = replayHockeyEvents(sport.setup, inspection.activeEvents)
   const failing = replay.diagnostics[0] ?? null
@@ -114,10 +117,13 @@ export function hockeyTimeline(state: GameState, sideLabels: HockeySideLabels = 
   const rows = units.map((unit): HockeyTimelineRow => {
     const first = unit[0]
     const period = parseHockeyPeriod(first.period)
-    const duration = durations.get(first.period.id) ?? null
+    // A replay that stops early has no projected periods after the failure, so fall back to
+    // the frozen rules. A count-down time that cannot be resolved stays unknown.
+    const duration = durations.get(first.period.id)
+      ?? (period ? hockeyPeriodDurationMs(sport.setup.rulesSnapshot, period) : null)
     const displayMs = first.elapsedMs === null
       ? null
-      : countDown && duration !== null ? duration - first.elapsedMs : first.elapsedMs
+      : !countDown ? first.elapsedMs : duration === null ? null : duration - first.elapsedMs
     const shotPayload = first.eventType === 'hockey.shot' ? first.payload as { outcome?: string; strength?: HockeyStrength | null } : null
     return {
       id: first.id,
@@ -145,7 +151,7 @@ export function hockeyTimeline(state: GameState, sideLabels: HockeySideLabels = 
     : failing && !rows.some(row => row.diagnostic)
       ? failing.message
       : null
-  return { rows, historyMessage }
+  return { rows, historyMessage, names: hockeyTimelineNames(sport.setup, all) }
 }
 
 export function filterHockeyTimelineRows(rows: readonly HockeyTimelineRow[], filters: HockeyTimelineFilters): HockeyTimelineRow[] {
