@@ -2,8 +2,21 @@ import { X } from 'lucide-react'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import type { GameState } from '../../types'
 import {
+  addHockeyEvents,
   correctHockeyEvents,
+  formatHockeyClock,
   formatHockeyFinalScore,
+  HOCKEY_FACEOFF_DOT_IDS,
+  hockeyActivePeriod,
+  hockeyAdditionScene,
+  hockeyDisplayFromElapsed,
+  hockeyElapsedFromDisplay,
+  hockeyFaceoffDotLabel,
+  hockeyPlaceablePeriods,
+  hockeyUnitPlacement,
+  parseHockeyClockText,
+  type HockeyFaceoffDotId,
+  type HockeyPlaceTarget,
   hockeyGoalieChangeCorrection,
   hasHockeyCorrectionConsequences,
   hockeyAvailableParticipants,
@@ -32,16 +45,19 @@ import {
   type HockeySideLabels,
   type HockeyTimelineRow,
 } from '../../lib/hockey'
+import HockeyGoalieDialog from './HockeyGoalieDialog'
 import HockeyPenaltyDialog from './HockeyPenaltyDialog'
 import HockeyPlayDialog, { type HockeyPlayDialogKind } from './HockeyPlayDialog'
 import HockeyShotDialog from './HockeyShotDialog'
 import { ActorField, Choices, Group } from './hockeyFields'
 
-export type HockeyTimelineAction = 'edit' | 'remove' | 'restore'
+/** Row actions, plus Add (HKY-4C), which has no row. */
+export type HockeyTimelineAction = 'edit' | 'move' | 'remove' | 'restore' | 'add'
 
 interface HockeyTimelineEditorProps {
   state: GameState
-  row: HockeyTimelineRow
+  /** Null only for Add. */
+  row: HockeyTimelineRow | null
   action: HockeyTimelineAction
   labels: HockeySideLabels
   recentOpponentLabels: string[]
@@ -112,25 +128,49 @@ export default function HockeyTimelineEditor({
   onApply,
   onClose,
 }: HockeyTimelineEditorProps) {
-  const ids = useMemo(() => row.events.map(event => event.id), [row.events])
-  const initial = useMemo(() => (action === 'edit' ? hockeyCorrectionInput(row.events) : null), [action, row.events])
+  const ids = useMemo(() => row?.events.map(event => event.id) ?? [], [row])
+  const initial = useMemo(() => (action === 'edit' && row ? hockeyCorrectionInput(row.events) : null), [action, row])
   const scene = useMemo(() => (action === 'edit' ? hockeyCorrectionScene(state, ids) : null), [action, state, ids])
   const timeline = useMemo(() => hockeyTimeline(state, labels), [state, labels])
-  const [pending, setPending] = useState<Pending | null>(() => (action === 'edit' ? null : confirmation(state, row, action, labels)))
+  const [pending, setPending] = useState<Pending | null>(() =>
+    (action === 'remove' || action === 'restore') && row ? confirmation(state, row, action, labels) : null)
+  // Add (HKY-4C): the family and time picked in the When step.
+  const [adding, setAdding] = useState<{ family: HockeyAddFamily; place: HockeyPlaceTarget } | null>(null)
+  const addScene = useMemo(() => (adding ? hockeyAdditionScene(state, adding.place) : null), [adding, state])
   const [error, setError] = useState<string | null>(null)
 
   const labelOf = (eventId: string) => timeline.rows.find(entry => entry.events.some(event => event.id === eventId))?.label ?? 'An event'
 
-  const edit = (correction: HockeyCorrectionInput): string | null => {
-    const now = new Date().toISOString()
-    const staged = stage(state, updateGoalies => correctHockeyEvents(state, ids, correction, { recorderUserId, now, updateGoalies }))
+  /** Applies a change with nothing else to show, or opens the preview. */
+  const review = (title: string, staged: Staged): string | null => {
     if (staged.error) return staged.error
     if (!hasHockeyCorrectionConsequences(staged.consequences) && staged.repairs.length === 0) {
       onApply((staged.plain.ok ? staged.plain : staged.repaired).state)
       return null
     }
-    setPending({ title: 'Save this change?', staged, alsoChanges: [], releases: [], withReleases: false, updateGoalies: true })
+    setPending({ title, staged, alsoChanges: [], releases: [], withReleases: false, updateGoalies: true })
     return null
+  }
+
+  const edit = (correction: HockeyCorrectionInput): string | null => {
+    const now = new Date().toISOString()
+    return review('Save this change?', stage(state, updateGoalies =>
+      correctHockeyEvents(state, ids, correction, { recorderUserId, now, updateGoalies })))
+  }
+
+  const add = (correction: HockeyCorrectionInput): string | null => {
+    if (!adding) return null
+    const now = new Date().toISOString()
+    return review('Add this event?', stage(state, updateGoalies =>
+      addHockeyEvents(state, correction, adding.place, { recorderUserId, now, updateGoalies })))
+  }
+
+  const move = (place: HockeyPlaceTarget): string | null => {
+    const correction = row ? hockeyCorrectionInput(row.events) : null
+    if (!correction) return 'This row cannot be moved.'
+    const now = new Date().toISOString()
+    return review('Move this event?', stage(state, updateGoalies =>
+      correctHockeyEvents(state, ids, correction, { recorderUserId, now, updateGoalies, place })))
   }
 
   const save = () => {
@@ -165,6 +205,61 @@ export default function HockeyTimelineEditor({
       />
     )
   }
+
+  if (action === 'move' && row) {
+    const goalie = row.events.some(event => event.eventType === 'hockey.goalie_change')
+    return (
+      <HockeyWhenSheet
+        state={state}
+        title={`Change time: ${row.label}`}
+        families={null}
+        allowPeriodStart={goalie}
+        start={hockeyUnitPlacement(row.events) ?? { periodId: row.periodId, elapsedMs: row.events[0].elapsedMs, placement: 'game_time' }}
+        submitLabel="Review changes"
+        onSubmit={(_family, place) => move(place)}
+        onClose={onClose}
+      />
+    )
+  }
+
+  if (action === 'add') {
+    if (!adding) {
+      return (
+        <HockeyWhenSheet
+          state={state}
+          title="Add a missed event"
+          families={ADD_FAMILIES}
+          allowPeriodStart
+          start={null}
+          submitLabel="Next"
+          onSubmit={(family, place) => {
+            setAdding({ family, place })
+            return null
+          }}
+          onClose={onClose}
+        />
+      )
+    }
+    if (!addScene) {
+      return (
+        <EditSheet title="Add a missed event" onClose={onClose}>
+          <p className="text-sm text-content-muted">Events cannot be added here. The game before this time needs repair first.</p>
+        </EditSheet>
+      )
+    }
+    return (
+      <HockeyCorrectionForm
+        initial={additionInitial(adding.family)}
+        adding
+        scene={addScene}
+        labels={labels}
+        recentOpponentLabels={recentOpponentLabels}
+        onSubmit={add}
+        onClose={onClose}
+      />
+    )
+  }
+
   if (!initial || !scene) {
     return (
       <EditSheet title="Edit" onClose={onClose}>
@@ -172,6 +267,67 @@ export default function HockeyTimelineEditor({
       </EditSheet>
     )
   }
+  return (
+    <HockeyCorrectionForm
+      initial={initial}
+      adding={false}
+      scene={scene}
+      labels={labels}
+      recentOpponentLabels={recentOpponentLabels}
+      onSubmit={edit}
+      onClose={onClose}
+    />
+  )
+}
+
+type HockeyAddFamily = 'shot' | 'penalties' | 'play' | 'faceoff' | 'goalie_change'
+
+const ADD_FAMILIES: Array<{ value: HockeyAddFamily; label: string }> = [
+  { value: 'shot', label: 'Shot' },
+  { value: 'penalties', label: 'Penalty' },
+  { value: 'play', label: 'Play' },
+  { value: 'faceoff', label: 'Faceoff' },
+  { value: 'goalie_change', label: 'Goalie' },
+]
+
+/** A blank form for each family; the dialogs fill in the rest. */
+function additionInitial(family: HockeyAddFamily): HockeyCorrectionInput | null {
+  switch (family) {
+    case 'faceoff':
+      return { kind: 'faceoff', input: { dotId: 'center', winner: 'tracked', takerParticipantId: null, opponentTakerLabel: null } }
+    case 'goalie_change':
+      return { kind: 'goalie_change', input: { side: 'tracked', inParticipantId: null, reason: 'tactical', newOpponentGoalie: null } }
+    case 'shot':
+      return { kind: 'shot', input: { side: 'tracked', outcome: 'saved' } }
+    case 'penalties':
+      return { kind: 'penalties', input: { penalties: [] } }
+    case 'play':
+      return { kind: 'play', input: { kind: 'hit', side: 'tracked' } }
+  }
+}
+
+/**
+ * The family's form: the capture dialog for shots, penalties and plays, or a short form.
+ * Adding (HKY-4C) opens the same forms blank; editing opens them prefilled.
+ */
+function HockeyCorrectionForm({
+  initial,
+  adding,
+  scene,
+  labels,
+  recentOpponentLabels,
+  onSubmit,
+  onClose,
+}: {
+  initial: HockeyCorrectionInput | null
+  adding: boolean
+  scene: HockeyCorrectionScene
+  labels: HockeySideLabels
+  recentOpponentLabels: string[]
+  onSubmit: (correction: HockeyCorrectionInput) => string | null
+  onClose: () => void
+}) {
+  if (!initial) return null
   const shared = {
     recentOpponentLabels,
     trackedLabel: labels.tracked,
@@ -188,8 +344,8 @@ export default function HockeyTimelineEditor({
           events={scene.events}
           derivedStrength={scene.derivedStrength}
           onIceLimits={scene.onIceLimits}
-          initial={initial.input}
-          onSubmit={input => edit({ kind: 'shot', input })}
+          initial={adding ? undefined : initial.input}
+          onSubmit={input => onSubmit({ kind: 'shot', input })}
         />
       )
     case 'penalties':
@@ -197,8 +353,8 @@ export default function HockeyTimelineEditor({
         <HockeyPenaltyDialog
           {...shared}
           sport={scene.sport}
-          initial={initial.input}
-          onSubmit={input => edit({ kind: 'penalties', input })}
+          initial={adding ? undefined : initial.input}
+          onSubmit={input => onSubmit({ kind: 'penalties', input })}
         />
       )
     case 'play':
@@ -210,22 +366,43 @@ export default function HockeyTimelineEditor({
           {...shared}
           draft={{ kind, location: null }}
           sport={scene.sport}
-          initial={{
+          initial={adding ? undefined : {
             kind,
             side: initial.input.side,
             player: initial.kind === 'play' ? initial.input.player ?? null : null,
             hitPlayer: initial.kind === 'play' ? initial.input.hitPlayer ?? null : null,
             location: initial.kind === 'timeout' ? null : initial.input.location ?? null,
           }}
-          onSubmit={input => edit({ kind: 'play', input })}
-          onTeamSubmit={input => edit(input.kind === 'timeout'
+          onSubmit={input => onSubmit({ kind: 'play', input })}
+          onTeamSubmit={input => onSubmit(input.kind === 'timeout'
             ? { kind: 'timeout', input: { side: input.side } }
             : { kind: 'team_event', input: { kind: input.kind, side: input.side, location: input.location } })}
         />
       )
     }
+    case 'goalie_change':
+      if (adding) {
+        return (
+          <HockeyGoalieDialog
+            sport={scene.sport}
+            trackedLabel={labels.tracked}
+            opponentLabel={labels.opponent}
+            onSubmit={change => onSubmit({
+              kind: 'goalie_change',
+              input: {
+                side: change.side,
+                inParticipantId: change.inParticipantId,
+                reason: change.inParticipantId === null ? 'pulled' : 'tactical',
+                newOpponentGoalie: change.newOpponentGoalie ?? null,
+              },
+            })}
+            onClose={onClose}
+          />
+        )
+      }
+      return <SimpleEdit initial={initial} adding={false} scene={scene} labels={labels} recentOpponentLabels={recentOpponentLabels} onSubmit={onSubmit} onClose={onClose} />
     default:
-      return <SimpleEdit initial={initial} scene={scene} labels={labels} recentOpponentLabels={recentOpponentLabels} onSubmit={edit} onClose={onClose} />
+      return <SimpleEdit initial={initial} adding={adding} scene={scene} labels={labels} recentOpponentLabels={recentOpponentLabels} onSubmit={onSubmit} onClose={onClose} />
   }
 }
 
@@ -375,6 +552,7 @@ function HockeyCorrectionPreview({
 /** Goalie changes, faceoffs, score adjustments and the shootout: short forms of their own. */
 function SimpleEdit({
   initial,
+  adding,
   scene,
   labels,
   recentOpponentLabels,
@@ -382,6 +560,7 @@ function SimpleEdit({
   onClose,
 }: {
   initial: HockeyCorrectionInput
+  adding: boolean
   scene: HockeyCorrectionScene
   labels: HockeySideLabels
   recentOpponentLabels: string[]
@@ -398,7 +577,7 @@ function SimpleEdit({
   const footer = (onClick: () => void) => (
     <>
       {error && <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
-      <button type="button" className="btn-primary w-full" onClick={onClick}>Review changes</button>
+      <button type="button" className="btn-primary w-full" onClick={onClick}>{adding ? 'Review' : 'Review changes'}</button>
     </>
   )
 
@@ -406,7 +585,7 @@ function SimpleEdit({
     return <GoalieEdit initial={initial.input} scene={scene} labels={labels} onSubmit={submit} onClose={onClose} footer={footer} />
   }
   if (initial.kind === 'faceoff') {
-    return <FaceoffEdit initial={initial.input} scene={scene} labels={labels} recentOpponentLabels={recentOpponentLabels} onSubmit={submit} onClose={onClose} footer={footer} />
+    return <FaceoffEdit initial={initial.input} adding={adding} scene={scene} labels={labels} recentOpponentLabels={recentOpponentLabels} onSubmit={submit} onClose={onClose} footer={footer} />
   }
   if (initial.kind === 'score_adjustment') {
     return <ScoreAdjustmentEdit initial={initial.input} labels={labels} onSubmit={submit} onClose={onClose} footer={footer} />
@@ -505,6 +684,7 @@ function GoalieEdit({
 
 function FaceoffEdit({
   initial,
+  adding,
   scene,
   labels,
   recentOpponentLabels,
@@ -513,6 +693,7 @@ function FaceoffEdit({
   footer,
 }: {
   initial: Extract<HockeyCorrectionInput, { kind: 'faceoff' }>['input']
+  adding: boolean
   scene: HockeyCorrectionScene
   labels: HockeySideLabels
   recentOpponentLabels: string[]
@@ -521,15 +702,25 @@ function FaceoffEdit({
   footer: Footer
 }) {
   const { setup, projection } = scene.sport
+  const [dotId, setDotId] = useState<HockeyFaceoffDotId>(initial.dotId)
+  const direction = hockeyActivePeriod(projection)?.trackedAttackingDirection ?? null
   const [winner, setWinner] = useState<HockeySide>(initial.winner)
   const [taker, setTaker] = useState(initial.takerParticipantId ?? '')
   const [opponentTaker, setOpponentTaker] = useState(initial.opponentTakerLabel ?? '')
   const submit = () => onSubmit({
     kind: 'faceoff',
-    input: { dotId: initial.dotId, winner, takerParticipantId: taker || null, opponentTakerLabel: opponentTaker.trim() || null },
+    input: { dotId, winner, takerParticipantId: taker || null, opponentTakerLabel: opponentTaker.trim() || null },
   })
   return (
-    <EditSheet title="Edit faceoff" onClose={onClose}>
+    <EditSheet title={adding ? 'Add faceoff' : 'Edit faceoff'} onClose={onClose}>
+      {adding && (
+        <label className="block text-sm font-semibold text-content">
+          Dot
+          <select className="input-field mt-1 w-full" value={dotId} onChange={event => setDotId(event.target.value as HockeyFaceoffDotId)}>
+            {HOCKEY_FACEOFF_DOT_IDS.map(id => <option key={id} value={id}>{hockeyFaceoffDotLabel(id, direction, labels)}</option>)}
+          </select>
+        </label>
+      )}
       <Group label="Won by">
         <Choices options={(['tracked', 'opponent'] as const).map(value => ({ value, label: labels[value] }))} value={winner} onChange={setWinner} />
       </Group>
@@ -688,4 +879,106 @@ function choiceText(choice: HockeyActorChoice | null | undefined): string {
 
 function unique(values: string[]): string[] {
   return [...new Set(values)]
+}
+
+/**
+ * The When step (HKY-4C): the period and the clock time as the game shows it, or the start of
+ * the period for a goalie change. Add also picks the kind of event first.
+ */
+function HockeyWhenSheet({
+  state,
+  title,
+  families,
+  allowPeriodStart,
+  start,
+  submitLabel,
+  onSubmit,
+  onClose,
+}: {
+  state: GameState
+  title: string
+  families: Array<{ value: HockeyAddFamily; label: string }> | null
+  allowPeriodStart: boolean
+  start: HockeyPlaceTarget | null
+  submitLabel: string
+  onSubmit: (family: HockeyAddFamily, place: HockeyPlaceTarget) => string | null
+  onClose: () => void
+}) {
+  const periods = useMemo(() => hockeyPlaceablePeriods(state, new Date().toISOString()), [state])
+  const startPeriod = periods.find(period => period.periodId === start?.periodId) ?? periods[periods.length - 1]
+  const [family, setFamily] = useState<HockeyAddFamily>(families?.[0].value ?? 'shot')
+  const [periodId, setPeriodId] = useState(startPeriod?.periodId ?? '')
+  const [atStart, setAtStart] = useState(start?.placement === 'period_start')
+  const [clockText, setClockText] = useState(() =>
+    startPeriod && start?.elapsedMs !== null && start?.elapsedMs !== undefined
+      ? formatHockeyClock(hockeyDisplayFromElapsed(startPeriod, start.elapsedMs))
+      : '')
+  const [error, setError] = useState<string | null>(null)
+  const period = periods.find(entry => entry.periodId === periodId) ?? null
+  const clocked = period?.playedMs !== null && period?.playedMs !== undefined
+  const periodStart = allowPeriodStart && (families === null || family === 'goalie_change')
+
+  const submit = () => {
+    if (!period) return setError('Pick a period that has started.')
+    let place: HockeyPlaceTarget
+    if (periodStart && atStart) {
+      place = { periodId: period.periodId, elapsedMs: clocked ? 0 : null, placement: 'period_start' }
+    } else if (!clocked) {
+      place = { periodId: period.periodId, elapsedMs: null, placement: 'game_time' }
+    } else {
+      const displayMs = parseHockeyClockText(clockText)
+      const elapsedMs = displayMs === null ? null : hockeyElapsedFromDisplay(period, displayMs)
+      if (elapsedMs === null) return setError(`Enter a clock time from 0:00 to ${formatHockeyClock(period.durationMs)}, like 12:34.`)
+      if (period.playedMs !== null && elapsedMs > period.playedMs) return setError('That time has not been played yet in this period.')
+      place = { periodId: period.periodId, elapsedMs, placement: 'game_time' }
+    }
+    const message = onSubmit(family, place)
+    setError(message)
+  }
+
+  return (
+    <EditSheet title={title} onClose={onClose}>
+      {families && (
+        <Group label="Event">
+          <Choices options={families} value={family} onChange={setFamily} columns={3} />
+        </Group>
+      )}
+      <label className="block text-sm font-semibold text-content">
+        Period
+        <select className="input-field mt-1 w-full" value={periodId} onChange={event => setPeriodId(event.target.value)}>
+          {periods.map(entry => <option key={entry.periodId} value={entry.periodId}>{entry.label}</option>)}
+        </select>
+      </label>
+      {periodStart && (
+        <label className="flex items-start gap-2 text-sm text-content">
+          <input type="checkbox" className="mt-1" checked={atStart} onChange={event => setAtStart(event.target.checked)} />
+          <span>
+            At the start of the period
+            <span className="block text-xs text-content-muted">Before every other event of the period, for the goalie who started it.</span>
+          </span>
+        </label>
+      )}
+      {!(periodStart && atStart) && (clocked ? (
+        <label className="block text-sm font-semibold text-content">
+          Clock {period?.countDown ? '(time left)' : '(time played)'}
+          <input
+            className="input-field mt-1 w-full tabular-nums"
+            inputMode="numeric"
+            placeholder={period?.countDown ? formatHockeyClock(period.durationMs) : '0:00'}
+            value={clockText}
+            onChange={event => setClockText(event.target.value)}
+          />
+          {period && period.playedMs !== null && period.playedMs < period.durationMs && (
+            <span className="mt-1 block text-xs font-normal text-content-muted">
+              Played so far: up to {formatHockeyClock(hockeyDisplayFromElapsed(period, period.playedMs))} on the clock.
+            </span>
+          )}
+        </label>
+      ) : (
+        <p className="text-xs text-content-muted">This game has no clock, so the event goes at the end of the period.</p>
+      ))}
+      {error && <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
+      <button type="button" className="btn-primary w-full" onClick={submit}>{submitLabel}</button>
+    </EditSheet>
+  )
 }

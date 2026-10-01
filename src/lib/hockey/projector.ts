@@ -1,5 +1,4 @@
 import type { GameState } from '../../types'
-import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type {
   GameEvent,
   GameEventDiagnostic,
@@ -25,6 +24,7 @@ import {
   hockeyPenaltySegmentsMs,
 } from './penalties'
 import { hockeyPeriod, hockeyPeriodDurationMs, parseHockeyPeriod } from './periods'
+import { hockeyEventPlacement, orderHockeyEvents } from './placement'
 import { HOCKEY_FACEOFF_DOTS, hockeyZone, type HockeyFaceoffDotId } from './rinkGeometry'
 import { hockeyOvertimeSuddenDeath } from './rules'
 import { hockeyTrackedAttackingDirection } from './setup'
@@ -68,7 +68,8 @@ export type HockeyClockMoment =
   | { ok: false; message: string }
 
 /**
- * Replays Hockey events in capture order and stops at the first invalid event. `beforeEach`
+ * Replays Hockey events in game order (capture order, with placed events at their game time,
+ * HKY-4C) and stops at the first invalid event. `beforeEach`
  * sees the projection as it stands just before each event (HKY-4B consequence preview); it
  * must read, never write.
  */
@@ -78,7 +79,7 @@ export function replayHockeyEvents(
   beforeEach?: (event: GameEvent, projection: HockeyMatchProjection) => void
 ): HockeyReplayOutput {
   const replay = new HockeyReplay(setup)
-  const ordered = [...events].sort(compareGameEventCaptureOrder)
+  const ordered = orderHockeyEvents(events)
   const failed = (error: unknown, eventId: string): HockeyReplayOutput => {
     if (!(error instanceof HockeyReplayError)) throw error
     return {
@@ -291,6 +292,13 @@ class HockeyReplay {
       return
     }
     if (event.elapsedMs === null) fail('Anchored Hockey events need the clock time.')
+    const placement = hockeyEventPlacement(event)
+    if (placement) {
+      // A placed event is checked against its period, not the live clock at its insertion point.
+      if (placement === 'period_start' && event.elapsedMs !== 0) fail('A period-start event is at elapsed zero.')
+      if (event.elapsedMs > active.durationMs) fail('That time is past the end of the period.')
+      return
+    }
     const clock = p.clock!
     // A clock set moves the paused clock; its own target is checked with the payload.
     if (event.eventType === 'hockey.clock_set') return
@@ -743,7 +751,8 @@ class HockeyReplay {
   private timeout(event: HockeyEvent<'hockey.timeout'>): void {
     const p = this.projection
     if (p.status !== 'in_progress' || !hockeyActivePeriod(p)) fail('Timeouts are taken during a period.')
-    if (p.clock?.running) fail('Pause the clock for the timeout.')
+    // A placed timeout only counts (HKY-4C); the clock rows around it stay as recorded.
+    if (p.clock?.running && !hockeyEventPlacement(event)) fail('Pause the clock for the timeout.')
     p.timeouts[event.teamSide] += 1
   }
 

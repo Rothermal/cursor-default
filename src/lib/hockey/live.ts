@@ -9,10 +9,18 @@ import {
   initializeGameEventStream,
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { compareGameEventCaptureOrder, inspectGameEventStream, stableJson } from '../gameEvents/stream'
+import { inspectGameEventStream, stableJson } from '../gameEvents/stream'
 import type { GameEvent, GameEventActor, GameEventLocation, GameEventMutation, GameEventPeriod } from '../gameEvents/types'
-import { createHockeyEvent, isHockeyReason } from './events'
+import { createHockeyEvent, isHockeyReason, type CreateHockeyEventInput } from './events'
 import { hockeyPeriod } from './periods'
+import {
+  HOCKEY_PLACEMENT_KEYS,
+  hockeyEventPlacement,
+  hockeyPlacementFields,
+  isPlaceableHockeyEventType,
+  orderHockeyEvents,
+  type HockeyPlacement,
+} from './placement'
 import { hockeyActivePeriod, hockeyClockMomentAt, lastHockeyPeriod, replayHockeyEvents } from './projector'
 import { normalizeHockeyMatchSetup, validateHockeyMatchSetup } from './setup'
 import { createHockeySportGameState } from './state'
@@ -55,10 +63,23 @@ export interface HockeyCommandContext {
   /** When a correction is saved; the update time of revised events. */
   correctedAt?: string
   /**
-   * Correction mode only: amends the whole candidate history before it is checked, for
-   * dependent repairs saved in the same batch (goalie restamping).
+   * Correction and recorded-later modes: amends the whole candidate history before it is
+   * checked, for dependent repairs saved in the same batch (goalie restamping).
    */
   amendCorrection?: (candidate: GameEvent[]) => { events: GameEvent[]; mutations: GameEventMutation[] }
+  /**
+   * Game-order placement (HKY-4C). On an append the new events are recorded later at this game
+   * time; on a correction the unit moves there. The builder sees the game as it stood at that
+   * point, with an anchored clock paused at the given time.
+   */
+  place?: HockeyPlaceTarget
+}
+
+export interface HockeyPlaceTarget {
+  periodId: string
+  /** Clock time on anchored games (zero for period start); null on clockless games. */
+  elapsedMs: number | null
+  placement: HockeyPlacement
 }
 
 export type HockeyPendingEvent = {
@@ -441,6 +462,7 @@ export function runHockeyCommand(
   if (!sport || state.sport?.id !== 'hockey') return failure(state, 'not_hockey', 'This is not a Hockey event game.')
   if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Set up the Hockey game first.')
   if (context.replaceEventIds) return runHockeyCorrection(state, sport, context, context.replaceEventIds, build)
+  if (context.place) return runHockeyAddition(state, sport, context, context.place, build)
   const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
   // Commands decide from a fresh replay, never from the cached projection.
   const replay = replayHockeyEvents(sport.setup, inspection.activeEvents)
@@ -501,7 +523,7 @@ function runHockeyCorrection(
 ): HockeyCommandResult {
   const inspection = inspectGameEventStream(state.eventStream!, gameEventRegistry)
   if (!inspection.complete) return failure(state, 'history_invalid', 'Some stored Hockey events cannot be read.')
-  const ordered = [...inspection.activeEvents].sort(compareGameEventCaptureOrder)
+  const ordered = orderHockeyEvents(inspection.activeEvents)
   const current = replayHockeyEvents(sport.setup, ordered)
   const status = current.projection.status
   if (current.diagnostics.length === 0 && (status === 'suspended' || status === 'abandoned')) {
@@ -509,7 +531,7 @@ function runHockeyCorrection(
   }
   const targets = replaceEventIds.map(id => ordered.find(event => event.id === id))
   if (targets.length === 0 || targets.some(event => !event)) return failure(state, 'rejected', 'That event is no longer active.')
-  const unit = targets as GameEvent[]
+  let unit = targets as GameEvent[]
   if (context.occurredAt !== unit[0].occurredAt) {
     return failure(state, 'rejected', 'A correction is built at the time the event was recorded.')
   }
@@ -517,25 +539,55 @@ function runHockeyCorrection(
   if (unit.some((event, index) => ordered[first + index] !== event)) {
     return failure(state, 'rejected', 'Only one whole capture can be corrected at a time.')
   }
-  const prefix = replayHockeyEvents(sport.setup, ordered.slice(0, first))
+
+  // Where the unit replays: where it is placed now, or where a re-time moves it.
+  const stored = unitPlacement(unit)
+  const place = context.place ?? stored
+  if (context.place) {
+    // A re-time moves the capture; a clock pause taken with a live timeout stays where it was.
+    unit = unit.filter(event => !CLOCK_EVENT_TYPES.has(event.eventType))
+    if (unit.length === 0) return failure(state, 'rejected', 'Clock rows cannot be moved.')
+    const message = checkHockeyPlaceTarget(sport, current.projection, context.place, context.correctedAt ?? context.occurredAt)
+    if (message) return failure(state, 'rejected', message)
+  }
+  const moving = new Set(unit.map(event => event.id))
+  const others = ordered.filter(event => !moving.has(event.id))
+  // A content edit keeps the unit where it replays now; a re-time finds its new point with
+  // the unit's own capture identity, so same-time placed events keep their order.
+  const prefixEvents = context.place
+    ? hockeyEventsBeforePlacement(others, context.place, unit[0])
+    : ordered.slice(0, first)
+  const prefix = replayHockeyEvents(sport.setup, prefixEvents)
   if (prefix.diagnostics.length > 0) {
     return failure(state, 'history_invalid', 'The history before this event needs repair first.')
   }
-  const built = build(sport, prefix.projection)
+  const built = build(sport, place ? hockeyPlacedFrame(prefix.projection, place) : prefix.projection)
   if (typeof built === 'string') return failure(state, 'rejected', built)
   if (!Array.isArray(built)) return failure(state, built.code, built.message)
   if (built.length !== unit.length || built.some((pending, index) => pending.eventType !== unit[index].eventType)) {
     return failure(state, 'rejected', 'This change adds or removes events. Remove the row and record it again instead.')
+  }
+  if (place) {
+    const message = checkPlacedBuild(built, place)
+    if (message) return failure(state, 'rejected', message)
   }
 
   const now = context.correctedAt ?? context.occurredAt
   const mutations: GameEventMutation[] = []
   const revised = unit.map((event, index) => {
     const pending = built[index]
+    const flags = hockeyPlacementFields(event)
+    const payload = place
+      ? withPlacement(pending.payload, place.placement, {
+          recordedLater: flags.recordedLater,
+          // Moving a live capture marks it re-timed; a recorded-later event keeps its badge.
+          retimed: flags.retimed || (context.place !== undefined && !flags.recordedLater),
+        })
+      : pending.payload
     const next = createHockeyEvent({
       id: event.id,
       eventType: pending.eventType,
-      payload: pending.payload,
+      payload,
       period: pending.period,
       elapsedMs: pending.elapsedMs,
       teamSide: pending.teamSide,
@@ -544,7 +596,7 @@ function runHockeyCorrection(
       recorderUserId: event.recorderUserId,
       sequence: event.sequence,
       occurredAt: event.occurredAt,
-    }) as unknown as GameEvent
+    } as CreateHockeyEventInput<HockeyEventType>) as unknown as GameEvent
     const changes = {
       period: next.period,
       elapsedMs: next.elapsedMs,
@@ -569,7 +621,8 @@ function runHockeyCorrection(
     const check = gameEventRegistry.inspect(event)
     if (!check.ok) return failure(state, 'rejected', check.diagnostic.message)
   }
-  let candidate: GameEvent[] = [...ordered.slice(0, first), ...revised, ...ordered.slice(first + unit.length)]
+  const revisedById = new Map(revised.map(event => [event.id, event]))
+  let candidate: GameEvent[] = ordered.map(event => revisedById.get(event.id) ?? event)
   if (context.amendCorrection) {
     const amended = context.amendCorrection(candidate)
     candidate = amended.events
@@ -581,6 +634,180 @@ function runHockeyCorrection(
   if (!result.ok) return failure(state, 'rejected', result.error.message)
   // A correction ends the chance to restore the last undone capture (the Basketball rule).
   return { ok: true, state: withHockeyUndoReceipt(result.state, null), events: revised }
+}
+
+/**
+ * Recorded-later path (HKY-4C): the builder runs against the game as it stood at the chosen
+ * game time, and the new events append in capture order but replay at that time.
+ */
+function runHockeyAddition(
+  state: GameState,
+  sport: HockeySportGameState,
+  context: HockeyCommandContext,
+  place: HockeyPlaceTarget,
+  build: (sport: HockeySportGameState, projection: HockeyMatchProjection) => Built
+): HockeyCommandResult {
+  const inspection = inspectGameEventStream(state.eventStream!, gameEventRegistry)
+  const ordered = orderHockeyEvents(inspection.activeEvents)
+  const current = replayHockeyEvents(sport.setup, ordered)
+  if (!inspection.complete || current.diagnostics.length > 0) {
+    return failure(state, 'history_invalid', 'The Hockey event history needs repair before new events are recorded.')
+  }
+  const status = current.projection.status
+  if (status === 'suspended' || status === 'abandoned') return failure(state, 'rejected', 'Reopen the game to add to it.')
+  const message = checkHockeyPlaceTarget(sport, current.projection, place, context.occurredAt)
+  if (message) return failure(state, 'rejected', message)
+  const prefix = replayHockeyEvents(sport.setup, hockeyEventsBeforePlacement(ordered, place))
+  if (prefix.diagnostics.length > 0) return failure(state, 'history_invalid', 'The history before that time needs repair first.')
+  const built = build(sport, hockeyPlacedFrame(prefix.projection, place))
+  if (typeof built === 'string') return failure(state, 'rejected', built)
+  if (!Array.isArray(built)) return failure(state, built.code, built.message)
+  const placedMessage = checkPlacedBuild(built, place)
+  if (placedMessage) return failure(state, 'rejected', placedMessage)
+
+  let sequence = nextHockeyEventSequence(state.eventStream!.events, context.recorderUserId)
+  const events = built.map((pending, index) => createHockeyEvent({
+    id: context.eventIds?.[index],
+    eventType: pending.eventType,
+    payload: withPlacement(pending.payload, place.placement, { recordedLater: true, retimed: false }),
+    period: pending.period,
+    elapsedMs: pending.elapsedMs,
+    teamSide: pending.teamSide,
+    location: pending.location,
+    actors: pending.actors,
+    recorderUserId: context.recorderUserId,
+    sequence: sequence++,
+    occurredAt: context.occurredAt,
+  } as CreateHockeyEventInput<HockeyEventType>) as unknown as GameEvent)
+  for (const event of events) {
+    const check = gameEventRegistry.inspect(event)
+    if (!check.ok) return failure(state, 'rejected', check.diagnostic.message)
+  }
+  let candidate: GameEvent[] = [...ordered, ...events]
+  const mutations: GameEventMutation[] = []
+  if (context.amendCorrection) {
+    const amended = context.amendCorrection(candidate)
+    candidate = amended.events
+    mutations.push(...amended.mutations)
+  }
+  const replay = replayHockeyEvents(sport.setup, candidate)
+  if (replay.diagnostics.length > 0) return failure(state, 'rejected', replay.diagnostics[0].message)
+  const result = applyGameEventAppendsAndMutations(state, events, mutations, context.occurredAt, gameEventRegistry, gameEventProjectors)
+  if (!result.ok) return failure(state, 'rejected', result.error.message)
+  return { ok: true, state: withHockeyUndoReceipt(result.state, null), events }
+}
+
+const CLOCK_EVENT_TYPES = new Set<string>(['hockey.clock_started', 'hockey.clock_paused', 'hockey.clock_set'])
+
+/** The unit's stored placement, when its capture events are placed. */
+function unitPlacement(unit: readonly GameEvent[]): HockeyPlaceTarget | null {
+  const placed = unit.find(event => hockeyEventPlacement(event) !== null)
+  if (!placed) return null
+  return { periodId: placed.period.id, elapsedMs: placed.elapsedMs, placement: hockeyEventPlacement(placed)! }
+}
+
+/**
+ * Active events that replay before an event placed at `place` (game order). A new addition
+ * goes after every placed event at the same point; an existing event being re-timed passes
+ * itself as `existing`, so it keeps its capture-order tie-break.
+ */
+export function hockeyEventsBeforePlacement(
+  events: readonly GameEvent[],
+  place: HockeyPlaceTarget,
+  existing?: Pick<GameEvent, 'id' | 'sequence'>
+): GameEvent[] {
+  const probe = placeProbe(place, existing)
+  const ordered = orderHockeyEvents([...events, probe])
+  return ordered.slice(0, ordered.indexOf(probe))
+}
+
+/** A stand-in for the placed event, to find its position in game order. */
+function placeProbe(place: HockeyPlaceTarget, existing?: Pick<GameEvent, 'id' | 'sequence'>): GameEvent {
+  return {
+    id: existing?.id ?? '\uffff-placement-probe',
+    sportId: 'hockey',
+    eventType: 'hockey.shot',
+    schemaVersion: 1,
+    recorderUserId: '\uffff',
+    sequence: existing?.sequence ?? Number.MAX_SAFE_INTEGER,
+    period: { id: place.periodId, order: 0 },
+    elapsedMs: place.elapsedMs,
+    occurredAt: '9999-12-31T23:59:59.999Z',
+    teamSide: 'neutral',
+    location: null,
+    actors: [],
+    payload: { placement: place.placement },
+    revision: 1,
+    createdAt: '9999-12-31T23:59:59.999Z',
+    updatedAt: '9999-12-31T23:59:59.999Z',
+    deletedAt: null,
+  } as GameEvent
+}
+
+/** The projection at the placement with an anchored clock paused at the placed time. */
+export function hockeyPlacedFrame(projection: HockeyMatchProjection, place: HockeyPlaceTarget): HockeyMatchProjection {
+  if (!projection.clock || place.elapsedMs === null) return projection
+  return {
+    ...projection,
+    clock: {
+      ...projection.clock,
+      running: false,
+      elapsedMs: place.elapsedMs,
+      anchorElapsedMs: null,
+      anchorOccurredAt: null,
+      expired: false,
+    },
+  }
+}
+
+/** Whether a placement names a started period and a time inside what has been played of it. */
+export function checkHockeyPlaceTarget(
+  sport: HockeySportGameState,
+  projection: HockeyMatchProjection,
+  place: HockeyPlaceTarget,
+  occurredAt: string
+): string | null {
+  const period = projection.periods.find(entry => entry.id === place.periodId)
+  if (!period) return 'Pick a period that has started.'
+  const anchored = sport.setup.rulesSnapshot.clockModel === 'anchored'
+  if (!anchored) return place.elapsedMs === null ? null : 'This game has no clock.'
+  if (place.elapsedMs === null || !Number.isInteger(place.elapsedMs) || place.elapsedMs < 0) return 'Enter the clock time.'
+  if (place.placement === 'period_start') return place.elapsedMs === 0 ? null : 'A period-start event is at 0:00 played.'
+  let limit = period.endedAtElapsedMs ?? period.durationMs
+  if (period.id === projection.activePeriodId && projection.clock) {
+    const moment = hockeyClockMomentAt(projection.clock, occurredAt, period.durationMs)
+    if (!moment.ok) return moment.message
+    limit = moment.elapsedMs
+  }
+  return place.elapsedMs > limit ? 'That time has not been played yet in this period.' : null
+}
+
+function checkPlacedBuild(built: readonly HockeyPendingEvent[], place: HockeyPlaceTarget): string | null {
+  for (const pending of built) {
+    if (!isPlaceableHockeyEventType(pending.eventType)) return 'This kind of event cannot be placed at a game time.'
+    if (place.placement === 'period_start' && pending.eventType !== 'hockey.goalie_change') {
+      return 'Only a goalie change is placed at the period start.'
+    }
+    if (pending.period.id !== place.periodId || pending.elapsedMs !== place.elapsedMs) {
+      return 'The event must be recorded at the chosen time.'
+    }
+  }
+  return null
+}
+
+function withPlacement<T>(
+  payload: T,
+  placement: HockeyPlacement,
+  flags: { recordedLater: boolean; retimed: boolean }
+): T {
+  const base = { ...(payload as Record<string, unknown>) }
+  for (const key of HOCKEY_PLACEMENT_KEYS) delete base[key]
+  return {
+    ...base,
+    placement,
+    ...(flags.recordedLater ? { recordedLater: true } : {}),
+    ...(flags.retimed ? { retimed: true } : {}),
+  } as T
 }
 
 /** Sets or clears the Restore receipt; it lives in device preferences, outside fingerprints. */

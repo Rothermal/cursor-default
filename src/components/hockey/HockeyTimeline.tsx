@@ -9,6 +9,7 @@ import {
   hockeyTimelinePeriods,
   HOCKEY_TIMELINE_FAMILIES,
   canRemoveHockeyEvents,
+  isPlaceableHockeyEventType,
   hockeyCorrectionInput,
   hockeyParticipantLabel,
   hockeyTimelineEventFields,
@@ -35,11 +36,14 @@ interface HockeyTimelineProps {
    */
   correctionBlocked?: string | null
   onCorrect?: (row: HockeyTimelineRow, action: HockeyTimelineAction) => void
+  /** Recorded-later additions (HKY-4C). */
+  onAdd?: () => void
 }
 
 /**
  * The Timeline tab (HKY-4A): the whole game oldest first by period, with collapsed filters
- * and a detail sheet per row. The sheet offers Edit, Remove and Restore (HKY-4B).
+ * and a detail sheet per row. The sheet offers Edit, Remove and Restore (HKY-4B)
+ * and Change time; Add a missed event records one later (HKY-4C).
  */
 export default function HockeyTimeline({
   rows,
@@ -49,6 +53,7 @@ export default function HockeyTimeline({
   sideLabel,
   correctionBlocked = null,
   onCorrect,
+  onAdd,
 }: HockeyTimelineProps) {
   const [filters, setFilters] = useState<HockeyTimelineFilters>(DEFAULT_HOCKEY_TIMELINE_FILTERS)
   const [detail, setDetail] = useState<HockeyTimelineRow | null>(null)
@@ -66,6 +71,9 @@ export default function HockeyTimeline({
 
   return (
     <section className="space-y-3" aria-label="Timeline">
+      {onAdd && !correctionBlocked && (
+        <button type="button" className="btn-secondary w-full" onClick={onAdd}>Add a missed event</button>
+      )}
       <details className="rounded-md border border-line bg-surface">
         <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 text-sm font-semibold text-content">
           <span>Filters</span>
@@ -173,13 +181,14 @@ export default function HockeyTimeline({
                     <span className={`block ${row.removed ? 'text-content-muted line-through' : row.capture ? 'text-content' : 'text-content-muted'}`}>
                       {row.label}
                     </span>
-                    {(row.strength === 'pp' || row.strength === 'sh' || row.removed || row.revised || row.recordedLater) && (
+                    {(row.strength === 'pp' || row.strength === 'sh' || row.removed || row.revised || row.recordedLater || row.retimed) && (
                       <span className="mt-0.5 flex flex-wrap gap-1">
                         {row.strength === 'pp' && <Badge>PP</Badge>}
                         {row.strength === 'sh' && <Badge>SH</Badge>}
                         {row.removed && <Badge>Removed</Badge>}
                         {row.revised && !row.removed && <Badge>Revised</Badge>}
                         {row.recordedLater && <Badge>Recorded later</Badge>}
+                        {row.retimed && <Badge>Re-timed</Badge>}
                       </span>
                     )}
                     {row.diagnostic && (
@@ -234,6 +243,7 @@ function HockeyTimelineDetail({
   const titleId = useId()
   const removable = canRemoveHockeyEvents(row.events)
   const editable = !row.removed && hockeyCorrectionInput(row.events) !== null
+  const movable = editable && row.events.some(event => isPlaceableHockeyEventType(event.eventType))
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
       <div
@@ -283,7 +293,8 @@ function HockeyTimelineDetail({
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {editable && <button type="button" className="btn-primary" onClick={() => onCorrect('edit')}>Edit</button>}
-              <button type="button" className={`btn-secondary ${editable ? '' : 'col-span-2'}`} onClick={() => onCorrect('remove')}>Remove</button>
+              {movable && <button type="button" className="btn-secondary" onClick={() => onCorrect('move')}>Change time</button>}
+              <button type="button" className={`btn-secondary ${editable && !movable ? '' : 'col-span-2'}`} onClick={() => onCorrect('remove')}>Remove</button>
             </div>
           )}
         </div>
