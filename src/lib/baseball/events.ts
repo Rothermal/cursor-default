@@ -25,8 +25,18 @@ import type {
   BaseballPayloadByType,
   BaseballPitchLocation,
   BaseballRunnerMovement,
+  BaseballSubstitution,
 } from './types'
-import { BASEBALL_EVENT_SCHEMA_VERSION } from './types'
+import {
+  BASEBALL_EVENT_SCHEMA_VERSION,
+  BASEBALL_MAX_SUBSTITUTION_CHANGES,
+  BASEBALL_SUBSTITUTION_SCHEMA_VERSION,
+} from './types'
+
+/** Current schema per event type; only substitutions have moved past 1 (BSB-4B). */
+export function baseballEventSchemaVersion(eventType: BaseballEventType): number {
+  return eventType === 'baseball.substitution' ? BASEBALL_SUBSTITUTION_SCHEMA_VERSION : BASEBALL_EVENT_SCHEMA_VERSION
+}
 
 export const BASEBALL_PITCH_RESULTS = [
   'ball',
@@ -124,7 +134,7 @@ export function createBaseballEvent<TType extends BaseballEventType>(
     id: input.id ?? createBaseballUuid(),
     sportId: 'baseball',
     eventType: input.eventType,
-    schemaVersion: BASEBALL_EVENT_SCHEMA_VERSION,
+    schemaVersion: baseballEventSchemaVersion(input.eventType),
     recorderUserId: input.recorderUserId,
     sequence: input.sequence,
     period: input.period,
@@ -150,15 +160,18 @@ function definition(
   eventType: BaseballEventType,
   allowedTeamSides: readonly GameEventTeamSide[],
   validatePayload: PayloadValidator,
-  allowsLocation = false
+  allowsLocation = false,
+  migrations?: GameEventDefinition<GameEvent>['migrations']
 ): GameEventDefinition<GameEvent> {
+  const schemaVersion = baseballEventSchemaVersion(eventType)
   return {
     sportId: 'baseball',
     eventType,
-    currentSchemaVersion: BASEBALL_EVENT_SCHEMA_VERSION,
+    currentSchemaVersion: schemaVersion,
     allowedTeamSides,
+    ...(migrations ? { migrations } : {}),
     validate: event => {
-      if (event.schemaVersion !== BASEBALL_EVENT_SCHEMA_VERSION) {
+      if (event.schemaVersion !== schemaVersion) {
         return { ok: false, message: 'Unsupported Baseball event schema version.' }
       }
       if (event.elapsedMs !== null) {
@@ -206,7 +219,9 @@ export const baseballEventDefinitions: GameEventDefinition<GameEvent>[] = [
     }
     return null
   }),
-  definition('baseball.substitution', OFFENSE, validateSubstitutionPayload),
+  definition('baseball.substitution', OFFENSE, validateSubstitutionPayload, false, {
+    1: migrateSubstitutionV1,
+  }),
   definition('baseball.half_inning_ended', NEUTRAL, payload =>
     exactKeys(payload, ['captureCommandId', 'reason', 'note']) &&
     isCaptureId(payload.captureCommandId) &&
@@ -288,15 +303,74 @@ function validatePlateAppearancePayload(payload: Record<string, unknown>, event:
     : 'A plate appearance must say what happened to the batter.'
 }
 
-function validateSubstitutionPayload(payload: Record<string, unknown>): string | null {
-  if (!exactKeys(payload, ['captureCommandId', 'substitution'])) return 'Invalid substitution payload.'
+/**
+ * The changes of a substitution payload in either schema. Replay and labels read stored
+ * events that may not have passed through the registry migration yet (for example Restore).
+ */
+export function baseballSubstitutionChanges(payload: unknown): BaseballSubstitution[] {
+  if (!isPlainObject(payload)) return []
+  if (Array.isArray(payload.changes)) return payload.changes as BaseballSubstitution[]
+  return isPlainObject(payload.substitution) ? [payload.substitution as unknown as BaseballSubstitution] : []
+}
+
+/**
+ * True for a substitution saved before BSB-4B, read raw (`substitution`) or migrated
+ * (`legacyLineupRules`). It replays under the BSB-4A single-change rules so saved games
+ * keep the history they were recorded with; new writes never carry the marker.
+ */
+export function baseballSubstitutionUsesLegacyRules(payload: unknown): boolean {
+  return isPlainObject(payload) && (isPlainObject(payload.substitution) || payload.legacyLineupRules === true)
+}
+
+/**
+ * Schema 1 carried one `substitution`; schema 2 wraps it as the only change and keeps its
+ * provenance, so the stricter BSB-4B lineup checks never reject a history BSB-4A accepted.
+ */
+function migrateSubstitutionV1(event: GameEvent): GameEvent {
+  const payload = event.payload
+  if (!isPlainObject(payload) || !exactKeys(payload, ['captureCommandId', 'substitution'])) {
+    throw new Error('Invalid schema 1 substitution payload.')
+  }
+  return {
+    ...event,
+    schemaVersion: 2,
+    payload: { captureCommandId: payload.captureCommandId, changes: [payload.substitution], legacyLineupRules: true },
+  } as GameEvent
+}
+
+const OPPONENT_KINDS = new Set(['opponent_pitcher', 'opponent_slot'])
+
+function validateSubstitutionPayload(payload: Record<string, unknown>, event: GameEvent): string | null {
+  const legacy = 'legacyLineupRules' in payload
+  if (!exactKeys(payload, legacy ? ['captureCommandId', 'changes', 'legacyLineupRules'] : ['captureCommandId', 'changes'])) {
+    return 'Invalid substitution payload.'
+  }
   if (!isCaptureId(payload.captureCommandId)) return 'Invalid capture command id.'
-  const substitution = payload.substitution
+  const changes = payload.changes
+  if (!Array.isArray(changes) || changes.length < 1 || changes.length > BASEBALL_MAX_SUBSTITUTION_CHANGES) {
+    return 'A substitution makes one to six changes.'
+  }
+  // Only the schema 1 migration writes the marker: one BSB-4A change.
+  if (legacy && (payload.legacyLineupRules !== true || changes.length !== 1 || (changes[0] as { kind?: unknown })?.kind === 'batting_slot')) {
+    return 'Invalid substitution payload.'
+  }
+  for (const change of changes) {
+    const message = validateSubstitution(change)
+    if (message) return message
+  }
+  const opponent = changes.filter(change => OPPONENT_KINDS.has((change as { kind: string }).kind)).length
+  if (event.teamSide !== 'opponent') return opponent > 0 ? 'That change belongs to the opponent.' : null
+  if (opponent !== changes.length) return 'The opponent is tracked by batting slot and pitcher only.'
+  return changes.length === 1 ? null : 'Opponent changes are recorded one at a time.'
+}
+
+function validateSubstitution(substitution: unknown): string | null {
   if (!isPlainObject(substitution)) return 'Invalid substitution.'
   switch (substitution.kind) {
     case 'pinch_hitter':
     case 'pinch_runner':
     case 'courtesy_runner':
+    case 'batting_slot':
       return exactKeys(substitution, ['kind', 'incomingId', 'outgoingId']) &&
         isId(substitution.incomingId) &&
         isId(substitution.outgoingId) &&

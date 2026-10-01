@@ -185,12 +185,13 @@ export function recordBaseballBaserunning(
 export function substituteBaseball(
   state: GameState,
   side: BaseballTeamSide,
-  substitution: BaseballSubstitution,
+  changes: BaseballSubstitution | readonly BaseballSubstitution[],
   context: BaseballCommandContext
 ): BaseballCommandResult {
+  const list = Array.isArray(changes) ? changes : [changes as BaseballSubstitution]
   return append(state, context, 'baseball.substitution', side, {
     captureCommandId: captureId(context),
-    substitution: substitution as BaseballPayloadByType['baseball.substitution']['substitution'],
+    changes: list.map(change => ({ ...change })) as BaseballPayloadByType['baseball.substitution']['changes'],
   })
 }
 

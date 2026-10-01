@@ -459,3 +459,39 @@ these answers; a later change of mind lands as its own plan revision.
   from the runner menu, pinch hitter, both open positions filled, a position switch,
   player details, reload unchanged, no horizontal scroll, dark theme.
 
+### BSB-4B Double switch and DH forfeiture
+
+- `baseball.substitution` moved to schema 2: `{ captureCommandId, changes }`, one to six
+  changes applied in order. Only the result has to be a legal lineup. Opponent changes
+  stay one per event. Schema 1 events migrate on read through the registry, and
+  `baseballSubstitutionChanges` reads both shapes because Restore replays stored events
+  directly. Older games replay unchanged: the migration marks the event
+  `legacyLineupRules: true` (raw schema 1 payloads count too), and such events replay
+  under exactly the BSB-4A checks, skipping the whole-event checks below. The marker is
+  accepted only on one BSB-4A change, and new writes never carry it. A DH already in the
+  field from such a history does not block later, unrelated changes.
+- Rules checked once per event: a fielder moved off a position must hold a new one or
+  have left the game (extra-hitter and continuous batters may stay in as batters); a
+  non-batting pitcher who loses the position leaves the game. In a DH game, the DH slot
+  is the one whose setup starter had no position; while the pitcher does not bat, its
+  occupant may not take the field, and once every fielder bats the DH cannot return.
+  This is stricter than BSB-4A in two cases: a DH taking a filled position on its own,
+  and a position change that drops a fielder, are now rejected unless the event also
+  places that fielder.
+- New change `batting_slot`: a fielder who does not bat (the pitcher in a DH game) takes
+  a player's batting slot, and that player leaves.
+- Lineup sheet: **Double switch** picks the position, the new pitcher, the new fielder and
+  the batting slots (switched by default, or unchanged); **End the DH** offers the DH to
+  any position (the fielder there leaves and the pitcher bats in that slot; the DH
+  pitching sends the pitcher out) or the pitcher batting for the DH. Summaries name every
+  slot and who leaves. Recent plays read "Double switch: ..." and "...; the DH role ends".
+- `multiSubstitutions.test.ts` covers the migration (inspection, raw replay, Undo and
+  Restore of a schema 1 event), a literal pre-BSB-4B fixture for the DH filling an open
+  catcher spot after a pinch hitter (hydration, reload, review, Undo/Restore, legal options
+  and continued play, while the same new write is rejected), BSB-4A checks still applied
+  to saved events, a forged marker rejected, whole-event checks, the double switch pickers and result,
+  each forfeiture path and its rejections, and the rendered pickers. The BSB-4A engine
+  cross-check now also replays every multi-change option. Browser smoke at 390px: a
+  double switch at LF and the DH taking LF, reload unchanged, no horizontal scroll, dark
+  theme.
+

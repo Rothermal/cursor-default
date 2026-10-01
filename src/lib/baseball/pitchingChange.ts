@@ -12,8 +12,7 @@ import type { BaseballOpponentPitcher, BaseballPitchHand, BaseballSportGameState
  * - a fielder swaps with the pitcher (one `position_change` with two assignments); both
  *   keep their batting slots.
  *
- * Anything else (a double switch, the old pitcher to a third position) is a defensive switch
- * and stays in BSB-4.
+ * A double switch is a multi-change substitution on the Lineup tab (BSB-4B).
  */
 export interface BaseballPitchingChangeOption {
   kind: 'bench' | 'fielder'

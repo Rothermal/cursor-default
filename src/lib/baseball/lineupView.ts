@@ -1,4 +1,5 @@
 import { baseballFieldingPositionCode } from './positions'
+import { baseballDesignatedHitterSlot } from './projector'
 import { baseballPersonLabel } from './trackerView'
 import type {
   BaseballBase,
@@ -99,6 +100,23 @@ export function baseballOriginalSlot(sport: BaseballSportGameState, id: string):
  * null. Mirrors the projector: nobody already in the game, and re-entry only as the rules
  * allow (a starter returns once, to the original slot).
  */
+/** Fielders who do not bat: the pitcher while a DH bats for them. */
+export function baseballNonBattingFielders(sport: BaseballSportGameState): string[] {
+  const lineup = sport.projection.lineups.tracked
+  return Object.values(lineup.defense).filter(id => !lineup.battingOrder.includes(id))
+}
+
+/**
+ * The player in the DH slot while the DH role lasts, else null. The role ends for the game
+ * once every fielder bats (BSB-4B forfeiture), and only a DH-format setup that used one has it.
+ */
+export function baseballDesignatedHitterId(sport: BaseballSportGameState): string | null {
+  const slot = baseballDesignatedHitterSlot(sport.setup)
+  if (slot === null || baseballNonBattingFielders(sport).length === 0) return null
+  const id = sport.projection.lineups.tracked.battingOrder[slot] ?? null
+  return id && !Object.values(sport.projection.lineups.tracked.defense).includes(id) ? id : null
+}
+
 export function baseballCanEnter(sport: BaseballSportGameState, id: string, slot: number | null): boolean {
   if (!sport.setup.participants.some(participant => participant.id === id)) return false
   if (baseballIsActive(sport, id)) return false
@@ -144,7 +162,7 @@ function positionLabel(sport: BaseballSportGameState, id: string, slot: number):
   if (!starter || Object.values(sport.setup.trackedLineup.defense).includes(starter)) return 'No position'
   switch (sport.setup.rulesSnapshot.battingOrderFormat) {
     case 'designated_hitter':
-      return 'DH'
+      return baseballDesignatedHitterId(sport) === id ? 'DH' : 'No position'
     case 'extra_hitter':
       return 'EH'
     default:
