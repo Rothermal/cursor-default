@@ -2,6 +2,7 @@
 
 Status: draft for owner review (2026-10-01), revised after the first plan review
 (attribution warnings, stamped actors, lifecycle boundaries, correction receipts).
+Owner answers (2026-10-01): Q1–Q7 follow the recommendations, for now (section 9).
 Implementation starts only after this plan PR is approved or merged. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
 BSB-2 ([setup](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)) and BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)). Product model:
@@ -378,9 +379,11 @@ expectedRevision }] }`.
 
 ## 9. Owner Questions
 
-Each has a recommendation; one word answers are enough.
+Answered 2026-10-01: Mark chose the recommendation for every question "for now"
+(Remove-later, Yes, Later, Tab, Yes, Warn, Yes). The slices above already assume
+these answers; a later change of mind lands as its own plan revision.
 
-| # | Question | Options | Recommended |
+| # | Question | Options | Recommended (chosen) |
 | --- | --- | --- | --- |
 | Q1 | When an edit or removal would break later plays, what happens? | **Remove-later**: the preview lists them, including any half end, game end or reopen they depend on, and you may remove them too (restorable together), then re-enter / **Block**: refuse until you remove them yourself, newest first | Remove-later |
 | Q2 | Support double switches and DH forfeiture now? | **Yes** (BSB-4B, new versioned payload) / **Later** (single changes only in BSB-4) | Yes |
