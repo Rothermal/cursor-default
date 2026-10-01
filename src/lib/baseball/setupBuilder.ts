@@ -6,7 +6,7 @@ import { normalizeBaseballPosition } from './positions'
 import { createBaseballMatchRules, DEFAULT_BASEBALL_PROFILE_ID } from './profiles'
 import { resolveBaseballTeamRules, type BaseballLineupDefaults, type BaseballTeamSettingsV1 } from './settings'
 import { normalizeBaseballMatchSetup, validateBaseballMatchSetup } from './state'
-import type { BaseballHomeAway, BaseballMatchRules, BaseballMatchSetup } from './types'
+import type { BaseballBatHand, BaseballHomeAway, BaseballMatchRules, BaseballMatchSetup, BaseballPitchHand } from './types'
 
 /** A roster player available to this game (cloud roster row or a locally entered player). */
 export interface BaseballSetupRosterPlayer {
@@ -20,6 +20,14 @@ export interface BaseballOpponentSlotDraft {
   label: string
   number: string
   position: string
+  /** Optional (BSB-4A). */
+  bats?: BaseballBatHand | null
+}
+
+/** Optional handedness for one tracked player (BSB-4A); unknown when absent. */
+export interface BaseballPlayerHands {
+  bats: BaseballBatHand | null
+  throws: BaseballPitchHand | null
 }
 
 /**
@@ -38,7 +46,9 @@ export interface BaseballSetupDraft {
   /** Fielding number ('1'..'10') -> player id. */
   defense: Record<string, string>
   opponentSlots: BaseballOpponentSlotDraft[]
-  opponentPitcher: { label: string; number: string }
+  opponentPitcher: { label: string; number: string; throws?: BaseballPitchHand | null }
+  /** Roster player id -> hands, entered before the game starts (setup freezes them). */
+  hands?: Record<string, BaseballPlayerHands>
 }
 
 export const DEFAULT_OPPONENT_SLOT_COUNT = 9
@@ -164,6 +174,16 @@ export function missingBaseballDefaultPlayers(
     .filter(id => !available.has(id.toLowerCase()))
 }
 
+/** Sets one hand for a tracked player; null clears it. */
+export function setBaseballDraftHand(
+  draft: BaseballSetupDraft,
+  playerId: string,
+  patch: Partial<BaseballPlayerHands>
+): BaseballSetupDraft {
+  const current = draft.hands?.[playerId] ?? { bats: null, throws: null }
+  return { ...draft, hands: { ...draft.hands, [playerId]: { ...current, ...patch } } }
+}
+
 /** Removing a player from the game also removes them from the lineup. */
 export function setBaseballPlayerSelected(draft: BaseballSetupDraft, playerId: string, selected: boolean): BaseballSetupDraft {
   if (selected) {
@@ -229,8 +249,8 @@ export function buildBaseballMatchSetup(
       displayName: (player.displayName.trim() || 'Player').slice(0, 80),
       number: blankToNull(player.number ?? '', 10),
       position: normalizeBaseballPosition(player.position),
-      bats: null,
-      throws: null,
+      bats: draft.hands?.[player.playerId]?.bats ?? null,
+      throws: draft.hands?.[player.playerId]?.throws ?? null,
     })),
     trackedLineup: {
       battingOrder: draft.battingOrder.map(id => participantFor(id)!),
@@ -241,13 +261,13 @@ export function buildBaseballMatchSetup(
       label: blankToNull(slot.label),
       number: blankToNull(slot.number, 10),
       position: normalizeBaseballPosition(slot.position),
-      bats: null,
+      bats: slot.bats ?? null,
     })),
     opponentPitcher: {
       id: createId(),
       label: blankToNull(draft.opponentPitcher.label),
       number: blankToNull(draft.opponentPitcher.number, 10),
-      throws: null,
+      throws: draft.opponentPitcher.throws ?? null,
     },
   }
   const validation = validateBaseballMatchSetup(setup)

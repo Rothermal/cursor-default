@@ -1,8 +1,9 @@
-import type { BaseballPitchingChangeOption, BaseballPitchingChangeOptions } from '../../lib/baseball'
+import type { BaseballPitchHand, BaseballPitchingChangeOption, BaseballPitchingChangeOptions } from '../../lib/baseball'
+import BaseballHandChoice from './BaseballHandChoice'
 
 export type BaseballPitchingChangeDraft =
   | { side: 'tracked'; selectedId: string | null }
-  | { side: 'opponent'; label: string; number: string }
+  | { side: 'opponent'; label: string; number: string; throws: BaseballPitchHand | null }
 
 interface BaseballPitchingChangeSheetProps {
   draft: BaseballPitchingChangeDraft
@@ -87,6 +88,12 @@ export default function BaseballPitchingChangeSheet({
               onChange={event => onChange({ ...draft, number: event.target.value })}
             />
           </label>
+          <BaseballHandChoice
+            legend="Throws"
+            options={['L', 'R']}
+            value={draft.throws}
+            onChange={throws => onChange({ ...draft, throws: throws as BaseballPitchHand | null })}
+          />
           {!ready && <p className="text-sm text-content-muted">Give the new pitcher a label or a number.</p>}
         </>
       )}

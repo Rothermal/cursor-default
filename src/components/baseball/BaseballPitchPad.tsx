@@ -6,6 +6,7 @@ import {
   baseballPitchPadLocation,
   BASEBALL_MORE_PITCH_RESULTS,
   BASEBALL_PRIMARY_PITCH_RESULTS,
+  type BaseballBatHand,
   type BaseballPitchLocation,
   type BaseballPitchResult,
 } from '../../lib/baseball'
@@ -20,6 +21,8 @@ interface BaseballPitchPadProps {
   disabledReason?: string
   /** The "Runners moved" chip: armed, the next result opens runner resolution first. */
   runnersMoved?: { armed: boolean; onToggle: () => void }
+  /** The current batter's hand, when known (BSB-4A): labels the batter's box. */
+  batterHand?: BaseballBatHand | null
 }
 
 const V = 100
@@ -41,6 +44,7 @@ export default function BaseballPitchPad({
   onResult,
   disabledReason,
   runnersMoved,
+  batterHand = null,
 }: BaseballPitchPadProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const pending = pendingLocation ? baseballPitchPadDisplay(pendingLocation) : null
@@ -79,6 +83,14 @@ export default function BaseballPitchPad({
                 d={`M ${ZONE.x + 4} ${V - 9} h ${ZONE.size - 8} v 2.5 l ${-(ZONE.size - 8) / 2} 4 l ${-(ZONE.size - 8) / 2} -4 Z`}
                 fill="rgb(var(--content-subtle))"
               />
+              {batterHand && (
+                // Catcher's view: a right-handed batter stands on the left, a left-handed one on the right.
+                <g aria-hidden="true" fill="rgb(var(--content-muted))" fontSize="6" fontWeight="600" textAnchor="middle">
+                  {batterHand === 'S'
+                    ? <text x={V / 2} y={ZONE.x - 4}>Bats S</text>
+                    : <text x={batterHand === 'R' ? ZONE.x / 2 : V - ZONE.x / 2} y={V / 2}>Bats {batterHand}</text>}
+                </g>
+              )}
               {pending && (
                 <g aria-hidden="true">
                   <circle cx={pending.x * V} cy={pending.y * V} r="4.2" fill="rgb(var(--accent))" fillOpacity="0.25" stroke="rgb(var(--accent))" strokeWidth="1" />
@@ -87,7 +99,7 @@ export default function BaseballPitchPad({
               )}
             </svg>
             <div className="flex min-h-8 items-center justify-between gap-2 text-xs text-content-muted">
-              <span>Catcher's view</span>
+              <span>Catcher's view{batterHand ? ` · batter bats ${batterHand}` : ''}</span>
               {pendingLocation && (
                 <button type="button" className="font-semibold text-content underline" onClick={() => onLocation(null)}>
                   Clear
@@ -98,6 +110,7 @@ export default function BaseballPitchPad({
         )}
 
         <div className="space-y-2">
+          {!showZone && batterHand && <p className="text-xs text-content-muted">Batter bats {batterHand}</p>}
           {runnersMoved && !disabled && (
             <button
               type="button"

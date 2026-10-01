@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import BaseballHandChoice from '../components/baseball/BaseballHandChoice'
 import BaseballPositionField from '../components/baseball/BaseballPositionField'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
@@ -13,8 +14,10 @@ import {
   DEFAULT_BASEBALL_PROFILE_ID,
   normalizeBaseballMatchRules,
   normalizeBaseballPosition,
+  type BaseballBatHand,
   type BaseballBattingOrderFormat,
   type BaseballMatchRules,
+  type BaseballPitchHand,
   type BaseballProfileId,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
@@ -24,6 +27,7 @@ import {
   createBaseballSetupDraft,
   planBaseballTeamPrefill,
   setBaseballDraftFielder,
+  setBaseballDraftHand,
   setBaseballDraftRules,
   setBaseballPlayerSelected,
   type BaseballSetupDraft,
@@ -350,6 +354,22 @@ function BaseballSetupForm() {
                     {nameOf(player.playerId)}
                     <span className="text-content-muted">· {baseballPositionLabel(player.position)}</span>
                   </label>
+                  {draft.selectedPlayerIds.includes(player.playerId) && (
+                    <div className="mt-1 flex flex-wrap items-center gap-3 pl-6 text-xs text-content-muted">
+                      <span className="flex items-center gap-1">
+                        Bats
+                        <BaseballHandChoice compact legend={`${nameOf(player.playerId)} bats`} options={['L', 'R', 'S']}
+                          value={draft.hands?.[player.playerId]?.bats ?? null}
+                          onChange={bats => setDraft(setBaseballDraftHand(draft, player.playerId, { bats }))} />
+                      </span>
+                      <span className="flex items-center gap-1">
+                        Throws
+                        <BaseballHandChoice compact legend={`${nameOf(player.playerId)} throws`} options={['L', 'R']}
+                          value={draft.hands?.[player.playerId]?.throws ?? null}
+                          onChange={throws => setDraft(setBaseballDraftHand(draft, player.playerId, { throws: throws as BaseballPitchHand | null }))} />
+                      </span>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -427,7 +447,7 @@ function BaseballSetupForm() {
                   opponentSlots: draft.opponentSlots.map((entry, at) => at === index ? { ...entry, ...patch } : entry),
                 })
                 return (
-                  <li key={index} className="grid grid-cols-[1.5rem_1fr_4rem_4rem] items-center gap-2 text-sm">
+                  <li key={index} className="grid grid-cols-[1.5rem_1fr_3.5rem_3.5rem_3.5rem] items-center gap-2 text-sm">
                     <span className="tabular-nums text-content-muted">{index + 1}.</span>
                     <input aria-label={`Opponent batter ${index + 1} name`} placeholder={`Batter ${index + 1}`} className="input-field"
                       maxLength={80} value={slot.label} onChange={event => update({ label: event.target.value })} />
@@ -435,17 +455,30 @@ function BaseballSetupForm() {
                       maxLength={10} value={slot.number} onChange={event => update({ number: event.target.value })} />
                     <input aria-label={`Opponent batter ${index + 1} position`} placeholder="Pos" className="input-field"
                       maxLength={80} value={slot.position} onChange={event => update({ position: event.target.value })} />
+                    <select aria-label={`Opponent batter ${index + 1} bats`} className="input-field px-1" value={slot.bats ?? ''}
+                      onChange={event => update({ bats: (event.target.value || null) as BaseballBatHand | null })}>
+                      <option value="">Bats</option>
+                      <option value="L">L</option>
+                      <option value="R">R</option>
+                      <option value="S">S</option>
+                    </select>
                   </li>
                 )
               })}
             </ol>
-            <div className="grid grid-cols-[1fr_4rem] gap-2">
+            <div className="grid grid-cols-[1fr_4rem_4.5rem] gap-2">
               <input aria-label="Opponent pitcher name" placeholder="Starting pitcher" className="input-field" maxLength={80}
                 value={draft.opponentPitcher.label}
                 onChange={event => setDraft({ ...draft, opponentPitcher: { ...draft.opponentPitcher, label: event.target.value } })} />
               <input aria-label="Opponent pitcher number" placeholder="#" className="input-field" maxLength={10}
                 value={draft.opponentPitcher.number}
                 onChange={event => setDraft({ ...draft, opponentPitcher: { ...draft.opponentPitcher, number: event.target.value } })} />
+              <select aria-label="Opponent pitcher throws" className="input-field px-1" value={draft.opponentPitcher.throws ?? ''}
+                onChange={event => setDraft({ ...draft, opponentPitcher: { ...draft.opponentPitcher, throws: (event.target.value || null) as BaseballPitchHand | null } })}>
+                <option value="">Throws</option>
+                <option value="L">L</option>
+                <option value="R">R</option>
+              </select>
             </div>
           </section>
 
