@@ -1,13 +1,17 @@
 # Plan: BSB-4 Baseball Lineup Management, Timeline and Corrections
 
-Status: draft for owner review (2026-10-01). Implementation starts only after this plan
-PR is approved or merged. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
+Status: draft for owner review (2026-10-01), revised after the first plan review
+(attribution warnings, stamped actors, lifecycle boundaries, correction receipts).
+Implementation starts only after this plan PR is approved or merged. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
 BSB-2 ([setup](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)) and BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 5.4, 8.3 and 12.
 
 Exit condition (BSB-0 roadmap): any recorded mistake can be corrected without
-corrupting later state.
+corrupting later state. Here that means: any play can be edited, or removed together
+with every later row it invalidates (including explicitly confirmed lifecycle rows,
+section 4.1), and the saved history always replays completely. Plays removed by a
+correction can then be re-entered at the end.
 
 ---
 
@@ -101,8 +105,10 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
 - Each play row opens the BSB-3D read-only details, which gain **Edit** and **Remove**.
   Removed plays stay listed, collapsed under the half, with **Restore**.
 - Filters: half-inning, our team or theirs, and plays with a correction.
-- Game-flow rows (start, half end, game end, reopen) stay read-only. A game end is still
-  taken back with Reopen.
+- Game-flow rows (start, half end, game end, reopen) cannot be edited or removed on
+  their own. A game end is still taken back with Reopen. A correction may remove a half
+  end, game end or reopen only as a listed, confirmed dependency of a play it
+  invalidates (section 4.1); the game start is never removed.
 
 ---
 
@@ -114,6 +120,65 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
 | BSB-4B | Multi-change substitutions: double switch and DH forfeiture (Q2) | A double switch is one capture unit with a legal defense after it |
 | BSB-4C | Timeline tab, Remove and Restore of any play with a consequence preview | Any play can be removed and restored, and a removal that would break later plays is explained before it happens |
 | BSB-4D | Edit any play (pitch result, batted ball, runners, overrides, substitutions) | A wrong result early in an inning can be fixed and the rest of the inning replays |
+
+### 4.1 Correction contract (applies to BSB-4C and BSB-4D)
+
+Every correction (remove, restore, edit) is checked by replaying the full candidate
+history before anything is saved. The preview reports four kinds of consequence:
+
+1. **Changes:** score, outs, half-inning and runner differences the recorder should
+   expect.
+2. **Dependents:** later rows the engine would reject. The engine stops at the first
+   one, so the preview repeats the check with that row removed until the rest replays,
+   and lists every dependent found.
+   - No automatic period retagging and no automatic rewriting of later plays, ever.
+     Plays after a removed third out are dependents, because their stamped half is now
+     wrong (`expectCurrentPeriod`).
+   - **Lifecycle rows** are dependents like any other row, but they are listed
+     separately and by name ("Half-inning ended: time limit", "Final", "Game reopened
+     (rain)"). A cascade may remove a manual half end, a game end and any reopen that
+     follows it. It never removes the game start. Appending a new Reopen cannot repair
+     an earlier game end the change invalidated, because replay fails before reaching
+     it. So a game end the correction invalidates is always a dependent, together with
+     its later reopen.
+   - Under Q1 **Block**, any dependent refuses the correction. Under Q1
+     **Remove-later**, the recorder sees the full list and confirms it.
+3. **Attribution changes:** `actor_mismatch` warnings that are new or changed compared
+   with the current history, for every actor role, shown in two groups:
+   - **Fielding credit kept:** fielders keep the credit of the player stamped at
+     capture, and the warning says the lineup now shows someone else (BSB-1 contract).
+   - **Batting or pitching credit moved:** batter and pitcher lines follow the replayed
+     lineup, so the preview says whose line the play now counts for. Example: removing
+     a pinch-hitter substitution does not break the later plate appearance. It replays,
+     credited to the original batter, and the preview says "#14 Ruiz's plate appearance
+     now counts for #7 Lee".
+4. **Unchanged:** a correction that changes none of the above saves without a prompt.
+
+How a correction saves:
+- **Clean:** it saves immediately.
+- **Warnings only (attribution changes):** under Q6 **Warn**, the preview lists them
+  and needs an explicit "Save with these changes"; under Q6 **Block**, it is refused.
+- **Dependents:** follows Q1 as above. Warnings found after dependents are removed are
+  shown in the same preview.
+
+**Correction receipts.** Each saved correction stores a receipt in Baseball sport state:
+`{ id, createdAt, kind: 'remove' | 'edit', primaryEventIds, entries: [{ eventId,
+expectedRevision }] }`.
+- The receipts are bounded (newest 20), kept outside fingerprints like
+  `capturePreferences`, and survive reload, park, export and import as part of the game
+  state.
+- **Restore together** brings back a removal or cascade as one group, only when every
+  entry is still deleted at its expected revision. Otherwise the group is stale; the
+  Timeline says which rows changed, and only individual restore is offered.
+- **Individual restore** of any removed row works with or without a receipt, through
+  the same preview. A row restored on its own drops out of its group.
+- Receipts never grant anything the preview would not: restore is always re-checked
+  against the current history.
+- Edit receipts record which events an edit touched, so the Timeline can show
+  "Revised". Edits are not revertible from the receipt, because the engine keeps
+  revision metadata but not prior values. A wrong edit is fixed by editing again.
+- The quick-Undo `lastUndo` receipt stays separate, and any Timeline correction clears
+  it, as Basketball does.
 
 ### BSB-4A Lineup and single-change substitutions
 
@@ -159,22 +224,17 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
   - capture units from `captureCommandId`, as Recent plays does;
   - removed units with their removal time;
   - filter state.
-- New `src/lib/baseball/corrections.ts`:
-  - `previewBaseballRemoval(state, unitId)` replays the history without the unit and
-    reports one of three outcomes:
-    - **clean:** the score and outs change as listed;
-    - **breaks later plays:** it names the first later play the engine would reject,
-      and why;
-    - **new warnings:** fielding credit now disagrees with the lineup (`actor_mismatch`).
-  - `removeBaseballPlay` applies a removal only when the preview is clean, or when the
-    recorder confirms Q1's cascade.
-  - `restoreBaseballPlay` brings back a removed unit or cascade group under the same
-    check.
-- The Recent plays restore receipt stays separate: any Timeline change clears it, as
-  Basketball does.
-- Removing a pitching change or substitution follows the same preview. For example,
-  removing a pinch hitter whose plate appearance is recorded breaks that plate
-  appearance, and the preview says so.
+- New `src/lib/baseball/corrections.ts`, implementing section 4.1:
+  - `previewBaseballRemoval(state, unitId)` returns the changes, dependents (play and
+    lifecycle rows separately), and attribution changes by role;
+  - `removeBaseballPlay(state, preview, confirmation)` re-runs the preview, rejects a
+    stale one, and applies the unit plus confirmed dependents as one atomic mutation
+    batch with a correction receipt;
+  - `previewBaseballRestore` and `restoreBaseballCorrection` handle group and individual
+    restore under the same checks.
+- Removing a substitution or pitching change follows the same preview. Its later plays
+  usually still replay, with batting or pitching credit moved, so the preview lists
+  them as attribution changes rather than dependents.
 
 ### BSB-4D Edit any play
 
@@ -186,10 +246,23 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
   - the substitution sheet.
 - Each sheet is seeded from the stored event and the projection just before it (a
   prefix replay), so proposals, legal reasons and RBI rules match capture time.
-- Save writes one `update` mutation per changed event in the unit, after the same
-  preview as removal. Some fields are recomputed rather than edited:
-  - the period, which only changes through the Q1 cascade;
-  - stamped actors, which are re-resolved from the prefix projection.
+- Save writes one `update` mutation per changed event in the unit, plus any confirmed
+  dependents' removals, after the section 4.1 preview.
+- The period is never edited. A change that makes later rows land in the wrong half
+  makes them dependents.
+- **Stamped actors are preserved.** An actor role is restamped only when the edit
+  changes it:
+  - a changed fielder list restamps the `fielder_{n}` roles it adds, and drops the ones
+    it removes;
+  - the batter and pitcher stamps stay as recorded;
+  - every untouched role keeps its original participant, even when the prefix lineup
+    now shows someone else.
+
+  A location-only or result-only edit therefore leaves `actors` unchanged, and a
+  putout credited before an earlier lineup correction stays with its stamped fielder.
+- **Repair attribution** is a separate, explicit action on a row that has an
+  `actor_mismatch` warning. It restamps the chosen roles to the replayed lineup and
+  shows each role's before and after credit before Confirm.
 - What can change on a play:
   - the pitch result and pitch location;
   - the batted-ball result, type, spot and fielders;
@@ -209,7 +282,9 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
 - No new event types unless Q3 changes (lineup correction).
 - Corrections use the shared revisioned mutations. Every saved history must project
   completely, as today.
-- Capture preferences and the restore receipt stay out of fingerprints.
+- Correction receipts (section 4.1) live in Baseball sport state, are bounded and stay
+  out of fingerprints, like capture preferences and the quick-Undo receipt. Older games
+  read with an empty list. BSB-6 decides whether receipts sync.
 - Games stay on the `unsupported` cloud route. Parking, export, import and reload behave
   as in BSB-3.
 
@@ -220,7 +295,8 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
 - Timeline and correction rules mirror Basketball BKE-3:
   - consequence preview;
   - capture groups removed together;
-  - lifecycle rows read-only;
+  - lifecycle rows are never edited directly; they are removed only as listed,
+    confirmed dependents (section 4.1), and the game start never;
   - a successful Timeline mutation clears quick Undo.
 
   Hockey has newest-play Undo only today. Components stay sport-owned.
@@ -241,13 +317,35 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
   checked, and old single-change payloads replay unchanged.
 - **Timeline:** half-inning grouping, per-half lines, capture units, removed plays,
   filters.
+- **Attribution:**
+  - removing a pinch-hitter substitution replays the later plate appearance, credited
+    to the original batter, with a batter attribution change in the preview;
+  - removing a pitching change moves pitching credit, with a pitcher attribution change;
+  - an earlier defensive correction keeps the stamped putout and lists it as fielding
+    credit kept;
+  - a warnings-only correction needs the explicit confirmation (or is refused under Q6
+    Block).
+- **Stamped actors:** a location-only edit after an earlier lineup correction leaves
+  `actors` and fielding credit unchanged. A fielder-list edit restamps only the changed
+  roles. Repair attribution shows before/after and restamps only the chosen roles.
+- **Lifecycle boundaries:**
+  - removing a third out before a manual half end lists the half end and the later
+    half's plays as dependents, and no period is retagged;
+  - removing a walk-off play in a completed game with a later Reopen lists the game end
+    and the Reopen as dependents; the cascade replays, and restore together brings all
+    of them back;
+  - the game start is never a dependent;
+  - under Block, both are refused.
+- **Receipts:** group restore after reload and after export/import; a group made stale
+  by an independent restore or edit falls back to individual restore; the bounded list
+  drops the oldest receipt.
 - **Remove and restore:**
   - a clean removal;
   - a removal that breaks a later play (the preview names it, and nothing is saved
     without confirming);
   - the Q1 cascade and its restore as one group;
   - removing the third out reopens the half, with later plays handled by the cascade;
-  - a removal that changes fielding credit raises the warning.
+  - a removal that changes fielding credit raises a fielding-credit-kept warning.
 - **Edit:**
   - a ball changed to a strike changes the count, and a later walk becomes invalid and
     is explained;
@@ -263,9 +361,14 @@ switches. Switching tabs never writes anything, and any open sheet on Track stay
 
 ## 8. Risks
 
-- **Cascades.** One changed out can invalidate every later play in the inning. Q1
-  decides how much the app does automatically. The recommendation keeps the engine as
-  the only judge and never silently rewrites later plays.
+- **Cascades.** One changed out can invalidate every later play in the inning, and the
+  half ends and game end after it. Q1 decides whether those are removed after
+  confirmation or block the correction. Either way the engine is the only judge,
+  lifecycle rows are named in the preview, and later plays are never silently
+  rewritten or retagged.
+- **Attribution drift.** Batting and pitching credit follow the replayed lineup, so a
+  lineup correction can move credit without any replay failure. The preview makes every
+  such move visible before saving.
 - **Edit sheets reused out of context.** Capture sheets assume "now". Seeding from a
   prefix replay keeps proposals honest, and tests compare edit seeding with capture.
 - **Screen space.** The Lineup tab must fit 10 to 15 batting cards at 390px. Cards stay
@@ -279,10 +382,10 @@ Each has a recommendation; one word answers are enough.
 
 | # | Question | Options | Recommended |
 | --- | --- | --- | --- |
-| Q1 | When an edit or removal would break later plays, what happens? | **Remove-later**: the preview lists them and you may remove them too (restorable together), then re-enter / **Block**: refuse until you remove them yourself, newest first | Remove-later |
+| Q1 | When an edit or removal would break later plays, what happens? | **Remove-later**: the preview lists them, including any half end, game end or reopen they depend on, and you may remove them too (restorable together), then re-enter / **Block**: refuse until you remove them yourself, newest first | Remove-later |
 | Q2 | Support double switches and DH forfeiture now? | **Yes** (BSB-4B, new versioned payload) / **Later** (single changes only in BSB-4) | Yes |
 | Q3 | Add a batting-out-of-order correction event? | **Later** (after BSB-5; rare at youth levels) / **Now** | Later |
 | Q4 | Where does the lineup live? | **Tab** (Track / Lineup / Timeline) / **Menu** (a sheet from the Game menu) | Tab |
 | Q5 | A missed pitch can't be inserted mid-game (capture order is fixed). Is fixing it by editing the next pitch or using Quick PA enough? | **Yes** / **No** (needs an ordering change to the shared event layer) | Yes |
-| Q6 | After a correction, if fielding credit no longer matches the lineup, should it save? | **Warn** (save with a visible warning) / **Block** | Warn |
+| Q6 | After a correction, if credit moves (batting or pitching) or no longer matches the lineup (fielding), should it save? | **Warn** (the preview lists every change and you confirm) / **Block** | Warn |
 | Q7 | Capture batter and pitcher handedness? | **Yes** (setup for our team, label sheets for theirs) / **No** | Yes |
