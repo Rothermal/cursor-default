@@ -13,7 +13,10 @@ import {
   baseballCaptureTerminal,
   baseballDiamondView,
   baseballDroppedThirdStrikeAvailable,
-  baseballFallbackReason,
+  baseballBaserunningPlayOptions,
+  baseballCaptureAllowsRbi,
+  baseballCaptureFallbackReason,
+  baseballCaptureReasons,
   baseballFieldingPositionCode,
   baseballLineScoreView,
   baseballPersonLabel,
@@ -31,6 +34,8 @@ import {
   setBaseballCapturePreferences,
   startBaseballGame,
   substituteBaseball,
+  type BaseballBase,
+  type BaseballBaserunningPlay,
   type BaseballBattedBall,
   type BaseballCommandContext,
   type BaseballCommandResult,
@@ -55,13 +60,18 @@ const BATTING_FORMAT_LABELS: Record<string, string> = {
   continuous: 'Continuous order',
 }
 
+const BASE_LABELS: Record<BaseballBase, string> = { first: 'first', second: 'second', third: 'third' }
+
 const PENDING_END_REASON = 'The game can end on this play. Ending the game arrives in a later update.'
+
+type PlateCapture = Exclude<BaseballPendingCapture, { source: 'baserunning' }>
 
 /** What the recorder is doing below the diamond. Nothing is written until a step commits. */
 type CaptureFlow =
   | { step: 'idle' }
   | { step: 'dropped_third'; capture: Extract<BaseballPendingCapture, { source: 'pitch' }> }
-  | { step: 'in_play'; capture: BaseballPendingCapture; draft: BaseballInPlayDraft }
+  | { step: 'in_play'; capture: PlateCapture; draft: BaseballInPlayDraft }
+  | { step: 'runner_menu'; base: BaseballBase; runnerId: string }
   | { step: 'quick' }
   | { step: 'resolve'; capture: BaseballPendingCapture; draft: BaseballResolutionDraft; error: string | null }
   | { step: 'opponent_label'; slotId: string; label: string; number: string }
@@ -151,7 +161,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       projection,
       proposeBaseballCaptureMovements(sport, capture),
       terminal !== null,
-      baseballFallbackReason(terminal)
+      baseballCaptureFallbackReason(sport, capture)
     )
     setError(null)
     setFlow({
@@ -216,8 +226,18 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     proceed(capture)
   }
 
-  const onBattedBall = (capture: BaseballPendingCapture, battedBall: BaseballBattedBall) =>
+  const onBattedBall = (capture: PlateCapture, battedBall: BaseballBattedBall) =>
     openResolution({ ...capture, battedBall })
+
+  const openBaserunning = (play: BaseballBaserunningPlay, runnerId: string) =>
+    openResolution({ source: 'baserunning', play, runnerId })
+
+  const resolutionTitle = (capture: BaseballPendingCapture) => {
+    if (capture.source === 'baserunning') {
+      return baseballBaserunningPlayOptions(setup.rulesSnapshot).find(option => option.play === capture.play)?.label ?? 'Runner play'
+    }
+    return baseballCaptureTerminal(sport, capture) === null ? 'Runners on this pitch' : 'Where everyone ends up'
+  }
 
   const confirmResolution = () => {
     if (flow.step !== 'resolve') return
@@ -226,14 +246,16 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       setFlow({ ...flow, error: issues[0]! })
       return
     }
-    const result = commitBaseballCapture(state, flow.capture, baseballResolutionMovements(flow.draft.rows), context())
+    const result = commitBaseballCapture(state, flow.capture, baseballResolutionMovements(flow.draft.rows, { rbi: baseballCaptureAllowsRbi(sport, flow.capture) }), context())
     if (!result.ok) {
       // Keep every choice in place so the recorder can fix what the engine rejected.
       setFlow({ ...flow, error: result.message })
       return
     }
     applied(result)
-    finishCapture()
+    // A runner play is not a pitch: the pitch location and the "Runners moved" chip stay as they were.
+    if (flow.capture.source === 'baserunning') setFlow({ step: 'idle' })
+    else finishCapture()
   }
 
   const saveOpponentLabel = () => {
@@ -326,7 +348,12 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                   const runnerId = projection.bases[base]?.runnerId
                   if (runnerId) updateResolution(cycleBaseballResolutionDraftRow(runnerId))
                 }
-                : undefined}
+                : (flow.step === 'idle' || flow.step === 'runner_menu') && canCapture
+                  ? base => {
+                    const runnerId = projection.bases[base]?.runnerId
+                    if (runnerId) setFlow({ step: 'runner_menu', base, runnerId })
+                  }
+                  : undefined}
               onEditBatter={flow.step === 'idle' && canCapture && batterSlot
                 ? () => setFlow({
                   step: 'opponent_label',
@@ -382,6 +409,30 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
             </section>
           )}
 
+          {flow.step === 'runner_menu' && (
+            <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Runner play">
+              <h2 className="font-bold text-content">
+                {diamond.runners[flow.base]?.name ?? 'Runner'} on {BASE_LABELS[flow.base]}
+              </h2>
+              <p className="text-sm text-content-muted">
+                A play with no pitch. For a steal or wild pitch on a pitch, use "Runners moved" on the pad instead.
+              </p>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Plays">
+                {baseballBaserunningPlayOptions(setup.rulesSnapshot).map(option => (
+                  <button
+                    key={option.play}
+                    type="button"
+                    className="btn-secondary min-h-11 px-1 text-sm leading-tight"
+                    onClick={() => openBaserunning(option.play, flow.runnerId)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="btn-secondary w-full" onClick={() => setFlow({ step: 'idle' })}>Cancel</button>
+            </section>
+          )}
+
           {flow.step === 'in_play' && (
             <BaseballInPlaySheet
               draft={flow.draft}
@@ -404,11 +455,12 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
 
           {flow.step === 'resolve' && (
             <BaseballRunnerResolution
-              title={baseballCaptureTerminal(sport, flow.capture) === null ? 'Runners on this pitch' : 'Where everyone ends up'}
+              title={resolutionTitle(flow.capture)}
               draft={flow.draft}
               onChange={updateResolution}
               names={rowNames(flow.draft.rows)}
-              terminal={baseballCaptureTerminal(sport, flow.capture)}
+              reasons={baseballCaptureReasons(sport, flow.capture)}
+              allowRbi={baseballCaptureAllowsRbi(sport, flow.capture)}
               fielderCount={fielderCount}
               error={flow.error}
               // Cancel writes nothing; the "Runners moved" chip stays armed.
