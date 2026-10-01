@@ -553,6 +553,13 @@ or merged.
   and restore is replayed before it is kept. `capturePreferences.lastUndo` stores one
   receipt (event ids plus expected revisions), outside fingerprints and reload-safe;
   every new event clears it, so Restore is offered only until the next capture.
+- Run text in Recent plays comes from the same replay as the score
+  (`replayBaseballRunsByEvent`), so a run cancelled by a force or batter third out is
+  never announced, and explicit run-counts overrides are honoured either way.
+- Tapping a play opens its details read-only (`baseballPlayDetail`): batter and pitcher,
+  the pitch or quick result, the batted ball and fielders, and every runner's movement
+  with fielders, errors, recorder overrides and whether the run counted. Closing it
+  changes nothing; editing older plays is the BSB-4 Timeline.
 - `endings.ts`: at a pending end the pad is disabled and a banner names the reason with
   "Undo last play" and "End game" (Completed, or Run rule). The Game menu offers End
   half-inning (time limit, mercy, other, optional note) while outs are below three and
@@ -576,7 +583,9 @@ or merged.
 - Tests: Recent plays labels and dividers, Undo/Restore of single and multi-event units,
   the third out reopening a half, receipts cleared by new events and kept across a
   preference change and reload, endings (pending, suspend, time limit, forfeit),
-  pitching-change options and re-entry, opponent change, and component renders.
+  pitching-change options and re-entry, opponent change, run labels for a force third
+  out, a batter out before first, a timing play and explicit overrides, read-only details
+  that leave the game unchanged, and component renders.
 - Browser check at 390 px (development build, light and dark), driven through the UI:
   ball and strike, Undo then Restore of the strike, an opponent change to "#33 Lefty", a
   bench pitcher (#11 Olsen for #2 Garcia, batting 1st), End half-inning for a time

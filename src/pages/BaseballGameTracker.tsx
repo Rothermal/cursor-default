@@ -10,6 +10,7 @@ import {
   type BaseballEndHalfDraft,
 } from '../components/baseball/BaseballEndSheets'
 import BaseballInPlaySheet from '../components/baseball/BaseballInPlaySheet'
+import BaseballPlayDetailSheet from '../components/baseball/BaseballPlayDetailSheet'
 import BaseballPitchingChangeSheet, { type BaseballPitchingChangeDraft } from '../components/baseball/BaseballPitchingChangeSheet'
 import BaseballPitchPad from '../components/baseball/BaseballPitchPad'
 import BaseballQuickPlateAppearance from '../components/baseball/BaseballQuickPlateAppearance'
@@ -27,6 +28,7 @@ import {
   baseballPendingEndMessage,
   baseballPendingEndOutcome,
   baseballPitchingChangeOptions,
+  baseballPlayDetail,
   baseballRecentPlays,
   canRestoreBaseballPlay,
   canUndoBaseballPlay,
@@ -103,6 +105,7 @@ type CaptureFlow =
   | { step: 'end_half'; draft: BaseballEndHalfDraft; error: string | null }
   | { step: 'end_game'; draft: BaseballEndGameDraft; error: string | null }
   | { step: 'reopen'; reason: string; error: string | null }
+  | { step: 'play_detail'; playId: string }
 
 /**
  * The live Baseball tracker: the scoreboard strip, the diamond and the pitch pad showing
@@ -662,12 +665,25 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
             />
           )}
 
+          {flow.step === 'play_detail' && (() => {
+            const detail = baseballPlayDetail(state, flow.playId, names)
+            return detail
+              ? <BaseballPlayDetailSheet detail={detail} onClose={() => setFlow({ step: 'idle' })} />
+              : (
+                <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Play details">
+                  <p className="text-sm text-content-muted">This play is no longer recorded.</p>
+                  <button type="button" className="btn-secondary w-full" onClick={() => setFlow({ step: 'idle' })}>Close</button>
+                </section>
+              )
+          })()}
+
           {flow.step === 'idle' && (
             <BaseballRecentPlays
               rows={baseballRecentPlays(state, names)}
               canRestore={canRestoreBaseballPlay(state)}
               onUndo={undo}
               onRestore={restore}
+              onSelect={playId => setFlow({ step: 'play_detail', playId })}
             />
           )}
         </>

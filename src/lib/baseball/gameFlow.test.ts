@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { BaseballEndGameSheet, BaseballReopenSheet } from '../../components/baseball/BaseballEndSheets'
 import BaseballPitchingChangeSheet from '../../components/baseball/BaseballPitchingChangeSheet'
+import BaseballPlayDetailSheet from '../../components/baseball/BaseballPlayDetailSheet'
 import BaseballRecentPlays from '../../components/baseball/BaseballRecentPlays'
 import type { GameState } from '../../types'
 import {
@@ -22,6 +23,7 @@ import {
 } from './endings'
 import { baseballOpponentPitcherChange, baseballPitchingChangeOptions } from './pitchingChange'
 import {
+  baseballPlayDetail,
   baseballRecentPlays,
   canRestoreBaseballPlay,
   canUndoBaseballPlay,
@@ -31,9 +33,11 @@ import {
 import { normalizeBaseballSportGameState } from './state'
 import { setBaseballCapturePreferences } from './trackerView'
 import {
+  ballInPlay,
   baseballSetup,
   ctx,
   expectOk,
+  inPlay,
   pitch,
   projection,
   startedGame,
@@ -254,6 +258,7 @@ describe('Baseball game-flow components', () => {
       canRestore: true,
       onUndo: noop,
       onRestore: noop,
+      onSelect: noop,
     }))
     expect(html.match(/aria-label="Undo /g)).toHaveLength(1)
     expect(html).toContain('Restore')
@@ -297,5 +302,155 @@ describe('Baseball game-flow components', () => {
       onConfirm: noop,
     }))
     expect(reopen).toContain('disabled=""')
+  })
+})
+
+/** Bases loaded, two outs. */
+function basesLoadedTwoOut(): GameState {
+  let state = startedGame()
+  state = ballInPlay(state, 'single')
+  state = ballInPlay(state, 'single')
+  state = ballInPlay(state, 'single')
+  return strikeout(strikeout(state))
+}
+
+function newestPlay(state: GameState) {
+  return baseballRecentPlays(state, names).find(row => row.kind === 'play')!
+}
+
+describe('Baseball Recent plays credit only the runs the engine counts', () => {
+  it('announces no run when the third out is a force', () => {
+    let state = basesLoadedTwoOut()
+    const p0 = projection(state)
+    state = pitch(state, {
+      result: 'in_play',
+      inPlay: inPlay('fielders_choice', { fielders: [6] }),
+      movements: [
+        baseballMovement(p0.bases.third!.runnerId, 'third', 'home', 'on_play'),
+        baseballMovement(p0.bases.second!.runnerId, 'second', 'third', 'on_play'),
+        baseballMovement(p0.bases.first!.runnerId, 'first', 'out', 'on_play', { fielders: [6, 4] }),
+        baseballMovement(p0.currentBatterId!, 'batter', 'first', 'on_play'),
+      ],
+    })
+    expect(projection(state).score.opponent).toBe(0)
+    const play = newestPlay(state)
+    expect(play.label).not.toMatch(/run/)
+    const detail = baseballPlayDetail(state, play.id, names)!
+    const runners = detail.sections.find(section => section.heading === 'Runners')!
+    expect(runners.lines.some(line => line.includes('third to home') && line.includes('run does not count'))).toBe(true)
+  })
+
+  it('announces no run when the batter is out before reaching first for the third out', () => {
+    let state = startedGame()
+    state = strikeout(strikeout(state))
+    state = ballInPlay(state, 'triple')
+    const p0 = projection(state)
+    state = pitch(state, {
+      result: 'in_play',
+      inPlay: inPlay('out', { fielders: [6] }),
+      movements: [
+        baseballMovement(p0.bases.third!.runnerId, 'third', 'home', 'on_play'),
+        baseballMovement(p0.currentBatterId!, 'batter', 'out', 'on_play', { fielders: [6, 3] }),
+      ],
+    })
+    expect(projection(state).score.opponent).toBe(0)
+    expect(newestPlay(state).label).not.toMatch(/run/)
+  })
+
+  it('announces a timing-play run on a non-force third out', () => {
+    let state = startedGame()
+    state = strikeout(strikeout(state))
+    state = ballInPlay(state, 'triple')
+    const p0 = projection(state)
+    state = pitch(state, {
+      result: 'in_play',
+      inPlay: inPlay('single', { battedBallType: 'line' }),
+      movements: [
+        baseballMovement(p0.bases.third!.runnerId, 'third', 'home', 'on_play'),
+        baseballMovement(p0.currentBatterId!, 'batter', 'out', 'on_play', { fielders: [8, 4] }),
+      ],
+    })
+    expect(projection(state).score.opponent).toBe(1)
+    expect(newestPlay(state).label).toMatch(/1 run scores$/)
+  })
+
+  it('follows explicit run-counts overrides either way', () => {
+    let forced = basesLoadedTwoOut()
+    const p0 = projection(forced)
+    forced = pitch(forced, {
+      result: 'in_play',
+      inPlay: inPlay('fielders_choice', { fielders: [6] }),
+      movements: [
+        baseballMovement(p0.bases.third!.runnerId, 'third', 'home', 'on_play', { runCounts: true }),
+        baseballMovement(p0.bases.second!.runnerId, 'second', 'third', 'on_play'),
+        baseballMovement(p0.bases.first!.runnerId, 'first', 'out', 'on_play', { fielders: [6, 4] }),
+        baseballMovement(p0.currentBatterId!, 'batter', 'first', 'on_play'),
+      ],
+    })
+    expect(projection(forced).score.opponent).toBe(1)
+    expect(newestPlay(forced).label).toMatch(/1 run scores$/)
+    const detail = baseballPlayDetail(forced, newestPlay(forced).id, names)!
+    expect(detail.sections.flatMap(section => section.lines).some(line => line.includes('run counts set to yes'))).toBe(true)
+
+    let cancelled = startedGame()
+    cancelled = strikeout(strikeout(cancelled))
+    cancelled = ballInPlay(cancelled, 'triple')
+    const p1 = projection(cancelled)
+    cancelled = pitch(cancelled, {
+      result: 'in_play',
+      inPlay: inPlay('single', { battedBallType: 'line' }),
+      movements: [
+        baseballMovement(p1.bases.third!.runnerId, 'third', 'home', 'on_play', { runCounts: false }),
+        baseballMovement(p1.currentBatterId!, 'batter', 'out', 'on_play', { fielders: [8, 4] }),
+      ],
+    })
+    expect(projection(cancelled).score.opponent).toBe(0)
+    expect(newestPlay(cancelled).label).not.toMatch(/run/)
+  })
+})
+
+describe('Baseball read-only play details', () => {
+  it('describes the batted ball, fielders and every runner without changing the game', () => {
+    let state = basesLoadedTwoOut()
+    const p0 = projection(state)
+    state = pitch(state, {
+      result: 'in_play',
+      inPlay: inPlay('fielders_choice', { fielders: [6] }),
+      movements: [
+        baseballMovement(p0.bases.third!.runnerId, 'third', 'home', 'on_play'),
+        baseballMovement(p0.bases.second!.runnerId, 'second', 'third', 'on_play'),
+        baseballMovement(p0.bases.first!.runnerId, 'first', 'out', 'on_play', { fielders: [6, 4] }),
+        baseballMovement(p0.currentBatterId!, 'batter', 'first', 'on_play', { errorBy: 4 }),
+      ],
+    })
+    const before = JSON.stringify(state)
+    const detail = baseballPlayDetail(state, newestPlay(state).id, names)!
+    expect(JSON.stringify(state)).toBe(before)
+    const lines = detail.sections.flatMap(section => section.lines)
+    expect(lines).toContain("Result: Fielder's choice")
+    expect(lines).toContain('Batted ball: Ground')
+    expect(lines).toContain('Fielded by: SS (6)')
+    expect(lines.some(line => line.includes('out (6-4)'))).toBe(true)
+    expect(lines.some(line => line.includes('home to first') && line.includes('error on 2B (4)'))).toBe(true)
+    expect(lines.some(line => line.startsWith('Pitcher: '))).toBe(true)
+
+    const html = renderToStaticMarkup(createElement(BaseballPlayDetailSheet, { detail, onClose: () => undefined }))
+    expect(html).toContain('read-only')
+    expect(html).toContain('Close')
+  })
+
+  it('offers details only for plays, not game flow', () => {
+    const state = pitch(startedGame(), { result: 'ball' })
+    const rows = baseballRecentPlays(state, names)
+    const flow = rows.find(row => row.kind === 'flow')!
+    expect(baseballPlayDetail(state, flow.id, names)).toBeNull()
+    const html = renderToStaticMarkup(createElement(BaseballRecentPlays, {
+      rows,
+      canRestore: false,
+      onUndo: () => undefined,
+      onRestore: () => undefined,
+      onSelect: () => undefined,
+    }))
+    expect(html.match(/aria-label="Details: /g)).toHaveLength(1)
   })
 })

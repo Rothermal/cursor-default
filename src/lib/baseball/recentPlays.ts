@@ -4,11 +4,16 @@ import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
-import { BASEBALL_BASERUNNING_PLAY_OPTIONS, BASEBALL_QUICK_RESULT_OPTIONS } from './capture'
+import {
+  BASEBALL_BASERUNNING_PLAY_OPTIONS,
+  BASEBALL_BATTED_BALL_OPTIONS,
+  BASEBALL_QUICK_RESULT_OPTIONS,
+  BASEBALL_REASON_LABELS,
+} from './capture'
 import { baseballSportState, withBaseballUndoReceipt, type BaseballCommandResult } from './commands'
 import { formatBaseballHalf, parseBaseballPeriod } from './periods'
 import { baseballFieldingPositionCode } from './positions'
-import { replayBaseballEvents } from './projector'
+import { replayBaseballEvents, replayBaseballRunsByEvent } from './projector'
 import { baseballPersonLabel, BASEBALL_PRIMARY_PITCH_RESULTS, BASEBALL_MORE_PITCH_RESULTS } from './trackerView'
 import type {
   BaseballEventType,
@@ -60,7 +65,9 @@ export function baseballRecentPlays(
 ): BaseballRecentRow[] {
   const sport = baseballSportState(state)
   if (!sport || !state.eventStream) return []
-  const units = groupUnits(activeEvents(state))
+  const events = activeEvents(state)
+  const units = groupUnits(events)
+  const scored = replayBaseballRunsByEvent(sport.setup, events)
   const rows: BaseballRecentRow[] = []
   for (let index = units.length - 1; index >= 0 && rows.length < limit; index--) {
     const unit = units[index]
@@ -69,7 +76,7 @@ export function baseballRecentPlays(
     const divider = newer ? halfDivider(first, newer) : null
     if (divider) rows.push({ kind: 'divider', id: `divider-${first.id}`, label: divider })
     const halfLabel = formatPeriod(first)
-    const label = unit.map(event => baseballEventLabel(sport, event, names)).join(' + ')
+    const label = unit.map(event => baseballEventLabel(sport, event, names, scored.get(event.id) ?? [])).join(' + ')
     if (CAPTURE_TYPES.has(first.eventType as BaseballEventType)) {
       rows.push({
         kind: 'play',
@@ -166,7 +173,16 @@ export const BASEBALL_GAME_END_LABELS: Record<BaseballGameEndOutcome, string> = 
   abandoned: 'Abandoned',
 }
 
-export function baseballEventLabel(sport: BaseballSportGameState, event: GameEvent, names: BaseballSideNames): string {
+/**
+ * One line for an event. `scoredRunnerIds` are the runs the replay actually credited, so a run
+ * cancelled by a force or batter third out is never announced.
+ */
+export function baseballEventLabel(
+  sport: BaseballSportGameState,
+  event: GameEvent,
+  names: BaseballSideNames,
+  scoredRunnerIds: readonly string[]
+): string {
   const person = (id: string) => baseballPersonLabel(sport, id).name
   const actor = (role: string) => {
     const id = event.actors.find(entry => entry.role === role)?.participantId
@@ -181,17 +197,17 @@ export function baseballEventLabel(sport: BaseballSportGameState, event: GameEve
     case 'baseball.pitch': {
       const inPlay = payload.inPlay as { result: BaseballInPlayResult } | null
       const text = inPlay ? IN_PLAY_LABELS[inPlay.result] : PITCH_LABELS[payload.result as string] ?? 'Pitch'
-      return withBatter(capitalize(text) + runs(payload.movements as BaseballRunnerMovement[]))
+      return withBatter(capitalize(text) + runs(scoredRunnerIds))
     }
     case 'baseball.plate_appearance': {
       const inPlay = payload.inPlay as { result: BaseballInPlayResult } | null
       const text = inPlay ? IN_PLAY_LABELS[inPlay.result] : (QUICK_LABELS[payload.result as string] ?? 'Plate appearance').toLowerCase()
-      return withBatter(`${capitalize(text)} (quick)${runs(payload.movements as BaseballRunnerMovement[])}`)
+      return withBatter(`${capitalize(text)} (quick)${runs(scoredRunnerIds)}`)
     }
     case 'baseball.baserunning': {
       const movements = payload.movements as BaseballRunnerMovement[]
       const who = movements.map(movement => person(movement.runnerId)).join(', ')
-      return `${RUNNER_PLAY_LABELS[payload.play as string] ?? 'Runner play'}${who ? `: ${who}` : ''}${runs(movements)}`
+      return `${RUNNER_PLAY_LABELS[payload.play as string] ?? 'Runner play'}${who ? `: ${who}` : ''}${runs(scoredRunnerIds)}`
     }
     case 'baseball.substitution':
       return substitutionLabel(sport, payload.substitution as BaseballSubstitution, names, person)
@@ -247,8 +263,8 @@ function substitutionLabel(
   }
 }
 
-function runs(movements: readonly BaseballRunnerMovement[] | undefined): string {
-  const count = (movements ?? []).filter(movement => movement.to === 'home' && movement.runCounts !== false).length
+function runs(scoredRunnerIds: readonly string[]): string {
+  const count = scoredRunnerIds.length
   return count === 0 ? '' : count === 1 ? ', 1 run scores' : `, ${count} runs score`
 }
 
@@ -267,6 +283,101 @@ function halfDivider(older: GameEvent, newer: GameEvent): string | null {
 function formatPeriod(event: GameEvent): string {
   const period = parseBaseballPeriod(event.period)
   return period ? formatBaseballHalf(period.inning, period.half) : ''
+}
+
+// ---------------------------------------------------------------------------
+// Read-only play details
+
+export interface BaseballPlayDetail {
+  id: string
+  label: string
+  halfLabel: string
+  sections: Array<{ heading: string; lines: string[] }>
+}
+
+const FROM_LABELS: Record<string, string> = { batter: 'home', first: 'first', second: 'second', third: 'third' }
+const BATTED_BALL_LABELS = Object.fromEntries(BASEBALL_BATTED_BALL_OPTIONS.map(option => [option.type, option.label])) as Record<string, string>
+
+/**
+ * What a capture unit recorded, for the read-only details sheet (BSB-3D): the result, the
+ * batted ball, every runner's movement with fielders, errors and recorder overrides, and
+ * whether each run counted. Editing older plays is the BSB-4 Timeline.
+ */
+export function baseballPlayDetail(state: GameState, playId: string, names: BaseballSideNames): BaseballPlayDetail | null {
+  const sport = baseballSportState(state)
+  if (!sport || !state.eventStream) return null
+  const events = activeEvents(state)
+  const unit = groupUnits(events).find(candidate => candidate[0].id === playId)
+  if (!unit || !CAPTURE_TYPES.has(unit[0].eventType as BaseballEventType)) return null
+  const scored = replayBaseballRunsByEvent(sport.setup, events)
+  const person = (id: string) => baseballPersonLabel(sport, id).name
+  const fielder = (position: number) => `${baseballFieldingPositionCode(position) ?? 'Fielder'} (${position})`
+  const sections: BaseballPlayDetail['sections'] = []
+
+  for (const event of unit) {
+    const payload = event.payload as Record<string, unknown>
+    const play: string[] = []
+    const actor = (role: string) => event.actors.find(entry => entry.role === role)?.participantId ?? null
+    const batter = actor('batter')
+    const pitcher = actor('pitcher')
+    if (batter) play.push(`Batter: ${person(batter)}`)
+    if (pitcher) play.push(`Pitcher: ${person(pitcher)}`)
+    if (event.eventType === 'baseball.pitch') {
+      play.push(`Pitch: ${PITCH_LABELS[payload.result as string] ?? 'Pitch'}`)
+      const location = payload.pitchLocation as { x: number; y: number } | null
+      if (location) {
+        const inZone = location.x >= 0 && location.x <= 1 && location.y >= 0 && location.y <= 1
+        play.push(`Pitch location: ${inZone ? 'in the zone' : 'outside the zone'}`)
+      }
+    }
+    if (event.eventType === 'baseball.plate_appearance') {
+      play.push(`Quick result: ${QUICK_LABELS[payload.result as string] ?? 'Plate appearance'}`)
+      if (payload.finalBalls !== null || payload.finalStrikes !== null) {
+        play.push(`Final count: ${payload.finalBalls ?? '?'}-${payload.finalStrikes ?? '?'}`)
+      }
+    }
+    if (event.eventType === 'baseball.baserunning') {
+      play.push(`Runner play: ${RUNNER_PLAY_LABELS[payload.play as string] ?? 'Runner play'}`)
+    }
+    const inPlay = payload.inPlay as { result: BaseballInPlayResult; battedBallType: string; fielders: number[]; errorBy: number | null; insideThePark: boolean } | null | undefined
+    if (inPlay) {
+      play.push(`Result: ${capitalize(IN_PLAY_LABELS[inPlay.result])}${inPlay.insideThePark ? ' (inside the park)' : ''}`)
+      play.push(`Batted ball: ${BATTED_BALL_LABELS[inPlay.battedBallType] ?? 'Unknown'}${event.location ? ', location marked' : ''}`)
+      if (inPlay.fielders.length) play.push(`Fielded by: ${inPlay.fielders.map(fielder).join(', ')}`)
+      if (inPlay.errorBy !== null) play.push(`Error: ${fielder(inPlay.errorBy)}`)
+    }
+    if (event.eventType === 'baseball.substitution' || event.eventType === 'baseball.score_adjustment') {
+      play.push(baseballEventLabel(sport, event, names, []))
+    }
+    if (play.length) sections.push({ heading: unit.length > 1 ? baseballEventLabel(sport, event, names, scored.get(event.id) ?? []) : 'Play', lines: play })
+
+    const movements = (payload.movements as BaseballRunnerMovement[] | undefined) ?? []
+    if (movements.length) {
+      const counted = new Set(scored.get(event.id) ?? [])
+      sections.push({
+        heading: 'Runners',
+        lines: movements.map(movement => {
+          const where = movement.to === 'out'
+            ? `out${movement.fielders.length ? ` (${movement.fielders.join('-')})` : ''}`
+            : `${FROM_LABELS[movement.from]} to ${movement.to}`
+          const extras = [BASEBALL_REASON_LABELS[movement.reason]]
+          if (movement.errorBy !== null) extras.push(`error on ${fielder(movement.errorBy)}`)
+          if (movement.to === 'home') extras.push(counted.has(movement.runnerId) ? 'run counts' : 'run does not count')
+          if (movement.earned !== null) extras.push(`earned set to ${movement.earned ? 'yes' : 'no'}`)
+          if (movement.runCounts !== null) extras.push(`run counts set to ${movement.runCounts ? 'yes' : 'no'}`)
+          if (movement.rbi !== null) extras.push(`RBI set to ${movement.rbi ? 'yes' : 'no'}`)
+          return `${person(movement.runnerId)}: ${where} · ${extras.join(', ')}`
+        }),
+      })
+    }
+  }
+
+  return {
+    id: playId,
+    label: unit.map(event => baseballEventLabel(sport, event, names, scored.get(event.id) ?? [])).join(' + '),
+    halfLabel: formatPeriod(unit[0]),
+    sections,
+  }
 }
 
 // ---------------------------------------------------------------------------

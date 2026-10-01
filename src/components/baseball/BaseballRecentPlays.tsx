@@ -6,14 +6,16 @@ interface BaseballRecentPlaysProps {
   canRestore: boolean
   onUndo: () => void
   onRestore: () => void
+  /** Opens a play's read-only details. */
+  onSelect: (id: string) => void
 }
 
 /**
  * Recent plays (BSB-3D): capture units newest first, with game-flow rows and half-inning
  * dividers for context. Only the newest play can be undone; Restore brings back the play
- * just undone until the next capture.
+ * just undone until the next capture. Tapping a play opens its details, read-only.
  */
-export default function BaseballRecentPlays({ rows, canRestore, onUndo, onRestore }: BaseballRecentPlaysProps) {
+export default function BaseballRecentPlays({ rows, canRestore, onUndo, onRestore, onSelect }: BaseballRecentPlaysProps) {
   return (
     <section aria-labelledby="baseball-recent-plays">
       <div className="flex min-h-9 items-center justify-between gap-3">
@@ -34,8 +36,22 @@ export default function BaseballRecentPlays({ rows, canRestore, onUndo, onRestor
             </li>
           ) : (
             <li key={row.id} className="flex min-h-11 items-center gap-3 px-3 py-1">
-              <span className={`min-w-0 flex-1 ${row.kind === 'play' ? 'text-content' : 'text-content-muted'}`}>{row.label}</span>
-              <span className="shrink-0 text-xs text-content-muted">{row.halfLabel}</span>
+              {row.kind === 'play' ? (
+                <button
+                  type="button"
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left text-content"
+                  onClick={() => onSelect(row.id)}
+                  aria-label={`Details: ${row.label}, ${row.halfLabel}`}
+                >
+                  <span className="min-w-0 flex-1 underline decoration-line-strong underline-offset-2">{row.label}</span>
+                  <span className="shrink-0 text-xs text-content-muted">{row.halfLabel}</span>
+                </button>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-content-muted">{row.label}</span>
+                  <span className="shrink-0 text-xs text-content-muted">{row.halfLabel}</span>
+                </>
+              )}
               {row.kind === 'play' && row.undoable && (
                 <button
                   type="button"
