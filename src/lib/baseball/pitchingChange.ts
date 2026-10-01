@@ -1,6 +1,7 @@
+import { baseballCanEnter, baseballLeavingNote, baseballOrdinal } from './lineupView'
 import { baseballFieldingPositionCode } from './positions'
 import { baseballPersonLabel } from './trackerView'
-import type { BaseballBase, BaseballOpponentPitcher, BaseballSportGameState, BaseballSubstitution } from './types'
+import type { BaseballOpponentPitcher, BaseballPitchHand, BaseballSportGameState, BaseballSubstitution } from './types'
 
 /**
  * Pitching changes for the tracked team (BSB-3D, Q2). Only two shapes are offered, each a
@@ -30,9 +31,6 @@ export interface BaseballPitchingChangeOptions {
   fielders: BaseballPitchingChangeOption[]
 }
 
-const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th', '13th', '14th', '15th']
-const BASES: readonly BaseballBase[] = ['first', 'second', 'third']
-
 export function baseballPitchingChangeOptions(sport: BaseballSportGameState): BaseballPitchingChangeOptions {
   const { setup, projection } = sport
   const lineup = projection.lineups.tracked
@@ -40,27 +38,13 @@ export function baseballPitchingChangeOptions(sport: BaseballSportGameState): Ba
   if (!pitcherId) return { pitcherId: null, bench: [], fielders: [] }
   const name = (id: string) => baseballPersonLabel(sport, id).name
   const pitcher = name(pitcherId)
-  const onBase = new Set(BASES.flatMap(base => (projection.bases[base] ? [projection.bases[base]!.runnerId] : [])))
-  const fielding = new Set(Object.values(lineup.defense))
-  const active = (id: string) => lineup.battingOrder.includes(id) || fielding.has(id) || onBase.has(id)
-  const reentry = setup.rulesSnapshot.reentry
-  const mayReturn = (id: string) => {
-    if (!lineup.removedIds.includes(id)) return true
-    if (reentry === 'unlimited') return true
-    return reentry === 'starters_once' && lineup.starterIds.includes(id) && !lineup.reenteredIds.includes(id)
-  }
-
   const slot = lineup.battingOrder.indexOf(pitcherId)
-  const leavingNote = (() => {
-    if (reentry === 'unlimited') return `${pitcher} leaves the game and may re-enter later.`
-    if (reentry === 'starters_once' && lineup.starterIds.includes(pitcherId) && !lineup.reenteredIds.includes(pitcherId)) {
-      return `${pitcher} leaves the game and may re-enter once, in the same batting slot.`
-    }
-    return `${pitcher} leaves the game and cannot re-enter under these rules.`
-  })()
+  const leavingNote = baseballLeavingNote(sport, pitcherId)
 
   const bench = setup.participants
-    .filter(participant => !active(participant.id) && mayReturn(participant.id))
+    // The incoming player takes the pitcher's batting slot, so a returning starter must
+    // have started in that slot (BSB-4A found the old list could offer an illegal return).
+    .filter(participant => baseballCanEnter(sport, participant.id, slot >= 0 ? slot : null))
     .map<BaseballPitchingChangeOption>(participant => {
       const incoming = name(participant.id)
       return {
@@ -69,7 +53,7 @@ export function baseballPitchingChangeOptions(sport: BaseballSportGameState): Ba
         name: incoming,
         summary: [
           slot >= 0
-            ? `${incoming} replaces ${pitcher}, batting ${ORDINALS[slot] ?? `${slot + 1}th`}.`
+            ? `${incoming} replaces ${pitcher}, batting ${baseballOrdinal(slot)}.`
             : `${incoming} replaces ${pitcher} and does not bat.`,
           leavingNote,
         ],
@@ -109,13 +93,14 @@ export function baseballPitchingChangeOptions(sport: BaseballSportGameState): Ba
 export function baseballOpponentPitcherChange(
   id: string,
   label: string,
-  number: string
+  number: string,
+  throws: BaseballPitchHand | null = null
 ): Extract<BaseballSubstitution, { kind: 'opponent_pitcher' }> {
   const pitcher: BaseballOpponentPitcher = {
     id,
     label: label.trim() || null,
     number: number.trim() || null,
-    throws: null,
+    throws,
   }
   return { kind: 'opponent_pitcher', pitcher }
 }

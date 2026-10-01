@@ -200,7 +200,7 @@ describe('Baseball pitching changes', () => {
     expect(options.bench.map(option => option.incomingId)).toEqual(['t10', 't11', 't12'])
     expect(options.bench[0]!.summary).toEqual([
       '#10 Player 10 replaces #1 Player 1, batting 1st.',
-      '#1 Player 1 leaves the game and may re-enter once, in the same batting slot.',
+      '#1 Player 1 leaves the game and may re-enter once, in the 1st slot.',
     ])
     expect(options.fielders.map(option => option.incomingId)).toEqual(['t2', 't3', 't4', 't5', 't6', 't7', 't8', 't9'])
     expect(options.fielders[1]!.summary).toEqual([

@@ -17,6 +17,7 @@ import {
   missingBaseballDefaultPlayers,
   planBaseballTeamPrefill,
   setBaseballDraftFielder,
+  setBaseballDraftHand,
   setBaseballDraftRules,
   setBaseballPlayerSelected,
   type BaseballSetupDraft,
@@ -57,6 +58,33 @@ class MemoryStorage {
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', new MemoryStorage())
+})
+
+describe('Baseball setup handedness (BSB-4A)', () => {
+  it('freezes optional hands into the setup and leaves unknown hands null', () => {
+    let draft = setBaseballDraftHand(readyDraft(), id(1), { bats: 'L' })
+    draft = setBaseballDraftHand(draft, id(1), { throws: 'L' })
+    draft = setBaseballDraftHand(draft, id(2), { bats: 'S' })
+    draft = {
+      ...draft,
+      opponentSlots: draft.opponentSlots.map((slot, index) => (index === 0 ? { ...slot, bats: 'R' as const } : slot)),
+      opponentPitcher: { ...draft.opponentPitcher, throws: 'L' },
+    }
+    const built = buildBaseballMatchSetup(draft, roster, counter())
+    if (!built.ok) throw new Error(built.message)
+    const byPlayer = new Map(built.setup.participants.map(participant => [participant.playerId, participant]))
+    expect(byPlayer.get(id(1))).toMatchObject({ bats: 'L', throws: 'L' })
+    expect(byPlayer.get(id(2))).toMatchObject({ bats: 'S', throws: null })
+    expect(byPlayer.get(id(3))).toMatchObject({ bats: null, throws: null })
+    expect(built.setup.opponentSlots[0].bats).toBe('R')
+    expect(built.setup.opponentSlots[1].bats).toBeNull()
+    expect(built.setup.opponentPitcher.throws).toBe('L')
+  })
+
+  it('clears a hand when the same choice is tapped again', () => {
+    const draft = setBaseballDraftHand(setBaseballDraftHand(readyDraft(), id(1), { bats: 'L' }), id(1), { bats: null })
+    expect(draft.hands?.[id(1)]).toEqual({ bats: null, throws: null })
+  })
 })
 
 describe('Baseball setup draft', () => {

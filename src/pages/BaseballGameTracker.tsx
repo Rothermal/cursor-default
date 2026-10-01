@@ -9,7 +9,9 @@ import {
   type BaseballEndGameDraft,
   type BaseballEndHalfDraft,
 } from '../components/baseball/BaseballEndSheets'
+import BaseballHandChoice from '../components/baseball/BaseballHandChoice'
 import BaseballInPlaySheet from '../components/baseball/BaseballInPlaySheet'
+import BaseballLineupPanel from '../components/baseball/BaseballLineupPanel'
 import BaseballPlayDetailSheet from '../components/baseball/BaseballPlayDetailSheet'
 import BaseballPitchingChangeSheet, { type BaseballPitchingChangeDraft } from '../components/baseball/BaseballPitchingChangeSheet'
 import BaseballPitchPad from '../components/baseball/BaseballPitchPad'
@@ -17,6 +19,7 @@ import BaseballQuickPlateAppearance from '../components/baseball/BaseballQuickPl
 import BaseballRecentPlays from '../components/baseball/BaseballRecentPlays'
 import BaseballRunnerResolution from '../components/baseball/BaseballRunnerResolution'
 import BaseballScoreboard from '../components/baseball/BaseballScoreboard'
+import BaseballSubstitutionSheet from '../components/baseball/BaseballSubstitutionSheet'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
@@ -29,6 +32,13 @@ import {
   baseballPendingEndOutcome,
   baseballPitchingChangeOptions,
   baseballPlayDetail,
+  baseballPlayerGameDetail,
+  baseballBatterHand,
+  baseballOpponentLineupView,
+  baseballSubstitutionChoices,
+  baseballTrackedLineupView,
+  emptyBaseballSubstitutionDraft,
+  selectedBaseballSubstitution,
   baseballRecentPlays,
   canRestoreBaseballPlay,
   canUndoBaseballPlay,
@@ -62,6 +72,7 @@ import {
   startBaseballGame,
   substituteBaseball,
   type BaseballBase,
+  type BaseballBatHand,
   type BaseballBaserunningPlay,
   type BaseballBattedBall,
   type BaseballCommandContext,
@@ -76,6 +87,8 @@ import {
   type BaseballResolutionRow,
   type BaseballResolutionTransition,
   type BaseballSportGameState,
+  type BaseballSubstitutionDraft,
+  type BaseballSubstitutionKind,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
 
@@ -100,12 +113,29 @@ type CaptureFlow =
   | { step: 'runner_menu'; base: BaseballBase; runnerId: string }
   | { step: 'quick' }
   | { step: 'resolve'; capture: BaseballPendingCapture; draft: BaseballResolutionDraft; error: string | null }
-  | { step: 'opponent_label'; slotId: string; label: string; number: string }
+  | { step: 'opponent_label'; draft: OpponentSlotDraft; error: string | null }
   | { step: 'pitching_change'; draft: BaseballPitchingChangeDraft; error: string | null }
   | { step: 'end_half'; draft: BaseballEndHalfDraft; error: string | null }
   | { step: 'end_game'; draft: BaseballEndGameDraft; error: string | null }
   | { step: 'reopen'; reason: string; error: string | null }
   | { step: 'play_detail'; playId: string }
+
+interface OpponentSlotDraft {
+  slotId: string
+  label: string
+  number: string
+  bats: BaseballBatHand | null
+}
+
+/** What the Lineup tab has open. Nothing is written until a sheet confirms. */
+type LineupSheet =
+  | { type: 'none' }
+  | { type: 'substitute'; draft: BaseballSubstitutionDraft; error: string | null }
+  | { type: 'pitching'; draft: BaseballPitchingChangeDraft; error: string | null }
+  | { type: 'opponent_slot'; draft: OpponentSlotDraft; error: string | null }
+  | { type: 'player'; id: string }
+
+type TrackerTab = 'track' | 'lineup'
 
 /**
  * The live Baseball tracker: the scoreboard strip, the diamond and the pitch pad showing
@@ -138,6 +168,9 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   const [pitchLocation, setPitchLocation] = useState<BaseballPitchLocation | null>(null)
   const [flow, setFlow] = useState<CaptureFlow>({ step: 'idle' })
   const [runnersMovedArmed, setRunnersMovedArmed] = useState(false)
+  // Switching tabs writes nothing, and a sheet open on Track stays open (BSB-4A).
+  const [tab, setTab] = useState<TrackerTab>('track')
+  const [lineupSheet, setLineupSheet] = useState<LineupSheet>({ type: 'none' })
   const { setup, projection, capturePreferences } = sport
   const fielderCount = setup.rulesSnapshot.defensivePlayers
 
@@ -282,19 +315,26 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     else finishCapture()
   }
 
+  const opponentSlotDraft = (slotId: string): OpponentSlotDraft | null => {
+    const slot = projection.opponentSlotDetails[slotId]
+    return slot ? { slotId, label: slot.label ?? '', number: slot.number ?? '', bats: slot.bats } : null
+  }
+
+  /** One `opponent_slot` change: label, number and hand together; the position is kept. */
+  const saveOpponentSlot = (draft: OpponentSlotDraft) => {
+    return substituteBaseball(state, 'opponent', {
+      kind: 'opponent_slot',
+      slotId: draft.slotId,
+      label: draft.label.trim() || null,
+      number: draft.number.trim() || null,
+      position: projection.opponentSlotDetails[draft.slotId]?.position ?? null,
+      bats: draft.bats,
+    }, context())
+  }
+
   const saveOpponentLabel = () => {
     if (flow.step !== 'opponent_label') return
-    const slot = projection.opponentSlotDetails[flow.slotId]
-    if (!slot) return
-    const result = substituteBaseball(state, 'opponent', {
-      kind: 'opponent_slot',
-      slotId: flow.slotId,
-      label: flow.label.trim() || null,
-      number: flow.number.trim() || null,
-      position: slot.position,
-      bats: slot.bats,
-    }, context())
-    if (applied(result)) setFlow({ step: 'idle' })
+    commitFlow(saveOpponentSlot(flow.draft))
   }
 
   /** Saves a menu flow, or keeps the sheet open with the engine's message. */
@@ -317,7 +357,47 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       if (option) commitFlow(substituteBaseball(state, 'tracked', option.substitution, context()))
       return
     }
-    commitFlow(substituteBaseball(state, 'opponent', baseballOpponentPitcherChange(createBaseballUuid(), draft.label, draft.number), context()))
+    commitFlow(substituteBaseball(state, 'opponent', baseballOpponentPitcherChange(createBaseballUuid(), draft.label, draft.number, draft.throws), context()))
+  }
+
+  const substitutionChoices = baseballSubstitutionChoices(sport)
+  const trackedLineup = baseballTrackedLineupView(sport)
+
+  /** Saves a Lineup tab sheet, or keeps it open with the engine's message word for word. */
+  const commitLineupSheet = (result: BaseballCommandResult) => {
+    if (!result.ok) {
+      setLineupSheet(previous => ('error' in previous ? { ...previous, error: result.message } : previous))
+      return
+    }
+    applied(result)
+    setLineupSheet({ type: 'none' })
+  }
+
+  const confirmLineupSheet = () => {
+    if (lineupSheet.type === 'substitute') {
+      const option = selectedBaseballSubstitution(substitutionChoices, lineupSheet.draft)
+      if (option) commitLineupSheet(substituteBaseball(state, 'tracked', option.substitution, context()))
+      return
+    }
+    if (lineupSheet.type === 'pitching') {
+      const { draft } = lineupSheet
+      if (draft.side === 'tracked') {
+        const option = [...pitchingOptions.bench, ...pitchingOptions.fielders].find(entry => entry.incomingId === draft.selectedId)
+        if (option) commitLineupSheet(substituteBaseball(state, 'tracked', option.substitution, context()))
+        return
+      }
+      commitLineupSheet(substituteBaseball(state, 'opponent', baseballOpponentPitcherChange(createBaseballUuid(), draft.label, draft.number, draft.throws), context()))
+      return
+    }
+    if (lineupSheet.type === 'opponent_slot') commitLineupSheet(saveOpponentSlot(lineupSheet.draft))
+  }
+
+  /** From the runner menu: the Lineup tab with that runner's substitution already chosen. */
+  const openRunnerSubstitution = (kind: BaseballSubstitutionKind, groupKey: string) => {
+    setFlow({ step: 'idle' })
+    setError(null)
+    setLineupSheet({ type: 'substitute', draft: emptyBaseballSubstitutionDraft(kind, groupKey), error: null })
+    setTab('lineup')
   }
 
   const confirmEndHalf = () => {
@@ -353,6 +433,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   /** Menu actions replace whatever was open below the diamond; nothing was written yet. */
   const openFromMenu = (next: CaptureFlow) => {
     setMenuOpen(false)
+    setTab('track')
     setError(null)
     setFlow(next)
   }
@@ -398,7 +479,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       />
 
       <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Preview. Defensive switches and the Timeline come next. This game stays on this device.
+        Preview. Double switches and the Timeline come next. This game stays on this device.
       </p>
 
       {error && (
@@ -419,7 +500,101 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       )}
 
       {projection.status !== 'pregame' && (
+        <div role="tablist" aria-label="Tracker views" className="grid grid-cols-2 gap-1 rounded-md border border-line p-1">
+          {(['track', 'lineup'] as const).map(entry => (
+            <button
+              key={entry}
+              type="button"
+              role="tab"
+              aria-selected={tab === entry}
+              className={`min-h-10 rounded text-sm font-semibold ${tab === entry ? 'bg-accent text-accent-content' : 'text-content'}`}
+              onClick={() => setTab(entry)}
+            >
+              {entry === 'track' ? 'Track' : 'Lineup'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {projection.status !== 'pregame' && tab === 'lineup' && (
+        <section className="space-y-3" aria-label="Lineup">
+          {lineupSheet.type === 'substitute' && (
+            <BaseballSubstitutionSheet
+              teamName={names.tracked}
+              choices={substitutionChoices}
+              draft={lineupSheet.draft}
+              onChange={draft => setLineupSheet({ type: 'substitute', draft, error: null })}
+              onPitchingChange={pitchingOptions.pitcherId && canCapture
+                ? () => setLineupSheet({ type: 'pitching', draft: { side: 'tracked', selectedId: null }, error: null })
+                : null}
+              error={lineupSheet.error}
+              onCancel={() => setLineupSheet({ type: 'none' })}
+              onConfirm={confirmLineupSheet}
+            />
+          )}
+          {lineupSheet.type === 'pitching' && (
+            <BaseballPitchingChangeSheet
+              draft={lineupSheet.draft}
+              onChange={draft => setLineupSheet({ type: 'pitching', draft, error: null })}
+              options={pitchingOptions}
+              teamName={sideName(lineupSheet.draft.side)}
+              currentPitcher={pitcherName(lineupSheet.draft.side)}
+              error={lineupSheet.error}
+              onCancel={() => setLineupSheet({ type: 'none' })}
+              onConfirm={confirmLineupSheet}
+            />
+          )}
+          {lineupSheet.type === 'opponent_slot' && (
+            <OpponentSlotSheet
+              draft={lineupSheet.draft}
+              onChange={draft => setLineupSheet({ type: 'opponent_slot', draft, error: null })}
+              error={lineupSheet.error}
+              onCancel={() => setLineupSheet({ type: 'none' })}
+              onSave={confirmLineupSheet}
+            />
+          )}
+          {lineupSheet.type === 'player' && (() => {
+            const detail = baseballPlayerGameDetail(sport, lineupSheet.id)
+            return detail && (
+              <section className="space-y-2 rounded-md border border-line bg-surface p-3" aria-label="Player details">
+                <h2 className="font-bold text-content">{detail.name}</h2>
+                <p className="text-sm text-content-muted">{detail.role}</p>
+                <ul className="space-y-1 text-sm text-content">
+                  {detail.lines.map(line => <li key={line}>{line}</li>)}
+                </ul>
+                <button type="button" className="btn-secondary w-full" onClick={() => setLineupSheet({ type: 'none' })} autoFocus>Close</button>
+              </section>
+            )
+          })()}
+          <BaseballLineupPanel
+            tracked={trackedLineup}
+            opponent={baseballOpponentLineupView(sport)}
+            names={names}
+            canChange={canCapture && lineupSheet.type === 'none'}
+            substituteHint={!inProgress
+              ? 'Substitutions are made while the game is in progress.'
+              : projection.pendingEnd
+                ? 'Record the ending, or undo the last play, before substituting.'
+                : null}
+            onSubstitute={() => setLineupSheet({ type: 'substitute', draft: emptyBaseballSubstitutionDraft(), error: null })}
+            onOpponentPitchingChange={() => setLineupSheet({ type: 'pitching', draft: { side: 'opponent', label: '', number: '', throws: null }, error: null })}
+            onSelectPlayer={id => setLineupSheet({ type: 'player', id })}
+            onEditOpponentSlot={id => {
+              const draft = opponentSlotDraft(id)
+              if (draft) setLineupSheet({ type: 'opponent_slot', draft, error: null })
+            }}
+          />
+        </section>
+      )}
+
+      {projection.status !== 'pregame' && tab === 'track' && (
         <>
+          {inProgress && projection.battingSide === 'opponent' && trackedLineup.openPositions.length > 0 && flow.step === 'idle' && (
+            <div role="status" className="flex items-center gap-2 rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
+              <span className="flex-1">Fill {trackedLineup.openPositions.join(', ')} before the next pitch.</span>
+              <button type="button" className="btn-secondary min-h-10 px-3" onClick={() => setTab('lineup')}>Lineup</button>
+            </div>
+          )}
           <section aria-label="Diamond">
             <BaseballDiamond
               view={diamond}
@@ -446,12 +621,10 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                   }
                   : undefined}
               onEditBatter={flow.step === 'idle' && canCapture && batterSlot
-                ? () => setFlow({
-                  step: 'opponent_label',
-                  slotId: batterSlot.id,
-                  label: batterSlot.label ?? '',
-                  number: batterSlot.number ?? '',
-                })
+                ? () => {
+                  const draft = opponentSlotDraft(batterSlot.id)
+                  if (draft) setFlow({ step: 'opponent_label', draft, error: null })
+                }
                 : undefined}
             />
           </section>
@@ -493,6 +666,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                 onLocation={setPitchLocation}
                 onResult={canCapture ? onPitchResult : undefined}
                 disabledReason={PENDING_END_REASON}
+                batterHand={baseballBatterHand(sport)}
                 runnersMoved={showRunnersMoved
                   ? { armed: runnersMovedArmed, onToggle: () => setRunnersMovedArmed(armed => !armed) }
                   : undefined}
@@ -549,6 +723,25 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                   </button>
                 ))}
               </div>
+              {(['pinch_runner', 'courtesy_runner'] as const).some(kind =>
+                substitutionChoices[kind].some(group => group.key === `${kind === 'pinch_runner' ? 'pr' : 'cr'}:${flow.runnerId}`)) && (
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label="Substitute runner">
+                  {(['pinch_runner', 'courtesy_runner'] as const).map(kind => {
+                    const groupKey = `${kind === 'pinch_runner' ? 'pr' : 'cr'}:${flow.runnerId}`
+                    if (!substitutionChoices[kind].some(group => group.key === groupKey)) return null
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        className="btn-secondary min-h-11 px-1 text-sm leading-tight"
+                        onClick={() => openRunnerSubstitution(kind, groupKey)}
+                      >
+                        {kind === 'pinch_runner' ? 'Pinch runner' : 'Courtesy runner'}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               <button type="button" className="btn-secondary w-full" onClick={() => setFlow({ step: 'idle' })}>Cancel</button>
             </section>
           )}
@@ -590,33 +783,13 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           )}
 
           {flow.step === 'opponent_label' && (
-            <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Opponent batter">
-              <h2 className="font-bold text-content">Opponent batter</h2>
-              <p className="text-sm text-content-muted">A label for this batting slot. The lineup does not change.</p>
-              <label className="block space-y-1 text-sm font-semibold text-content">
-                <span>Name or label</span>
-                <input
-                  className="input-field"
-                  value={flow.label}
-                  maxLength={60}
-                  onChange={event => setFlow({ ...flow, label: event.target.value })}
-                />
-              </label>
-              <label className="block space-y-1 text-sm font-semibold text-content">
-                <span>Number</span>
-                <input
-                  className="input-field"
-                  inputMode="numeric"
-                  value={flow.number}
-                  maxLength={4}
-                  onChange={event => setFlow({ ...flow, number: event.target.value })}
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" className="btn-secondary" onClick={() => setFlow({ step: 'idle' })}>Cancel</button>
-                <button type="button" className="btn-primary" onClick={saveOpponentLabel}>Save</button>
-              </div>
-            </section>
+            <OpponentSlotSheet
+              draft={flow.draft}
+              onChange={draft => setFlow({ ...flow, draft, error: null })}
+              error={flow.error}
+              onCancel={() => setFlow({ step: 'idle' })}
+              onSave={saveOpponentLabel}
+            />
           )}
 
           {flow.step === 'pitching_change' && (
@@ -710,7 +883,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               />
               <MenuAction
                 label={`${names.opponent} pitching change`}
-                onClick={() => openFromMenu({ step: 'pitching_change', draft: { side: 'opponent', label: '', number: '' }, error: null })}
+                onClick={() => openFromMenu({ step: 'pitching_change', draft: { side: 'opponent', label: '', number: '', throws: null }, error: null })}
               />
               {baseballCanEndHalf(projection) && (
                 <MenuAction
@@ -842,5 +1015,60 @@ function LineupReview({ setup, teamName, opponentName }: { setup: BaseballMatchS
         </p>
       </section>
     </div>
+  )
+}
+
+function OpponentSlotSheet({
+  draft,
+  onChange,
+  error,
+  onCancel,
+  onSave,
+}: {
+  draft: OpponentSlotDraft
+  onChange: (draft: OpponentSlotDraft) => void
+  error: string | null
+  onCancel: () => void
+  onSave: () => void
+}) {
+  return (
+    <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Opponent batter">
+      <h2 className="font-bold text-content">Opponent batter</h2>
+      <p className="text-sm text-content-muted">A label and hand for this batting slot. The lineup does not change.</p>
+      <label className="block space-y-1 text-sm font-semibold text-content">
+        <span>Name or label</span>
+        <input
+          className="input-field"
+          value={draft.label}
+          maxLength={60}
+          onChange={event => onChange({ ...draft, label: event.target.value })}
+        />
+      </label>
+      <label className="block space-y-1 text-sm font-semibold text-content">
+        <span>Number</span>
+        <input
+          className="input-field"
+          inputMode="numeric"
+          value={draft.number}
+          maxLength={4}
+          onChange={event => onChange({ ...draft, number: event.target.value })}
+        />
+      </label>
+      <BaseballHandChoice
+        legend="Bats"
+        options={['L', 'R', 'S']}
+        value={draft.bats}
+        onChange={bats => onChange({ ...draft, bats })}
+      />
+      {error && (
+        <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
+          {error}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn-primary" onClick={onSave}>Save</button>
+      </div>
+    </section>
   )
 }

@@ -1,9 +1,8 @@
 # Plan: BSB-4 Baseball Lineup Management, Timeline and Corrections
 
-Status: draft for owner review (2026-10-01), revised after the first plan review
-(attribution warnings, stamped actors, lifecycle boundaries, correction receipts).
-Owner answers (2026-10-01): Q1–Q7 follow the recommendations, for now (section 9).
-Implementation starts only after this plan PR is approved or merged. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
+Status: approved and merged (PR #459, 2026-10-01). Owner answers (2026-10-01): Q1–Q7
+follow the recommendations, for now (section 9). BSB-4A is implemented; section 10 is
+the delivery record. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
 BSB-2 ([setup](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)) and BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 5.4, 8.3 and 12.
@@ -419,3 +418,44 @@ these answers; a later change of mind lands as its own plan revision.
 | Q5 | A missed pitch can't be inserted mid-game (capture order is fixed). Is fixing it by editing the next pitch or using Quick PA enough? | **Yes** / **No** (needs an ordering change to the shared event layer) | Yes |
 | Q6 | After a correction, if credit moves (batting or pitching) or no longer matches the lineup (fielding), should it save? | **Warn** (the preview lists every change and you confirm) / **Block** | Warn |
 | Q7 | Capture batter and pitcher handedness? | **Yes** (setup for our team, label sheets for theirs) / **No** | Yes |
+
+---
+
+## 10. Delivery Record
+
+### BSB-4A Lineup tab, single-change substitutions and handedness
+
+- `lineupView.ts` (pure): batting cards (slot, position or DH/EH/"No position", hands,
+  Batting/Up next, the starter replaced), defense rows, open positions, the bench with
+  each player's re-entry note, the opponent slots and pitcher, the current batter's hand,
+  and a read-only player game detail. `baseballCanEnter` mirrors the projector's
+  admission rule: nobody already in the game, and a returning starter only once, into
+  the original slot under `starters_once`.
+- `substitutionOptions.ts` (pure): pinch hitter, pinch runner, courtesy runner,
+  defensive replacement and position switch, grouped by target, each with a summary
+  line in the BSB-3D style. Deliberate limits, all multi-player changes for BSB-4B:
+  a DH or EH taking a filled position, and a fielder leaving from another position to
+  fill an open one. Courtesy runners are offered only from players who have not
+  appeared, which is stricter than the engine.
+- `substitutions.test.ts` checks, in seven game states, that every listed option is
+  accepted by the engine and every engine-accepted single change is listed apart from
+  the deliberate limits above.
+- Fix found on the way: the BSB-3D pitching change listed a returning starter for the
+  pitcher's slot even when it was not that starter's original slot; it now uses
+  `baseballCanEnter`.
+- Tracker: Track / Lineup tabs (switching writes nothing and keeps open sheets), the
+  Lineup tab with Substitute, player details, opponent slot edits (label, number, Bats)
+  and the opponent pitching change (now with Throws). The runner menu offers Pinch
+  runner and Courtesy runner, opening the Lineup tab with that runner chosen. An open
+  position shows a banner on Track while the opponent bats, because the engine refuses
+  the next pitch until the defense is complete.
+- Handedness: setup takes optional Bats (L/R/S) and Throws (L/R) per dressed player,
+  Bats per opponent slot and Throws for the opponent starter. The pitch pad labels the
+  batter's box from the current batter. No setup version change; older games read
+  null hands.
+- No new event types, payloads or migrations. Each substitution is one
+  `baseball.substitution` event with its own `captureCommandId`, so Undo and Recent
+  plays cover it. Browser smoke at 390px: setup hands, Bats S/L on the pad, pinch runner
+  from the runner menu, pinch hitter, both open positions filled, a position switch,
+  player details, reload unchanged, no horizontal scroll, dark theme.
+
