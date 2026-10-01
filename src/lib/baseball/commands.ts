@@ -31,6 +31,7 @@ import type {
   BaseballSportGameState,
   BaseballSubstitution,
   BaseballTeamSide,
+  BaseballUndoReceipt,
 } from './types'
 
 export type BaseballCommandErrorCode =
@@ -439,7 +440,18 @@ function append<TType extends BaseballEventType>(
     gameEventProjectors
   )
   if (!result.ok) return failure(state, 'rejected', result.error.message)
-  return { ok: true, state: result.state, events: [event] }
+  // Any new event ends the chance to restore the last undone play (BSB-3D).
+  return { ok: true, state: withBaseballUndoReceipt(result.state, null), events: [event] }
+}
+
+/** Sets or clears the Restore receipt; it lives in capture preferences, outside fingerprints. */
+export function withBaseballUndoReceipt(state: GameState, receipt: BaseballUndoReceipt | null): GameState {
+  const sport = baseballSportState(state)
+  if (!sport || sport.capturePreferences.lastUndo === receipt) return state
+  return {
+    ...state,
+    sportGameState: { ...sport, capturePreferences: { ...sport.capturePreferences, lastUndo: receipt } },
+  }
 }
 
 /**

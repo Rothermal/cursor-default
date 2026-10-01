@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import BaseballPositionField from '../components/baseball/BaseballPositionField'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
@@ -30,7 +30,8 @@ import {
   type BaseballSetupRosterPlayer,
 } from '../lib/baseball/setupBuilder'
 import { baseballTeamSettingsAdapter } from '../lib/baseball/teamSettingsSync'
-import { isBaseballEventPreviewAvailable } from '../lib/sportAvailability'
+import { getBaseballEventCreationPolicy } from '../lib/sportAvailability'
+import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
 
 interface BaseballTeamOption {
@@ -46,12 +47,14 @@ type RosterStatus = 'idle' | 'loading' | 'ready' | 'error'
  * local roster or a cloud team (prefilled once from team defaults) and opens `/game`.
  */
 export default function BaseballEventSetup() {
-  if (!isBaseballEventPreviewAvailable()) {
+  const { baseballEventTrackerEnabled } = useSettings()
+  if (!getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame) {
     return (
-      <main className="max-w-2xl mx-auto px-4 py-5">
+      <main className="max-w-2xl mx-auto px-4 py-5 space-y-3">
         <p className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">
-          Baseball event tracking is not available in this build yet.
+          Baseball event tracking is not available in this build yet. Turn on the new event tracker in Baseball settings to try it on this device.
         </p>
+        <Link to="/settings/sports/baseball" className="btn-secondary inline-block">Baseball settings</Link>
       </main>
     )
   }

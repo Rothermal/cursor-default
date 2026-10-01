@@ -6,6 +6,7 @@ export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
  */
 export const SPORT_EVENT_RELEASE_STAGES = {
   hockey: 'opt_in',
+  baseball: 'opt_in',
 } as const satisfies Record<string, SportEventReleaseStage>
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
@@ -73,11 +74,24 @@ export function getHockeyEventCreationPolicy(
 }
 
 /**
- * BSB-2: the Baseball event setup and holding page are a development preview. Production
- * builds keep the legacy Baseball stat grid; BSB-7 owns the release decision.
+ * BSB-3D (Q1): new Baseball event games need the owner's device toggle in production,
+ * which defaults off; development keeps the preview without it. Event Baseball stays
+ * local-only at every stage; BSB-7 owns the wider release.
  */
-export function isBaseballEventPreviewAvailable(development: boolean = DEVELOPMENT_BUILD): boolean {
-  return development
+export function getBaseballEventCreationPolicy(
+  enabledOnDevice: boolean,
+  {
+    development = DEVELOPMENT_BUILD,
+    releaseStage = SPORT_EVENT_RELEASE_STAGES.baseball,
+  }: SportEventCreationPolicyOptions = {}
+): SportEventCreationPolicy {
+  const preferenceAvailable = releaseStage === 'opt_in'
+  return {
+    releaseStage,
+    preferenceAvailable,
+    canCreateNewEventGame: development || (preferenceAvailable && enabledOnDevice),
+    canAccessExistingEventGames: true,
+  }
 }
 
 export function getSportAvailabilityPolicy(

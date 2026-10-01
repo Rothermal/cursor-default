@@ -1,7 +1,7 @@
 # Plan: BSB-3 Baseball Diamond Tracker and Pitch Pad
 
 Status: approved and merged 2026-09-29 (PR #448; owner answers in section 9). BSB-3A
-(PR #450), BSB-3B (PR #452) and BSB-3C are implemented (section 10); BSB-3D follows.
+(PR #450), BSB-3B (PR #452), BSB-3C (PR #454) and BSB-3D are implemented (section 10).
 Builds on the BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)) and BSB-2 roster,
 defaults and setup ([plan](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 4, 8 and 12.
@@ -542,3 +542,52 @@ or merged.
   error scoring the runner from third with "Error by 6" and "Earned run: No" (checked in
   the stored payload), and a pickoff at second with fielders 1-4. Projection matched
   after each step; no horizontal scroll and no console errors.
+
+### BSB-3D Endings, pitching changes, Recent plays and Undo
+
+- `recentPlays.ts`: capture units (pitch, plate appearance, runner play, substitution,
+  score adjustment) grouped by `captureCommandId`, newest first, with game-flow rows
+  (start, half end, game end, reopen) and "Middle N" / "End N" dividers. Undo removes
+  only the newest active unit and refuses game flow; the game start, a manual half end
+  and a game end are never undone (a game end is taken back with Reopen). Every removal
+  and restore is replayed before it is kept. `capturePreferences.lastUndo` stores one
+  receipt (event ids plus expected revisions), outside fingerprints and reload-safe;
+  every new event clears it, so Restore is offered only until the next capture.
+- Run text in Recent plays comes from the same replay as the score
+  (`replayBaseballRunsByEvent`), so a run cancelled by a force or batter third out is
+  never announced, and explicit run-counts overrides are honoured either way.
+- Tapping a play opens its details read-only (`baseballPlayDetail`): batter and pitcher,
+  the pitch or quick result, the batted ball and fielders, and every runner's movement
+  with fielders, errors, recorder overrides and whether the run counted. Closing it
+  changes nothing; editing older plays is the BSB-4 Timeline.
+- `endings.ts`: at a pending end the pad is disabled and a banner names the reason with
+  "Undo last play" and "End game" (Completed, or Run rule). The Game menu offers End
+  half-inning (time limit, mercy, other, optional note) while outs are below three and
+  no end is pending, End game (Completed or Run rule only when pending, plus time limit,
+  forfeit with a winner, suspend and abandon with a required reason) and Reopen with a
+  required reason. A result card shows the outcome, score, winner and note.
+- `pitchingChange.ts`: the tracked team chooses a bench player (one `defensive`
+  substitution at position 1, taking the pitcher's batting slot; the re-entry rule is
+  spelled out) or a fielder swap (one `position_change` with both assignments; both keep
+  their batting slots). The sheet shows the summary before Confirm. Bench excludes
+  players in the game and removed players who may not return. The opponent change takes
+  a label and/or number. Double switches stay in BSB-4.
+- Release (Q1): `SPORT_EVENT_RELEASE_STAGES.baseball` is `opt_in`. Production needs the
+  default-off device toggle `statkeeper_settings.baseball.eventTrackerEnabled` (Settings
+  -> Sports -> Baseball); development does not. `getBaseballEventCreationPolicy` gates
+  only new-game setup; the `/game` tracker is never gated. `releasePolicy.test.ts` audits
+  the consumers. Games stay local-only.
+- Known limit: after End game and Reopen at a pending end, the last play can no longer be
+  undone because the reopen is game flow. The banner offers Undo before End game for the
+  common case; editing older plays is the BSB-4 Timeline.
+- Tests: Recent plays labels and dividers, Undo/Restore of single and multi-event units,
+  the third out reopening a half, receipts cleared by new events and kept across a
+  preference change and reload, endings (pending, suspend, time limit, forfeit),
+  pitching-change options and re-entry, opponent change, run labels for a force third
+  out, a batter out before first, a timing play and explicit overrides, read-only details
+  that leave the game unchanged, and component renders.
+- Browser check at 390 px (development build, light and dark), driven through the UI:
+  ball and strike, Undo then Restore of the strike, an opponent change to "#33 Lefty", a
+  bench pitcher (#11 Olsen for #2 Garcia, batting 1st), End half-inning for a time
+  limit, Suspend with "Rain", and Reopen. Projection matched after each step; no
+  horizontal scroll and no console errors.

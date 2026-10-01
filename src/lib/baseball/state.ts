@@ -14,6 +14,7 @@ import type {
   BaseballSideLineup,
   BaseballSportGameState,
   BaseballTrackedLineup,
+  BaseballUndoReceipt,
 } from './types'
 import { BASEBALL_GAME_STATE_VERSION, BASEBALL_SETUP_VERSION } from './types'
 
@@ -32,7 +33,7 @@ export function createBaseballSportGameState(setup: BaseballMatchSetup): Basebal
 }
 
 export function defaultBaseballCapturePreferences(): BaseballCapturePreferences {
-  return { trackPitchLocation: true, trackBattedBallLocation: true }
+  return { trackPitchLocation: true, trackBattedBallLocation: true, lastUndo: null }
 }
 
 export function createBaseballMatchProjection(setup: BaseballMatchSetup): BaseballMatchProjection {
@@ -202,7 +203,25 @@ function normalizeCapturePreferences(value: unknown): BaseballCapturePreferences
       typeof value.trackBattedBallLocation === 'boolean'
         ? value.trackBattedBallLocation
         : defaults.trackBattedBallLocation,
+    lastUndo: normalizeUndoReceipt(value.lastUndo),
   }
+}
+
+/** A malformed receipt is dropped rather than trusted; Restore re-checks each event anyway. */
+function normalizeUndoReceipt(value: unknown): BaseballUndoReceipt | null {
+  if (!isPlainObject(value) || typeof value.createdAt !== 'string' || !Array.isArray(value.entries)) return null
+  if (value.entries.length === 0) return null
+  const entries: BaseballUndoReceipt['entries'] = []
+  for (const entry of value.entries) {
+    if (
+      !isPlainObject(entry) ||
+      typeof entry.eventId !== 'string' ||
+      typeof entry.expectedRevision !== 'number' ||
+      !Number.isInteger(entry.expectedRevision)
+    ) return null
+    entries.push({ eventId: entry.eventId, expectedRevision: entry.expectedRevision })
+  }
+  return { createdAt: value.createdAt, entries }
 }
 
 export function normalizeBaseballMatchSetup(value: unknown): BaseballMatchSetup | null {

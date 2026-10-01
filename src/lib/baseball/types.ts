@@ -535,6 +535,19 @@ export interface BaseballProjectionWarning {
 export interface BaseballCapturePreferences {
   trackPitchLocation: boolean
   trackBattedBallLocation: boolean
+  /** BSB-3D: what the last Undo removed, so Restore can bring it back until the next capture. */
+  lastUndo: BaseballUndoReceipt | null
+}
+
+export interface BaseballUndoReceipt extends JsonObject {
+  createdAt: string
+  /** Each removed event with the revision its deletion gave it. */
+  entries: BaseballUndoReceiptEntry[]
+}
+
+export interface BaseballUndoReceiptEntry extends JsonObject {
+  eventId: string
+  expectedRevision: number
 }
 
 export interface BaseballSportGameState {

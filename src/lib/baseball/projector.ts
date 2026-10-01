@@ -110,6 +110,29 @@ export function replayBaseballEvents(setup: BaseballMatchSetup, events: readonly
   return { projection: replay.projection, diagnostics: [] }
 }
 
+/**
+ * The runners each event actually scored, from the same replay that builds the score, so
+ * Recent plays never announces a run the third-out rules cancelled. Stops at the first
+ * invalid event, like `replayBaseballEvents`.
+ */
+export function replayBaseballRunsByEvent(
+  setup: BaseballMatchSetup,
+  events: readonly GameEvent[]
+): Map<string, string[]> {
+  const replay = new BaseballReplay(setup)
+  const scored = new Map<string, string[]>()
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    try {
+      replay.apply(event as BaseballEvent)
+    } catch (error) {
+      if (!(error instanceof BaseballReplayError)) throw error
+      break
+    }
+    scored.set(event.id, replay.runnersScoredByLastEvent)
+  }
+  return scored
+}
+
 export const baseballGameEventProjector: SportGameEventProjector = {
   sportId: 'baseball',
   requiresSportGameState: true,
@@ -160,6 +183,8 @@ class BaseballReplay {
   /** Participant ids stamped on the event being applied, by actor role. */
   private stamped = new Map<string, string>()
   private currentEventId = ''
+  /** Runner ids whose runs counted on the event applied last. */
+  runnersScoredByLastEvent: string[] = []
 
   constructor(private readonly setup: BaseballMatchSetup) {
     this.projection = createBaseballMatchProjection(setup)
@@ -170,6 +195,7 @@ class BaseballReplay {
   apply(event: BaseballEvent): void {
     const p = this.projection
     this.currentEventId = event.id
+    this.runnersScoredByLastEvent = []
     this.stamped = new Map(
       event.actors.flatMap(actor => (actor.participantId ? [[actor.role, actor.participantId] as const] : []))
     )
@@ -888,6 +914,7 @@ class BaseballReplay {
     isPaEvent: boolean,
     terminal: Terminal | null
   ): void {
+    this.runnersScoredByLastEvent.push(movement.runnerId)
     const p = this.projection
     const side = p.battingSide
     p.score[side] += 1
