@@ -6,7 +6,7 @@ import type {
   SportGameEventProjectionResult,
   SportGameEventProjector,
 } from '../gameEvents/types'
-import { basePosition, baseballSubstitutionChanges } from './events'
+import { basePosition, baseballSubstitutionChanges, baseballSubstitutionUsesLegacyRules } from './events'
 import { baseballPeriod } from './periods'
 import { createBaseballMatchProjection } from './state'
 import { baseballPlayerStatsById } from './stats'
@@ -194,6 +194,8 @@ class BaseballReplay {
   /** Participant ids stamped on the event being applied, by actor role. */
   private stamped = new Map<string, string>()
   private currentEventId = ''
+  /** Applying a pre-BSB-4B substitution under the BSB-4A single-change rules. */
+  private legacyLineupRules = false
   /** Runner ids whose runs counted on the event applied last. */
   runnersScoredByLastEvent: string[] = []
 
@@ -227,7 +229,7 @@ class BaseballReplay {
     if (p.status === 'pregame') {
       if (event.eventType === 'baseball.substitution') {
         this.expectPeriod(event, 1, 'top')
-        this.applySubstitutionEvent(event.teamSide as BaseballTeamSide, baseballSubstitutionChanges(event.payload))
+        this.applySubstitutionEvent(event.teamSide as BaseballTeamSide, baseballSubstitutionChanges(event.payload), baseballSubstitutionUsesLegacyRules(event.payload))
         return
       }
       fail('Start the game before recording play.')
@@ -248,7 +250,7 @@ class BaseballReplay {
         return
       }
       case 'baseball.substitution':
-        this.applySubstitutionEvent(event.teamSide as BaseballTeamSide, baseballSubstitutionChanges(event.payload))
+        this.applySubstitutionEvent(event.teamSide as BaseballTeamSide, baseballSubstitutionChanges(event.payload), baseballSubstitutionUsesLegacyRules(event.payload))
         return
       default:
         break
@@ -972,17 +974,29 @@ class BaseballReplay {
    * be a legal lineup, so a double switch or a DH forfeiture passes through states a single
    * change could not leave behind.
    */
-  private applySubstitutionEvent(side: BaseballTeamSide, changes: readonly BaseballSubstitution[]): void {
+  private applySubstitutionEvent(side: BaseballTeamSide, changes: readonly BaseballSubstitution[], legacy: boolean): void {
     if (changes.length === 0) fail('A substitution makes at least one change.')
     if (side === 'opponent') {
       changes.forEach(change => this.applyOpponentChange(change))
       return
     }
+    if (legacy) {
+      // Saved before BSB-4B: replay exactly as BSB-4A accepted it, checks and all.
+      this.legacyLineupRules = true
+      try {
+        changes.forEach(change => this.applySubstitution(change))
+      } finally {
+        this.legacyLineupRules = false
+      }
+      return
+    }
     const lineup = this.projection.lineups.tracked
     const fieldedBefore = new Set(Object.values(lineup.defense))
     const dhBefore = this.nonBattingFielders().length > 0
+    const dhSlot = baseballDesignatedHitterSlot(this.setup)
+    const dhFieldedBefore = dhSlot !== null && fieldedBefore.has(lineup.battingOrder[dhSlot] ?? '')
     changes.forEach(change => this.applySubstitution(change))
-    this.checkLineupAfterChanges(fieldedBefore, dhBefore)
+    this.checkLineupAfterChanges(fieldedBefore, dhBefore, dhFieldedBefore)
   }
 
   /**
@@ -991,7 +1005,7 @@ class BaseballReplay {
    * bat (the pitcher in a DH game) and lost the position has left the game. Once every
    * fielder bats in a DH game, the DH role has ended and cannot start again.
    */
-  private checkLineupAfterChanges(fieldedBefore: ReadonlySet<string>, dhBefore: boolean): void {
+  private checkLineupAfterChanges(fieldedBefore: ReadonlySet<string>, dhBefore: boolean, dhFieldedBefore: boolean): void {
     const lineup = this.projection.lineups.tracked
     const fielding = new Set(Object.values(lineup.defense))
     const battersMayStay =
@@ -1008,7 +1022,9 @@ class BaseballReplay {
     if (!dhBefore) fail('The DH role has ended for this game; every fielder bats.')
     const dhSlot = baseballDesignatedHitterSlot(this.setup)
     const dhId = dhSlot === null ? null : lineup.battingOrder[dhSlot]
-    if (dhId && fielding.has(dhId)) fail('When the DH takes the field, the pitcher bats; the DH role ends.')
+    // Only this event's move counts: a DH already fielding from a pre-BSB-4B history
+    // does not block later, unrelated changes.
+    if (dhId && fielding.has(dhId) && !dhFieldedBefore) fail('When the DH takes the field, the pitcher bats; the DH role ends.')
   }
 
   /** Fielders outside the batting order: the pitcher while a DH bats for them. */
@@ -1154,8 +1170,10 @@ class BaseballReplay {
     if (Object.values(lineup.defense).includes(incomingId)) fail('Use a position change for a player already fielding.')
     const leaving = outgoingId ?? previous
     const previousPitcher = lineup.pitcherId
+    const standard = this.rules.battingOrderFormat === 'standard'
     if (lineup.battingOrder.includes(incomingId)) {
       if (outgoingId) fail('A player already batting cannot replace another batter.')
+      if (this.legacyLineupRules && previous && standard) fail('Move the current fielder to another position first.')
       lineup.defense[key] = incomingId
     } else {
       if (!leaving) {
@@ -1170,6 +1188,9 @@ class BaseballReplay {
         this.admit(incomingId, null)
       }
       this.removeFromGame(leaving)
+      if (this.legacyLineupRules && previous && previous !== leaving && standard) {
+        fail('Move the current fielder to another position first.')
+      }
       lineup.defense[key] = incomingId
       const base = this.baseOf(leaving)
       if (base) fail('A runner on base leaves through a pinch runner.')
@@ -1189,6 +1210,8 @@ class BaseballReplay {
     }
     for (const entry of assignments) {
       if (entry.position > this.rules.defensivePlayers) fail('That position is not used under these rules.')
+      const occupant = lineup.defense[String(entry.position)]
+      if (this.legacyLineupRules && occupant && !movers.has(occupant)) fail('Every displaced fielder needs a new position.')
       if (!this.isActive(entry.participantId)) fail('Only players in the game can change positions.')
       if (
         this.rules.battingOrderFormat === 'standard' &&

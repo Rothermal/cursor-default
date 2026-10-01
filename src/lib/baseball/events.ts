@@ -313,7 +313,19 @@ export function baseballSubstitutionChanges(payload: unknown): BaseballSubstitut
   return isPlainObject(payload.substitution) ? [payload.substitution as unknown as BaseballSubstitution] : []
 }
 
-/** Schema 1 carried one `substitution`; schema 2 wraps it as the only change. */
+/**
+ * True for a substitution saved before BSB-4B, read raw (`substitution`) or migrated
+ * (`legacyLineupRules`). It replays under the BSB-4A single-change rules so saved games
+ * keep the history they were recorded with; new writes never carry the marker.
+ */
+export function baseballSubstitutionUsesLegacyRules(payload: unknown): boolean {
+  return isPlainObject(payload) && (isPlainObject(payload.substitution) || payload.legacyLineupRules === true)
+}
+
+/**
+ * Schema 1 carried one `substitution`; schema 2 wraps it as the only change and keeps its
+ * provenance, so the stricter BSB-4B lineup checks never reject a history BSB-4A accepted.
+ */
 function migrateSubstitutionV1(event: GameEvent): GameEvent {
   const payload = event.payload
   if (!isPlainObject(payload) || !exactKeys(payload, ['captureCommandId', 'substitution'])) {
@@ -322,18 +334,25 @@ function migrateSubstitutionV1(event: GameEvent): GameEvent {
   return {
     ...event,
     schemaVersion: 2,
-    payload: { captureCommandId: payload.captureCommandId, changes: [payload.substitution] },
+    payload: { captureCommandId: payload.captureCommandId, changes: [payload.substitution], legacyLineupRules: true },
   } as GameEvent
 }
 
 const OPPONENT_KINDS = new Set(['opponent_pitcher', 'opponent_slot'])
 
 function validateSubstitutionPayload(payload: Record<string, unknown>, event: GameEvent): string | null {
-  if (!exactKeys(payload, ['captureCommandId', 'changes'])) return 'Invalid substitution payload.'
+  const legacy = 'legacyLineupRules' in payload
+  if (!exactKeys(payload, legacy ? ['captureCommandId', 'changes', 'legacyLineupRules'] : ['captureCommandId', 'changes'])) {
+    return 'Invalid substitution payload.'
+  }
   if (!isCaptureId(payload.captureCommandId)) return 'Invalid capture command id.'
   const changes = payload.changes
   if (!Array.isArray(changes) || changes.length < 1 || changes.length > BASEBALL_MAX_SUBSTITUTION_CHANGES) {
     return 'A substitution makes one to six changes.'
+  }
+  // Only the schema 1 migration writes the marker: one BSB-4A change.
+  if (legacy && (payload.legacyLineupRules !== true || changes.length !== 1 || (changes[0] as { kind?: unknown })?.kind === 'batting_slot')) {
+    return 'Invalid substitution payload.'
   }
   for (const change of changes) {
     const message = validateSubstitution(change)

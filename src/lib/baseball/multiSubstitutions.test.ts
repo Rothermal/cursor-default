@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
-import { gameEventRegistry } from '../gameEvents/runtime'
+import { applyGameEventAppendsAndMutations } from '../gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEvent } from '../gameEvents/types'
-import { baseballSportState, substituteBaseball } from './commands'
+import { baseballSportState, nextBaseballEventSequence, recordBaseballPitch, substituteBaseball } from './commands'
 import { baseballDesignatedHitterId, baseballTrackedLineupView } from './lineupView'
+import { normalizeBaseballSportGameState } from './state'
 import { replayBaseballEvents } from './projector'
 import { baseballRecentPlays, restoreBaseballPlay, undoBaseballPlay } from './recentPlays'
 import {
@@ -68,7 +70,7 @@ describe('Baseball substitution payload schema 2', () => {
     const old: GameState = { ...state, eventStream: { ...state.eventStream!, events: [...state.eventStream!.events.slice(0, -1), legacy] } }
     const inspection = inspectGameEventStream(old.eventStream!, gameEventRegistry)
     expect(inspection.complete).toBe(true)
-    expect(inspection.activeEvents[inspection.activeEvents.length - 1]!.payload).toEqual(stored.payload)
+    expect(inspection.activeEvents[inspection.activeEvents.length - 1]!.payload).toEqual({ ...stored.payload, legacyLineupRules: true })
     expect(replayBaseballEvents(sportOf(old).setup, inspection.activeEvents).projection.lineups.tracked)
       .toEqual(tracked(state))
     // Raw schema 1 payloads replay too (Restore reads stored events directly).
@@ -273,5 +275,132 @@ describe('Baseball multi-change sheet', () => {
     expect(html).toContain('New fielder (LF)')
     expect(html).toContain('Pitcher bats 7th, LF bats 1st (switched)')
     expect(html).toContain('#11 Player 11 replaces #7 Player 7 at LF, batting 1st.')
+  })
+})
+
+/**
+ * A substitution exactly as BSB-4A saved it (schema 1). BSB-4A's picker offered the DH for
+ * an open position after a pinch hitter, and its projector accepted the move; BSB-4B would
+ * reject the same change as a new write, so saved games must keep replaying it.
+ */
+const PRE_BSB4B_DH_TO_CATCHER = {
+  id: '6f3c1a52-0b4e-4c55-9a51-1d8a8e3a4b01',
+  sportId: 'baseball',
+  eventType: 'baseball.substitution',
+  schemaVersion: 1,
+  recorderUserId: null,
+  period: { id: 'inning-2-top', order: 3 },
+  elapsedMs: null,
+  occurredAt: '2026-09-30T18:00:00.000Z',
+  teamSide: 'tracked',
+  location: null,
+  actors: [],
+  payload: {
+    captureCommandId: 'c0a8e7f4-5d1b-4a8e-9b0c-3e2f1a6d7c88',
+    substitution: { kind: 'defensive', position: 2, incomingId: 't10', outgoingId: null },
+  },
+  revision: 1,
+  createdAt: '2026-09-30T18:00:00.000Z',
+  updatedAt: '2026-09-30T18:00:00.000Z',
+  deletedAt: null,
+} as const
+
+/** Top 2 of a DH game: t11 pinch-hit for the catcher t2 in the bottom 1, so C is open. */
+function dhOpenCatcher(): GameState {
+  let state = walk(threeUpThreeDown(startedGame(dhSetup())))
+  state = expectOk(attempt(state, { kind: 'pinch_hitter', incomingId: 't11', outgoingId: 't2' }))
+  return strikeout(strikeout(strikeout(state)))
+}
+
+function withLegacyEvent(state: GameState): GameState {
+  const event = { ...PRE_BSB4B_DH_TO_CATCHER, sequence: nextBaseballEventSequence(state.eventStream!.events, null) } as unknown as GameEvent
+  const result = applyGameEventAppendsAndMutations(state, [event], [], at(10), gameEventRegistry, gameEventProjectors)
+  if (!result.ok) throw new Error(result.error.message)
+  return result.state
+}
+
+describe('Baseball substitutions saved before BSB-4B', () => {
+  it('replays the DH into an open catcher spot that BSB-4A accepted, while new writes stay strict', () => {
+    const before = dhOpenCatcher()
+    expect(attempt(before, { kind: 'defensive', position: 2, incomingId: 't10', outgoingId: null })).toMatchObject({
+      ok: false,
+      message: 'When the DH takes the field, the pitcher bats; the DH role ends.',
+    })
+
+    const state = withLegacyEvent(before)
+    const stored = state.eventStream!.events[state.eventStream!.events.length - 1] as GameEvent
+    const inspection = inspectGameEventStream(state.eventStream!, gameEventRegistry)
+    expect(inspection.complete).toBe(true)
+    expect(inspection.activeEvents.find(event => event.id === stored.id)!.payload).toEqual({
+      captureCommandId: PRE_BSB4B_DH_TO_CATCHER.payload.captureCommandId,
+      changes: [{ kind: 'defensive', position: 2, incomingId: 't10', outgoingId: null }],
+      legacyLineupRules: true,
+    })
+    // Hydrated projection: the DH catches, the pitcher still does not bat, nobody left.
+    const lineup = tracked(state)
+    expect(lineup.defense['2']).toBe('t10')
+    expect(lineup.battingOrder).not.toContain('t1')
+    expect(lineup.removedIds).toEqual(['t2'])
+    expect(replayBaseballEvents(sportOf(state).setup, state.eventStream!.events as GameEvent[]).diagnostics).toEqual([])
+    const normalized = normalizeBaseballSportGameState(JSON.parse(JSON.stringify(state.sportGameState)))
+    expect(normalized?.projection.lineups.tracked).toEqual(lineup)
+
+    // Review.
+    expect(baseballRecentPlays(state, names)[0]).toMatchObject({ label: '#10 Player 10 to C' })
+    expect(baseballTrackedLineupView(sportOf(state)).cards[0]).toMatchObject({ id: 't10', position: 'C' })
+    expect(baseballDesignatedHitterId(sportOf(state))).toBeNull()
+
+    // Every option offered on top of the saved history is one the engine accepts.
+    for (const option of Object.values(choices(state)).flatMap(groups => groups.flatMap(group => group.options))) {
+      const result = attempt(state, option.changes)
+      expect(result.ok ? 'ok' : `${option.key}: ${result.message}`).toBe('ok')
+    }
+
+    // Undo and Restore of the saved event.
+    const undone = expectOk(undoBaseballPlay(state, at(11)))
+    expect(tracked(undone).defense['2']).toBeUndefined()
+    const restored = expectOk(restoreBaseballPlay(undone, at(12)))
+    expect(tracked(restored).defense['2']).toBe('t10')
+
+    // Play continues: a pitch, a pitching change and the remaining open spot all work.
+    let next = expectOk(recordBaseballPitch(restored, { result: 'ball' }, ctx()))
+    next = expectOk(attempt(next, { kind: 'defensive', position: 1, incomingId: 't12', outgoingId: 't1' }))
+    expect(tracked(next).pitcherId).toBe('t12')
+    expect(projection(next).balls).toBe(1)
+    expect(choices(next).position_change.length).toBeGreaterThan(0)
+  })
+
+  it('still applies the BSB-4A checks to saved events', () => {
+    const state = startedGame()
+    const legacy = {
+      ...PRE_BSB4B_DH_TO_CATCHER,
+      period: { id: 'inning-1-top', order: 1 },
+      sequence: nextBaseballEventSequence(state.eventStream!.events, null),
+      // Displaces the LF without a new position, which BSB-4A refused in a standard order.
+      payload: { captureCommandId: 'legacy-2', substitution: { kind: 'position_change', assignments: [{ participantId: 't8', position: 7 }] } },
+    } as unknown as GameEvent
+    const result = applyGameEventAppendsAndMutations(state, [legacy], [], at(20), gameEventRegistry, gameEventProjectors)
+    expect(result.ok).toBe(false)
+    const replay = replayBaseballEvents(sportOf(state).setup, [...(state.eventStream!.events as GameEvent[]), legacy])
+    expect(replay.diagnostics[0]?.message).toBe('Every displaced fielder needs a new position.')
+  })
+
+  it('rejects the legacy marker on anything but one BSB-4A change', () => {
+    const state = startedGame()
+    const forged = {
+      ...PRE_BSB4B_DH_TO_CATCHER,
+      schemaVersion: 2,
+      period: { id: 'inning-1-top', order: 1 },
+      sequence: nextBaseballEventSequence(state.eventStream!.events, null),
+      payload: {
+        captureCommandId: 'forged',
+        changes: [
+          { kind: 'defensive', position: 7, incomingId: 't10', outgoingId: 't7' },
+          { kind: 'defensive', position: 8, incomingId: 't11', outgoingId: 't8' },
+        ],
+        legacyLineupRules: true,
+      },
+    } as unknown as GameEvent
+    expect(gameEventRegistry.inspect(forged).ok).toBe(false)
   })
 })
