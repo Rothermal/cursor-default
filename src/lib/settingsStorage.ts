@@ -12,10 +12,16 @@ export interface HockeyDeviceSettings {
   eventTrackerEnabled: boolean
 }
 
+export interface BaseballDeviceSettings {
+  /** BSB-3D: owner opt-in for new Baseball event games; defaults off. */
+  eventTrackerEnabled: boolean
+}
+
 export interface AppSettings {
   enabledSports: Record<string, boolean>
   basketball: BasketballDeviceSettings
   hockey: HockeyDeviceSettings
+  baseball: BaseballDeviceSettings
   courtCapture: {
     reboundPromptAfterMiss: boolean
   }
@@ -36,6 +42,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     clockExpirationVibrationEnabled: false,
   },
   hockey: {
+    eventTrackerEnabled: false,
+  },
+  baseball: {
     eventTrackerEnabled: false,
   },
   courtCapture: {
@@ -66,6 +75,7 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
     ? stored.basketball
     : {}
   const hockey = isRecord(stored.hockey) ? stored.hockey : {}
+  const baseball = isRecord(stored.baseball) ? stored.baseball : {}
 
   return {
     enabledSports: {
@@ -93,6 +103,10 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
     hockey: {
       // Only an explicit true opts in; malformed values fail closed.
       eventTrackerEnabled: hockey.eventTrackerEnabled === true,
+    },
+    baseball: {
+      // Only an explicit true opts in; malformed values fail closed.
+      eventTrackerEnabled: baseball.eventTrackerEnabled === true,
     },
     courtCapture: {
       reboundPromptAfterMiss:

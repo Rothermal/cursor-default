@@ -21,6 +21,7 @@ import AppearanceSettings from '../components/settings/AppearanceSettings'
 import SoccerSettings from '../components/settings/SoccerSettings'
 import BasketballSettings from '../components/settings/BasketballSettings'
 import HockeySettings from '../components/settings/HockeySettings'
+import BaseballSettings from '../components/settings/BaseballSettings'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
@@ -729,7 +730,7 @@ export default function Admin() {
             </div>
             <div className="space-y-2">
               {sports.map(sport => {
-                const hasSettings = sport.id === 'basketball' || sport.id === 'soccer' || sport.id === 'hockey'
+                const hasSettings = sport.id === 'basketball' || sport.id === 'soccer' || sport.id === 'hockey' || sport.id === 'baseball'
                 const availability = getSportAvailabilityPolicy(
                   sport.id,
                   isSportEnabled(sport.id)
@@ -768,7 +769,8 @@ export default function Admin() {
         {settingsSection === 'sport' &&
           selectedSettingsSport?.id !== 'basketball' &&
           selectedSettingsSport?.id !== 'soccer' &&
-          selectedSettingsSport?.id !== 'hockey' && (
+          selectedSettingsSport?.id !== 'hockey' &&
+          selectedSettingsSport?.id !== 'baseball' && (
           <section className="card space-y-2">
             <p className="text-lg font-semibold text-content">
               {selectedSettingsSport ? `${selectedSettingsSport.icon} ${selectedSettingsSport.name}` : 'Sport'} settings
@@ -794,6 +796,10 @@ export default function Admin() {
 
         {settingsSection === 'sport' && selectedSettingsSport?.id === 'hockey' && (
           <HockeySettings />
+        )}
+
+        {settingsSection === 'sport' && selectedSettingsSport?.id === 'baseball' && (
+          <BaseballSettings />
         )}
 
         {settingsSection === 'data' && (

@@ -2,14 +2,39 @@ import { ChevronLeft, Menu, X } from 'lucide-react'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import BaseballDiamond from '../components/baseball/BaseballDiamond'
+import {
+  BaseballEndGameSheet,
+  BaseballEndHalfSheet,
+  BaseballReopenSheet,
+  type BaseballEndGameDraft,
+  type BaseballEndHalfDraft,
+} from '../components/baseball/BaseballEndSheets'
 import BaseballInPlaySheet from '../components/baseball/BaseballInPlaySheet'
+import BaseballPitchingChangeSheet, { type BaseballPitchingChangeDraft } from '../components/baseball/BaseballPitchingChangeSheet'
 import BaseballPitchPad from '../components/baseball/BaseballPitchPad'
 import BaseballQuickPlateAppearance from '../components/baseball/BaseballQuickPlateAppearance'
+import BaseballRecentPlays from '../components/baseball/BaseballRecentPlays'
 import BaseballRunnerResolution from '../components/baseball/BaseballRunnerResolution'
 import BaseballScoreboard from '../components/baseball/BaseballScoreboard'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
+  BASEBALL_GAME_END_LABELS,
+  baseballCanEndHalf,
+  baseballCanReopen,
+  baseballEndGameOptions,
+  baseballOpponentPitcherChange,
+  baseballPendingEndMessage,
+  baseballPendingEndOutcome,
+  baseballPitchingChangeOptions,
+  baseballRecentPlays,
+  canRestoreBaseballPlay,
+  canUndoBaseballPlay,
+  endBaseballGame,
+  endBaseballHalfInning,
+  reopenBaseballGame,
+  restoreBaseballPlay,
+  undoBaseballPlay,
   baseballCaptureTerminal,
   baseballDiamondView,
   baseballDroppedThirdStrikeAvailable,
@@ -51,7 +76,6 @@ import {
   type BaseballSportGameState,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
-import { isBaseballEventPreviewAvailable } from '../lib/sportAvailability'
 
 const BATTING_FORMAT_LABELS: Record<string, string> = {
   standard: 'Standard (nine bat)',
@@ -62,7 +86,7 @@ const BATTING_FORMAT_LABELS: Record<string, string> = {
 
 const BASE_LABELS: Record<BaseballBase, string> = { first: 'first', second: 'second', third: 'third' }
 
-const PENDING_END_REASON = 'The game can end on this play. Ending the game arrives in a later update.'
+const PENDING_END_REASON = 'The game can end here. Record the ending, or undo the last play.'
 
 type PlateCapture = Exclude<BaseballPendingCapture, { source: 'baserunning' }>
 
@@ -75,23 +99,20 @@ type CaptureFlow =
   | { step: 'quick' }
   | { step: 'resolve'; capture: BaseballPendingCapture; draft: BaseballResolutionDraft; error: string | null }
   | { step: 'opponent_label'; slotId: string; label: string; number: string }
+  | { step: 'pitching_change'; draft: BaseballPitchingChangeDraft; error: string | null }
+  | { step: 'end_half'; draft: BaseballEndHalfDraft; error: string | null }
+  | { step: 'end_game'; draft: BaseballEndGameDraft; error: string | null }
+  | { step: 'reopen'; reason: string; error: string | null }
 
 /**
  * The live Baseball tracker: the scoreboard strip, the diamond and the pitch pad showing
  * the current projection (BSB-3A), with pitches, the in-play sheet, runner resolution and
- * Quick PA (BSB-3B). Between-pitch running, endings and Undo follow in BSB-3C and BSB-3D.
+ * Quick PA (BSB-3B), runner plays between pitches (BSB-3C), and endings, pitching changes,
+ * Recent plays with Undo and Restore (BSB-3D).
  */
 export default function BaseballGameTracker() {
   const { state } = useGame()
-  if (!isBaseballEventPreviewAvailable()) {
-    return (
-      <main className="max-w-2xl mx-auto px-4 py-5">
-        <p className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">
-          Baseball event tracking is not available in this build yet.
-        </p>
-      </main>
-    )
-  }
+  // Existing event games stay reachable at every release stage; only new games are gated.
   const sport = baseballSportState(state)
   if (!sport) {
     return (
@@ -273,6 +294,66 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     if (applied(result)) setFlow({ step: 'idle' })
   }
 
+  /** Saves a menu flow, or keeps the sheet open with the engine's message. */
+  const commitFlow = (result: BaseballCommandResult) => {
+    if (!result.ok) {
+      setFlow(previous => ('error' in previous ? { ...previous, error: result.message } : previous))
+      return
+    }
+    applied(result)
+    setFlow({ step: 'idle' })
+  }
+
+  const pitchingOptions = baseballPitchingChangeOptions(sport)
+
+  const confirmPitchingChange = () => {
+    if (flow.step !== 'pitching_change') return
+    const { draft } = flow
+    if (draft.side === 'tracked') {
+      const option = [...pitchingOptions.bench, ...pitchingOptions.fielders].find(entry => entry.incomingId === draft.selectedId)
+      if (option) commitFlow(substituteBaseball(state, 'tracked', option.substitution, context()))
+      return
+    }
+    commitFlow(substituteBaseball(state, 'opponent', baseballOpponentPitcherChange(createBaseballUuid(), draft.label, draft.number), context()))
+  }
+
+  const confirmEndHalf = () => {
+    if (flow.step !== 'end_half' || !flow.draft.reason) return
+    commitFlow(endBaseballHalfInning(state, flow.draft.reason, flow.draft.note.trim() || null, context()))
+  }
+
+  const confirmEndGame = () => {
+    if (flow.step !== 'end_game' || !flow.draft.outcome) return
+    commitFlow(endBaseballGame(state, flow.draft.outcome, context(), {
+      forfeitWinner: flow.draft.outcome === 'forfeit' ? flow.draft.winner : null,
+      note: flow.draft.note.trim() || null,
+    }))
+  }
+
+  const confirmReopen = () => {
+    if (flow.step !== 'reopen' || !flow.reason.trim()) return
+    commitFlow(reopenBaseballGame(state, flow.reason.trim(), context()))
+  }
+
+  const recordPendingEnd = () => {
+    if (!projection.pendingEnd) return
+    applied(endBaseballGame(state, baseballPendingEndOutcome(projection.pendingEnd), context()))
+  }
+
+  const undo = () => {
+    if (applied(undoBaseballPlay(state, new Date().toISOString()))) finishCapture()
+  }
+  const restore = () => {
+    applied(restoreBaseballPlay(state, new Date().toISOString()))
+  }
+
+  /** Menu actions replace whatever was open below the diamond; nothing was written yet. */
+  const openFromMenu = (next: CaptureFlow) => {
+    setMenuOpen(false)
+    setError(null)
+    setFlow(next)
+  }
+
   const rowNames = (rows: BaseballResolutionRow[]) =>
     Object.fromEntries(rows.map(row => [row.runnerId, baseballPersonLabel(sport, row.runnerId).name]))
 
@@ -283,6 +364,13 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     baseballDroppedThirdStrikeAvailable(sport)
 
   const profile = findBaseballRulesProfile(setup.rulesSnapshot.profileId)
+  const pitcherName = (side: 'tracked' | 'opponent') => {
+    const id = side === 'tracked' ? projection.lineups.tracked.defense['1'] : projection.lineups.opponent.pitcherId
+    return id ? baseballPersonLabel(sport, id).name : 'No pitcher'
+  }
+  const endGameOptions = baseballEndGameOptions(projection)
+  const result = projection.result
+  const resultWinner = result?.winner === 'tie' ? 'Tie game' : result?.winner ? `${sideName(result.winner)} win` : null
 
   return (
     <main className="max-w-2xl mx-auto px-4 pb-6 space-y-3">
@@ -307,7 +395,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       />
 
       <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Development preview. Runner plays between pitches, pitching changes and Undo come next. This game stays on this device.
+        Preview. Defensive switches and the Timeline come next. This game stays on this device.
       </p>
 
       {error && (
@@ -364,6 +452,35 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                 : undefined}
             />
           </section>
+
+          {inProgress && projection.pendingEnd && flow.step === 'idle' && (
+            <section className="space-y-2 rounded-md border border-accent bg-surface p-3" aria-label="Game can end">
+              <h2 className="font-bold text-content">{baseballPendingEndMessage(projection.pendingEnd)}</h2>
+              <p className="text-sm text-content-muted">
+                Play is paused until the ending is recorded. If the last play was wrong, undo it first.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className="btn-secondary" disabled={!canUndoBaseballPlay(state)} onClick={undo}>Undo last play</button>
+                <button type="button" className="btn-primary" onClick={recordPendingEnd}>End game</button>
+              </div>
+            </section>
+          )}
+
+          {result && (
+            <section className="space-y-2 rounded-md border border-line bg-surface p-3" aria-label="Result">
+              <h2 className="text-lg font-bold text-content">{BASEBALL_GAME_END_LABELS[result.outcome]}</h2>
+              <p className="text-sm text-content">
+                {names.tracked} {projection.score.tracked}, {names.opponent} {projection.score.opponent}
+                {resultWinner && <span className="text-content-muted"> · {resultWinner}</span>}
+              </p>
+              {result.note && <p className="text-sm text-content-muted">{result.note}</p>}
+              {flow.step === 'idle' && baseballCanReopen(projection) && (
+                <button type="button" className="btn-secondary w-full" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })}>
+                  Reopen game
+                </button>
+              )}
+            </section>
+          )}
 
           {inProgress && flow.step === 'idle' && (
             <>
@@ -498,6 +615,61 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               </div>
             </section>
           )}
+
+          {flow.step === 'pitching_change' && (
+            <BaseballPitchingChangeSheet
+              draft={flow.draft}
+              onChange={draft => setFlow({ ...flow, draft, error: null })}
+              options={pitchingOptions}
+              teamName={sideName(flow.draft.side)}
+              currentPitcher={pitcherName(flow.draft.side)}
+              error={flow.error}
+              onCancel={() => setFlow({ step: 'idle' })}
+              onConfirm={confirmPitchingChange}
+            />
+          )}
+
+          {flow.step === 'end_half' && (
+            <BaseballEndHalfSheet
+              draft={flow.draft}
+              onChange={draft => setFlow({ ...flow, draft, error: null })}
+              halfLabel={baseballScoreboardView(sport, names).halfLabel}
+              error={flow.error}
+              onCancel={() => setFlow({ step: 'idle' })}
+              onConfirm={confirmEndHalf}
+            />
+          )}
+
+          {flow.step === 'end_game' && (
+            <BaseballEndGameSheet
+              draft={flow.draft}
+              onChange={draft => setFlow({ ...flow, draft, error: null })}
+              options={endGameOptions}
+              names={names}
+              error={flow.error}
+              onCancel={() => setFlow({ step: 'idle' })}
+              onConfirm={confirmEndGame}
+            />
+          )}
+
+          {flow.step === 'reopen' && (
+            <BaseballReopenSheet
+              reason={flow.reason}
+              onChange={reason => setFlow({ ...flow, reason, error: null })}
+              error={flow.error}
+              onCancel={() => setFlow({ step: 'idle' })}
+              onConfirm={confirmReopen}
+            />
+          )}
+
+          {flow.step === 'idle' && (
+            <BaseballRecentPlays
+              rows={baseballRecentPlays(state, names)}
+              canRestore={canRestoreBaseballPlay(state)}
+              onUndo={undo}
+              onRestore={restore}
+            />
+          )}
         </>
       )}
 
@@ -513,6 +685,36 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
             checked={capturePreferences.trackBattedBallLocation}
             onChange={checked => setPreference({ trackBattedBallLocation: checked })}
           />
+          {inProgress && (
+            <>
+              <MenuAction
+                label={`${names.tracked} pitching change`}
+                disabled={!pitchingOptions.pitcherId}
+                onClick={() => openFromMenu({ step: 'pitching_change', draft: { side: 'tracked', selectedId: null }, error: null })}
+              />
+              <MenuAction
+                label={`${names.opponent} pitching change`}
+                onClick={() => openFromMenu({ step: 'pitching_change', draft: { side: 'opponent', label: '', number: '' }, error: null })}
+              />
+              {baseballCanEndHalf(projection) && (
+                <MenuAction
+                  label="End half-inning"
+                  onClick={() => openFromMenu({ step: 'end_half', draft: { reason: null, note: '' }, error: null })}
+                />
+              )}
+              <MenuAction
+                label="End game"
+                onClick={() => openFromMenu({
+                  step: 'end_game',
+                  draft: { outcome: projection.pendingEnd ? baseballPendingEndOutcome(projection.pendingEnd) : null, note: '', winner: null },
+                  error: null,
+                })}
+              />
+            </>
+          )}
+          {baseballCanReopen(projection) && (
+            <MenuAction label="Reopen game" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })} />
+          )}
         </GameMenu>
       )}
     </main>
@@ -546,6 +748,14 @@ function GameMenu({ onClose, children }: { onClose: () => void; children: ReactN
         <div className="space-y-2 p-4">{children}</div>
       </div>
     </div>
+  )
+}
+
+function MenuAction({ label, disabled, onClick }: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="btn-secondary w-full min-h-11 text-left" disabled={disabled} onClick={onClick}>
+      {label}
+    </button>
   )
 }
 

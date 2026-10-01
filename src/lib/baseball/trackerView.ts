@@ -233,10 +233,8 @@ export function setBaseballCapturePreferences(
   const sport = baseballSportState(state)
   if (!sport) return state
   const next = { ...sport.capturePreferences, ...patch }
-  if (
-    next.trackPitchLocation === sport.capturePreferences.trackPitchLocation &&
-    next.trackBattedBallLocation === sport.capturePreferences.trackBattedBallLocation
-  ) {
+  const current = sport.capturePreferences
+  if ((Object.keys(next) as Array<keyof BaseballCapturePreferences>).every(key => next[key] === current[key])) {
     return state
   }
   return { ...state, sportGameState: { ...sport, capturePreferences: next } }

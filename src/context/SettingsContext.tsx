@@ -21,6 +21,8 @@ interface SettingsContextType {
   setBasketballEventTrackerPreviewEnabled: (enabled: boolean) => void
   hockeyEventTrackerEnabled: boolean
   setHockeyEventTrackerEnabled: (enabled: boolean) => void
+  baseballEventTrackerEnabled: boolean
+  setBaseballEventTrackerEnabled: (enabled: boolean) => void
   basketballDeviceSettings: BasketballDeviceSettings
   setBasketballDeviceSetting: (
     key: keyof BasketballDeviceSettings,
@@ -111,6 +113,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setBaseballEventTrackerEnabled = useCallback((enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      baseball: {
+        ...prev.baseball,
+        eventTrackerEnabled: enabled,
+      },
+    }))
+  }, [])
+
   const setBasketballDeviceSetting = useCallback((
     key: keyof BasketballDeviceSettings,
     enabled: boolean
@@ -136,6 +148,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setBasketballEventTrackerPreviewEnabled,
         hockeyEventTrackerEnabled: settings.hockey.eventTrackerEnabled,
         setHockeyEventTrackerEnabled,
+        baseballEventTrackerEnabled: settings.baseball.eventTrackerEnabled,
+        setBaseballEventTrackerEnabled,
         basketballDeviceSettings: settings.basketball,
         setBasketballDeviceSetting,
         basketballSettings: basketball.settings,
