@@ -1,7 +1,7 @@
 # Plan: BSB-3 Baseball Diamond Tracker and Pitch Pad
 
 Status: approved and merged 2026-09-29 (PR #448; owner answers in section 9). BSB-3A
-(PR #450) and BSB-3B are implemented (section 10); BSB-3C and BSB-3D follow.
+(PR #450), BSB-3B (PR #452) and BSB-3C are implemented (section 10); BSB-3D follows.
 Builds on the BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)) and BSB-2 roster,
 defaults and setup ([plan](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 4, 8 and 12.
@@ -505,3 +505,40 @@ or merged.
   opponent slot relabelled "#21 Tall lefty", a dropped third strike with the batter to
   first, and DP blocked until fielders are tapped. Score, count, outs and bases matched
   the projection after each step; no horizontal scroll and no console errors.
+
+### BSB-3C Between-pitch running and Advanced overrides
+
+- `capture.ts`: `BaseballPendingCapture` gains a `baserunning` source (play plus the
+  tapped runner). It has no terminal, proposes through `proposeBaseballBaserunning` and
+  commits one `recordBaseballBaserunning` event. Presets: the tapped runner moves up one
+  base on Steal, Error, Defensive indifference and Other advance (reason `awarded`), is
+  out on Caught stealing, Pickoff and Appeal out, and every runner moves up one base on
+  Wild pitch, Passed ball and Balk. `baseballBaserunningPlayOptions` hides Steal, Caught
+  stealing and Defensive indifference without `stealing`, and Balk without `balks`, so
+  slowpitch shows neither. `baseballCaptureReasons` gives the engine's running reasons
+  (no stolen base without stealing) and `baseballCaptureFallbackReason` the play's reason
+  for runners the recorder adds.
+- Tracker: tapping a runner chip while nothing else is open (and capture is allowed)
+  opens the runner menu ("{runner} on {base}"), which reminds the recorder to use
+  "Runners moved" for running on a pitch. A play opens runner resolution titled with the
+  play and listing every runner, so a double steal is one play. Confirm keeps the pad's
+  pitch location and the "Runners moved" chip as they were, since no pitch was thrown.
+- Resolution rows carry optional `earned`, `rbi` and `runCounts`. Each moving row has a
+  collapsed **Advanced** disclosure: "Error by" (non-out rows) and, for a runner who
+  scores, Earned run and Run counts as "By the rules", Yes or No. RBI is offered only on
+  the event that completes a plate appearance (`baseballCaptureAllowsRbi`), because the
+  projector credits RBIs only there; runner plays and continuing pitches never show it
+  and send `rbi: null`. It opens and reads "Advanced (changed)" when any applicable
+  override is set. Moving a row off home clears the run overrides; only home movements
+  send them.
+- Tests: play filtering by rules, the reason list, presets, a steal that leaves the count
+  alone, a double steal as one event, caught stealing and a pickoff with fielders, a wild
+  pitch and a balk moving every runner, error-by and run overrides written only for the
+  runner who scores, overrides cleared off home, no RBI override on a runner play or
+  continuing pitch, an RBI override on a bases-loaded walk changing the batter's RBI, and
+  the Advanced render.
+- Browser check at 390 px (development build, light and dark), driven through the UI: a
+  steal of second after a strike (count kept), a double steal from first and second, an
+  error scoring the runner from third with "Error by 6" and "Earned run: No" (checked in
+  the stored payload), and a pickoff at second with fielders 1-4. Projection matched
+  after each step; no horizontal scroll and no console errors.
