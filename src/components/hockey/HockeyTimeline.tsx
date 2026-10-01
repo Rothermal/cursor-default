@@ -8,6 +8,8 @@ import {
   groupHockeyTimelineByPeriod,
   hockeyTimelinePeriods,
   HOCKEY_TIMELINE_FAMILIES,
+  canRemoveHockeyEvents,
+  hockeyCorrectionInput,
   hockeyParticipantLabel,
   hockeyTimelineEventFields,
   type HockeyMatchParticipant,
@@ -18,6 +20,7 @@ import {
   type HockeyTimelineRow,
 } from '../../lib/hockey'
 import type { GameEvent } from '../../lib/gameEvents/types'
+import type { HockeyTimelineAction } from './HockeyTimelineEditor'
 
 interface HockeyTimelineProps {
   rows: HockeyTimelineRow[]
@@ -26,13 +29,27 @@ interface HockeyTimelineProps {
   /** Participant and opponent goalie names by id, from `hockeyTimeline`. */
   names: HockeyTimelineNames
   sideLabel: (side: HockeySide) => string
+  /**
+   * Corrections (HKY-4B): null while the game cannot be corrected (suspended or abandoned),
+   * with the reason shown in the detail sheet instead of the actions.
+   */
+  correctionBlocked?: string | null
+  onCorrect?: (row: HockeyTimelineRow, action: HockeyTimelineAction) => void
 }
 
 /**
  * The Timeline tab (HKY-4A): the whole game oldest first by period, with collapsed filters
- * and a read-only detail sheet per row. Editing arrives in HKY-4B.
+ * and a detail sheet per row. The sheet offers Edit, Remove and Restore (HKY-4B).
  */
-export default function HockeyTimeline({ rows, historyMessage, names, participants, sideLabel }: HockeyTimelineProps) {
+export default function HockeyTimeline({
+  rows,
+  historyMessage,
+  names,
+  participants,
+  sideLabel,
+  correctionBlocked = null,
+  onCorrect,
+}: HockeyTimelineProps) {
   const [filters, setFilters] = useState<HockeyTimelineFilters>(DEFAULT_HOCKEY_TIMELINE_FILTERS)
   const [detail, setDetail] = useState<HockeyTimelineRow | null>(null)
   const visible = filterHockeyTimelineRows(rows, filters)
@@ -181,6 +198,11 @@ export default function HockeyTimeline({ rows, historyMessage, names, participan
           row={detail}
           names={names}
           sideLabel={sideLabel}
+          correctionBlocked={correctionBlocked}
+          onCorrect={onCorrect && (action => {
+            onCorrect(detail, action)
+            setDetail(null)
+          })}
           onClose={() => setDetail(null)}
         />
       )}
@@ -198,14 +220,20 @@ function HockeyTimelineDetail({
   row,
   names,
   sideLabel,
+  correctionBlocked,
+  onCorrect,
   onClose,
 }: {
   row: HockeyTimelineRow
   names: HockeyTimelineNames
   sideLabel: (side: HockeySide) => string
+  correctionBlocked: string | null
+  onCorrect?: (action: HockeyTimelineAction) => void
   onClose: () => void
 }) {
   const titleId = useId()
+  const removable = canRemoveHockeyEvents(row.events)
+  const editable = !row.removed && hockeyCorrectionInput(row.events) !== null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
       <div
@@ -246,7 +274,18 @@ function HockeyTimelineDetail({
           {row.events.map(event => (
             <EventDetail key={event.id} event={event} names={names} sideLabel={sideLabel} multiple={row.events.length > 1} />
           ))}
-          <p className="text-xs text-content-muted">Editing arrives in a later update. Use Undo in Recent Events for the latest capture.</p>
+          {!onCorrect ? null : !removable ? (
+            <p className="text-xs text-content-muted">Game flow and clock rows cannot be changed here. Use Set clock or the Game menu.</p>
+          ) : correctionBlocked ? (
+            <p className="text-xs text-content-muted">{correctionBlocked}</p>
+          ) : row.removed ? (
+            <button type="button" className="btn-secondary w-full" onClick={() => onCorrect('restore')}>Restore</button>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {editable && <button type="button" className="btn-primary" onClick={() => onCorrect('edit')}>Edit</button>}
+              <button type="button" className={`btn-secondary ${editable ? '' : 'col-span-2'}`} onClick={() => onCorrect('remove')}>Remove</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
