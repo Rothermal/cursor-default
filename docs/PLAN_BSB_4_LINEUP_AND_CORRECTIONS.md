@@ -426,7 +426,7 @@ these answers; a later change of mind lands as its own plan revision.
 ### BSB-4A Lineup tab, single-change substitutions and handedness
 
 - `lineupView.ts` (pure): batting cards (slot, position or DH/EH/"No position", hands,
-  Batting/Up next, the starter replaced), defense rows, open positions, the bench with
+  Batting/Up next, the starter replaced, shown in the player details), defense rows, open positions, the bench with
   each player's re-entry note, the opponent slots and pitcher, the current batter's hand,
   and a read-only player game detail. `baseballCanEnter` mirrors the projector's
   admission rule: nobody already in the game, and a returning starter only once, into

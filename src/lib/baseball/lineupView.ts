@@ -275,6 +275,8 @@ export interface BaseballPlayerGameDetail {
   name: string
   /** "Batting 2nd · C · Bats R, throws R", or the bench note. */
   role: string
+  /** "Replaced #3 Lee in the 2nd slot", for a substitute holding a starter's slot. */
+  replaced: string | null
   lines: string[]
 }
 
@@ -325,5 +327,6 @@ export function baseballPlayerGameDetail(sport: BaseballSportGameState, id: stri
     lines.push(`Fielding: ${field.po} PO, ${field.a} A, ${field.e} E`)
   }
   if (lines.length === 0) lines.push('No plays recorded yet.')
-  return { id, name: baseballPersonLabel(sport, id).name, role, lines }
+  const replaced = card?.replaced ? `Replaced ${card.replaced} in the ${baseballOrdinal(card.slot - 1)} slot.` : null
+  return { id, name: baseballPersonLabel(sport, id).name, role, replaced, lines }
 }

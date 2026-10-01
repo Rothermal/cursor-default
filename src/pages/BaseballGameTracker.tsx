@@ -13,6 +13,7 @@ import BaseballHandChoice from '../components/baseball/BaseballHandChoice'
 import BaseballInPlaySheet from '../components/baseball/BaseballInPlaySheet'
 import BaseballLineupPanel from '../components/baseball/BaseballLineupPanel'
 import BaseballPlayDetailSheet from '../components/baseball/BaseballPlayDetailSheet'
+import BaseballPlayerDetailSheet from '../components/baseball/BaseballPlayerDetailSheet'
 import BaseballPitchingChangeSheet, { type BaseballPitchingChangeDraft } from '../components/baseball/BaseballPitchingChangeSheet'
 import BaseballPitchPad from '../components/baseball/BaseballPitchPad'
 import BaseballQuickPlateAppearance from '../components/baseball/BaseballQuickPlateAppearance'
@@ -555,16 +556,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           )}
           {lineupSheet.type === 'player' && (() => {
             const detail = baseballPlayerGameDetail(sport, lineupSheet.id)
-            return detail && (
-              <section className="space-y-2 rounded-md border border-line bg-surface p-3" aria-label="Player details">
-                <h2 className="font-bold text-content">{detail.name}</h2>
-                <p className="text-sm text-content-muted">{detail.role}</p>
-                <ul className="space-y-1 text-sm text-content">
-                  {detail.lines.map(line => <li key={line}>{line}</li>)}
-                </ul>
-                <button type="button" className="btn-secondary w-full" onClick={() => setLineupSheet({ type: 'none' })} autoFocus>Close</button>
-              </section>
-            )
+            return detail && <BaseballPlayerDetailSheet detail={detail} onClose={() => setLineupSheet({ type: 'none' })} />
           })()}
           <BaseballLineupPanel
             tracked={trackedLineup}

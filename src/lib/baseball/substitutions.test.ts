@@ -373,6 +373,18 @@ describe('Baseball Lineup tab components', () => {
     expect(html).not.toContain('Double switch</button>')
   })
 
+  it('shows the starter a substitute replaced in the rendered player details', async () => {
+    const { createElement } = await import('react')
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const { default: BaseballPlayerDetailSheet } = await import('../../components/baseball/BaseballPlayerDetailSheet')
+    const state = sub(runnerOnFirst(), { kind: 'pinch_hitter', incomingId: 't10', outgoingId: 't2' })
+    const detail = baseballPlayerGameDetail(sportOf(state), 't10')!
+    expect(detail.replaced).toBe('Replaced #2 Player 2 in the 2nd slot.')
+    const html = renderToStaticMarkup(createElement(BaseballPlayerDetailSheet, { detail, onClose: () => {} }))
+    expect(html).toContain('Replaced #2 Player 2 in the 2nd slot.')
+    expect(baseballPlayerGameDetail(sportOf(state), 't1')!.replaced).toBeNull()
+  })
+
   it('describes a player game and the batter hand', () => {
     let state = runnerOnFirst()
     const detail = baseballPlayerGameDetail(sportOf(state), 't1')!
