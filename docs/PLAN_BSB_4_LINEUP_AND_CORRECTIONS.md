@@ -144,21 +144,36 @@ history before anything is saved. The preview reports four kinds of consequence:
      its later reopen.
    - Under Q1 **Block**, any dependent refuses the correction. Under Q1
      **Remove-later**, the recorder sees the full list and confirms it.
-3. **Attribution changes:** `actor_mismatch` warnings that are new or changed compared
-   with the current history, for every actor role, shown in two groups:
-   - **Fielding credit kept:** fielders keep the credit of the player stamped at
-     capture, and the warning says the lineup now shows someone else (BSB-1 contract).
+3. **Attribution changes**, found by comparing resolved credit before and after, not
+   from the warning list alone. The preview replays the current history and the
+   candidate and compares, for every surviving event, the batter, pitcher and fielders
+   each one is credited to. They are shown in two groups:
    - **Batting or pitching credit moved:** batter and pitcher lines follow the replayed
-     lineup, so the preview says whose line the play now counts for. Example: removing
-     a pinch-hitter substitution does not break the later plate appearance. It replays,
-     credited to the original batter, and the preview says "#14 Ruiz's plate appearance
-     now counts for #7 Lee".
-4. **Unchanged:** a correction that changes none of the above saves without a prompt.
+     lineup, so any event whose credited batter or pitcher differs is listed with the
+     previous and the new credited player, for example "Top 5 plate appearance: moves
+     from #14 Ruiz to #7 Lee". This holds whether the candidate adds, changes or
+     clears an `actor_mismatch` warning, so both directions need the same confirmation:
+     - removing a pinch-hitter substitution credits the later plate appearance to the
+       original batter (a mismatch warning appears);
+     - restoring that substitution moves it back to the pinch hitter (the warning
+       clears, and the move is still listed);
+     - removing or restoring a pitching change moves pitching credit the same way.
+   - **Fielding credit kept:** fielders keep the credit of the player stamped at
+     capture (BSB-1 contract), so fielding credit only moves when the recorder changes
+     the fielders or uses Repair attribution (section 4D), and those moves are listed
+     like batting moves. A new or changed fielder mismatch is listed as "lineup now
+     shows #9 Diaz at shortstop; credit stays with #3 Park".
+   - A mismatch warning that clears with no credit transfer is shown as information
+     ("now matches the lineup"), is never described as a transfer, and on its own needs
+     no confirmation.
+4. **Unchanged:** a correction with no dependents and no credit moved saves without a
+   prompt.
 
 How a correction saves:
 - **Clean:** it saves immediately.
-- **Warnings only (attribution changes):** under Q6 **Warn**, the preview lists them
+- **Credit moved, no dependents:** under Q6 **Warn**, the preview lists every move
   and needs an explicit "Save with these changes"; under Q6 **Block**, it is refused.
+  Restores use exactly the same rule.
 - **Dependents:** follows Q1 as above. Warnings found after dependents are removed are
   shown in the same preview.
 
@@ -227,12 +242,17 @@ expectedRevision }] }`.
   - filter state.
 - New `src/lib/baseball/corrections.ts`, implementing section 4.1:
   - `previewBaseballRemoval(state, unitId)` returns the changes, dependents (play and
-    lifecycle rows separately), and attribution changes by role;
+    lifecycle rows separately), and attribution changes by role from a before/after
+    credit comparison;
   - `removeBaseballPlay(state, preview, confirmation)` re-runs the preview, rejects a
     stale one, and applies the unit plus confirmed dependents as one atomic mutation
     batch with a correction receipt;
   - `previewBaseballRestore` and `restoreBaseballCorrection` handle group and individual
-    restore under the same checks.
+    restore under the same checks, including credit moved back.
+- `projector.ts` gains `replayBaseballCreditByEvent(setup, events)` next to
+  `replayBaseballRunsByEvent`: the credited batter, pitcher and fielders per event from
+  the same replay that builds the lines, so the preview compares real credit, not
+  warnings.
 - Removing a substitution or pitching change follows the same preview. Its later plays
   usually still replay, with batting or pitching credit moved, so the preview lists
   them as attribution changes rather than dependents.
@@ -321,11 +341,17 @@ expectedRevision }] }`.
 - **Attribution:**
   - removing a pinch-hitter substitution replays the later plate appearance, credited
     to the original batter, with a batter attribution change in the preview;
-  - removing a pitching change moves pitching credit, with a pitcher attribution change;
+  - restoring that substitution moves the plate appearance back to the pinch hitter;
+    the warning clears, yet the preview still lists the move from the original batter
+    to the pinch hitter and needs the same confirmation;
+  - removing a pitching change moves pitching credit, with a pitcher attribution
+    change, and restoring it moves the credit back with the same confirmation;
+  - a correction that only clears a fielder mismatch, with no credit moved, saves
+    without confirmation and shows the cleared warning as information;
   - an earlier defensive correction keeps the stamped putout and lists it as fielding
     credit kept;
-  - a warnings-only correction needs the explicit confirmation (or is refused under Q6
-    Block).
+  - a correction whose only consequence is moved credit needs the explicit
+    confirmation (or is refused under Q6 Block).
 - **Stamped actors:** a location-only edit after an earlier lineup correction leaves
   `actors` and fielding credit unchanged. A fielder-list edit restamps only the changed
   roles. Repair attribution shows before/after and restamps only the chosen roles.
@@ -369,7 +395,8 @@ expectedRevision }] }`.
   rewritten or retagged.
 - **Attribution drift.** Batting and pitching credit follow the replayed lineup, so a
   lineup correction can move credit without any replay failure. The preview makes every
-  such move visible before saving.
+  such move visible before saving, in both directions, because it compares credited
+  players rather than warnings.
 - **Edit sheets reused out of context.** Capture sheets assume "now". Seeding from a
   prefix replay keeps proposals honest, and tests compare edit seeding with capture.
 - **Screen space.** The Lineup tab must fit 10 to 15 batting cards at 390px. Cards stay
