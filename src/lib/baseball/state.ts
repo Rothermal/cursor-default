@@ -4,6 +4,7 @@ import { normalizeBaseballMatchRules } from './rules'
 import type {
   BaseballBatHand,
   BaseballCapturePreferences,
+  BaseballCorrectionReceipt,
   BaseballMatchParticipant,
   BaseballMatchProjection,
   BaseballMatchRules,
@@ -16,7 +17,7 @@ import type {
   BaseballTrackedLineup,
   BaseballUndoReceipt,
 } from './types'
-import { BASEBALL_GAME_STATE_VERSION, BASEBALL_SETUP_VERSION } from './types'
+import { BASEBALL_GAME_STATE_VERSION, BASEBALL_MAX_CORRECTION_RECEIPTS, BASEBALL_SETUP_VERSION } from './types'
 
 const MAX_LABEL_LENGTH = 80
 
@@ -33,7 +34,7 @@ export function createBaseballSportGameState(setup: BaseballMatchSetup): Basebal
 }
 
 export function defaultBaseballCapturePreferences(): BaseballCapturePreferences {
-  return { trackPitchLocation: true, trackBattedBallLocation: true, lastUndo: null }
+  return { trackPitchLocation: true, trackBattedBallLocation: true, lastUndo: null, corrections: [] }
 }
 
 export function createBaseballMatchProjection(setup: BaseballMatchSetup): BaseballMatchProjection {
@@ -204,7 +205,29 @@ function normalizeCapturePreferences(value: unknown): BaseballCapturePreferences
         ? value.trackBattedBallLocation
         : defaults.trackBattedBallLocation,
     lastUndo: normalizeUndoReceipt(value.lastUndo),
+    corrections: normalizeCorrectionReceipts(value.corrections),
   }
+}
+
+/** Games saved before BSB-4C read with no receipts; a malformed receipt is dropped on its own. */
+function normalizeCorrectionReceipts(value: unknown): BaseballCorrectionReceipt[] {
+  if (!Array.isArray(value)) return []
+  const receipts: BaseballCorrectionReceipt[] = []
+  for (const entry of value) {
+    if (!isPlainObject(entry) || !isId(entry.id) || (entry.kind !== 'remove' && entry.kind !== 'edit')) continue
+    if (!Array.isArray(entry.primaryEventIds) || !entry.primaryEventIds.every(isId)) continue
+    const undo = normalizeUndoReceipt({ createdAt: entry.createdAt, entries: entry.entries })
+    if (!undo) continue
+    receipts.push({
+      id: entry.id,
+      createdAt: undo.createdAt,
+      kind: entry.kind,
+      primaryEventIds: [...entry.primaryEventIds],
+      entries: undo.entries,
+    })
+    if (receipts.length === BASEBALL_MAX_CORRECTION_RECEIPTS) break
+  }
+  return receipts
 }
 
 /** A malformed receipt is dropped rather than trusted; Restore re-checks each event anyway. */

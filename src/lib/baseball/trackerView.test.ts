@@ -113,7 +113,7 @@ describe('Baseball capture preferences', () => {
   it('change without touching events or the fingerprint, and survive reload', () => {
     const state = startedGame()
     const next = setBaseballCapturePreferences(state, { trackPitchLocation: false })
-    expect(sportOf(next).capturePreferences).toEqual({ trackPitchLocation: false, trackBattedBallLocation: true, lastUndo: null })
+    expect(sportOf(next).capturePreferences).toEqual({ trackPitchLocation: false, trackBattedBallLocation: true, lastUndo: null, corrections: [] })
     expect(next.eventStream).toBe(state.eventStream)
     expect(buildGameSyncFingerprint(next)).toBe(buildGameSyncFingerprint(state))
     const reloaded = gameReducer(createInitialState(), {

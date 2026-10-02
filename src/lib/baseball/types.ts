@@ -551,6 +551,23 @@ export interface BaseballCapturePreferences {
   trackBattedBallLocation: boolean
   /** BSB-3D: what the last Undo removed, so Restore can bring it back until the next capture. */
   lastUndo: BaseballUndoReceipt | null
+  /** BSB-4C: Timeline corrections, newest first, at most `BASEBALL_MAX_CORRECTION_RECEIPTS`. */
+  corrections: BaseballCorrectionReceipt[]
+}
+
+export const BASEBALL_MAX_CORRECTION_RECEIPTS = 20
+
+/**
+ * One saved Timeline correction (BSB-4 section 4.1). A removal can be restored together while
+ * every entry is still removed at its expected revision; restore is always re-checked.
+ */
+export interface BaseballCorrectionReceipt extends JsonObject {
+  id: string
+  createdAt: string
+  kind: 'remove' | 'edit'
+  /** The rows the recorder chose; the other entries were confirmed dependents. */
+  primaryEventIds: string[]
+  entries: BaseballUndoReceiptEntry[]
 }
 
 export interface BaseballUndoReceipt extends JsonObject {

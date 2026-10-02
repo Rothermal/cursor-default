@@ -1,8 +1,8 @@
 # Plan: BSB-4 Baseball Lineup Management, Timeline and Corrections
 
 Status: approved and merged (PR #459, 2026-10-01). Owner answers (2026-10-01): Q1–Q7
-follow the recommendations, for now (section 9). BSB-4A is implemented; section 10 is
-the delivery record. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
+follow the recommendations, for now (section 9). BSB-4A to BSB-4C are implemented; section 10
+is the delivery record. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
 BSB-2 ([setup](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)) and BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 5.4, 8.3 and 12.
@@ -495,3 +495,47 @@ these answers; a later change of mind lands as its own plan revision.
   double switch at LF and the DH taking LF, reload unchanged, no horizontal scroll, dark
   theme.
 
+### BSB-4C Timeline, Remove and Restore
+
+- `units.ts` now holds the capture-unit helpers (active and removed events, grouping by
+  `captureCommandId`, capture types) that Recent plays, the Timeline and corrections share.
+- `timeline.ts` (pure): units by half-inning, newest first, each half with its batting
+  team and line ("0 R, 0 H, 0 E, 0 LOB"). Removed rows stay under their half with their
+  removal time and saved group. Rows carry Revised (`revision > 1`), the first lineup
+  warning, and the team they concern. Filters: half-inning, team and corrected only.
+- `projector.ts` gains `replayBaseballCreditByEvent`: the batter, pitcher and tracked
+  fielders each pitch, quick plate appearance and runner play credits, from the same
+  replay. A half-inning mismatch now reads "Recorded in Bottom 1, but play is now in
+  Top 1." instead of the period id.
+- `corrections.ts`:
+  - `previewBaseballRemoval` and `previewBaseballRestore` (one removed unit, or a saved
+    group while every entry is still removed at its expected revision) replay the
+    candidate history. Each rejected later row is a dependent, removed with its whole unit
+    and replayed again, listed as plays or game flow with the engine's reason. The game
+    start and the rows being restored are never dropped; that refuses the correction.
+  - Changes compare score, status, half-inning, outs, count and runners. Credit compares
+    batter, pitcher and fielders per surviving event, grouped by half and role ("Bottom 1
+    batting: moves from #10 to #1 (2 plays)"). New fielder mismatches are "credit
+    stays with ..."; cleared ones with no move are information only.
+  - Dependents, credit moves or kept fielding credit need "Save with these changes"
+    (Q1 Remove-later, Q6 Warn). `removeBaseballPlay` and `restoreBaseballCorrection`
+    re-run the preview, reject a stale one, and save one atomic mutation batch. The
+    preview key binds every stored event's id, revision and removal state, so any change
+    to the history since (even an Undo then Restore) makes it stale.
+  - Receipts (`capturePreferences.corrections`, newest 20, outside fingerprints, `[]` for
+    older games) record each removal's rows and dependents. Group restore consumes its
+    receipt; a row restored alone drops out of its group; dependents removed by a restore
+    get their own receipt. Every correction clears quick Undo's receipt.
+- UI: a Timeline tab with collapsed filters, rows that open the play details with
+  **Remove…**, collapsed Removed lists with Restore and Restore together, and a preview
+  sheet listing changes, later rows (plays and game flow), credit moves, fielding credit
+  kept and information.
+- `corrections.test.ts` covers a clean removal, flow rows refused, a broken later play
+  needing confirmation, a stale preview (including a history change whose consequences
+  read the same, for remove, individual restore and group restore), the third-out cascade and group restore, game
+  end and reopen as lifecycle dependents, quick Restore cleared, pinch-hitter and
+  pitching-change credit moving both ways, fielding credit kept and then cleared, receipt
+  round trip and bound, group fallback, Timeline grouping and filters, and the rendered
+  Timeline and preview. Browser smoke at 390px: the third-out cascade removed and restored
+  together, a clean removal and individual restore after reload, dark theme, no
+  horizontal scroll.
