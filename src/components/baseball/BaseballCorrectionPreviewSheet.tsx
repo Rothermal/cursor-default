@@ -9,18 +9,19 @@ interface BaseballCorrectionPreviewSheetProps {
 }
 
 /**
- * What a Timeline Remove or Restore does before it saves (BSB-4 section 4.1): the changes to
+ * What a Timeline Remove, Restore or Edit (BSB-4D) does before it saves (BSB-4 section 4.1): the changes to
  * the game, later rows that would be removed with it (plays and game flow named separately),
  * and credit that moves. A clean correction saves with one tap; anything listed needs
  * "Save with these changes".
  */
 export default function BaseballCorrectionPreviewSheet({ preview, error, onCancel, onConfirm }: BaseballCorrectionPreviewSheetProps) {
   const removing = preview.action === 'remove'
+  const title = preview.action === 'edit' ? 'Edit' : removing ? 'Remove' : 'Restore'
   const { plays, lifecycle } = preview.dependents
   return (
-    <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label={removing ? 'Remove play' : 'Restore'}>
+    <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label={preview.action === 'edit' ? 'Edit play' : removing ? 'Remove play' : 'Restore'}>
       <div>
-        <h2 className="font-bold text-content">{removing ? 'Remove' : 'Restore'}</h2>
+        <h2 className="font-bold text-content">{title}</h2>
         <RowList rows={preview.rows} />
       </div>
       {preview.changes.length > 0 && <Group heading="What changes" lines={preview.changes} />}
@@ -34,10 +35,11 @@ export default function BaseballCorrectionPreviewSheet({ preview, error, onCance
           <p className="text-xs">They stay listed as removed and can be restored together.</p>
         </div>
       )}
+      {preview.stampChanges.length > 0 && <Group heading="Who is recorded" lines={preview.stampChanges} />}
       {preview.creditMoves.length > 0 && <Group heading="Credit moves" lines={preview.creditMoves} />}
       {preview.fieldingKept.length > 0 && <Group heading="Fielding credit kept" lines={preview.fieldingKept} />}
       {preview.information.length > 0 && <Group heading="Also" lines={preview.information} />}
-      {!preview.needsConfirmation && preview.changes.length === 0 && preview.information.length === 0 && (
+      {!preview.needsConfirmation && preview.changes.length === 0 && preview.information.length === 0 && preview.stampChanges.length === 0 && (
         <p className="text-sm text-content-muted">Nothing else in the game changes.</p>
       )}
       {error && (
@@ -46,7 +48,7 @@ export default function BaseballCorrectionPreviewSheet({ preview, error, onCance
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
         <button type="button" className="btn-primary" onClick={() => onConfirm(preview.needsConfirmation)} autoFocus>
-          {preview.needsConfirmation ? 'Save with these changes' : removing ? 'Remove' : 'Restore'}
+          {preview.needsConfirmation ? 'Save with these changes' : preview.action === 'edit' ? 'Save' : title}
         </button>
       </div>
     </section>

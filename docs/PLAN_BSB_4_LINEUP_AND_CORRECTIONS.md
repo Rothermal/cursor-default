@@ -1,7 +1,7 @@
 # Plan: BSB-4 Baseball Lineup Management, Timeline and Corrections
 
 Status: approved and merged (PR #459, 2026-10-01). Owner answers (2026-10-01): Q1–Q7
-follow the recommendations, for now (section 9). BSB-4A to BSB-4C are implemented; section 10
+follow the recommendations, for now (section 9). BSB-4A to BSB-4D are implemented; section 10
 is the delivery record. Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)),
 BSB-2 ([setup](PLAN_BSB_2_ROSTER_SETTINGS_AND_SETUP.md)) and BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)). Product model:
@@ -539,3 +539,46 @@ these answers; a later change of mind lands as its own plan revision.
   Timeline and preview. Browser smoke at 390px: the third-out cascade removed and restored
   together, a clean removal and individual restore after reload, dark theme, no
   horizontal scroll.
+
+### BSB-4D Edit any play
+
+- `edits.ts`:
+  - `baseballEditTarget` reads a Timeline row's play with a prefix replay (the game just
+    before it) and a seed: the pending capture and stored movements for a pitch, quick
+    plate appearance or runner play, the changes of a substitution, or the delta and
+    reason of a score adjustment. Game-flow rows and units recorded in several parts are
+    refused with a reason.
+  - `baseballEditResolutionRows` reuses the stored movements while the play itself is
+    unchanged (locations may differ), otherwise the engine's proposal for the new result
+    against the prefix. `baseballInPlayDraftFrom` and `baseballSubstitutionEditDraft`
+    seed the in-play and substitution sheets.
+  - `baseballCaptureEdit`, `baseballSubstitutionEdit` and `baseballScoreAdjustmentEdit`
+    build the new payload, location and actors. `baseballEditActors` keeps every stamped
+    role, drops fielder roles the new play no longer uses and stamps the ones it adds from
+    the prefix defense; batter and pitcher stamps stay as recorded.
+  - `baseballRepairAttributionEdit` restamps only the chosen roles to the replayed lineup
+    (`baseballMismatchedRoles` lists them); `baseballRoleLabel` names them.
+- `corrections.ts`: `previewBaseballEdit` and `editBaseballPlay` use the section 4.1
+  contract. The candidate history swaps in the edited event (type, period, team, time,
+  order and `captureCommandId` kept); an edit the engine rejects at its own place is
+  refused ("This change does not fit here: ..."), an identical one is "Nothing
+  changed.". Later rows it breaks become dependents. The preview adds "Who is recorded"
+  lines for restamped roles, and its key binds the replacement content. Save writes one
+  `update` plus any confirmed dependents' removals in one batch, with an `edit` receipt
+  (and a `remove` receipt for its dependents).
+- UI: the Timeline detail sheet has **Edit…**, and **Repair attribution…** when a role
+  differs from the lineup. Edit reopens the pitch pad, Quick PA, runner-play menu,
+  in-play sheet (with the prefix diamond), runner resolution with Advanced, the
+  substitution sheet, an opponent label form or the score adjustment form, all against
+  the prefix. The preview is shown over the hidden sheet, so Cancel returns with every
+  choice kept. The tracker banner no longer says editing comes next.
+- Tests: `edits.test.ts` (prefix seeding matches capture proposals, flow rows refused,
+  ball to strike breaking a later walk, single to double, out to error, a location-only
+  edit after a lineup correction keeping actors and fielding credit, a fielder-list
+  restamp, substitution and score adjustment edits, refusals, a stale preview, Revised on
+  the Timeline, Repair attribution), `editSheets.test.ts` (rendered edit, preview, detail
+  and repair sheets) and `editIntegration.test.ts` (seven innings with a pinch hitter who
+  takes the mound, a double switch, a removed steal with its cascade, an edited hit,
+  reload, park, export and import, then group restore). Browser smoke at 390px: a ball
+  edited to a called strike, a single edited to a double through the in-play and runner
+  sheets with Cancel back from the preview, reload, dark theme, no horizontal scroll.

@@ -3,6 +3,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import BaseballCorrectionPreviewSheet from '../components/baseball/BaseballCorrectionPreviewSheet'
 import BaseballDiamond from '../components/baseball/BaseballDiamond'
+import BaseballEditPlay from '../components/baseball/BaseballEditPlay'
 import {
   BaseballEndGameSheet,
   BaseballEndHalfSheet,
@@ -18,6 +19,7 @@ import BaseballPlayerDetailSheet from '../components/baseball/BaseballPlayerDeta
 import BaseballPitchingChangeSheet, { type BaseballPitchingChangeDraft } from '../components/baseball/BaseballPitchingChangeSheet'
 import BaseballPitchPad from '../components/baseball/BaseballPitchPad'
 import BaseballQuickPlateAppearance from '../components/baseball/BaseballQuickPlateAppearance'
+import BaseballRepairAttributionSheet from '../components/baseball/BaseballRepairAttributionSheet'
 import BaseballRecentPlays from '../components/baseball/BaseballRecentPlays'
 import BaseballRunnerResolution from '../components/baseball/BaseballRunnerResolution'
 import BaseballScoreboard from '../components/baseball/BaseballScoreboard'
@@ -28,12 +30,19 @@ import { useGame } from '../context/GameContext'
 import {
   BASEBALL_TIMELINE_DEFAULT_FILTER,
   baseballTimeline,
+  baseballEditTarget,
+  baseballMismatchedRoles,
+  baseballRepairAttributionEdit,
+  editBaseballPlay,
+  previewBaseballEdit,
   previewBaseballRemoval,
   previewBaseballRestore,
   removeBaseballPlay,
   restoreBaseballCorrection,
   type BaseballCorrectionPreview,
   type BaseballCorrectionPreviewResult,
+  type BaseballEditTarget,
+  type BaseballEventEdit,
   type BaseballTimelineFilter,
   BASEBALL_GAME_END_LABELS,
   baseballCanEndHalf,
@@ -151,17 +160,27 @@ type TrackerTab = 'track' | 'lineup' | 'timeline'
 
 const TAB_LABELS: Record<TrackerTab, string> = { track: 'Track', lineup: 'Lineup', timeline: 'Timeline' }
 
+/** An edit's preview over the sheet that made it; Cancel returns to that sheet unchanged. */
+interface EditPreview {
+  preview: BaseballCorrectionPreview
+  edit: BaseballEventEdit
+  error: string | null
+}
+
 /** What the Timeline tab has open. Nothing is written until a preview confirms. */
 type TimelineSheet =
   | { type: 'none' }
   | { type: 'detail'; playId: string }
   | { type: 'preview'; preview: BaseballCorrectionPreview; error: string | null }
+  | { type: 'edit'; playId: string; target: BaseballEditTarget; previewing: EditPreview | null; error: string | null }
+  | { type: 'repair'; playId: string; selected: string[]; previewing: EditPreview | null; error: string | null }
 
 /**
  * The live Baseball tracker: the scoreboard strip, the diamond and the pitch pad showing
  * the current projection (BSB-3A), with pitches, the in-play sheet, runner resolution and
  * Quick PA (BSB-3B), runner plays between pitches (BSB-3C), and endings, pitching changes,
- * Recent plays with Undo and Restore (BSB-3D).
+ * Recent plays with Undo and Restore (BSB-3D), the Lineup tab (BSB-4A/4B), and the Timeline
+ * with Remove, Restore (BSB-4C), Edit and Repair attribution (BSB-4D).
  */
 export default function BaseballGameTracker() {
   const { state } = useGame()
@@ -455,6 +474,40 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
     setTimelineSheet({ type: 'preview', preview: result.preview, error: null })
   }
 
+  /** Previews an edit or attribution repair over its sheet, or keeps the sheet open with the reason. */
+  const previewEdit = (edit: BaseballEventEdit) => {
+    const result = previewBaseballEdit(state, edit, names)
+    setTimelineSheet(previous => {
+      if (previous.type !== 'edit' && previous.type !== 'repair') return previous
+      return result.ok
+        ? { ...previous, previewing: { preview: result.preview, edit, error: null }, error: null }
+        : { ...previous, previewing: null, error: result.message }
+    })
+  }
+
+  const confirmEdit = (previewing: EditPreview, confirmed: boolean) => {
+    const result = editBaseballPlay(state, previewing.preview, previewing.edit, names, { now: new Date().toISOString(), confirmed })
+    if (!result.ok) {
+      setTimelineSheet(previous => ('previewing' in previous && previous.previewing
+        ? { ...previous, previewing: { ...previous.previewing, error: result.message } }
+        : previous))
+      return
+    }
+    applied(result)
+    setFlow({ step: 'idle' })
+    setTimelineSheet({ type: 'none' })
+  }
+
+  const openEdit = (playId: string) => {
+    const result = baseballEditTarget(state, playId)
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    setError(null)
+    setTimelineSheet({ type: 'edit', playId, target: result.target, previewing: null, error: null })
+  }
+
   const confirmCorrection = (preview: BaseballCorrectionPreview, confirmed: boolean) => {
     const options = { now: new Date().toISOString(), confirmed }
     const result = preview.action === 'remove'
@@ -526,7 +579,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
       />
 
       <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Preview. Editing plays comes next. This game stays on this device.
+        Preview. This game stays on this device.
       </p>
 
       {error && (
@@ -629,12 +682,25 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
         <section className="space-y-3" aria-label="Timeline">
           {timelineSheet.type === 'detail' && (() => {
             const detail = baseballPlayDetail(state, timelineSheet.playId, names)
+            const editable = baseballEditTarget(state, timelineSheet.playId)
+            const mismatched = baseballMismatchedRoles(state, timelineSheet.playId)
             return detail
               ? (
                 <BaseballPlayDetailSheet
                   detail={detail}
                   onClose={() => setTimelineSheet({ type: 'none' })}
                   onRemove={() => openPreview(previewBaseballRemoval(state, timelineSheet.playId, names))}
+                  onEdit={editable.ok ? () => openEdit(timelineSheet.playId) : null}
+                  editBlocked={editable.ok ? null : editable.message}
+                  onRepair={mismatched.length > 0 && editable.ok
+                    ? () => setTimelineSheet({
+                      type: 'repair',
+                      playId: timelineSheet.playId,
+                      selected: mismatched.map(entry => entry.role),
+                      previewing: null,
+                      error: null,
+                    })
+                    : undefined}
                 />
               )
               : (
@@ -643,6 +709,65 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                   <button type="button" className="btn-secondary w-full" onClick={() => setTimelineSheet({ type: 'none' })}>Close</button>
                 </section>
               )
+          })()}
+          {timelineSheet.type === 'edit' && (() => {
+            const detail = baseballPlayDetail(state, timelineSheet.playId, names)
+            return (
+              <>
+                {timelineSheet.error && (
+                  <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
+                    {timelineSheet.error}
+                  </p>
+                )}
+                {/* Hidden, not unmounted, while previewing so Cancel returns to every choice made. */}
+                <div hidden={timelineSheet.previewing !== null}>
+                  <BaseballEditPlay
+                    target={timelineSheet.target}
+                    label={detail?.label ?? 'Play'}
+                    halfLabel={detail?.halfLabel ?? ''}
+                    names={names}
+                    trackPitchLocation={capturePreferences.trackPitchLocation}
+                    trackBattedBallLocation={capturePreferences.trackBattedBallLocation}
+                    onCancel={() => setTimelineSheet({ type: 'detail', playId: timelineSheet.playId })}
+                    onPreview={previewEdit}
+                  />
+                </div>
+              </>
+            )
+          })()}
+          {timelineSheet.type === 'repair' && !timelineSheet.previewing && (() => {
+            const detail = baseballPlayDetail(state, timelineSheet.playId, names)
+            const { playId, selected } = timelineSheet
+            return (
+              <BaseballRepairAttributionSheet
+                label={detail?.label ?? 'Play'}
+                halfLabel={detail?.halfLabel ?? ''}
+                roles={baseballMismatchedRoles(state, playId)}
+                selected={selected}
+                onChange={next => setTimelineSheet({ ...timelineSheet, selected: next, error: null })}
+                error={timelineSheet.error}
+                onCancel={() => setTimelineSheet({ type: 'detail', playId })}
+                onPreview={() => {
+                  const repair = baseballRepairAttributionEdit(state, playId, selected)
+                  if (!repair.ok) {
+                    setTimelineSheet({ ...timelineSheet, error: repair.message })
+                    return
+                  }
+                  previewEdit(repair.edit)
+                }}
+              />
+            )
+          })()}
+          {(timelineSheet.type === 'edit' || timelineSheet.type === 'repair') && timelineSheet.previewing && (() => {
+            const previewing = timelineSheet.previewing
+            return (
+              <BaseballCorrectionPreviewSheet
+                preview={previewing.preview}
+                error={previewing.error}
+                onCancel={() => setTimelineSheet({ ...timelineSheet, previewing: null })}
+                onConfirm={confirmed => confirmEdit(previewing, confirmed)}
+              />
+            )
           })()}
           {timelineSheet.type === 'preview' && (
             <BaseballCorrectionPreviewSheet
