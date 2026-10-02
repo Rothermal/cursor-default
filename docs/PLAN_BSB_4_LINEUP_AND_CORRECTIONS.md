@@ -519,7 +519,9 @@ these answers; a later change of mind lands as its own plan revision.
     stays with ..."; cleared ones with no move are information only.
   - Dependents, credit moves or kept fielding credit need "Save with these changes"
     (Q1 Remove-later, Q6 Warn). `removeBaseballPlay` and `restoreBaseballCorrection`
-    re-run the preview, reject a stale one, and save one atomic mutation batch.
+    re-run the preview, reject a stale one, and save one atomic mutation batch. The
+    preview key binds every stored event's id, revision and removal state, so any change
+    to the history since (even an Undo then Restore) makes it stale.
   - Receipts (`capturePreferences.corrections`, newest 20, outside fingerprints, `[]` for
     older games) record each removal's rows and dependents. Group restore consumes its
     receipt; a row restored alone drops out of its group; dependents removed by a restore
@@ -529,7 +531,8 @@ these answers; a later change of mind lands as its own plan revision.
   sheet listing changes, later rows (plays and game flow), credit moves, fielding credit
   kept and information.
 - `corrections.test.ts` covers a clean removal, flow rows refused, a broken later play
-  needing confirmation, a stale preview, the third-out cascade and group restore, game
+  needing confirmation, a stale preview (including a history change whose consequences
+  read the same, for remove, individual restore and group restore), the third-out cascade and group restore, game
   end and reopen as lifecycle dependents, quick Restore cleared, pinch-hitter and
   pitching-change credit moving both ways, fielding credit kept and then cleared, receipt
   round trip and bound, group fallback, Timeline grouping and filters, and the rendered

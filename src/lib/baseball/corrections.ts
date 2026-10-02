@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
@@ -234,15 +235,28 @@ function buildPreview(
     needsConfirmation,
     key: '',
   }
+  // The key binds the preview to the exact history it reviewed: every stored event's id,
+  // revision and removal state, so any capture, Undo, Restore or correction since makes it
+  // stale even when the listed consequences would read the same. Preferences stay out.
   preview.key = JSON.stringify([
     target,
+    baseballHistoryToken(state),
     chosen.map(entry => entry.eventIds),
-    dependents.map(entry => entry.unit.map(event => [event.id, event.revision])),
+    dependents.map(entry => entry.unit.map(event => event.id)),
     changes,
     credit.creditMoves,
     credit.fieldingKept,
   ])
   return { ok: true, preview }
+}
+
+/** Every stored event (raw, active and removed) as id, revision and removed flag, in stored order. */
+function baseballHistoryToken(state: GameState): Array<[string, number, boolean]> {
+  return (state.eventStream?.events ?? []).flatMap(value => {
+    if (!isGameEventEnvelope(value)) return []
+    const event = value as GameEvent
+    return [[event.id, event.revision, event.deletedAt !== null] as [string, number, boolean]]
+  })
 }
 
 const STATUS_LABELS: Record<BaseballMatchProjection['status'], string> = {

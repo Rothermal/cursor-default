@@ -21,7 +21,7 @@ import {
   type BaseballCorrectionPreview,
 } from './corrections'
 import { replayBaseballCreditByEvent } from './projector'
-import { canRestoreBaseballPlay, undoBaseballPlay } from './recentPlays'
+import { canRestoreBaseballPlay, restoreBaseballPlay, undoBaseballPlay } from './recentPlays'
 import { normalizeBaseballSportGameState } from './state'
 import {
   ballInPlay,
@@ -109,6 +109,45 @@ describe('Baseball correction preview and removal', () => {
       ok: false,
       message: 'The game changed since this preview. Review the changes again.',
     })
+  })
+
+  it('rejects a stale preview when the history changed but its consequences read the same', () => {
+    const STALE = 'The game changed since this preview. Review the changes again.'
+    // Undo then Restore leaves the same game but bumps the target's revision.
+    const bounce = (state: GameState) => expectOk(restoreBaseballPlay(expectOk(undoBaseballPlay(state, at(3))), at(4)))
+
+    let state = pitches(startedGame(), 'ball')
+    const ball = newest(state)
+    const removal = previewRemove(state, ball.id)
+    state = bounce(state)
+    expect(baseballSportState(state)!.projection).toMatchObject({ balls: 1 })
+    expect(state.eventStream!.events.find(event => (event as GameEvent).id === ball.id)).toMatchObject({ revision: 3 })
+    expect(previewRemove(state, ball.id)).toMatchObject({ changes: removal.changes, creditMoves: removal.creditMoves })
+    expect(removeBaseballPlay(state, removal, names, { now: at(5), confirmed: true })).toMatchObject({ ok: false, message: STALE })
+
+    // Individual restore: a later pitch bounced by Undo/Restore.
+    let single = pitches(startedGame(), 'ball')
+    const first = newest(single)
+    single = remove(single, first.id)
+    single = pitches(single, 'called_strike')
+    const unitRestore = previewBaseballRestore(single, { kind: 'restore_unit', unitId: first.id }, names)
+    if (!unitRestore.ok) throw new Error(unitRestore.message)
+    single = bounce(single)
+    expect(restoreBaseballCorrection(single, unitRestore.preview, names, { now: at(5), confirmed: true })).toMatchObject({ ok: false, message: STALE })
+
+    // Group restore: the same bounce after the preview.
+    let group = walk(startedGame())
+    group = remove(group, active(group)[1]!.id, true, 'grp')
+    group = pitches(group, 'called_strike')
+    const groupRestore = previewBaseballRestore(group, { kind: 'restore_group', receiptId: 'grp' }, names)
+    if (!groupRestore.ok) throw new Error(groupRestore.message)
+    group = bounce(group)
+    const fresh = previewBaseballRestore(group, { kind: 'restore_group', receiptId: 'grp' }, names)
+    expect(fresh.ok && fresh.preview.changes).toEqual(groupRestore.preview.changes)
+    expect(restoreBaseballCorrection(group, groupRestore.preview, names, { now: at(5), confirmed: true })).toMatchObject({ ok: false, message: STALE })
+    // A fresh preview of the same history still saves.
+    if (!fresh.ok) throw new Error(fresh.message)
+    expect(restoreBaseballCorrection(group, fresh.preview, names, { now: at(6), confirmed: true }).ok).toBe(true)
   })
 
   it('removes the third out with every later play of the next half, without retagging, and restores them together', () => {
