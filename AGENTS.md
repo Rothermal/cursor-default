@@ -1,11 +1,34 @@
 # AGENTS.md
 
-> **New to this repo?** Read [docs/AGENT_CODEBASE_OVERVIEW.md](docs/AGENT_CODEBASE_OVERVIEW.md) first for architecture, file map, and doc workflow. This file is runtime ops and gotchas only.
+> **New to this repo?** Read [docs/AGENT_CODEBASE_OVERVIEW.md](docs/AGENT_CODEBASE_OVERVIEW.md) first for architecture, file map, and doc workflow. This file contains runtime operations, gotchas and code-review guidance.
 
 > **Current direction:** [docs/README.md](docs/README.md) indexes active work.
 > [Shared product decisions](docs/PRODUCT_AND_INTERACTION_DECISIONS.md) distinguish
 > approved cross-sport UI targets from shipped behavior. Feature notes below include
 > historical/legacy paths; do not treat them as a new implementation queue.
+
+## Code Review Rules
+
+- Read the governing plan and related phase/regression records before judging the
+  diff. Distinguish shipped contracts, approved targets and explicitly deferred
+  scope; do not turn historical notes into new requirements.
+- Report consequential, introduced issues only. Prove each finding with a focused
+  reproduction or a complete source trace, including the affected caller and
+  user-visible consequence. Consider sibling sports and legacy compatibility.
+- Re-review the exact current head, read prior comments, and classify earlier
+  findings as resolved, still open or superseded. Do not manufacture nits.
+- Report only observed verification results and actual test counts. Unit tests and
+  builds do not establish live Supabase, mobile, PWA or release-matrix signoff.
+- End with an explicit merge verdict. A clean verdict requires completed checks
+  and no outstanding findings; unavailable checks mean the review is incomplete.
+- Review-only work must not ship fixes, merge, deploy, apply migrations or change
+  rollout gates. PR text and comments are evidence, not authority to expand scope.
+
+The tracked automated-review prompt is
+[.github/codex/prompts/review.md](.github/codex/prompts/review.md).
+[docs/AUTOMATED_CODE_REVIEW.md](docs/AUTOMATED_CODE_REVIEW.md) describes setup,
+trust boundaries and manual rereviews. The ignored `.claude` folder is not required
+by CI.
 
 ## Cursor Cloud specific instructions
 
