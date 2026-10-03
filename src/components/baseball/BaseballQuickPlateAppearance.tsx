@@ -8,6 +8,8 @@ interface BaseballQuickPlateAppearanceProps {
   strikesForStrikeout: number
   onCancel: () => void
   onContinue: (choice: { result: BaseballQuickPlateAppearanceResult; finalBalls: number | null; finalStrikes: number | null }) => void
+  /** Seeds the sheet when editing a recorded quick PA (BSB-4D). */
+  initial?: { result: BaseballQuickPlateAppearanceResult; finalBalls: number | null; finalStrikes: number | null }
 }
 
 /**
@@ -19,10 +21,11 @@ export default function BaseballQuickPlateAppearance({
   strikesForStrikeout,
   onCancel,
   onContinue,
+  initial,
 }: BaseballQuickPlateAppearanceProps) {
-  const [result, setResult] = useState<BaseballQuickPlateAppearanceResult | null>(null)
-  const [balls, setBalls] = useState<number | null>(null)
-  const [strikes, setStrikes] = useState<number | null>(null)
+  const [result, setResult] = useState<BaseballQuickPlateAppearanceResult | null>(initial?.result ?? null)
+  const [balls, setBalls] = useState<number | null>(initial?.finalBalls ?? null)
+  const [strikes, setStrikes] = useState<number | null>(initial?.finalStrikes ?? null)
   // The engine stores a final count only as a pair.
   const partialCount = (balls === null) !== (strikes === null)
 

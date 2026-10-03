@@ -2,7 +2,7 @@ import type { GameState } from '../../types'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { compareGameEventCaptureOrder } from '../gameEvents/stream'
+import { compareGameEventCaptureOrder, stableJson } from '../gameEvents/stream'
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
 import { baseballSportState, type BaseballCommandResult } from './commands'
 import { createBaseballUuid } from './id'
@@ -48,7 +48,7 @@ export interface BaseballDependentRow extends BaseballCorrectionRow {
 }
 
 export interface BaseballCorrectionPreview {
-  action: 'remove' | 'restore'
+  action: 'remove' | 'restore' | 'edit'
   /** What the recorder chose: the removed unit, the removed row restored, or a receipt's group. */
   target: BaseballCorrectionTarget
   /** The rows removed or restored by choice. */
@@ -62,6 +62,8 @@ export interface BaseballCorrectionPreview {
   fieldingKept: string[]
   /** Mismatches the correction clears without moving credit. Needs no confirmation. */
   information: string[]
+  /** For an edit (BSB-4D): stamped roles whose participant the edit changes, before and after. */
+  stampChanges: string[]
   /** True when dependents, credit moves or kept fielding credit need "Save with these changes". */
   needsConfirmation: boolean
   /** Compared on save, so a preview made against an older history is rejected. */
@@ -72,6 +74,18 @@ export type BaseballCorrectionTarget =
   | { kind: 'remove'; unitId: string }
   | { kind: 'restore_unit'; unitId: string }
   | { kind: 'restore_group'; receiptId: string }
+  | { kind: 'edit'; eventId: string }
+
+/**
+ * A changed play (BSB-4D): the event's new payload, batted-ball location and actors. The type,
+ * period, team, time and place in the order never change.
+ */
+export interface BaseballEventEdit {
+  eventId: string
+  payload: GameEvent['payload']
+  location: GameEvent['location']
+  actors: GameEvent['actors']
+}
 
 export type BaseballCorrectionPreviewResult =
   | { ok: true; preview: BaseballCorrectionPreview }
@@ -94,7 +108,32 @@ export function previewBaseballRemoval(state: GameState, unitId: string, names: 
   if (!isBaseballCaptureEvent(unit[0])) {
     return refuse('Game-flow rows are not removed on their own. Reopen a finished game, or remove the play they depend on.')
   }
-  return buildPreview(state, sport, names, { kind: 'remove', unitId }, unit, [])
+  return buildPreview(state, sport, names, { kind: 'remove', unitId }, unit, [], [])
+}
+
+/**
+ * Previews an edit of one play under the same contract: the edited history replays in full,
+ * later rows it breaks are dependents, credit is compared, and stamp changes are listed.
+ */
+export function previewBaseballEdit(state: GameState, edit: BaseballEventEdit, names: BaseballSideNames): BaseballCorrectionPreviewResult {
+  const sport = baseballSportState(state)
+  if (!sport || !state.eventStream) return refuse('This is not a Baseball event game.')
+  const current = baseballActiveEvents(state).find(event => event.id === edit.eventId)
+  if (!current) return refuse('That play is no longer in the game.')
+  if (!isBaseballCaptureEvent(current)) return refuse('Game-flow rows cannot be edited.')
+  const replacement: GameEvent = {
+    ...current,
+    // The capture id ties the play to its unit; an edit keeps it.
+    payload: { ...edit.payload, captureCommandId: (current.payload as { captureCommandId?: unknown }).captureCommandId ?? null } as GameEvent['payload'],
+    location: edit.location,
+    actors: edit.actors,
+  }
+  const registryCheck = gameEventRegistry.inspect(replacement)
+  if (!registryCheck.ok) return refuse(registryCheck.diagnostic.message)
+  if (stableJson([replacement.payload, replacement.location, replacement.actors]) === stableJson([current.payload, current.location, current.actors])) {
+    return refuse('Nothing changed.')
+  }
+  return buildPreview(state, sport, names, { kind: 'edit', eventId: edit.eventId }, [], [], [replacement])
 }
 
 /**
@@ -112,7 +151,7 @@ export function previewBaseballRestore(
   if (target.kind === 'restore_unit') {
     const unit = groupBaseballUnits(removed).find(candidate => candidate[0].id === target.unitId)
     if (!unit) return refuse('That row is not removed.')
-    return buildPreview(state, sport, names, target, [], unit)
+    return buildPreview(state, sport, names, target, [], unit, [])
   }
   const receipt = sport.capturePreferences.corrections.find(entry => entry.id === target.receiptId)
   if (!receipt || receipt.kind !== 'remove') return refuse('That removal can no longer be restored together.')
@@ -121,7 +160,7 @@ export function previewBaseballRestore(
     return refuse('Some of these rows changed since they were removed. Restore them one at a time.')
   }
   const ids = new Set(receipt.entries.map(entry => entry.eventId))
-  return buildPreview(state, sport, names, target, [], removed.filter(event => ids.has(event.id)))
+  return buildPreview(state, sport, names, target, [], removed.filter(event => ids.has(event.id)), [])
 }
 
 /** Whether a saved removal can still be restored together, and which of its rows changed. */
@@ -156,8 +195,20 @@ export function restoreBaseballCorrection(
   names: BaseballSideNames,
   options: BaseballCorrectionOptions
 ): BaseballCommandResult {
-  if (preview.target.kind === 'remove') return failure(state, 'That preview is not a restore.')
+  if (preview.target.kind === 'remove' || preview.target.kind === 'edit') return failure(state, 'That preview is not a restore.')
   return saveCorrection(state, previewBaseballRestore(state, preview.target, names), preview, options)
+}
+
+/** Saves a previewed edit: one update, plus any confirmed dependents' removals, as one batch. */
+export function editBaseballPlay(
+  state: GameState,
+  preview: BaseballCorrectionPreview,
+  edit: BaseballEventEdit,
+  names: BaseballSideNames,
+  options: BaseballCorrectionOptions
+): BaseballCommandResult {
+  if (preview.target.kind !== 'edit' || preview.target.eventId !== edit.eventId) return failure(state, 'That preview is not this edit.')
+  return saveCorrection(state, previewBaseballEdit(state, edit, names), preview, options, edit)
 }
 
 // ---------------------------------------------------------------------------
@@ -169,13 +220,15 @@ function buildPreview(
   names: BaseballSideNames,
   target: BaseballCorrectionTarget,
   removing: GameEvent[],
-  restoring: GameEvent[]
+  restoring: GameEvent[],
+  replacing: GameEvent[]
 ): BaseballCorrectionPreviewResult {
   const before = baseballActiveEvents(state)
   const removingIds = new Set(removing.map(event => event.id))
   const restoringIds = new Set(restoring.map(event => event.id))
+  const replacements = new Map(replacing.map(event => [event.id, event]))
   let candidate = [
-    ...before.filter(event => !removingIds.has(event.id)),
+    ...before.filter(event => !removingIds.has(event.id)).map(event => replacements.get(event.id) ?? event),
     ...restoring.map(event => ({ ...event, deletedAt: null })),
   ].sort(compareGameEventCaptureOrder)
 
@@ -188,9 +241,12 @@ function buildPreview(
     const failing = candidate.find(event => event.id === diagnostic.eventId)
     if (!failing) return refuse(diagnostic.message)
     if (restoringIds.has(failing.id)) return refuse(`This row cannot come back here: ${diagnostic.message}`)
+    if (replacements.has(failing.id)) return refuse(`This change does not fit here: ${diagnostic.message}`)
     if (failing.eventType === 'baseball.game_started') return refuse(diagnostic.message)
     const unit = groupBaseballUnits(candidate).find(entry => entry.some(event => event.id === failing.id))!
-    if (unit.some(event => restoringIds.has(event.id))) return refuse(`This row cannot come back here: ${diagnostic.message}`)
+    if (unit.some(event => restoringIds.has(event.id) || replacements.has(event.id))) {
+      return refuse(`This change does not fit here: ${diagnostic.message}`)
+    }
     dependents.push({ unit, reason: diagnostic.message })
     const dropped = new Set(unit.map(event => event.id))
     candidate = candidate.filter(event => !dropped.has(event.id))
@@ -203,7 +259,7 @@ function buildPreview(
     label: unit.map(event => baseballEventLabel(sport, event, names, [])).join(' + '),
     halfLabel: formatBaseballEventHalf(unit[0]),
   })
-  const chosen = groupBaseballUnits(removing.length ? removing : restoring).map(row)
+  const chosen = groupBaseballUnits(removing.length ? removing : restoring.length ? restoring : replacing).map(row)
   dependents.sort((a, b) => compareGameEventCaptureOrder(a.unit[0], b.unit[0]))
   const plays: BaseballDependentRow[] = []
   const lifecycle: BaseballDependentRow[] = []
@@ -225,13 +281,15 @@ function buildPreview(
   )
   const needsConfirmation =
     dependents.length > 0 || credit.creditMoves.length > 0 || credit.fieldingKept.length > 0
+  const stampChanges = replacing.flatMap(event => describeStampChanges(sport, before.find(entry => entry.id === event.id)!, event))
   const preview: BaseballCorrectionPreview = {
-    action: target.kind === 'remove' ? 'remove' : 'restore',
+    action: target.kind === 'remove' ? 'remove' : target.kind === 'edit' ? 'edit' : 'restore',
     target,
     rows: chosen,
     dependents: { plays, lifecycle },
     changes,
     ...credit,
+    stampChanges,
     needsConfirmation,
     key: '',
   }
@@ -241,6 +299,8 @@ function buildPreview(
   preview.key = JSON.stringify([
     target,
     baseballHistoryToken(state),
+    // An edit's content is part of what was reviewed: a different draft needs a new preview.
+    replacing.map(event => [event.id, event.payload, event.location, event.actors]),
     chosen.map(entry => entry.eventIds),
     dependents.map(entry => entry.unit.map(event => event.id)),
     changes,
@@ -248,6 +308,33 @@ function buildPreview(
     credit.fieldingKept,
   ])
   return { ok: true, preview }
+}
+
+const ROLE_ORDER = (role: string) => (role === 'batter' ? 0 : role === 'pitcher' ? 1 : 2 + Number(role.slice('fielder_'.length)))
+
+function roleName(role: string): string {
+  if (role === 'batter' || role === 'pitcher') return role === 'batter' ? 'Batter' : 'Pitcher'
+  const position = Number(role.slice('fielder_'.length))
+  return `Fielder at ${baseballFieldingPositionCode(position) ?? position}`
+}
+
+/** Stamped roles an edit adds, drops or moves to another participant. */
+function describeStampChanges(sport: BaseballSportGameState, before: GameEvent, after: GameEvent): string[] {
+  const stamped = (event: GameEvent) =>
+    new Map(event.actors.flatMap(actor => (actor.participantId ? [[actor.role, actor.participantId] as const] : [])))
+  const previous = stamped(before)
+  const next = stamped(after)
+  const person = (id: string) => baseballPersonLabel(sport, id).name
+  return [...new Set([...previous.keys(), ...next.keys()])]
+    .sort((a, b) => ROLE_ORDER(a) - ROLE_ORDER(b))
+    .flatMap(role => {
+      const from = previous.get(role)
+      const to = next.get(role)
+      if (from === to) return []
+      if (!from) return [`${roleName(role)}: now recorded as ${person(to!)}`]
+      if (!to) return [`${roleName(role)}: ${person(from)} no longer recorded`]
+      return [`${roleName(role)}: ${person(from)} becomes ${person(to)}`]
+    })
 }
 
 /** Every stored event (raw, active and removed) as id, revision and removed flag, in stored order. */
@@ -342,9 +429,12 @@ function compareCredit(
       }
     }
   }
-  const creditMoves = [...moves.values()].map(move =>
-    `${move.half} ${move.role}: moves from ${move.from} to ${move.to}${move.plays > 1 ? ` (${move.plays} plays)` : ''}`
-  )
+  const creditMoves = [...moves.values()].map(move => {
+    const count = move.plays > 1 ? ` (${move.plays} plays)` : ''
+    if (move.from === 'nobody') return `${move.half} ${move.role}: now credited to ${move.to}${count}`
+    if (move.to === 'nobody') return `${move.half} ${move.role}: no longer credited to ${move.from}${count}`
+    return `${move.half} ${move.role}: moves from ${move.from} to ${move.to}${count}`
+  })
 
   const surviving = new Set(candidate.map(event => event.id))
   const warningKey = (warning: BaseballMatchProjection['warnings'][number]) =>
@@ -383,7 +473,8 @@ function saveCorrection(
   state: GameState,
   fresh: BaseballCorrectionPreviewResult,
   preview: BaseballCorrectionPreview,
-  options: BaseballCorrectionOptions
+  options: BaseballCorrectionOptions,
+  edit: BaseballEventEdit | null = null
 ): BaseballCommandResult {
   if (!fresh.ok) return failure(state, fresh.message)
   if (fresh.preview.key !== preview.key) {
@@ -396,8 +487,20 @@ function saveCorrection(
   const chosenIds = fresh.preview.rows.flatMap(row => row.eventIds)
   const dependentIds = [...fresh.preview.dependents.plays, ...fresh.preview.dependents.lifecycle].flatMap(row => row.eventIds)
   const restoring = fresh.preview.action === 'restore'
+  const editing = fresh.preview.action === 'edit'
+  const chosenMutations: GameEventMutation[] = editing && edit
+    ? [{
+        type: 'update',
+        eventId: edit.eventId,
+        changes: {
+          payload: { ...edit.payload, captureCommandId: (findBaseballStoredEvent(state, edit.eventId)!.payload as { captureCommandId?: unknown }).captureCommandId ?? null } as GameEvent['payload'],
+          location: edit.location,
+          actors: edit.actors,
+        },
+      }]
+    : chosenIds.map(eventId => ({ type: restoring ? 'restore' as const : 'delete' as const, eventId }))
   const mutations: GameEventMutation[] = [
-    ...chosenIds.map(eventId => ({ type: restoring ? 'restore' as const : 'delete' as const, eventId })),
+    ...chosenMutations,
     ...dependentIds.map(eventId => ({ type: 'delete' as const, eventId })),
   ]
   const result = applyGameEventMutations(state, mutations, options.now, gameEventRegistry, gameEventProjectors)
@@ -405,7 +508,7 @@ function saveCorrection(
   if (!result.inspection.complete) return failure(state, 'The change would leave an incomplete Baseball history.')
 
   const revisionOf = (eventId: string) => findBaseballStoredEvent(result.state, eventId)!.revision
-  const removedIds = restoring ? dependentIds : [...chosenIds, ...dependentIds]
+  const removedIds = restoring || editing ? dependentIds : [...chosenIds, ...dependentIds]
   const restoredIds = new Set(restoring ? chosenIds : [])
   let receipts = sport.capturePreferences.corrections
   if (fresh.preview.target.kind === 'restore_group') {
@@ -425,10 +528,20 @@ function saveCorrection(
       id: options.receiptId ?? createBaseballUuid(),
       createdAt: options.now,
       kind: 'remove',
-      primaryEventIds: restoring ? [] : chosenIds,
+      primaryEventIds: restoring || editing ? [] : chosenIds,
       entries: removedIds.map(eventId => ({ eventId, expectedRevision: revisionOf(eventId) })),
     }
     receipts = [receipt, ...receipts]
+  }
+  if (editing) {
+    // Edits are not revertible from the receipt (no prior values are kept); it records what changed.
+    receipts = [{
+      id: `${options.receiptId ?? createBaseballUuid()}${removedIds.length > 0 ? '-edit' : ''}`,
+      createdAt: options.now,
+      kind: 'edit',
+      primaryEventIds: chosenIds,
+      entries: chosenIds.map(eventId => ({ eventId, expectedRevision: revisionOf(eventId) })),
+    }, ...receipts]
   }
   const nextSport = baseballSportState(result.state)!
   const next: GameState = {
