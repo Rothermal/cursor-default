@@ -1,6 +1,7 @@
 import type { GameState } from '../types'
 import type { ParkedGameSummary } from './gameParking'
 import { basketballSummaryPath } from './basketball/summary'
+import { baseballSummaryPath } from './baseball/summary'
 
 type ResumableGameState = Pick<
   GameState,
@@ -62,6 +63,13 @@ export function routeForResumedGame(state: ResumableGameState): string {
     }
     return state.gameInfo ? '/players' : '/setup'
   }
+  // A finished Baseball event game opens on its Summary (BSB-5A).
+  if (
+    state.sport.id === 'baseball' &&
+    state.sportGameState?.sportId === 'baseball' &&
+    state.eventStream?.events.length &&
+    ['final', 'abandoned'].includes(String(state.sportGameState.projection?.status))
+  ) return baseballSummaryPath()
   if (state.players.length === 0) return '/players'
   return '/game'
 }
