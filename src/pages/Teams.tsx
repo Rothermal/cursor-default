@@ -1721,9 +1721,15 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       Boolean(guardianMap[player.id])
                     )
                     return (
-                      <div key={player.id} className="border border-line rounded-xl px-3 py-2">
+                      <div
+                        key={player.id}
+                        className={`border rounded-xl px-3 py-2 ${isEditing ? 'border-accent border-2' : 'border-line'}`}
+                      >
                         {isEditing ? (
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-2" role="group" aria-label={`Edit ${playerDisplayName(player)}`}>
+                            <p className="text-xs font-semibold text-content-muted break-words">
+                              Editing #{player.jersey_number || '—'} {playerDisplayName(player)}
+                            </p>
                             <div className="grid grid-cols-12 gap-2">
                               <input
                                 type="text"
