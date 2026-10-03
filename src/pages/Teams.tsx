@@ -1727,7 +1727,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       >
                         {isEditing ? (
                           <div className="flex flex-col gap-2" role="group" aria-label={`Edit ${playerDisplayName(player)}`}>
-                            <p className="text-xs font-semibold text-content-muted">
+                            <p className="text-xs font-semibold text-content-muted break-words">
                               Editing #{player.jersey_number || '—'} {playerDisplayName(player)}
                             </p>
                             <div className="grid grid-cols-12 gap-2">
