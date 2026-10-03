@@ -111,8 +111,6 @@ function formatReport(report, results, metadata, runUrl) {
     body += '\n\nAutomated verification did not fully pass; this is not a merge approval.'
   }
   const table = gates.map(check => `| ${check.name} | ${check.status} |`).join('\n')
-  // Prevent generated text or quoted discussion from issuing mention notifications.
-  body = body.replace(/@/g, '@\u200b')
   return `${marker(metadata)}\n## Codex Review\n\n`
     + `Head: \`${metadata.headSha}\` | Base: \`${metadata.baseSha}\`\n\n`
     + 'Model: `gpt-6.1-sol` | Reasoning: `high` | Read-only source review\n\n'
@@ -128,7 +126,8 @@ async function publish({ github, context, core, metadata, report, results }) {
   }
   const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: metadata.number })
   if (!isCurrent(pr, metadata)) {
-    core.info('Not publishing: the PR changed, closed, became draft or was retargeted')
+    core.warning('Review not published: the PR head/base, open/draft state or target changed. '
+      + 'If it is still eligible, manually rerun Codex PR Review for the current snapshot.')
     return
   }
   const runUrl = `https://github.com/${metadata.repository}/actions/runs/${context.runId}`

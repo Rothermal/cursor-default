@@ -55,6 +55,9 @@ paths. The publisher adds the reviewed SHA, deterministic check table and run li
 Do not invent test counts, assume lint warnings are pre-existing, or treat local
 tests as proof that Supabase/PWA/real-game checks passed. Read the full logs to
 report any counts, claims or failures accurately.
+Do not include account mentions or copy discussion verbatim. Preserve literal
+code identifiers such as `@supabase/supabase-js` and `@media` without inserting
+invisible characters; the publisher preserves the report text.
 
 End with exactly one of these headings:
 

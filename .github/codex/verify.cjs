@@ -14,9 +14,10 @@ function verify(checkout, output, run = spawnSync) {
     const command = name === 'review-controls' ? 'node' : 'pnpm'
     const args = name === 'install' ? ['install', '--frozen-lockfile']
       : name === 'review-controls' ? ['--test', '.github/codex/review.test.cjs'] : [name]
+    const cwd = name === 'review-controls' ? path.resolve(__dirname, '../..') : checkout
     const log = fs.openSync(path.join(output, `${name}.log`), 'w')
     const result = run(command, args, {
-      cwd: checkout, stdio: ['ignore', log, log], timeout: 12 * 60 * 1000,
+      cwd, stdio: ['ignore', log, log], timeout: 12 * 60 * 1000,
       env: { ...process.env, CI: 'true', FORCE_COLOR: '0' },
     })
     if (result.error) fs.writeSync(log, `${result.error.message}\n`)

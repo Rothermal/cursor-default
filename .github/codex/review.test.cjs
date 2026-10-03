@@ -32,7 +32,7 @@ function fixture(pr = makePr(), comments = []) {
   }
   return { github, calls, outputs, context: { repo: { owner: 'Rothermal', repo: 'cursor-default' },
     actor: 'Rothermal', sha: base, runId: 123 },
-  core: { info() {}, setOutput: (key, value) => { outputs[key] = value } } }
+  core: { info() {}, warning() {}, setOutput: (key, value) => { outputs[key] = value } } }
 }
 
 test('only ready, same-repository PRs on stattracker are eligible', () => {
@@ -93,10 +93,11 @@ test('proved blocking findings retain their verdict even with a failed gate', ()
   assert.ok(body.includes('## Verdict: Needs additional updates'))
 })
 
-test('quoted or generated mentions cannot notify accounts', () => {
-  const body = formatReport(`Verified @Rothermal and @everyone text.\n${cleanReport}`, results, metadata, 'https://example.com')
-  assert.equal(body.includes('@Rothermal'), false)
-  assert.ok(body.includes('@\u200bRothermal'))
+test('publication preserves code identifiers and code blocks verbatim', () => {
+  const report = 'Check `@supabase/supabase-js` and `@media`.\n\n```css\n@media (prefers-color-scheme: dark) {}\n```\n' + cleanReport
+  const body = formatReport(report, results, metadata, 'https://example.com')
+  assert.ok(body.includes(report))
+  assert.equal(body.includes('\u200b'), false)
 })
 
 test('prepare paginates context and emits an exact-head snapshot', async t => {
@@ -191,7 +192,7 @@ test('verification runs independent gates even after a test failure', t => {
   const commands = []
   const checks = verify('candidate', directory, (command, args, options) => {
     commands.push([command, args])
-    assert.equal(options.cwd, 'candidate')
+    assert.equal(options.cwd, args[0] === '--test' ? path.resolve(__dirname, '../..') : 'candidate')
     assert.equal(options.env.CI, 'true')
     fs.writeSync(options.stdio[1], 'verification output\n')
     return { status: args[0] === 'test' ? 1 : 0 }
@@ -225,4 +226,36 @@ test('a quoted marker in another bot comment cannot suppress a new review', asyn
   const f = fixture(makePr(), [{ user: { login: 'github-actions[bot]' }, body: `Earlier discussion:\n${marker(metadata)}` }])
   await prepare({ ...f, number: 465, directory })
   assert.equal(f.outputs.should_review, 'true')
+})
+
+test('controller coverage uses trusted files even when the candidate predates this workflow', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-old-candidate-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const candidate = path.join(directory, 'candidate')
+  fs.mkdirSync(candidate)
+  assert.equal(fs.existsSync(path.join(candidate, '.github/codex/review.test.cjs')), false)
+  const checks = verify(candidate, path.join(directory, 'output'), (command, args, options) => {
+    if (command === 'node') {
+      assert.equal(options.cwd, path.resolve(__dirname, '../..'))
+      assert.ok(fs.existsSync(path.resolve(options.cwd, args[1])))
+    } else {
+      assert.equal(options.cwd, candidate)
+    }
+    return { status: 0 }
+  })
+  assert.ok(checks.every(check => check.status === 'passed'))
+  assert.ok(formatReport(cleanReport, { checks }, metadata, 'https://example.com')
+    .includes('## Verdict: No further changes needed'))
+})
+
+test('stale base produces a visible warning instead of a silent publication skip', async () => {
+  const pr = makePr()
+  pr.base.sha = 'c'.repeat(40)
+  const f = fixture(pr)
+  const warnings = []
+  f.core.warning = message => warnings.push(message)
+  await publish({ ...f, metadata, report: cleanReport, results })
+  assert.equal(f.calls.length, 0)
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0], /manually rerun/)
 })

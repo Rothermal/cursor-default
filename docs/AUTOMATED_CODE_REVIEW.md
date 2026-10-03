@@ -51,8 +51,13 @@ action's default installer. Review upgrades to the pin as normal code changes.
 - Equivalent CLI: `gh workflow run codex-review.yml --ref stattracker -f pr_number=123 -f force=true`.
 - The workflow must first be merged into the default branch (`stattracker`);
   this implementation PR cannot exercise its own new target-branch workflow.
-- Jobs cancel older runs for the same PR. Publishing rechecks head, base, target,
-  draft and open state; superseded results are not posted as current reviews.
+- Only eligible verification/review jobs enter cancellation groups for the same
+  PR; skipped or wrong-ref dispatches cannot cancel an existing review. Publishing
+  is serialized without canceling an active publisher, and rechecks head, base,
+  target, draft and open state. Superseded results are never posted as current.
+- A base-SHA change also prevents publication. The job emits a visible warning;
+  rerun manually after the base settles to review the new head/base snapshot.
+  Advancing `stattracker` alone is not an automatic review trigger.
 
 ## Trust and verification
 
@@ -64,7 +69,7 @@ builds execute PR code. Future external contributions need a separate trust desi
 | Job | Inputs and permissions |
 | --- | --- |
 | Prepare | Trusted base controller; read-only API token; paginated PR body, discussion, reviews and inline comments |
-| Verify | Exact head; frozen pnpm install, review-control tests, typecheck, full app unit suite, lint and production/PWA build; no OpenAI/app/cloud secrets, no write token |
+| Verify | Trusted checkout's controller tests; exact head's frozen pnpm install, typecheck, full app unit suite, lint and production/PWA build; no OpenAI/app/cloud secrets, no write token |
 | Review | Fresh runner; exact head, full Git history, trusted prompt and captured context/logs; read-only sandbox, drop-sudo, isolated Codex home, OpenAI proxy |
 | Publish | Fresh runner; only trusted base controller and artifacts; `issues: write` for comments, no PR code execution or OpenAI key |
 
@@ -76,6 +81,10 @@ incomplete** if any gate failed or was skipped. Model/runner failures produce
 failed jobs, not empty or misleading approval comments. The verification job's
 success means logs were collected, not that every check passed; see its artifact
 and the published check table. CI still enforces actual test/build success.
+The `review-controls` gate tests the trusted controller used by the workflow, not
+the candidate's files. PR branches cut before this workflow merged do not need to
+contain its tests. Ordinary CI still tests candidate controller changes when the
+candidate includes the new CI configuration.
 
 The AI review proves findings through source traces and reads the independent
 verification logs. It cannot install dependencies or run temporary probes in the
@@ -92,6 +101,10 @@ review procedure. The ignored `.claude/skills/pr-review` is not a CI dependency.
 PR comments and proposed policy changes are review data, not authority to change
 the active trusted policy. Source findings use P0/P1/P2 and separately identify
 Blocking versus Non-blocking merge severity. No manufactured style nits.
+The prompt prohibits account mentions and copied discussion, but the publisher
+does not rewrite `@` characters: code samples and package identifiers remain
+byte-preserved. GitHub's normal mention behavior applies if a report violates
+that instruction; this is not a notification-suppression security boundary.
 
 Run helper coverage with `node --test .github/codex/review.test.cjs`. The ordinary
 CI workflow runs it too. These tests exercise trust eligibility, duplicate handling,
@@ -100,6 +113,9 @@ stale-head/base rejection, blank feedback, gate downgrades and comment ownership
 Before enabling, verify a clean ready PR, a new-commit rereview, a forced same-head
 rereview, draft/fork skips and a stale-head cancellation. Confirm the API project
 has model access and that publisher permissions work under repository policy.
+Also test a base advance during a run and a wrong-ref/skipped manual dispatch
+while an eligible review is active; the former warns without publishing, while
+the latter must not cancel the valid review.
 Those live checks remain pending until an actual Actions run supplies evidence.
 
 ## References
