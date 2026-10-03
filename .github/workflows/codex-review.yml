@@ -1,0 +1,198 @@
+name: Codex PR Review
+
+on:
+  pull_request_target:
+    branches: [stattracker]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open PR targeting stattracker
+        required: true
+        type: string
+      force:
+        description: Re-review an already reviewed commit (updates its existing comment)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: >-
+      vars.CODEX_REVIEW_ENABLED == 'true' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/stattracker')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      should_review: ${{ steps.context.outputs.should_review }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
+      base_sha: ${{ steps.context.outputs.base_sha }}
+      tooling_sha: ${{ steps.context.outputs.tooling_sha }}
+      number: ${{ steps.context.outputs.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Capture trusted review context
+        id: context
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          FORCE_REVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+        with:
+          script: |
+            const { prepare } = require('./.github/codex/review.cjs');
+            await prepare({ github, context, core, directory: 'review-input',
+              number: process.env.PR_NUMBER, force: process.env.FORCE_REVIEW === 'true' });
+      - uses: actions/upload-artifact@v4
+        if: steps.context.outputs.should_review == 'true'
+        with:
+          name: codex-review-input
+          path: review-input/
+          retention-days: 7
+          if-no-files-found: error
+
+  verify:
+    needs: prepare
+    if: needs.prepare.outputs.should_review == 'true'
+    concurrency:
+      group: codex-verify-${{ needs.prepare.outputs.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tooling_sha }}
+          path: automation
+          persist-credentials: false
+      - name: Check out exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify head in a runner without app or OpenAI secrets
+        run: node automation/.github/codex/verify.cjs candidate verification
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-verification
+          path: verification/
+          retention-days: 7
+          if-no-files-found: error
+
+  review:
+    needs: [prepare, verify]
+    concurrency:
+      group: codex-review-${{ needs.prepare.outputs.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - name: Require configured API key
+        env:
+          KEY_CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' }}
+        run: |
+          if [ "$KEY_CONFIGURED" != "true" ]; then
+            echo "::error::Set the OPENAI_API_KEY repository secret before enabling Codex reviews."
+            exit 1
+          fi
+      - name: Check out trusted policy
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tooling_sha }}
+          path: automation
+          persist-credentials: false
+      - name: Check out exact head and full comparison history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          path: candidate
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: codex-review-input
+          path: review-input
+      - uses: actions/download-artifact@v4
+        with:
+          name: codex-verification
+          path: verification
+      - name: Read-only review with GPT-6.1 Sol / high
+        uses: openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e # v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: gpt-6.1-sol
+          effort: high
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          working-directory: ${{ github.workspace }}/candidate
+          prompt-file: ${{ github.workspace }}/automation/.github/codex/prompts/review.md
+          output-file: ${{ github.workspace }}/review-report.md
+          codex-home: ${{ runner.temp }}/codex-review-home
+          codex-args: '["--ephemeral"]'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-review-report
+          path: review-report.md
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, review]
+    concurrency:
+      group: codex-publish-${{ needs.prepare.outputs.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+    steps:
+      - name: Check out trusted publisher (never PR code)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tooling_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: codex-review-input
+          path: review-input
+      - uses: actions/download-artifact@v4
+        with:
+          name: codex-verification
+          path: verification
+      - uses: actions/download-artifact@v4
+        with:
+          name: codex-review-report
+          path: report
+      - name: Validate current head and publish non-empty feedback
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { publish } = require('./.github/codex/review.cjs');
+            await publish({ github, context, core,
+              metadata: JSON.parse(fs.readFileSync('review-input/metadata.json', 'utf8')),
+              results: JSON.parse(fs.readFileSync('verification/results.json', 'utf8')),
+              report: fs.readFileSync('report/review-report.md', 'utf8') });

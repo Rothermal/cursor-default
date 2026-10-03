@@ -6,6 +6,7 @@ unfinished implementation; some retain important verification or follow-up work.
 ## Current references
 
 - [Operations: deployment, cloud configuration and icons](OPERATIONS.md)
+- [Automated PR reviews: setup, trust and manual rereviews](AUTOMATED_CODE_REVIEW.md)
 - [App overview and local development](../README.md)
 - [Codebase architecture](AGENT_CODEBASE_OVERVIEW.md)
 - [Shared product and interaction decisions](PRODUCT_AND_INTERACTION_DECISIONS.md)
