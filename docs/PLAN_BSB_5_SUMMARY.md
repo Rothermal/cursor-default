@@ -134,6 +134,11 @@ scroll inside their card).
 - `BaseballSummary` page with the tab bar, Overview and Box score; the App route
   dispatch adds Baseball before the legacy fallback.
 - Entry points from the tracker and the parked-game card.
+- Source health: the Summary inspects and replays the stream with the same checks the
+  tracker uses and never trusts cached totals. An incomplete or quarantined stream
+  shows its recovery message and the last valid context, with no official totals,
+  and never falls through to the legacy grid Summary. Batter, pitcher and fielder
+  credit on every tab follows the replay after corrections, as in BSB-4.
 
 ### BSB-5B Plays and Spray chart
 
@@ -149,9 +154,21 @@ scroll inside their card).
 - `pitchLog.ts` (pure): a replay of pitch events giving, per pitch, the pitcher,
   batter, batter hand, count before the pitch, result, location and play id.
 - `BaseballPitchPlot` reuses the `BaseballPitchPad` zone frame read-only.
-- Pitch counts from `pitchingLines`, with flags from `pitchCountWarnings` and
-  `pitchCountLimit`. Plate appearances recorded with Quick PA count as "untracked"
-  next to the pitcher (`untrackedPlateAppearances`), never as pitches.
+- Pitch counts keep the shipped contract. The total is the projection's
+  `pitchingLines` total, the same number the tracker shows and checks against
+  `pitchCountWarnings` and `pitchCountLimit`, so the Summary and the tracker never
+  disagree. That total is a lower bound: it includes individually recorded pitches
+  plus the estimate `applyQuickPlateAppearance` adds from a Quick PA's final count
+  (two-strike fouls cannot be recovered, and a Quick PA without a final count adds
+  none).
+- Each row splits the total into **Recorded** (pitch events, counted by the pitch
+  log) and **Estimated** (total minus recorded), and shows "≥" when an estimate is
+  included. Quick PA plate appearances are listed separately as **Untracked PA**
+  (`untrackedPlateAppearances`). Unlocated pitches are a third, separate count: they
+  are recorded pitches with no zone location, so they count as Recorded and appear in
+  the pitch log but not on the plot.
+- Counting only recorded pitches would change the tracker's warning contract and needs
+  an explicit owner decision; this slice does not make it.
 
 ### BSB-5D Pitcher decisions
 
@@ -161,8 +178,17 @@ scroll inside their card).
 - `decisions.ts` (pure): the suggestion (section 4.4) and validation (a pitcher must
   have pitched for that side; W and L on opposite sides; SV only for the winning side
   and not the W pitcher; HLD never the W, L or SV pitcher).
-- The projection keeps only decisions recorded after the latest game end, so
-  Reopen clears them and a new end asks again.
+- Lifecycle: each game end starts a completed-game epoch, identified by that end
+  event's id, and a decisions event carries the epoch it was made for. The projection
+  uses only decisions whose epoch is the current one, and there is no current epoch
+  while the game is reopened, so Reopen clears the effective decisions even though
+  the event stays in history. A new end starts a new epoch with no decisions, and the
+  sheet asks again. Within an epoch the newest active decisions event wins as a whole
+  (each one carries both sides), and removing it falls back to the one before.
+- Edited history: when a later correction means stored decisions no longer validate
+  (for example the W pitcher no longer pitched), they stay as recorded, show a
+  "Check decisions" flag on Overview and the sheet, and never make the projection
+  fail.
 - Overview and Box score show the decisions; **Set decisions** opens a sheet seeded
   with the stored decisions or the suggestion. It is a capture unit, so Undo and the
   Timeline can take it back like any other row.
@@ -175,9 +201,18 @@ Following official scoring in simplified form, with the recorder confirming:
   scaled to the profile's scheduled innings and rounded down), W is left blank for the
   recorder to choose among the relievers.
 - **L:** the pitcher responsible for the run that gave the winners the lead for good.
-- **SV:** the last pitcher of the winning team when that pitcher finished the game, did not get
-  the win, and entered with a lead of three runs or fewer (or pitched at least three
-  innings, or entered with the tying run on deck); otherwise blank.
+- **SV** (Official Baseball Rules 9.19): suggested only when the last pitcher of the
+  winning team finished the game, is not the W pitcher, pitched at least one out,
+  never let the lead go (the winners led from the moment that pitcher entered to the
+  end), and meets one of:
+  1. entered with a lead of three runs or fewer and pitched at least one full inning
+     (three outs);
+  2. entered with the potential tying run on base, at bat or on deck (lead no larger
+     than runners on base plus two);
+  3. pitched at least three innings (nine outs).
+  Otherwise SV is blank. It is also blank when the replay cannot establish
+  eligibility (for example a Quick PA or warning leaves the entry state unclear) or
+  when a profile's rules differ from OBR; the recorder decides those.
 - **HLD:** not suggested; the recorder adds holds by hand.
 
 No decisions are suggested for ties, forfeits, suspended or abandoned games.
@@ -215,9 +250,21 @@ No decisions are suggested for ties, forfeits, suspended or abandoned games.
 - **Pitches:** count-before for every pitch across a full plate appearance, including
   fouls with two strikes and Quick PA; batter hand from setup and opponent labels;
   filters; warning and limit flags.
-- **Decisions:** the suggestion for a starter win, a relief win with a save, a blown
-  save, a short starter (blank W), extra innings and ties; validation refusals; Reopen
-  clears them; reload, park and export/import keep them.
+- **Mixed pitch counts:** one pitcher with recorded pitches (some unlocated) and Quick
+  PAs with and without a final count. Box score, Pitch counts and the tracker show the
+  same total; Recorded, Estimated, Untracked PA and unlocated counts are each right;
+  the warning threshold and the limit trigger on the same pitch in Summary and tracker.
+- **Decisions:** the suggestion for a starter win, a relief win with a save, a short
+  starter (blank W), extra innings and ties; validation refusals; reload, park and
+  export/import keep them.
+- **Save eligibility:** a reliever entering with two outs, bases empty and a three-run
+  lead who gets the final out gets no SV; a reliever entering with the tying run on
+  deck (or on base) who finishes the game gets SV; a reliever who gives up the lead and
+  then finishes after the team retakes it gets no SV (and may be the W).
+- **Decision lifecycle:** Reopen clears the effective decisions while the event stays in
+  history; a new end asks again; the newest decisions in the epoch win and removing it
+  falls back; an edit that invalidates stored decisions flags them without breaking the
+  projection.
 - **Routing:** a Baseball event game opens `BaseballSummary`, a legacy Baseball game
   still opens the grid Summary, and other sports are unaffected.
 - **Browser smoke at 390px, light and dark:** each tab on a scripted seven-inning game,
