@@ -69,9 +69,23 @@ finalization policy, and adds fixed Hockey wrappers like Basketball's 056-061 an
     opponent scores:
     - goals are `hockey.shot` events with `outcome = 'goal'`, counted for their
       `team_side`, plus `hockey.score_adjustment` deltas (1 or -1),
-    - shootout: when the stream has a `hockey.shootout_started`, the side with more
-      `hockey.shootout_attempt` goals gets one goal added, the HKY-3C final-score rule
-      (§7 Q3). A started shootout with equal shootout goals is refused as undecided,
+    - shootout: the winner gets one goal added, the HKY-3C final-score rule (§7 Q3),
+      but only when the shootout is decided by the same rule as `refreshHockeyShootout`.
+      The policy counts active `hockey.shootout_attempt` events (current revision) per
+      side, attempts taken and goals, and reads `rulesSnapshot.shootout.rounds` from the
+      stored immutable setup snapshot:
+      - while neither side has taken more than `rounds` attempts, a side has won once its
+        goals exceed the other side's goals plus that side's attempts left in the rounds
+        (an early clinch),
+      - after that (sudden death), a side has won only after a complete round, with
+        equal attempts taken and unequal goals,
+      - otherwise there is no winner, even with unequal goals: a reasoned early end
+        part way through the rounds or before the answering sudden-death attempt, or an
+        abandon. Then no goal is added and the recorded regulation and overtime score is
+        published, which is the local result (a tie) and follows §7 Q2. Unequal totals
+        alone never decide the shootout,
+      - the rule reads only counts, so it does not depend on attempt order. A missing or
+        malformed `rounds` refuses finalization,
     - it refuses malformed scoring payloads, wrong `team_side` values and negative or
       overflowing scores, as the Basketball policy does,
     - a tie without a shootout is accepted: Hockey rules allow ties, and the tracker
@@ -193,7 +207,10 @@ nothing can edit cannot be tested by the owner (§7 Q6).
 - **XS-9 (lineup defaults)**: Hockey team settings carry `lineupDefaults` in the
   Basketball/Soccer shape, plus goalies.
 - The Basketball recorder and finalization panels become sport-parameterized instead of
-  being copied. Basketball behavior must not change; its existing tests cover it.
+  being copied. Only presentation is shared: source preparation, canonical parsing and
+  replay validation, and reopen policy (Basketball's anchored-clock modes) stay behind
+  per-sport adapters or callbacks, never a rename of RPC strings. Basketball behavior
+  must not change; its existing tests cover it.
 
 ---
 
@@ -204,8 +221,12 @@ nothing can edit cannot be tested by the owner (§7 Q6).
 - server (SQL run against a branch or local database where available, otherwise by the
   owner after applying): bind, upload, checkpoint, conflict and recovery for a Hockey
   game; the policy's score for regulation, overtime, shootout, score adjustments and
-  removed goals; refusals for an unfinished stream, an undecided shootout and malformed
-  payloads; finalize, reopen with reason, re-finalize and history; viewer and scorer
+  removed goals; refusals for an unfinished stream and malformed payloads;
+  server and client parity on the same fixtures for the shootout: an early clinch, a
+  sudden-death win after a complete round, a reasoned end after only the first attempt
+  of a three-round shootout (goals 1-0, no winner, published 0-0), and a reasoned end
+  after the first sudden-death goal before the answering attempt (no winner, the
+  recorded score); finalize, reopen with reason, re-finalize and history; viewer and scorer
   refusals; Soccer and Basketball readiness and finalize unchanged,
 - client unit tests: adapter payloads, routing for event, legacy and local-only games,
   the cloud policy parser, the handshake parser (exact, older, newer), Game Info gating
@@ -248,7 +269,7 @@ nothing can edit cannot be tested by the owner (§7 Q6).
 |---|---|---|
 | Q1 | HKY-0 and BSB-0 suggested widening the event-platform allow-lists for all three new sports in one migration. Doing that now would open the cloud paths for Baseball and Football before they have a finalization policy. Widen for Hockey only? | Yes. Hockey only; Baseball and Football each add themselves with their own policy |
 | Q2 | Which ends can be finalized: a completed game, an ended-early game (ended with a reason), an abandoned game? | All three, with the score as recorded (the Soccer and Basketball rule). A suspended game cannot be finalized until it is resumed and ended |
-| Q3 | A shootout winner: publish the final score with one goal added for the winner (3-2 after a 2-2 shootout)? | Yes, the HKY-3C result. Player totals never include it |
+| Q3 | A shootout winner: publish the final score with one goal added for the winner (3-2 after a 2-2 shootout)? | Yes, the HKY-3C result, only for a decided shootout. A shootout ended or abandoned before it is decided publishes the recorded score with no goal added. Player totals never include it |
 | Q4 | Hockey games recorded before HKY-5B: leave them on this device, with an Enable cloud sync option in the Game menu? | Yes. Nothing uploads unless the recorder enables it |
 | Q5 | Reopen: one kind (reopen with a reason; the recorder then corrects or keeps playing), or Basketball's two (correct records only, or resume the game)? | One kind. Hockey's local Reopen already lets the recorder correct or resume, and the owner re-finalizes explicitly |
 | Q6 | Move the Team Manage Hockey rules and lineup panel from HKY-6C into HKY-5C, so saved settings can be edited and tested? Line combinations stay a later module | Yes |
