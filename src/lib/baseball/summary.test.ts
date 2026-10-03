@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
 import { baseballBoxScore } from './boxScore'
-import { baseballMovement, baseballSportState, endBaseballGame, recordBaseballPlateAppearance, reopenBaseballGame, substituteBaseball } from './commands'
+import { baseballMovement, baseballSportState, endBaseballGame, recordBaseballBaserunning, recordBaseballPlateAppearance, reopenBaseballGame, substituteBaseball } from './commands'
 import {
   baseballSummaryPath,
   baseballSummarySource,
@@ -206,6 +206,36 @@ describe('Baseball box score', () => {
       ['t11', '0.1'],
     ])
     expect(score.fielding.rows.map(row => row.id)).toEqual(expect.arrayContaining(['t10', 't11']))
+  })
+
+  it('keeps a reliever whose only credit is a wild pitch or balk on a runner play', () => {
+    for (const play of ['wild_pitch', 'balk'] as const) {
+      let state = walk(startedGame())
+      state = expectOk(substituteBaseball(state, 'tracked', { kind: 'defensive', position: 1, incomingId: 't10', outgoingId: 't1' }, ctx()))
+      state = expectOk(recordBaseballBaserunning(state, play, [baseballMovement('o1', 'first', 'second', play)], ctx()))
+      state = expectOk(substituteBaseball(state, 'tracked', { kind: 'defensive', position: 1, incomingId: 't11', outgoingId: 't10' }, ctx()))
+      const pitching = box(state).pitching.tracked
+      // t11 is on the mound now, so it is listed too.
+      expect(pitching.rows.map(row => [row.id, row.ip])).toEqual([['t1', '0.0'], ['t10', '0.0'], ['t11', '0.0']])
+      expect(pitching.notes).toEqual([{ label: play === 'wild_pitch' ? 'WP' : 'BK', text: '#10 Player 10' }])
+    }
+  })
+
+  it('keeps an opponent reliever whose only credit is a wild pitch', () => {
+    let state = walk(threeUpThreeDown(startedGame()))
+    const reliever = { id: 'opp-p2', label: 'Reliever', number: '33', throws: 'R' as const }
+    state = expectOk(substituteBaseball(state, 'opponent', { kind: 'opponent_pitcher', pitcher: reliever }, ctx()))
+    state = expectOk(recordBaseballBaserunning(state, 'wild_pitch', [baseballMovement('t1', 'first', 'second', 'wild_pitch')], ctx()))
+    state = expectOk(substituteBaseball(state, 'opponent', { kind: 'opponent_pitcher', pitcher: { id: 'opp-p3', label: 'Closer', number: '44', throws: 'L' } }, ctx()))
+    const pitching = box(state).pitching.opponent
+    expect(pitching.rows.map(row => row.name)).toEqual(['#21 Starter', '#33 Reliever', '#44 Closer'])
+    expect(pitching.notes).toEqual([{ label: 'WP', text: '#33 Reliever' }])
+  })
+
+  it('leaves out a starter replaced before the first pitch', () => {
+    let state = startedGame()
+    state = expectOk(substituteBaseball(state, 'tracked', { kind: 'defensive', position: 1, incomingId: 't10', outgoingId: 't1' }, ctx()))
+    expect(box(state).pitching.tracked.rows.map(row => row.id)).toEqual(['t10'])
   })
 
   it('shows PH for a pinch hitter who never fields', () => {

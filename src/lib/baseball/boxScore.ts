@@ -186,10 +186,15 @@ function batting(sport: BaseballSportGameState, side: BaseballTeamSide, rows: Ba
 function pitching(sport: BaseballSportGameState, side: BaseballTeamSide, order: readonly string[]): BaseballBoxPitching {
   const { projection } = sport
   const lines = Object.values(projection.pitchingLines).filter(line => line.side === side)
-  const pitched = (line: BaseballPitchingLine) => line.bf > 0 || line.outs > 0 || line.pitches > 0
+  // Any recorded credit counts as an appearance: a reliever can face no batter and still be
+  // charged a wild pitch or balk on a runner play.
+  const pitched = (line: BaseballPitchingLine) =>
+    Object.entries(line).some(([key, value]) => key !== 'pitcherId' && key !== 'side' && value !== 0)
   // Mound order from the replay; anyone the replay missed keeps projection order after them.
   const ids = [...order, ...lines.map(line => line.pitcherId).filter(id => !order.includes(id))]
-  let shown = ids.filter(id => projection.pitchingLines[id] && pitched(projection.pitchingLines[id]))
+  // The pitcher on the mound now is listed even before facing a batter.
+  const current = projection.status === 'pregame' ? null : projection.lineups[side].pitcherId
+  let shown = ids.filter(id => id === current || (projection.pitchingLines[id] && pitched(projection.pitchingLines[id])))
   if (shown.length === 0 && ids[0]) shown = [ids[0]]
   const rows = shown.map(id => {
     const line = projection.pitchingLines[id] ?? emptyPitchingLine(id, side)
