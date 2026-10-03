@@ -378,6 +378,14 @@ describe('Converted application surface color ownership', () => {
     expect(labels).toHaveLength(1)
     expect(labels[0][1].split(/\s+/)).toContain('break-words')
   })
+  it('labels and wraps the Teams inline roster edit form', () => {
+    const source = readFileSync('src/pages/Teams.tsx', 'utf8')
+    expect(source).toContain("isEditing ? 'border-accent border-2' : 'border-line'")
+    expect(source).toContain('role="group" aria-label={`Edit ${playerDisplayName(player)}`}')
+    const labels = [...source.matchAll(/<p className="([^"]*)">\s*Editing #\{player.jersey_number/g)]
+    expect(labels).toHaveLength(1)
+    expect(labels[0][1].split(/\s+/)).toContain('break-words')
+  })
   it('wraps long Basketball player history source labels', () => {
     const source = readFileSync('src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx', 'utf8')
     const labels = [...source.matchAll(/<p className="([^"]*)">\s*\{game.cloudScope === 'personal'/g)]
