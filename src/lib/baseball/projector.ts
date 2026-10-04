@@ -158,6 +158,63 @@ export function replayBaseballCreditByEvent(
   return credit
 }
 
+/**
+ * Who held each batting slot, which positions each tracked player fielded and the order
+ * pitchers took the mound (BSB-5A box score), from the same replay that builds the lines,
+ * so a corrected lineup reorders the box score too. Stops at the first invalid event, like
+ * `replayBaseballEvents`.
+ */
+export interface BaseballLineupHistory {
+  /** Per tracked batting slot, every occupant in the order they took it (no repeats). */
+  trackedSlots: string[][]
+  /** Fielding numbers each tracked player held, in order, without consecutive repeats. */
+  trackedPositions: Record<string, number[]>
+  /** Pitchers per side in the order they took the mound. */
+  pitchers: Record<BaseballTeamSide, string[]>
+}
+
+export function replayBaseballLineupHistory(
+  setup: BaseballMatchSetup,
+  events: readonly GameEvent[]
+): BaseballLineupHistory {
+  const replay = new BaseballReplay(setup)
+  const history: BaseballLineupHistory = {
+    trackedSlots: setup.trackedLineup.battingOrder.map(() => []),
+    trackedPositions: {},
+    pitchers: { tracked: [], opponent: [] },
+  }
+  const record = () => {
+    const { tracked, opponent } = replay.projection.lineups
+    tracked.battingOrder.forEach((id, slot) => {
+      const occupants = history.trackedSlots[slot]
+      if (occupants && !occupants.includes(id)) occupants.push(id)
+    })
+    for (const [key, id] of Object.entries(tracked.defense)) {
+      const held = (history.trackedPositions[id] ??= [])
+      if (held[held.length - 1] !== Number(key)) held.push(Number(key))
+    }
+    for (const [side, lineup] of [['tracked', tracked], ['opponent', opponent]] as const) {
+      const order = history.pitchers[side]
+      if (order[order.length - 1] !== lineup.pitcherId) order.push(lineup.pitcherId)
+    }
+  }
+  record()
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    try {
+      replay.apply(event as BaseballEvent)
+    } catch (error) {
+      if (!(error instanceof BaseballReplayError)) throw error
+      break
+    }
+    record()
+  }
+  // A pitcher who returns to the mound keeps the first appearance only.
+  for (const side of ['tracked', 'opponent'] as const) {
+    history.pitchers[side] = history.pitchers[side].filter((id, index, all) => all.indexOf(id) === index)
+  }
+  return history
+}
+
 export interface BaseballEventCredit {
   /** Null on runner plays, which credit no batter. */
   batterId: string | null

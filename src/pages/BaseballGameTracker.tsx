@@ -1,6 +1,6 @@
 import { ChevronLeft, Menu, X } from 'lucide-react'
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import BaseballCorrectionPreviewSheet from '../components/baseball/BaseballCorrectionPreviewSheet'
 import BaseballDiamond from '../components/baseball/BaseballDiamond'
 import BaseballEditPlay from '../components/baseball/BaseballEditPlay'
@@ -44,6 +44,7 @@ import {
   type BaseballEditTarget,
   type BaseballEventEdit,
   type BaseballTimelineFilter,
+  BASEBALL_BATTING_FORMAT_LABELS,
   BASEBALL_GAME_END_LABELS,
   baseballCanEndHalf,
   baseballCanReopen,
@@ -82,6 +83,7 @@ import {
   baseballResolutionMovements,
   baseballScoreboardView,
   baseballSportState,
+  baseballSummaryPath,
   commitBaseballCapture,
   createBaseballResolutionRows,
   addBaseballResolutionFielder,
@@ -112,13 +114,6 @@ import {
   type BaseballSubstitutionKind,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
-
-const BATTING_FORMAT_LABELS: Record<string, string> = {
-  standard: 'Standard (nine bat)',
-  designated_hitter: 'Designated hitter',
-  extra_hitter: 'Extra hitters',
-  continuous: 'Continuous order',
-}
 
 const BASE_LABELS: Record<BaseballBase, string> = { first: 'first', second: 'second', third: 'third' }
 
@@ -207,8 +202,11 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   const [pitchLocation, setPitchLocation] = useState<BaseballPitchLocation | null>(null)
   const [flow, setFlow] = useState<CaptureFlow>({ step: 'idle' })
   const [runnersMovedArmed, setRunnersMovedArmed] = useState(false)
-  // Switching tabs writes nothing, and a sheet open on Track stays open (BSB-4A).
-  const [tab, setTab] = useState<TrackerTab>('track')
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Switching tabs writes nothing, and a sheet open on Track stays open (BSB-4A). The Summary
+  // links straight to the Timeline with `?tab=timeline` (BSB-5A).
+  const [tab, setTab] = useState<TrackerTab>(() => (searchParams.get('tab') === 'timeline' ? 'timeline' : 'track'))
   const [lineupSheet, setLineupSheet] = useState<LineupSheet>({ type: 'none' })
   const [timelineSheet, setTimelineSheet] = useState<TimelineSheet>({ type: 'none' })
   const [timelineFilter, setTimelineFilter] = useState<BaseballTimelineFilter>(BASEBALL_TIMELINE_DEFAULT_FILTER)
@@ -592,7 +590,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
         <section className="space-y-3">
           <p className="text-sm text-content-muted">
             {profile?.label ?? 'Custom rules'} · {setup.rulesSnapshot.scheduledInnings} innings ·{' '}
-            {BATTING_FORMAT_LABELS[setup.rulesSnapshot.battingOrderFormat]}
+            {BASEBALL_BATTING_FORMAT_LABELS[setup.rulesSnapshot.battingOrderFormat]}
           </p>
           <button type="button" className="btn-primary w-full" onClick={start}>Start game</button>
           <LineupReview setup={setup} teamName={names.tracked} opponentName={names.opponent} />
@@ -857,6 +855,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                 {resultWinner && <span className="text-content-muted"> · {resultWinner}</span>}
               </p>
               {result.note && <p className="text-sm text-content-muted">{result.note}</p>}
+              <Link to={baseballSummaryPath()} className="btn-primary block w-full text-center">Summary</Link>
               {flow.step === 'idle' && baseballCanReopen(projection) && (
                 <button type="button" className="btn-secondary w-full" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })}>
                   Reopen game
@@ -1110,6 +1109,9 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           )}
           {baseballCanReopen(projection) && (
             <MenuAction label="Reopen game" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })} />
+          )}
+          {projection.status !== 'pregame' && (
+            <MenuAction label={inProgress ? 'Summary (in progress)' : 'Summary'} onClick={() => navigate(baseballSummaryPath())} />
           )}
         </GameMenu>
       )}
