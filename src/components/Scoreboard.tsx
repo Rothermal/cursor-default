@@ -3,7 +3,7 @@ import { useGame } from '../context/GameContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import type { BasketballTeamSide } from '../lib/basketball/types'
-import { isBasketballEventLocalOnly } from '../lib/basketball/eventCloudPolicy'
+import { isEventGameLocalOnly } from '../lib/eventCloudPolicy'
 import { gameSideDisplayName } from '../lib/display'
 
 interface EventScoreControls {
@@ -30,7 +30,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
   const opponentLabel = gameSideDisplayName(gameInfo, 'opponent')
 
   const syncLabel = (() => {
-    if (isBasketballEventLocalOnly(state) && cloudSync.status !== 'error') {
+    if (isEventGameLocalOnly(state) && cloudSync.status !== 'error') {
       return 'Cloud Sync: local only'
     }
     switch (cloudSync.status) {

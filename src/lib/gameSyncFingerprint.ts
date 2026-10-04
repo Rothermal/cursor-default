@@ -4,6 +4,7 @@ import { sportSupportsLegacyAggregateCloudSync } from './sportGameState/capabili
 import { sportGameStateForFingerprint } from './sportGameState/state'
 import { SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { isBasketballEventLocalOnly } from './basketball/eventCloudPolicy'
+import { isEventGameLocalOnly } from './eventCloudPolicy'
 
 /**
  * Canonical snapshot of game fields that are uploaded on cloud sync (excludes sync metadata).
@@ -61,20 +62,39 @@ export function isBasketballEventCloudSyncEligible(state: GameState): boolean {
   )
 }
 
-export function isEventCloudSyncEligible(state: GameState): boolean {
-  return (
-    isSoccerEventCloudSyncEligible(state) ||
-    isBasketballEventCloudSyncEligible(state)
+/** Hockey event games (HKY-5B); legacy Hockey stat-grid games keep aggregate sync. */
+export function isHockeyEventCloudSyncEligible(state: GameState): boolean {
+  return Boolean(
+    state.sport?.id === 'hockey' &&
+      state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+      state.eventStream !== null &&
+      state.sportGameState?.sportId === 'hockey'
   )
 }
 
-export type CloudSyncRoute = 'aggregate' | 'soccer_events' | 'basketball_events' | 'unsupported'
+export function isEventCloudSyncEligible(state: GameState): boolean {
+  return (
+    isSoccerEventCloudSyncEligible(state) ||
+    isBasketballEventCloudSyncEligible(state) ||
+    isHockeyEventCloudSyncEligible(state)
+  )
+}
+
+export type CloudSyncRoute =
+  | 'aggregate'
+  | 'soccer_events'
+  | 'basketball_events'
+  | 'hockey_events'
+  | 'unsupported'
 
 /** Exhaustive transport selection keeps event games out of legacy aggregate tables. */
 export function cloudSyncRouteForState(state: GameState): CloudSyncRoute {
   if (isSoccerEventCloudSyncEligible(state)) return 'soccer_events'
   if (isBasketballEventCloudSyncEligible(state)) {
     return isBasketballEventLocalOnly(state) ? 'unsupported' : 'basketball_events'
+  }
+  if (isHockeyEventCloudSyncEligible(state)) {
+    return isEventGameLocalOnly(state) ? 'unsupported' : 'hockey_events'
   }
   if (isAggregateCloudSyncEligible(state)) return 'aggregate'
   return 'unsupported'

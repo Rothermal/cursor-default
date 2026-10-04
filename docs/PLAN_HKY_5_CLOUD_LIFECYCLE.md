@@ -292,3 +292,14 @@ Filled in as each slice lands.
   start, and per-side attempt counts that differ by more than one (alternation makes those
   impossible). Not applied to the Supabase project yet. Record:
   [REGRESSION_HKY_5_CLOUD_LIFECYCLE.md](REGRESSION_HKY_5_CLOUD_LIFECYCLE.md).
+- **HKY-5B1** (client sync): HKY-5B ships in two PRs. This one adds the Hockey transport
+  adapter and `'hockey_events'` route, the per-game cloud policy (moved to a sport-neutral
+  `src/lib/eventCloudPolicy.ts` that Basketball now delegates to, so its normalizer no
+  longer strips Hockey policies), the release handshake through a shared checker
+  (`src/lib/eventReleaseCapabilities.ts`), Cloud or This device only at setup, Enable
+  cloud sync in the Game menu, the sync status and conflict review on the tracker, and
+  opening Hockey games from Cloud Games. The shared event shell rows load through
+  `src/lib/gameEvents/cloudShell.ts`. The legacy-row selector needed no change: any game
+  with a setup snapshot is already excluded. Enable is refused for a game recorded signed
+  out or by another account, because sync requires every event to be this recorder's.
+  Game Info recorders, finalize, reopen and the read-only finalized tracker are HKY-5B2.
