@@ -8,7 +8,7 @@ import ConfirmDialog from '../ConfirmDialog'
 
 export default function BasketballEnableCloudPanel({ state }: { state: GameState }) {
   const { user } = useAuth()
-  const { enableBasketballCloudSync } = useGame()
+  const { enableEventCloudSync } = useGame()
   const [busy, setBusy] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +24,7 @@ export default function BasketballEnableCloudPanel({ state }: { state: GameState
     setConfirmOpen(false)
     setError(null)
     setBusy(true)
-    const result = await enableBasketballCloudSync()
+    const result = await enableEventCloudSync()
     setBusy(false)
     if (!result.ok) setError(result.reason)
   }

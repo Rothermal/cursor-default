@@ -29,7 +29,7 @@ import {
   clearBasketballSetupDraft,
   loadBasketballSetupDraft,
 } from '../lib/basketball/setupDraft'
-import { isBasketballEventLocalOnly } from '../lib/basketball/eventCloudPolicy'
+import { isEventGameLocalOnly } from '../lib/eventCloudPolicy'
 import { LOCAL_GAME_DELETE_WARNING } from '../lib/localGameDiscard'
 
 function activeSyncStatusLabel(status: string, lastError: string | null): string | null {
@@ -218,7 +218,7 @@ export default function SportDashboard() {
     )
   }
 
-  const activeSyncLabel = isBasketballEventLocalOnly(state) && state.cloudSync.status !== 'error'
+  const activeSyncLabel = isEventGameLocalOnly(state) && state.cloudSync.status !== 'error'
     ? 'Cloud Sync: local only'
     : activeSyncStatusLabel(state.cloudSync.status, state.cloudSync.lastError)
 

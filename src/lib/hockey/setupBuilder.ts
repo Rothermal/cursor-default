@@ -7,6 +7,7 @@ import { createHockeyMatchRules, findHockeyRulesProfile, DEFAULT_HOCKEY_PROFILE_
 import { HOCKEY_RULES_FIELDS } from './rules'
 import { validateHockeyMatchSetup } from './setup'
 import { hockeyLocalPlayerKey } from './stats'
+import type { EventCloudPolicy } from '../eventCloudPolicy'
 import type {
   HockeyAttackingDirection,
   HockeyClockModel,
@@ -260,9 +261,13 @@ export function createHockeyEventGameState(input: {
   opponentName: string
   date: string
   context: HockeyCommandContext
+  /** HKY-5B: cloud games sync automatically; device games stay local until enabled. */
+  cloudPolicy?: EventCloudPolicy
 }): HockeyCommandResult {
+  const initial = createInitialState()
   const base: GameState = {
-    ...createInitialState(),
+    ...initial,
+    cloudSync: { ...initial.cloudSync, eventCloudPolicy: input.cloudPolicy ?? 'local_only' },
     sport: input.sport,
     gameInfo: {
       teamName: input.teamName.trim() || 'Home',
