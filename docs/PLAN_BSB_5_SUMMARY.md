@@ -1,6 +1,7 @@
 # Plan: BSB-5 Baseball Game Summary
 
-Status: draft for owner review. No code starts until Mark approves or merges this plan.
+Status: approved (PR #465 merged 2026-10-03). BSB-5A in review. Owner questions Q1-Q6 are open;
+slices follow the recommended answers until Mark decides otherwise.
 Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)), BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)) and BSB-4
 ([lineup and corrections](PLAN_BSB_4_LINEUP_AND_CORRECTIONS.md)). Product model:
@@ -300,3 +301,15 @@ No decisions are suggested for ties, forfeits, suspended or abandoned games.
 ## 10. Delivery Record
 
 Filled in as each slice merges.
+
+- **BSB-5A (in review):** `summary.ts` (route check, `?tab=`, `baseballSummarySource`
+  rebuilding the projection with the tracker's inspect/replay checks, `baseballSummaryView`
+  with the line score, "X" for the home half not needed, LOB, status and game facts) and
+  `boxScore.ts` (batting by slot with substitutes indented and PH/PR/CR/DH labels, opponent
+  batting by slot, pitching in mound order with "≥" pitch totals when Quick PA is included,
+  tracked fielding, notes under each table). `replayBaseballLineupHistory` in the projector
+  gives slot occupants, positions held and mound order from the same replay. `BaseballSummary`
+  has Overview and Box score; an unhealthy stream shows the problem and no totals. Entry
+  points: the tracker result card, the Game menu (also mid-game) and resuming a final or
+  abandoned parked game. The lineup-warning card links to `/game?tab=timeline`. Pitcher HR,
+  HBP, WP and BK sit in notes under the pitching table so it fits a phone.
