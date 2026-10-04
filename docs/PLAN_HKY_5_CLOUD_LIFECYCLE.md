@@ -7,7 +7,7 @@ capture), [HKY-3](PLAN_HKY_3_PENALTIES_STRENGTH_AND_OUTCOMES.md) (penalties, str
 shootout, result) and [HKY-4](PLAN_HKY_4_TIMELINE_AND_CORRECTIONS.md) (Timeline and
 corrections).
 
-Status: proposed. Implementation waits until the owner approves (merges) this plan.
+Status: approved (PR #467 merged 2026-10-03). HKY-5A implemented; see §8.
 
 ---
 
@@ -280,3 +280,15 @@ nothing can edit cannot be tested by the owner (§7 Q6).
 ## 8. Delivery Record
 
 Filled in as each slice lands.
+
+- **HKY-5A** (server): two migrations instead of one, so the publication sport check is
+  staged `NOT VALID` in `072_hockey_event_platform_publication_constraint.sql` and
+  validated in `073_hockey_event_cloud_lifecycle.sql` after the first transaction releases
+  its lock (the 054/055 pattern). 073 adds Hockey to `is_event_platform_sport`, accepts
+  Hockey setup version 1 in `bind_event_game_v2`, adds `is_hockey_primary_stream_ended` and
+  `validate_hockey_finalization_policy`, re-creates readiness (057) and finalize (058) with
+  only the Hockey branch, and adds the fixed wrappers and `get_hockey_release_capabilities`
+  (contract 1). The policy also refuses more than one shootout start, attempts without a
+  start, and per-side attempt counts that differ by more than one (alternation makes those
+  impossible). Not applied to the Supabase project yet. Record:
+  [REGRESSION_HKY_5_CLOUD_LIFECYCLE.md](REGRESSION_HKY_5_CLOUD_LIFECYCLE.md).
