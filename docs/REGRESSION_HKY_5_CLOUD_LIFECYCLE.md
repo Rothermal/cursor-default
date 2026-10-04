@@ -17,7 +17,9 @@ Supabase's `auth` schema (`auth.users`, `auth.uid()` from `request.jwt.claim.sub
 `anon`, `authenticated`, `service_role` and `authenticator` roles. Calls ran under
 `SET ROLE authenticated` with the user set per call. This exercises the SQL, grants and
 row-level checks, not PostgREST or the deployed project. The harness is in
-`/mnt/project-files/hockey/hky5a-sql/`.
+[`supabase/tests/hky5a/`](../supabase/tests/hky5a/README.md): `run.sh` rebuilds the cases,
+applies every migration and runs the three tables below, exiting non-zero on any mismatch.
+Changing the policy's early-clinch rule to "more goals wins" makes it fail on review probe 1.
 
 **Server and client parity.** Games built with the real Hockey commands (the same ones the
 tracker runs) were loaded as cloud events. The server policy's score was compared with the
@@ -63,11 +65,11 @@ client's final score (`result.finalScore`, or the score when abandoned):
 | Viewer finalize refused; owner finalize without `canonicalSchemaVersion` refused | Pass |
 | Owner finalizes: publication 1, game final at 1-0 (shootout goal added) | Pass |
 | Scorer event write after final refused | Pass |
-| Reopen with a one-letter reason refused; scorer reopen refused; owner reopens: game in progress, scores cleared, publication 1 inactive with its reason | Pass |
+| Reopen with a one-letter reason refused; scorer reopen refused; owner reopens: game in progress, tracked score cleared and opponent score reset to 0 (shared reopen behavior), publication 1 inactive with its reason | Pass |
 | Scorer publication history refused; owner re-finalizes: publication 2, final 1-0 | Pass |
 | Audit rows: `hockey_game_finalized` 1, `hockey_game_reopened` 1, `hockey_game_finalized` 2 | Pass |
 | Outsider readiness refused; Hockey setup version 2 refused; personal Hockey bind accepted | Pass |
-| Baseball through the private binder and readiness: "Sport is not supported by the event platform" | Pass |
+| Baseball through the private binder and readiness, as the database owner: "Sport is not supported by the event platform" | Pass |
 
 The re-created `bind_event_game_v2`, `get_event_finalization_readiness` and
 `finalize_event_game` differ from their 069, 057 and 058 sources only by the added Hockey
@@ -79,9 +81,11 @@ lines (checked by script and by `migration073.test.ts`).
 only, no Baseball, Football or aggregate functions; shared functions equal their latest
 sources plus the Hockey branch; terminal predicate; score and decided-shootout policy;
 wrapper grants and private cores; canonical schema check before finalizing; handshake.
+`src/lib/hockey/hky5aParityCases.test.ts` builds the 15 parity games and checks the client
+scores in the table above; the database harness reuses it.
 
 Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test`
-(264 files, 2498 tests) and `pnpm build` pass.
+(266 files, 2516 tests on the merged head) and `pnpm build` pass.
 
 ### Pending
 
