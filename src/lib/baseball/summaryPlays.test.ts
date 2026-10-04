@@ -4,7 +4,7 @@ import { baseballMovement, baseballSportState, proposeBaseballMovements, recordB
 import { previewBaseballRemoval, removeBaseballPlay } from './corrections'
 import { BASEBALL_SPRAY_DEFAULT_FILTER, baseballSprayChart, baseballSprayResult } from './spray'
 import { baseballSummaryPlays } from './summaryPlays'
-import { ctx, expectOk, inPlay, pitch, pitches, projection, startedGame, strikeout, threeUpThreeDown, walk } from './testFixtures'
+import { ballInPlay, ctx, expectOk, inPlay, pitch, pitches, projection, startedGame, strikeout, threeUpThreeDown, walk } from './testFixtures'
 import type { BaseballInPlay } from './types'
 import { baseballActiveEvents } from './units'
 
@@ -30,6 +30,16 @@ function topFirst(): GameState {
   return strikeout(state)
 }
 
+function removeUnit(state: GameState, unitId: string): GameState {
+  const preview = previewBaseballRemoval(state, unitId, names)
+  if (!preview.ok) throw new Error(preview.message)
+  const removed = removeBaseballPlay(state, preview.preview, names, { now: '2026-10-04T00:00:00.000Z', confirmed: true })
+  if (!removed.ok) throw new Error(removed.message)
+  return removed.state
+}
+
+const newestId = (state: GameState) => (events => events[events.length - 1].id)(baseballActiveEvents(state))
+
 describe('Baseball Summary plays', () => {
   it('lists plays oldest first by half with each half line', () => {
     let state = topFirst()
@@ -54,6 +64,32 @@ describe('Baseball Summary plays', () => {
       ['Batter 1: Strikeout', ['Ball', 'Foul', 'Called strike']],
       ['Batter 2: Walk', ['Ball', 'Ball', 'Ball']],
     ])
+  })
+
+  it('groups by the replayed batter after a removed pinch hitter and keeps the recorded one', () => {
+    let state = threeUpThreeDown(startedGame())
+    state = expectOk(substituteBaseball(state, 'tracked', { kind: 'pinch_hitter', incomingId: 't10', outgoingId: 't1' }, ctx()))
+    const sub = newestId(state)
+    state = pitches(state, 'ball')
+    state = removeUnit(state, sub)
+    state = ballInPlay(state, 'out', { fielders: [6, 3] })
+    const bottom = baseballSummaryPlays(sportOf(state), baseballActiveEvents(state), names).halves[1]
+    expect(bottom.rows).toHaveLength(1)
+    expect(bottom.rows[0].label).toMatch(/^#1 Player 1: /)
+    expect(bottom.rows[0]).toMatchObject({ pitches: ['Ball'], recordedBatter: '#10 Player 10' })
+  })
+
+  it('carries a folded pitch warning onto the plate appearance row', () => {
+    let state = expectOk(substituteBaseball(startedGame(), 'tracked', { kind: 'defensive', position: 1, incomingId: 't10', outgoingId: 't1' }, ctx()))
+    const change = newestId(state)
+    state = pitches(state, 'ball')
+    state = removeUnit(state, change)
+    state = strikeout(state)
+    const sport = sportOf(state)
+    expect(sport.projection.warnings).toHaveLength(1)
+    const [row] = baseballSummaryPlays(sport, baseballActiveEvents(state), names).halves[0].rows
+    expect(row).toMatchObject({ label: 'Batter 1: Strikeout', pitches: ['Ball', 'Called strike', 'Called strike'], recordedBatter: null })
+    expect(row.warning).toBe(sport.projection.warnings[0].message)
   })
 
   it('keeps pitches before a runner play as their own rows', () => {

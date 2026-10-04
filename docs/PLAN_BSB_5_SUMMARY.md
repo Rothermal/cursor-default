@@ -319,7 +319,11 @@ Filled in as each slice merges.
   the row of the plate appearance they belong to ("Batter 4: Strikeout", "Before: Ball,
   Foul"); a runner play or change mid plate appearance keeps the earlier pitches as their own
   rows, and a pitch that ends the plate appearance without a ball in play is named by its
-  outcome (strikeout, walk, HBP). Lineup changes open details like plays, as on the Timeline.
+  outcome (strikeout, walk, HBP). Grouping and batter names follow
+  `replayBaseballCreditByEvent`, so a corrected lineup regroups the plate appearance as the
+  batting lines credit it; a row whose stamped batter differs says "Recorded for", and a folded
+  pitch's lineup warning stays on its row. Lineup changes open details like plays, as on the
+  Timeline.
   `spray.ts` plots located balls in play from the replayed plate appearances (Quick PA
   included) with team, batter, result (hit, out, error; FC and sacrifices count as outs) and
   batted-ball type filters and an unlocated count. `BaseballSprayChart` draws on

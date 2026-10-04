@@ -1,6 +1,6 @@
 import type { GameEvent } from '../gameEvents/types'
 import { baseballPeriod, formatBaseballHalf, parseBaseballPeriod } from './periods'
-import { replayBaseballRunsByEvent } from './projector'
+import { replayBaseballCreditByEvent, replayBaseballRunsByEvent } from './projector'
 import { baseballEventLabel, type BaseballSideNames } from './recentPlays'
 import { BASEBALL_MORE_PITCH_RESULTS, BASEBALL_PRIMARY_PITCH_RESULTS, baseballPersonLabel } from './trackerView'
 import type { BaseballHalf, BaseballPlateAppearanceOutcome, BaseballSportGameState, BaseballTeamSide } from './types'
@@ -37,6 +37,11 @@ export interface BaseballSummaryPlayRow {
   warning: string | null
   /** Earlier pitches of this plate appearance, oldest first ("Ball", "Foul"). */
   pitches: string[]
+  /**
+   * The batter stamped when a pitch in this row was recorded, when the replayed lineup now
+   * credits someone else (after a lineup correction). The label names the credited batter.
+   */
+  recordedBatter: string | null
 }
 
 export interface BaseballSummaryPlayHalf {
@@ -60,6 +65,10 @@ export function baseballSummaryPlays(
   options: { scoringOnly?: boolean } = {}
 ): BaseballSummaryPlays {
   const scored = replayBaseballRunsByEvent(sport.setup, events)
+  // Grouping and names follow the replayed batter, not the stamp, so a corrected lineup
+  // regroups the plate appearance the same way the batting lines credit it.
+  const credit = replayBaseballCreditByEvent(sport.setup, events)
+  const batterOf = (event: GameEvent) => credit.get(event.id)?.batterId ?? null
   const warnings = new Map<string, string>()
   for (const warning of sport.projection.warnings) {
     if (!warnings.has(warning.eventId)) warnings.set(warning.eventId, warning.message)
@@ -76,7 +85,7 @@ export function baseballSummaryPlays(
     for (const unit of pending.units) rows.push(rowFor(unit, []))
     pending = null
   }
-  const rowFor = (unit: GameEvent[], pitches: string[]) => {
+  const rowFor = (unit: GameEvent[], folded: GameEvent[][]) => {
     const first = unit[0]
     const period = parseBaseballPeriod(first.period)!
     const credited = unit.flatMap(event => scored.get(event.id) ?? [])
@@ -85,7 +94,11 @@ export function baseballSummaryPlays(
     const batterId = batterOf(first)
     const label = outcomeLabel
       ? `${batterId ? `${baseballPersonLabel(sport, batterId).name}: ` : ''}${outcomeLabel}${runsText(credited.length)}`
-      : unit.map(event => baseballEventLabel(sport, event, names, scored.get(event.id) ?? [])).join(' + ')
+      : unit.map(event => baseballEventLabel(sport, withCreditedBatter(event, batterOf(event)), names, scored.get(event.id) ?? [])).join(' + ')
+    const all = [...folded.flat(), ...unit]
+    const recorded = all
+      .map(event => stampedBatter(event))
+      .find(id => id !== null && batterId !== null && id !== batterId) ?? null
     return {
       half: halfGroup(halves, sport, period.inning, period.half),
       row: {
@@ -93,8 +106,10 @@ export function baseballSummaryPlays(
         kind: isBaseballCaptureEvent(first) ? 'play' as const : 'flow' as const,
         label,
         runs: credited.length,
-        warning: unit.map(event => warnings.get(event.id)).find(Boolean) ?? null,
-        pitches,
+        // A folded pitch keeps its diagnostic on the row that now shows it.
+        warning: all.map(event => warnings.get(event.id)).find(Boolean) ?? null,
+        pitches: folded.map(entry => PITCH_LABELS[(entry[0].payload as { result: string }).result] ?? 'Pitch'),
+        recordedBatter: recorded ? baseballPersonLabel(sport, recorded).name : null,
       },
     }
   }
@@ -114,9 +129,9 @@ export function baseballSummaryPlays(
     const folds = pending && batterId !== null && pending.batterId === batterId && isBaseballCaptureEvent(first) &&
       first.eventType !== 'baseball.baserunning' && first.eventType !== 'baseball.substitution'
     if (folds && pending) {
-      const pitches = pending.units.map(entry => PITCH_LABELS[(entry[0].payload as { result: string }).result] ?? 'Pitch')
+      const folded = pending.units
       pending = null
-      rows.push(rowFor(unit, pitches))
+      rows.push(rowFor(unit, folded))
     } else {
       // A runner play or change in the middle of a plate appearance keeps the pitches before it as rows.
       flush()
@@ -162,8 +177,18 @@ function halfGroup(
   return group
 }
 
-function batterOf(event: GameEvent): string | null {
+function stampedBatter(event: GameEvent): string | null {
   return event.actors.find(actor => actor.role === 'batter')?.participantId ?? null
+}
+
+/** A display-only copy naming the batter the replay credits; the stored event is unchanged. */
+function withCreditedBatter(event: GameEvent, batterId: string | null): GameEvent {
+  const stamped = stampedBatter(event)
+  if (!batterId || !stamped || stamped === batterId) return event
+  return {
+    ...event,
+    actors: event.actors.map(actor => (actor.role === 'batter' ? { ...actor, participantId: batterId } : actor)),
+  }
 }
 
 /** A single pitch that changed only the count: no plate appearance ended, no runner moved. */

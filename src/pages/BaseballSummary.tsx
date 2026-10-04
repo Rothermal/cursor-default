@@ -280,6 +280,9 @@ function PlayText({ row }: { row: BaseballSummaryPlays['halves'][number]['rows']
         {row.pitches.length > 0 && (
           <span className="block text-xs text-content-muted">Before: {row.pitches.join(', ')}</span>
         )}
+        {row.recordedBatter && (
+          <span className="block text-xs text-content-muted">Recorded for {row.recordedBatter}</span>
+        )}
         {row.warning && (
           <span className="mt-0.5 flex items-start gap-1 text-xs text-warning-content">
             <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
