@@ -12,6 +12,7 @@ import { createBaseballMatchProjection } from './state'
 import { baseballPlayerStatsById } from './stats'
 import type {
   BaseballActorRole,
+  BaseballBatHand,
   BaseballBase,
   BaseballBattingLine,
   BaseballEvent,
@@ -213,6 +214,57 @@ export function replayBaseballLineupHistory(
     history.pitchers[side] = history.pitchers[side].filter((id, index, all) => all.indexOf(id) === index)
   }
   return history
+}
+
+/** One recorded pitch as the replay saw it (BSB-5C pitch log). */
+export interface BaseballReplayedPitch {
+  eventId: string
+  /** The count when the pitch was thrown. */
+  balls: number
+  strikes: number
+  battingSide: BaseballTeamSide
+  /** Credited by the replay, so a corrected lineup moves the pitch too. */
+  batterId: string | null
+  pitcherId: string | null
+  /** The batter's hand at that time: setup for our players, the slot details for the opponent. */
+  batterHand: BaseballBatHand | null
+}
+
+/**
+ * Every recorded pitch event with the count before it, from the same replay that builds the
+ * pitching lines. Quick PA plate appearances record no pitches and are not listed. Stops at
+ * the first invalid event, like `replayBaseballEvents`.
+ */
+export function replayBaseballPitches(setup: BaseballMatchSetup, events: readonly GameEvent[]): BaseballReplayedPitch[] {
+  const replay = new BaseballReplay(setup)
+  const hands = new Map(setup.participants.map(participant => [participant.id, participant.bats ?? null]))
+  const pitches: BaseballReplayedPitch[] = []
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    const before = replay.projection
+    const balls = before.balls
+    const strikes = before.strikes
+    const battingSide = before.battingSide
+    const opponentHands = new Map(Object.entries(before.opponentSlotDetails).map(([id, detail]) => [id, detail.bats ?? null]))
+    try {
+      replay.apply(event as BaseballEvent)
+    } catch (error) {
+      if (!(error instanceof BaseballReplayError)) throw error
+      break
+    }
+    if (event.eventType !== 'baseball.pitch') continue
+    const credit = replay.creditByLastEvent
+    const batterId = credit?.batterId ?? null
+    pitches.push({
+      eventId: event.id,
+      balls,
+      strikes,
+      battingSide,
+      batterId,
+      pitcherId: credit?.pitcherId ?? null,
+      batterHand: batterId ? (hands.get(batterId) ?? opponentHands.get(batterId) ?? null) : null,
+    })
+  }
+  return pitches
 }
 
 export interface BaseballEventCredit {

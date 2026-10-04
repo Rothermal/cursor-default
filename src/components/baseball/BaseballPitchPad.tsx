@@ -32,6 +32,29 @@ const ZONE = {
   size: (1 / BASEBALL_PITCH_PAD_SPAN) * V,
 }
 
+/** The strike zone and plate without marks, shared with the Summary's pitch plot (BSB-5C). */
+export function BaseballZoneShapes() {
+  return (
+    <>
+      <rect
+        x={ZONE.x} y={ZONE.x} width={ZONE.size} height={ZONE.size}
+        fill="rgb(var(--surface))" stroke="rgb(var(--content))" strokeWidth="0.8"
+      />
+      {[1, 2].map(line => (
+        <g key={line} stroke="rgb(var(--content-subtle))" strokeWidth="0.4" strokeDasharray="1.5 1.5">
+          <line x1={ZONE.x + (ZONE.size * line) / 3} y1={ZONE.x} x2={ZONE.x + (ZONE.size * line) / 3} y2={ZONE.x + ZONE.size} />
+          <line x1={ZONE.x} y1={ZONE.x + (ZONE.size * line) / 3} x2={ZONE.x + ZONE.size} y2={ZONE.x + (ZONE.size * line) / 3} />
+        </g>
+      ))}
+      {/* Home plate below the zone, as the catcher sees it. */}
+      <path
+        d={`M ${ZONE.x + 4} ${V - 9} h ${ZONE.size - 8} v 2.5 l ${-(ZONE.size - 8) / 2} 4 l ${-(ZONE.size - 8) / 2} -4 Z`}
+        fill="rgb(var(--content-subtle))"
+      />
+    </>
+  )
+}
+
 /**
  * The pitch pad (BSB-3A, results live in BSB-3B): a catcher's-view strike zone with a
  * ball area around it, the pitch results and the "Runners moved" chip. A location is
@@ -68,21 +91,7 @@ export default function BaseballPitchPad({
                 ))
               }}
             >
-              <rect
-                x={ZONE.x} y={ZONE.x} width={ZONE.size} height={ZONE.size}
-                fill="rgb(var(--surface))" stroke="rgb(var(--content))" strokeWidth="0.8"
-              />
-              {[1, 2].map(line => (
-                <g key={line} stroke="rgb(var(--content-subtle))" strokeWidth="0.4" strokeDasharray="1.5 1.5">
-                  <line x1={ZONE.x + (ZONE.size * line) / 3} y1={ZONE.x} x2={ZONE.x + (ZONE.size * line) / 3} y2={ZONE.x + ZONE.size} />
-                  <line x1={ZONE.x} y1={ZONE.x + (ZONE.size * line) / 3} x2={ZONE.x + ZONE.size} y2={ZONE.x + (ZONE.size * line) / 3} />
-                </g>
-              ))}
-              {/* Home plate below the zone, as the catcher sees it. */}
-              <path
-                d={`M ${ZONE.x + 4} ${V - 9} h ${ZONE.size - 8} v 2.5 l ${-(ZONE.size - 8) / 2} 4 l ${-(ZONE.size - 8) / 2} -4 Z`}
-                fill="rgb(var(--content-subtle))"
-              />
+              <BaseballZoneShapes />
               {batterHand && (
                 // Catcher's view: a right-handed batter stands on the left, a left-handed one on the right.
                 <g aria-hidden="true" fill="rgb(var(--content-muted))" fontSize="6" fontWeight="600" textAnchor="middle">
