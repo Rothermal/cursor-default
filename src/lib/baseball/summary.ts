@@ -16,13 +16,14 @@ import type {
  * fresh replay of the stream; nothing here writes events.
  */
 
-export type BaseballSummaryTab = 'overview' | 'box' | 'plays' | 'spray'
+export type BaseballSummaryTab = 'overview' | 'box' | 'plays' | 'spray' | 'pitches'
 
 export const BASEBALL_SUMMARY_TABS: ReadonlyArray<{ tab: BaseballSummaryTab; label: string }> = [
   { tab: 'overview', label: 'Overview' },
   { tab: 'box', label: 'Box score' },
   { tab: 'plays', label: 'Plays' },
   { tab: 'spray', label: 'Spray' },
+  { tab: 'pitches', label: 'Pitches' },
 ]
 
 export const BASEBALL_BATTING_FORMAT_LABELS: Record<BaseballBattingOrderFormat, string> = {

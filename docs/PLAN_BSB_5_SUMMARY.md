@@ -1,6 +1,6 @@
 # Plan: BSB-5 Baseball Game Summary
 
-Status: approved (PR #465 merged 2026-10-03). BSB-5A merged (PR #469); BSB-5B in review. Owner questions Q1-Q6 are open;
+Status: approved (PR #465 merged 2026-10-03). BSB-5A merged (PR #469); BSB-5B merged (PR #471); BSB-5C in review. Owner questions Q1-Q6 are open;
 slices follow the recommended answers until Mark decides otherwise.
 Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)), BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)) and BSB-4
@@ -313,7 +313,7 @@ Filled in as each slice merges.
   points: the tracker result card, the Game menu (also mid-game) and resuming a final or
   abandoned parked game. The lineup-warning card links to `/game?tab=timeline`. Pitcher HR,
   HBP, WP and BK sit in notes under the pitching table so it fits a phone.
-- **BSB-5B (in review):** `summaryPlays.ts` groups active capture units by half-inning,
+- **BSB-5B (merged, PR #471):** `summaryPlays.ts` groups active capture units by half-inning,
   oldest first, with each half's line, runs per row from `replayBaseballRunsByEvent` and a
   scoring-only filter that drops empty halves. Pitches that only change the count fold into
   the row of the plate appearance they belong to ("Batter 4: Strikeout", "Before: Ball,
@@ -330,3 +330,16 @@ Filled in as each slice merges.
   `BaseballFieldShapes`, the painted field split out of `BaseballDiamond`. Rows and marks open
   the read-only play details, whose note links to `/game?tab=timeline`; the Plays tab also
   has a "Correct on the Timeline" link.
+- **BSB-5C (in review):** `replayBaseballPitches` in the projector lists every recorded
+  pitch with the count before it, the replay-credited batter and pitcher and the batter's
+  hand at that time (setup for our players, the slot details for the opponent); Quick PA
+  records no pitches. `pitchLog.ts` turns that into the pitch log (six plot kinds: ball,
+  called strike, swinging strike including foul tips and missed bunts, foul, in play,
+  HBP), the plot with pitcher, result, batter hand and count filters and an unlocated
+  count, and pitch counts per pitcher in the box score's mound order. Count totals are the
+  projection's `pitchingLines`; each row splits them into Recorded, Estimated (total minus
+  recorded), Untracked PA and pitches without a location, shows "≥" when Quick PA is
+  included, and flags warnings and the limit with `baseballPitchCountAlert`, the helper the
+  tracker's scoreboard now uses too. `BaseballPitchPlot` draws on `BaseballZoneShapes`,
+  split out of `BaseballPitchPad`, with a shape per kind as well as a color (new `--zone-*`
+  tokens, contrast-checked in both themes). The Summary tab bar is five equal columns.

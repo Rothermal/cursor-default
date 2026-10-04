@@ -2,15 +2,21 @@ import { AlertTriangle, ChevronLeft } from 'lucide-react'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import BaseballBoxScore from '../components/baseball/BaseballBoxScore'
+import BaseballPitchCounts from '../components/baseball/BaseballPitchCounts'
+import BaseballPitchPlot from '../components/baseball/BaseballPitchPlot'
 import BaseballPlayDetailSheet from '../components/baseball/BaseballPlayDetailSheet'
 import BaseballPlayerDetailSheet from '../components/baseball/BaseballPlayerDetailSheet'
 import BaseballSprayChart from '../components/baseball/BaseballSprayChart'
 import { useGame } from '../context/GameContext'
 import {
+  BASEBALL_PITCH_DEFAULT_FILTER,
   BASEBALL_SPRAY_DEFAULT_FILTER,
   BASEBALL_SUMMARY_TABS,
   baseballActiveEvents,
   baseballBoxScore,
+  baseballPitchCounts,
+  baseballPitchLog,
+  baseballPitchPlot,
   baseballPlayDetail,
   baseballPlayerGameDetail,
   baseballSprayChart,
@@ -20,6 +26,7 @@ import {
   baseballSummaryView,
   parseBaseballSummaryTab,
   type BaseballSportGameState,
+  type BaseballPitchFilter,
   type BaseballSprayFilter,
   type BaseballSummaryPlays,
   type BaseballSummaryView,
@@ -41,6 +48,7 @@ export default function BaseballSummary() {
   const [playId, setPlayId] = useState<string | null>(null)
   const [scoringOnly, setScoringOnly] = useState(false)
   const [sprayFilter, setSprayFilter] = useState<BaseballSprayFilter>(BASEBALL_SPRAY_DEFAULT_FILTER)
+  const [pitchFilter, setPitchFilter] = useState<BaseballPitchFilter>(BASEBALL_PITCH_DEFAULT_FILTER)
 
   const sport = source.sport
   const names: BaseballTeamNames = {
@@ -90,14 +98,14 @@ export default function BaseballSummary() {
         </section>
       ) : (
         <>
-          <div role="tablist" aria-label="Summary views" className="grid grid-cols-4 gap-1 rounded-md border border-line p-1">
+          <div role="tablist" aria-label="Summary views" className="grid grid-cols-5 gap-1 rounded-md border border-line p-1">
             {BASEBALL_SUMMARY_TABS.map(entry => (
               <button
                 key={entry.tab}
                 type="button"
                 role="tab"
                 aria-selected={tab === entry.tab}
-                className={`min-h-10 rounded text-sm font-semibold ${tab === entry.tab ? 'bg-accent text-accent-content' : 'text-content'}`}
+                className={`min-h-11 min-w-0 rounded px-0.5 text-[13px] font-semibold leading-tight ${tab === entry.tab ? 'bg-accent text-accent-content' : 'text-content'}`}
                 onClick={() => navigate(baseballSummaryPath(entry.tab), { replace: true })}
               >
                 {entry.label}
@@ -126,6 +134,21 @@ export default function BaseballSummary() {
               onOpenPlay={setPlayId}
             />
           )}
+          {tab === 'pitches' && started && (() => {
+            const log = baseballPitchLog(sport, events)
+            return (
+              <div className="space-y-4">
+                <BaseballPitchPlot
+                  plot={baseballPitchPlot(sport, log, pitchFilter)}
+                  filter={pitchFilter}
+                  names={names}
+                  onFilter={setPitchFilter}
+                  onOpenPlay={setPlayId}
+                />
+                <BaseballPitchCounts counts={baseballPitchCounts(sport, events, log)} names={names} />
+              </div>
+            )
+          })()}
           {tab !== 'overview' && !started && (
             <p className="text-sm text-content-muted">This view fills in once the game starts.</p>
           )}
