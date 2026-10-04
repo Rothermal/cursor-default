@@ -71,6 +71,8 @@ describe('Baseball Summary route', () => {
 
   it('keeps the tab in the query and falls back to Overview', () => {
     expect(parseBaseballSummaryTab(new URLSearchParams('tab=box'))).toBe('box')
+    expect(parseBaseballSummaryTab(new URLSearchParams('tab=plays'))).toBe('plays')
+    expect(parseBaseballSummaryTab(new URLSearchParams('tab=spray'))).toBe('spray')
     expect(parseBaseballSummaryTab(new URLSearchParams('tab=nonsense'))).toBe('overview')
     expect(baseballSummaryPath('box')).toBe('/summary?tab=box')
   })
