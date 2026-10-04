@@ -2,6 +2,7 @@ import type { GameState } from '../../types'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
+import { HOCKEY_FINAL_CLOUD_GAME_MESSAGE, isFinalHockeyCloudGame } from './cloudPolicy'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
 import { HOCKEY_OUTCOME_LABELS } from './captureCommands'
@@ -213,6 +214,7 @@ function applyChecked(
   now: string,
   events: GameEvent[]
 ): HockeyCommandResult {
+  if (isFinalHockeyCloudGame(state)) return failure(state, HOCKEY_FINAL_CLOUD_GAME_MESSAGE)
   const removing = new Set(mutations.filter(mutation => mutation.type === 'delete').map(mutation => mutation.eventId))
   const restoring = mutations.filter(mutation => mutation.type === 'restore').map(mutation => findEvent(state, mutation.eventId)!)
   const candidate = [

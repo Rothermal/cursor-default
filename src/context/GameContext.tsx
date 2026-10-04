@@ -41,6 +41,7 @@ import {
   loadBasketballReopenHandoff,
   type BasketballReopenHandoff,
 } from '../lib/basketball/reopenHandoff'
+import { applyHockeyReopenHandoff, type HockeyReopenHandoff } from '../lib/hockey/reopenHandoff'
 import {
   pauseRunningBasketballClockForWorkflow,
   shouldInterceptRunningBasketballClock,
@@ -121,6 +122,9 @@ import {
   getPendingSyncFlag,
   setPendingSyncFlag,
 } from '../lib/gameStorageKeys'
+
+/** A Basketball handoff from the server read, or a Hockey one from the manager's reopen result. */
+export type EventReopenHandoff = BasketballReopenHandoff | HockeyReopenHandoff
 
 export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
 
@@ -376,7 +380,7 @@ interface GameContextType {
   enableEventCloudSync: () => Promise<FlushCloudSyncResult>
   markEventCloudGameReopened: (
     gameId: string,
-    handoff?: BasketballReopenHandoff | null
+    handoff?: EventReopenHandoff | null
   ) => Promise<void>
   resolveEventConflict: (
     eventId: string,
@@ -1348,9 +1352,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const markEventCloudGameReopened = useCallback(async (
     gameId: string,
-    suppliedHandoff?: BasketballReopenHandoff | null
+    suppliedHandoff?: EventReopenHandoff | null
   ) => {
     try {
+      // Only Basketball has a server handoff read; Hockey passes its own reopen result or null.
       const handoff = suppliedHandoff === undefined
         ? await loadBasketballReopenHandoff(gameId)
         : suppliedHandoff
@@ -1358,6 +1363,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         record => record.gameState.cloudSync.gameId === gameId
       )
       for (const record of matches) {
+        // A Hockey copy learns of a reopen elsewhere only while it still holds the final status,
+        // so a Game Info visit never clears an unrelated sync error.
+        if (
+          !handoff &&
+          record.gameState.sportGameState?.sportId === 'hockey' &&
+          record.gameState.cloudSync.gameStatus !== 'final'
+        ) continue
         const cloudStateChanged = record.gameState.cloudSync.gameStatus !== 'in_progress' ||
           record.gameState.cloudSync.status !== 'idle' ||
           record.gameState.cloudSync.lastError !== null
@@ -1373,14 +1385,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
           : record.gameState
         const applied = handoff && userId
-          ? applyBasketballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+          ? 'sportId' in handoff
+            ? applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+            : applyBasketballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
           : { ok: true as const, state: cloudReopenedState, changed: cloudStateChanged }
         if (!applied.ok) {
           setParkingError(applied.reason)
           return
         }
         if (!applied.changed) continue
-        const dirty = Boolean(handoff && applied.changed)
+        // A Hockey handoff that only reopened the binding appended nothing to upload.
+        const dirty = handoff
+          ? !('sportId' in handoff) || applied.state.eventStream !== cloudReopenedState.eventStream
+          : false
         saveParkedGameRecordStateAtomically(record.localGameId, applied.state, userId, {
           dirty: dirty ? true : record.sync.dirty,
           nextAttemptAt: dirty ? null : record.sync.nextAttemptAt,
