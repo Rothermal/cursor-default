@@ -2,18 +2,26 @@ import { AlertTriangle, ChevronLeft } from 'lucide-react'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import BaseballBoxScore from '../components/baseball/BaseballBoxScore'
+import BaseballPlayDetailSheet from '../components/baseball/BaseballPlayDetailSheet'
 import BaseballPlayerDetailSheet from '../components/baseball/BaseballPlayerDetailSheet'
+import BaseballSprayChart from '../components/baseball/BaseballSprayChart'
 import { useGame } from '../context/GameContext'
 import {
+  BASEBALL_SPRAY_DEFAULT_FILTER,
   BASEBALL_SUMMARY_TABS,
   baseballActiveEvents,
   baseballBoxScore,
+  baseballPlayDetail,
   baseballPlayerGameDetail,
+  baseballSprayChart,
+  baseballSummaryPlays,
   baseballSummaryPath,
   baseballSummarySource,
   baseballSummaryView,
   parseBaseballSummaryTab,
   type BaseballSportGameState,
+  type BaseballSprayFilter,
+  type BaseballSummaryPlays,
   type BaseballSummaryView,
   type BaseballTeamNames,
 } from '../lib/baseball'
@@ -30,6 +38,9 @@ export default function BaseballSummary() {
   const source = useMemo(() => baseballSummarySource(state), [state])
   const events = useMemo(() => (source.healthy ? baseballActiveEvents(state) : []), [source.healthy, state])
   const [playerId, setPlayerId] = useState<string | null>(null)
+  const [playId, setPlayId] = useState<string | null>(null)
+  const [scoringOnly, setScoringOnly] = useState(false)
+  const [sprayFilter, setSprayFilter] = useState<BaseballSprayFilter>(BASEBALL_SPRAY_DEFAULT_FILTER)
 
   const sport = source.sport
   const names: BaseballTeamNames = {
@@ -48,6 +59,8 @@ export default function BaseballSummary() {
 
   const view = source.healthy ? baseballSummaryView(sport, names, state.gameInfo?.date || null) : null
   const detail = playerId && source.healthy ? baseballPlayerGameDetail(sport, playerId) : null
+  const play = playId && source.healthy ? baseballPlayDetail(state, playId, names) : null
+  const started = sport.projection.status !== 'pregame'
 
   return (
     <main className="mx-auto max-w-2xl space-y-3 px-4 pb-6">
@@ -77,7 +90,7 @@ export default function BaseballSummary() {
         </section>
       ) : (
         <>
-          <div role="tablist" aria-label="Summary views" className="grid grid-cols-2 gap-1 rounded-md border border-line p-1">
+          <div role="tablist" aria-label="Summary views" className="grid grid-cols-4 gap-1 rounded-md border border-line p-1">
             {BASEBALL_SUMMARY_TABS.map(entry => (
               <button
                 key={entry.tab}
@@ -93,19 +106,45 @@ export default function BaseballSummary() {
           </div>
 
           {view && tab === 'overview' && <Overview view={view} sport={sport} />}
-          {tab === 'box' && sport.projection.status !== 'pregame' && (
+          {tab === 'box' && started && (
             <BaseballBoxScore box={baseballBoxScore(sport, events)} names={names} onOpenPlayer={setPlayerId} />
           )}
-          {tab === 'box' && sport.projection.status === 'pregame' && (
-            <p className="text-sm text-content-muted">The box score fills in once the game starts.</p>
+          {tab === 'plays' && started && (
+            <Plays
+              plays={baseballSummaryPlays(sport, events, names, { scoringOnly })}
+              scoringOnly={scoringOnly}
+              onScoringOnly={setScoringOnly}
+              onOpenPlay={setPlayId}
+            />
+          )}
+          {tab === 'spray' && started && (
+            <BaseballSprayChart
+              chart={baseballSprayChart(sport, events, sprayFilter)}
+              filter={sprayFilter}
+              names={names}
+              onFilter={setSprayFilter}
+              onOpenPlay={setPlayId}
+            />
+          )}
+          {tab !== 'overview' && !started && (
+            <p className="text-sm text-content-muted">This view fills in once the game starts.</p>
           )}
         </>
       )}
 
       {detail && (
-        <PlayerDialog onClose={() => setPlayerId(null)}>
+        <SheetDialog label="Player details" onClose={() => setPlayerId(null)}>
           <BaseballPlayerDetailSheet detail={detail} onClose={() => setPlayerId(null)} />
-        </PlayerDialog>
+        </SheetDialog>
+      )}
+      {play && (
+        <SheetDialog label="Play details" onClose={() => setPlayId(null)}>
+          <BaseballPlayDetailSheet
+            detail={play}
+            onClose={() => setPlayId(null)}
+            note={<>To change this play, <Link to="/game?tab=timeline" className="font-semibold underline">correct it on the Timeline</Link>.</>}
+          />
+        </SheetDialog>
       )}
     </main>
   )
@@ -188,7 +227,76 @@ function Overview({ view, sport }: { view: BaseballSummaryView; sport: BaseballS
   )
 }
 
-function PlayerDialog({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+function Plays({ plays, scoringOnly, onScoringOnly, onOpenPlay }: {
+  plays: BaseballSummaryPlays
+  scoringOnly: boolean
+  onScoringOnly: (value: boolean) => void
+  onOpenPlay: (playId: string) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
+        <label className="flex min-h-11 items-center gap-2 text-sm text-content">
+          <input type="checkbox" className="h-5 w-5" checked={scoringOnly} onChange={event => onScoringOnly(event.target.checked)} />
+          Scoring plays only ({plays.scoringPlays})
+        </label>
+        <Link to="/game?tab=timeline" className="text-sm font-semibold text-content underline">Correct on the Timeline</Link>
+      </div>
+      {plays.halves.length === 0 && (
+        <p className="text-sm text-content-muted">{scoringOnly ? 'No runs have scored yet.' : 'No plays yet.'}</p>
+      )}
+      {plays.halves.map(half => (
+        <section key={half.key} className="rounded-md border border-line bg-surface" aria-label={`${half.label}, ${half.battingSide === 'tracked' ? 'we bat' : 'they bat'}`}>
+          <header className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-line px-3 py-2">
+            <h2 className="font-bold text-content">{half.label}</h2>
+            {half.line && <p className="text-xs tabular-nums text-content-muted">{half.line}</p>}
+          </header>
+          <ol className="divide-y divide-line">
+            {half.rows.map(row => (
+              <li key={row.id}>
+                {row.kind === 'play' ? (
+                  <button type="button" className="flex min-h-11 w-full items-start gap-2 px-3 py-2 text-left text-sm text-content" onClick={() => onOpenPlay(row.id)}>
+                    <PlayText row={row} />
+                  </button>
+                ) : (
+                  <div className="flex min-h-11 items-start gap-2 px-3 py-2 text-sm text-content-muted">
+                    <PlayText row={row} />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function PlayText({ row }: { row: BaseballSummaryPlays['halves'][number]['rows'][number] }) {
+  return (
+    <>
+      <span className="min-w-0 flex-1">
+        <span className="block">{row.label}</span>
+        {row.pitches.length > 0 && (
+          <span className="block text-xs text-content-muted">Before: {row.pitches.join(', ')}</span>
+        )}
+        {row.warning && (
+          <span className="mt-0.5 flex items-start gap-1 text-xs text-warning-content">
+            <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
+            {row.warning}
+          </span>
+        )}
+      </span>
+      {row.runs > 0 && (
+        <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs font-bold text-accent-content">
+          {row.runs} {row.runs === 1 ? 'run' : 'runs'}
+        </span>
+      )}
+    </>
+  )
+}
+
+function SheetDialog({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const titleId = useId()
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -206,7 +314,7 @@ function PlayerDialog({ onClose, children }: { onClose: () => void; children: Re
         className="w-full max-w-md p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
         onClick={event => event.stopPropagation()}
       >
-        <span id={titleId} className="sr-only">Player details</span>
+        <span id={titleId} className="sr-only">{label}</span>
         {children}
       </div>
     </div>

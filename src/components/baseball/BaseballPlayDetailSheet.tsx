@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { BaseballPlayDetail } from '../../lib/baseball'
 
 interface BaseballPlayDetailSheetProps {
@@ -10,6 +11,8 @@ interface BaseballPlayDetailSheetProps {
   editBlocked?: string | null
   /** Shown when a stamped role differs from the replayed lineup (BSB-4D). */
   onRepair?: () => void
+  /** Replaces the read-only hint about Undo (the Summary points to the Timeline instead). */
+  note?: ReactNode
 }
 
 /**
@@ -17,7 +20,7 @@ interface BaseballPlayDetailSheetProps {
  * nothing. Opened from the Timeline, it offers Edit and Remove, which preview first (BSB-4C,
  * BSB-4D), and Repair attribution when a stamped role differs from the lineup.
  */
-export default function BaseballPlayDetailSheet({ detail, onClose, onRemove, onEdit, editBlocked, onRepair }: BaseballPlayDetailSheetProps) {
+export default function BaseballPlayDetailSheet({ detail, onClose, onRemove, onEdit, editBlocked, onRepair, note }: BaseballPlayDetailSheetProps) {
   return (
     <section className="space-y-3 rounded-md border border-line bg-surface p-3" aria-label="Play details">
       <div>
@@ -46,7 +49,7 @@ export default function BaseballPlayDetailSheet({ detail, onClose, onRemove, onE
         </>
       ) : (
         <>
-          <p className="text-xs text-content-muted">Undo changes the newest play. Older plays are corrected on the Timeline tab.</p>
+          <p className="text-xs text-content-muted">{note ?? 'Undo changes the newest play. Older plays are corrected on the Timeline tab.'}</p>
           <button type="button" className="btn-secondary w-full" onClick={onClose} autoFocus>Close</button>
         </>
       )}
