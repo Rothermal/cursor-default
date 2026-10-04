@@ -1,4 +1,4 @@
-import type { CloudSyncState } from '../../types'
+import type { CloudSyncState, GameState } from '../../types'
 import type { TeamRole } from '../teamPermissions'
 
 export const DELETED_SOURCE_PLAYER_BINDING_ERROR =
@@ -20,4 +20,15 @@ export function deletedSourcePlayerRecoverySettlementPatch(): Pick<
   'allowDeletedSourcePlayerRecovery'
 > {
   return { allowDeletedSourcePlayerRecovery: undefined }
+}
+
+/**
+ * The team whose owner or admin may approve recovery: the cloud binding's team, or before
+ * the first bind succeeds, a Hockey game's immutable source team (HKY-5B1 review).
+ */
+export function deletedSourceRecoveryTeamId(state: GameState): string | null {
+  if (state.cloudSync.teamId) return state.cloudSync.teamId
+  const sportState = state.sportGameState
+  if (sportState?.sportId === 'hockey' && !state.cloudSync.gameId) return sportState.setup.sourceTeamId
+  return null
 }

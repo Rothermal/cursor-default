@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
 import { useTeamRole } from '../../hooks/useTeamRole'
 import { eventCloudPolicyForState } from '../../lib/eventCloudPolicy'
-import { canOfferDeletedSourcePlayerRecovery } from '../../lib/gameEvents/deletedSourceRecovery'
+import { canOfferDeletedSourcePlayerRecovery, deletedSourceRecoveryTeamId } from '../../lib/gameEvents/deletedSourceRecovery'
 import { hockeyCloudEnableAvailability } from '../../lib/hockey/enableCloudSync'
 import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
@@ -82,7 +82,7 @@ export function HockeyCloudMenuSection({ state, onDone }: { state: GameState; on
 /** Sync problems shown on the tracker: conflicts to review, or an error with Retry and Export. */
 export function HockeyCloudSyncAlerts({ state }: { state: GameState }) {
   const { flushCloudSync, resolveEventConflict, recoverDeletedEventParticipantSources } = useGame()
-  const teamAccess = useTeamRole(state.cloudSync.teamId)
+  const teamAccess = useTeamRole(deletedSourceRecoveryTeamId(state))
   const [conflictOpen, setConflictOpen] = useState(false)
   const [recoveryOpen, setRecoveryOpen] = useState(false)
   const [busy, setBusy] = useState(false)

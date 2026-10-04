@@ -54,7 +54,10 @@ import {
   eventConflictRecoveryFingerprint,
   resolveEventConflictInState,
 } from '../lib/gameEvents/eventConflictResolution'
-import { deletedSourcePlayerRecoverySettlementPatch } from '../lib/gameEvents/deletedSourceRecovery'
+import {
+  deletedSourcePlayerRecoverySettlementPatch,
+  deletedSourceRecoveryTeamId,
+} from '../lib/gameEvents/deletedSourceRecovery'
 import { eventCloudTransportAdapterForSport } from '../lib/eventCloudTransportAdapters'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
@@ -1173,7 +1176,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!localGameId || !getParkedGameRecord(localGameId, userId)) {
         return { ok: false, reason: 'This local game is unavailable.' }
       }
-      if (!isEventCloudSyncEligible(current) || !current.cloudSync.teamId) {
+      if (!isEventCloudSyncEligible(current) || !deletedSourceRecoveryTeamId(current)) {
         return { ok: false, reason: 'Historical player recovery requires a team event game.' }
       }
 

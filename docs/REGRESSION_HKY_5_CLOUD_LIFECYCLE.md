@@ -106,6 +106,11 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
 - setup choice: signed out or This device only saves locally; Cloud starts only after a
   ready handshake and never falls back silently.
 
+`src/lib/hockey/cloudRecovery.test.ts` (4 cases, from the PR #472 review): a team game
+whose source player was deleted before its first upload resolves the approving team from
+its immutable setup, offers Preserve history to the owner, and sends the one-attempt
+approval on the first bind.
+
 ### Manual (after the owner applies 072 and 073)
 
 | Step | Expected |
@@ -118,6 +123,7 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
 | Open the same team game from Cloud Games on a second account (scorer) | Offers to start an independent recorder stream |
 | Open it as a viewer, or after it is final | Goes to Game Info |
 | Edit the same event on two devices with one account | Conflict banner, Review, keep local or cloud |
+| Team game kept offline, a source player deleted elsewhere, then reconnect | Binding error; the team owner sees Preserve history, which binds with the frozen player |
 
 ### Pending
 
