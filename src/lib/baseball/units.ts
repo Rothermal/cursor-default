@@ -18,10 +18,27 @@ export const BASEBALL_CAPTURE_TYPES: ReadonlySet<BaseballEventType> = new Set<Ba
   'baseball.baserunning',
   'baseball.substitution',
   'baseball.score_adjustment',
+  'baseball.pitcher_decisions',
 ])
 
 export function isBaseballCaptureEvent(event: GameEvent): boolean {
   return BASEBALL_CAPTURE_TYPES.has(event.eventType as BaseballEventType)
+}
+
+/**
+ * The completed-game epoch (BSB-5D): the id of the game end that made the game final, or null
+ * when the game is not final now (never ended, reopened since, suspended or abandoned).
+ */
+export function baseballDecisionEpochId(events: readonly GameEvent[]): string | null {
+  let epoch: string | null = null
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    if (event.eventType === 'baseball.game_reopened') epoch = null
+    if (event.eventType === 'baseball.game_ended') {
+      const outcome = (event.payload as { outcome?: unknown }).outcome
+      epoch = outcome === 'suspended' || outcome === 'abandoned' ? null : event.id
+    }
+  }
+  return epoch
 }
 
 /** Active (not removed) events in capture order, migrated to the current payload shapes. */

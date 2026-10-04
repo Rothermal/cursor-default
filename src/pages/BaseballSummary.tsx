@@ -2,11 +2,13 @@ import { AlertTriangle, ChevronLeft } from 'lucide-react'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import BaseballBoxScore from '../components/baseball/BaseballBoxScore'
+import BaseballDecisionsSheet from '../components/baseball/BaseballDecisionsSheet'
 import BaseballPitchCounts from '../components/baseball/BaseballPitchCounts'
 import BaseballPitchPlot from '../components/baseball/BaseballPitchPlot'
 import BaseballPlayDetailSheet from '../components/baseball/BaseballPlayDetailSheet'
 import BaseballPlayerDetailSheet from '../components/baseball/BaseballPlayerDetailSheet'
 import BaseballSprayChart from '../components/baseball/BaseballSprayChart'
+import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
   BASEBALL_PITCH_DEFAULT_FILTER,
@@ -14,6 +16,9 @@ import {
   BASEBALL_SUMMARY_TABS,
   baseballActiveEvents,
   baseballBoxScore,
+  baseballDecisionIssues,
+  baseballDecisionLabels,
+  baseballDecisionsView,
   baseballPitchCounts,
   baseballPitchLog,
   baseballPitchPlot,
@@ -25,6 +30,9 @@ import {
   baseballSummarySource,
   baseballSummaryView,
   parseBaseballSummaryTab,
+  saveBaseballPitcherDecisions,
+  type BaseballDecisionsView,
+  type BaseballPitcherDecisions,
   type BaseballSportGameState,
   type BaseballPitchFilter,
   type BaseballSprayFilter,
@@ -32,13 +40,16 @@ import {
   type BaseballSummaryView,
   type BaseballTeamNames,
 } from '../lib/baseball'
+import { createBaseballUuid } from '../lib/baseball/id'
 
 /**
- * Read-only Summary for a Baseball event game on this device (BSB-5). Corrections stay on the
- * tracker's Timeline; this page only reads a fresh replay of the stream.
+ * Summary for a Baseball event game on this device (BSB-5). It reads a fresh replay of the
+ * stream; corrections stay on the tracker's Timeline. The one thing recorded here is pitcher
+ * decisions (BSB-5D), set once the game is final.
  */
 export default function BaseballSummary() {
-  const { state } = useGame()
+  const { state, dispatch } = useGame()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const tab = parseBaseballSummaryTab(searchParams)
@@ -49,6 +60,8 @@ export default function BaseballSummary() {
   const [scoringOnly, setScoringOnly] = useState(false)
   const [sprayFilter, setSprayFilter] = useState<BaseballSprayFilter>(BASEBALL_SPRAY_DEFAULT_FILTER)
   const [pitchFilter, setPitchFilter] = useState<BaseballPitchFilter>(BASEBALL_PITCH_DEFAULT_FILTER)
+  const [decisionDraft, setDecisionDraft] = useState<BaseballPitcherDecisions | null>(null)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
 
   const sport = source.sport
   const names: BaseballTeamNames = {
@@ -69,6 +82,29 @@ export default function BaseballSummary() {
   const detail = playerId && source.healthy ? baseballPlayerGameDetail(sport, playerId) : null
   const play = playId && source.healthy ? baseballPlayDetail(state, playId, names) : null
   const started = sport.projection.status !== 'pregame'
+  const decisions = source.healthy && started ? baseballDecisionsView(sport, events) : null
+  // A reopened game closes the sheet: its decisions belonged to the earlier ending.
+  const draft = decisions?.canSet ? decisionDraft : null
+
+  const openDecisions = () => {
+    if (!decisions) return
+    setDecisionError(null)
+    setDecisionDraft(structuredClone(decisions.current?.decisions ?? decisions.suggestion.decisions))
+  }
+  const saveDecisions = () => {
+    if (!draft) return
+    const result = saveBaseballPitcherDecisions(state, draft, {
+      recorderUserId: user?.id ?? null,
+      occurredAt: new Date().toISOString(),
+      captureCommandId: createBaseballUuid(),
+    })
+    if (!result.ok) {
+      setDecisionError(result.message)
+      return
+    }
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    setDecisionDraft(null)
+  }
 
   return (
     <main className="mx-auto max-w-2xl space-y-3 px-4 pb-6">
@@ -113,9 +149,14 @@ export default function BaseballSummary() {
             ))}
           </div>
 
-          {view && tab === 'overview' && <Overview view={view} sport={sport} />}
+          {view && tab === 'overview' && <Overview view={view} sport={sport} decisions={decisions} names={names} onSetDecisions={openDecisions} />}
           {tab === 'box' && started && (
-            <BaseballBoxScore box={baseballBoxScore(sport, events)} names={names} onOpenPlayer={setPlayerId} />
+            <BaseballBoxScore
+              box={baseballBoxScore(sport, events)}
+              names={names}
+              decisions={decisions?.current?.decisions ?? null}
+              onOpenPlayer={setPlayerId}
+            />
           )}
           {tab === 'plays' && started && (
             <Plays
@@ -155,6 +196,25 @@ export default function BaseballSummary() {
         </>
       )}
 
+      {draft && decisions && (
+        <SheetDialog label="Pitcher decisions" onClose={() => setDecisionDraft(null)}>
+          <BaseballDecisionsSheet
+            sport={sport}
+            view={decisions}
+            names={names}
+            draft={draft}
+            issues={baseballDecisionIssues(sport, events, draft)}
+            error={decisionError}
+            onChange={next => {
+              setDecisionError(null)
+              setDecisionDraft(next)
+            }}
+            onUseSuggestion={() => setDecisionDraft(structuredClone(decisions.suggestion.decisions))}
+            onCancel={() => setDecisionDraft(null)}
+            onSave={saveDecisions}
+          />
+        </SheetDialog>
+      )}
       {detail && (
         <SheetDialog label="Player details" onClose={() => setPlayerId(null)}>
           <BaseballPlayerDetailSheet detail={detail} onClose={() => setPlayerId(null)} />
@@ -173,7 +233,13 @@ export default function BaseballSummary() {
   )
 }
 
-function Overview({ view, sport }: { view: BaseballSummaryView; sport: BaseballSportGameState }) {
+function Overview({ view, sport, decisions, names, onSetDecisions }: {
+  view: BaseballSummaryView
+  sport: BaseballSportGameState
+  decisions: BaseballDecisionsView | null
+  names: BaseballTeamNames
+  onSetDecisions: () => void
+}) {
   return (
     <div className="space-y-3">
       <section className="space-y-1 rounded-md border border-line bg-surface p-3" aria-label="Result">
@@ -182,6 +248,8 @@ function Overview({ view, sport }: { view: BaseballSummaryView; sport: BaseballS
         {view.outcomeForTracked && <p className="text-sm text-content-muted">{view.outcomeForTracked}</p>}
         {view.note && <p className="text-sm text-content-muted">{view.note}</p>}
       </section>
+
+      {decisions?.canSet && <Decisions sport={sport} decisions={decisions} names={names} onSet={onSetDecisions} />}
 
       {view.warningCount > 0 && (
         <section className="flex items-start gap-2 rounded-md border border-warning-line bg-warning p-3 text-sm text-warning-content">
@@ -247,6 +315,47 @@ function Overview({ view, sport }: { view: BaseballSummaryView; sport: BaseballS
         </dl>
       </section>
     </div>
+  )
+}
+
+function Decisions({ sport, decisions, names, onSet }: {
+  sport: BaseballSportGameState
+  decisions: BaseballDecisionsView
+  names: BaseballTeamNames
+  onSet: () => void
+}) {
+  const labels = decisions.current ? baseballDecisionLabels(sport, decisions.current.decisions) : null
+  const sides = labels ? (['tracked', 'opponent'] as const).filter(side => labels[side].length > 0) : []
+  return (
+    <section className="space-y-2 rounded-md border border-line bg-surface p-3" aria-label="Pitcher decisions">
+      <h2 className="font-bold text-content">Pitcher decisions</h2>
+      {!labels ? (
+        <p className="text-sm text-content-muted">Not set yet.</p>
+      ) : sides.length === 0 ? (
+        <p className="text-sm text-content-muted">Set with no decisions.</p>
+      ) : (
+        <dl className="space-y-1 text-sm">
+          {sides.map(side => (
+            <div key={side}>
+              <dt className="truncate font-semibold text-content">{names[side]}</dt>
+              <dd className="text-content">{labels[side].join(' · ')}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {decisions.issues.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-warning-line bg-warning p-2 text-sm text-warning-content">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Check decisions</p>
+            <p>A later correction changed the game, and these decisions no longer fit it: {decisions.issues[0]}</p>
+          </div>
+        </div>
+      )}
+      <button type="button" className="btn-secondary w-full" onClick={onSet}>
+        {decisions.current ? 'Change decisions' : 'Set decisions'}
+      </button>
+    </section>
   )
 }
 
