@@ -51,6 +51,56 @@ function infieldArcEnds() {
 const ARC = infieldArcEnds()
 const p = (point: { x: number; y: number }) => `${point.x * S} ${point.y * S}`
 
+/** The painted field without players, shared with the Summary's spray chart (BSB-5B). */
+export function BaseballFieldShapes() {
+  return (
+    <>
+      <rect width={S} height={S} fill="rgb(var(--diamond-grass))" />
+      {/* Warning track and fence. */}
+      <path
+        d={`M ${p(BASEBALL_FENCE.left)} Q ${p(BASEBALL_FENCE_CONTROL)} ${p(BASEBALL_FENCE.right)}`}
+        fill="none" stroke="rgb(var(--diamond-dirt))" strokeWidth="2.4"
+      />
+      <path
+        d={`M ${p(BASEBALL_FENCE.left)} Q ${p(BASEBALL_FENCE_CONTROL)} ${p(BASEBALL_FENCE.right)}`}
+        fill="none" stroke="rgb(var(--diamond-line))" strokeWidth="0.5"
+      />
+      {/* Infield dirt: from home out along both lines to the arc around the rubber. */}
+      <path
+        d={`M ${p(BASEBALL_HOME_PLATE)} L ${p(ARC.right)} A ${BASEBALL_INFIELD_RADIUS * S} ${BASEBALL_INFIELD_RADIUS * S} 0 0 0 ${p(ARC.left)} Z`}
+        fill="rgb(var(--diamond-dirt))"
+      />
+      {/* Infield grass inside the base paths. */}
+      <path
+        d={`M ${BASEBALL_HOME_PLATE.x * S} ${BASEBALL_HOME_PLATE.y * S - 4.2} L ${BASEBALL_BASE_POINTS.first.x * S - 3} ${BASEBALL_BASE_POINTS.first.y * S} L ${BASEBALL_BASE_POINTS.second.x * S} ${BASEBALL_BASE_POINTS.second.y * S + 3} L ${BASEBALL_BASE_POINTS.third.x * S + 3} ${BASEBALL_BASE_POINTS.third.y * S} Z`}
+        fill="rgb(var(--diamond-grass))"
+      />
+      <circle cx={BASEBALL_RUBBER.x * S} cy={BASEBALL_RUBBER.y * S} r="2.6" fill="rgb(var(--diamond-dirt))" />
+      <circle cx={BASEBALL_HOME_PLATE.x * S} cy={BASEBALL_HOME_PLATE.y * S} r="3.6" fill="rgb(var(--diamond-dirt))" />
+      {/* Foul lines. */}
+      <line x1={BASEBALL_HOME_PLATE.x * S} y1={BASEBALL_HOME_PLATE.y * S} x2={BASEBALL_FENCE.left.x * S} y2={BASEBALL_FENCE.left.y * S} stroke="rgb(var(--diamond-line))" strokeWidth="0.45" />
+      <line x1={BASEBALL_HOME_PLATE.x * S} y1={BASEBALL_HOME_PLATE.y * S} x2={BASEBALL_FENCE.right.x * S} y2={BASEBALL_FENCE.right.y * S} stroke="rgb(var(--diamond-line))" strokeWidth="0.45" />
+      <rect x={BASEBALL_RUBBER.x * S - 0.9} y={BASEBALL_RUBBER.y * S - 0.25} width="1.8" height="0.5" fill="rgb(var(--diamond-line))" />
+      {/* Bases and home plate. */}
+      {BASES.map(base => {
+        const point = BASEBALL_BASE_POINTS[base]
+        return (
+          <rect
+            key={base}
+            x={point.x * S - 1.1} y={point.y * S - 1.1} width="2.2" height="2.2"
+            transform={`rotate(45 ${point.x * S} ${point.y * S})`}
+            fill="rgb(var(--diamond-line))"
+          />
+        )
+      })}
+      <path
+        d={`M ${BASEBALL_HOME_PLATE.x * S - 1.2} ${BASEBALL_HOME_PLATE.y * S - 1} h 2.4 v 1.1 l -1.2 1.1 l -1.2 -1.1 Z`}
+        fill="rgb(var(--diamond-line))"
+      />
+    </>
+  )
+}
+
 /**
  * The fixed diamond (BSB-3A): home plate at the bottom, runners on the bases, the batter at
  * home and fielder markers. Taps only do something while a play is being entered.
@@ -89,48 +139,7 @@ export default function BaseballDiamond({
             ))
           } : undefined}
         >
-          <rect width={S} height={S} fill="rgb(var(--diamond-grass))" />
-          {/* Warning track and fence. */}
-          <path
-            d={`M ${p(BASEBALL_FENCE.left)} Q ${p(BASEBALL_FENCE_CONTROL)} ${p(BASEBALL_FENCE.right)}`}
-            fill="none" stroke="rgb(var(--diamond-dirt))" strokeWidth="2.4"
-          />
-          <path
-            d={`M ${p(BASEBALL_FENCE.left)} Q ${p(BASEBALL_FENCE_CONTROL)} ${p(BASEBALL_FENCE.right)}`}
-            fill="none" stroke="rgb(var(--diamond-line))" strokeWidth="0.5"
-          />
-          {/* Infield dirt: from home out along both lines to the arc around the rubber. */}
-          <path
-            d={`M ${p(BASEBALL_HOME_PLATE)} L ${p(ARC.right)} A ${BASEBALL_INFIELD_RADIUS * S} ${BASEBALL_INFIELD_RADIUS * S} 0 0 0 ${p(ARC.left)} Z`}
-            fill="rgb(var(--diamond-dirt))"
-          />
-          {/* Infield grass inside the base paths. */}
-          <path
-            d={`M ${BASEBALL_HOME_PLATE.x * S} ${BASEBALL_HOME_PLATE.y * S - 4.2} L ${BASEBALL_BASE_POINTS.first.x * S - 3} ${BASEBALL_BASE_POINTS.first.y * S} L ${BASEBALL_BASE_POINTS.second.x * S} ${BASEBALL_BASE_POINTS.second.y * S + 3} L ${BASEBALL_BASE_POINTS.third.x * S + 3} ${BASEBALL_BASE_POINTS.third.y * S} Z`}
-            fill="rgb(var(--diamond-grass))"
-          />
-          <circle cx={BASEBALL_RUBBER.x * S} cy={BASEBALL_RUBBER.y * S} r="2.6" fill="rgb(var(--diamond-dirt))" />
-          <circle cx={BASEBALL_HOME_PLATE.x * S} cy={BASEBALL_HOME_PLATE.y * S} r="3.6" fill="rgb(var(--diamond-dirt))" />
-          {/* Foul lines. */}
-          <line x1={BASEBALL_HOME_PLATE.x * S} y1={BASEBALL_HOME_PLATE.y * S} x2={BASEBALL_FENCE.left.x * S} y2={BASEBALL_FENCE.left.y * S} stroke="rgb(var(--diamond-line))" strokeWidth="0.45" />
-          <line x1={BASEBALL_HOME_PLATE.x * S} y1={BASEBALL_HOME_PLATE.y * S} x2={BASEBALL_FENCE.right.x * S} y2={BASEBALL_FENCE.right.y * S} stroke="rgb(var(--diamond-line))" strokeWidth="0.45" />
-          <rect x={BASEBALL_RUBBER.x * S - 0.9} y={BASEBALL_RUBBER.y * S - 0.25} width="1.8" height="0.5" fill="rgb(var(--diamond-line))" />
-          {/* Bases and home plate. */}
-          {BASES.map(base => {
-            const point = BASEBALL_BASE_POINTS[base]
-            return (
-              <rect
-                key={base}
-                x={point.x * S - 1.1} y={point.y * S - 1.1} width="2.2" height="2.2"
-                transform={`rotate(45 ${point.x * S} ${point.y * S})`}
-                fill="rgb(var(--diamond-line))"
-              />
-            )
-          })}
-          <path
-            d={`M ${BASEBALL_HOME_PLATE.x * S - 1.2} ${BASEBALL_HOME_PLATE.y * S - 1} h 2.4 v 1.1 l -1.2 1.1 l -1.2 -1.1 Z`}
-            fill="rgb(var(--diamond-line))"
-          />
+          <BaseballFieldShapes />
 
           {view.fielders.map(fielder => {
             const spot = BASEBALL_FIELDER_SPOTS[fielder.position]

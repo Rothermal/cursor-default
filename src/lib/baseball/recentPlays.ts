@@ -138,7 +138,7 @@ const PITCH_LABELS = Object.fromEntries(
   [...BASEBALL_PRIMARY_PITCH_RESULTS, ...BASEBALL_MORE_PITCH_RESULTS].map(option => [option.result, option.label])
 ) as Record<string, string>
 
-const IN_PLAY_LABELS: Record<BaseballInPlayResult, string> = {
+export const BASEBALL_IN_PLAY_LABELS: Record<BaseballInPlayResult, string> = {
   single: 'single',
   double: 'double',
   triple: 'triple',
@@ -194,12 +194,12 @@ export function baseballEventLabel(
       return 'Game started'
     case 'baseball.pitch': {
       const inPlay = payload.inPlay as { result: BaseballInPlayResult } | null
-      const text = inPlay ? IN_PLAY_LABELS[inPlay.result] : PITCH_LABELS[payload.result as string] ?? 'Pitch'
+      const text = inPlay ? BASEBALL_IN_PLAY_LABELS[inPlay.result] : PITCH_LABELS[payload.result as string] ?? 'Pitch'
       return withBatter(capitalize(text) + runs(scoredRunnerIds))
     }
     case 'baseball.plate_appearance': {
       const inPlay = payload.inPlay as { result: BaseballInPlayResult } | null
-      const text = inPlay ? IN_PLAY_LABELS[inPlay.result] : (QUICK_LABELS[payload.result as string] ?? 'Plate appearance').toLowerCase()
+      const text = inPlay ? BASEBALL_IN_PLAY_LABELS[inPlay.result] : (QUICK_LABELS[payload.result as string] ?? 'Plate appearance').toLowerCase()
       return withBatter(`${capitalize(text)} (quick)${runs(scoredRunnerIds)}`)
     }
     case 'baseball.baserunning': {
@@ -356,7 +356,7 @@ export function baseballPlayDetail(state: GameState, playId: string, names: Base
     }
     const inPlay = payload.inPlay as { result: BaseballInPlayResult; battedBallType: string; fielders: number[]; errorBy: number | null; insideThePark: boolean } | null | undefined
     if (inPlay) {
-      play.push(`Result: ${capitalize(IN_PLAY_LABELS[inPlay.result])}${inPlay.insideThePark ? ' (inside the park)' : ''}`)
+      play.push(`Result: ${capitalize(BASEBALL_IN_PLAY_LABELS[inPlay.result])}${inPlay.insideThePark ? ' (inside the park)' : ''}`)
       play.push(`Batted ball: ${BATTED_BALL_LABELS[inPlay.battedBallType] ?? 'Unknown'}${event.location ? ', location marked' : ''}`)
       if (inPlay.fielders.length) play.push(`Fielded by: ${inPlay.fielders.map(fielder).join(', ')}`)
       if (inPlay.errorBy !== null) play.push(`Error: ${fielder(inPlay.errorBy)}`)
