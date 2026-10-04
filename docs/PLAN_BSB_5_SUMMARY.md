@@ -343,3 +343,7 @@ Filled in as each slice merges.
   tracker's scoreboard now uses too. `BaseballPitchPlot` draws on `BaseballZoneShapes`,
   split out of `BaseballPitchPad`, with a shape per kind as well as a color (new `--zone-*`
   tokens, contrast-checked in both themes). The Summary tab bar is five equal columns.
+  Review fix: pitches closer than the tap radius (0.05 of the pad frame) share one
+  numbered mark (`baseballPitchPlotClusters`, grouped in game order against each group's
+  first pitch), and tapping it opens a list of those pitches with half, game pitch number,
+  count and result, each opening its play. Event data and locations are unchanged.

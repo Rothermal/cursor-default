@@ -1,5 +1,6 @@
 import type { GameEvent } from '../gameEvents/types'
 import { baseballBoxScore } from './boxScore'
+import { baseballPitchPadDisplay } from './diamondGeometry'
 import { parseBaseballPeriod, formatBaseballHalf } from './periods'
 import { replayBaseballPitches } from './projector'
 import { baseballPitchCountAlert, baseballPersonLabel, type BaseballPitcherCount } from './trackerView'
@@ -114,12 +115,36 @@ export interface BaseballPitchPlotPoint {
   x: number
   y: number
   kind: BaseballPitchKind
+  /** The pitch's number in the game's pitch log, from 1. */
+  sequence: number
   /** "#12 Lee to #4 Kim, 1-2: Called strike" */
   label: string
+  /** "Top 1 · Pitch 3 · 0-2 · Foul", which tells pitches at one spot apart. */
+  context: string
 }
+
+/**
+ * Marks drawn at one spot. Pitches closer than the overlap distance share one mark, so a
+ * tap never lands on only the topmost of several; a mark with more than one pitch opens a
+ * chooser listing them in game order.
+ */
+export interface BaseballPitchPlotCluster {
+  /** The first pitch's event id. */
+  id: string
+  /** Display position (0..1) of the first pitch. */
+  x: number
+  y: number
+  /** In game order; the last one is drawn on top. */
+  points: BaseballPitchPlotPoint[]
+}
+
+/** Display distance (pad frame 0..1) under which marks share a spot; the tap target's radius. */
+export const BASEBALL_PITCH_PLOT_OVERLAP = 0.05
 
 export interface BaseballPitchPlot {
   points: BaseballPitchPlotPoint[]
+  /** The points grouped by spot, in order of each group's first pitch. */
+  clusters: BaseballPitchPlotCluster[]
   /** Recorded pitches the filter keeps that have no location. */
   unlocated: number
   /** Pitchers with a recorded pitch, both teams, for the pitcher filter. */
@@ -152,25 +177,49 @@ export function baseballPitchPlot(
     .filter((entry, index) => entry.pitcherId && log.findIndex(other => other.pitcherId === entry.pitcherId) === index)
     .map(entry => ({ id: entry.pitcherId!, name: name(entry.pitcherId), side: entry.side }))
   const counts = [...new Set(log.map(entry => entry.count))].sort()
+  const sequence = new Map(log.map((entry, index) => [entry.eventId, index + 1]))
   const kept = log.filter(entry =>
     (filter.pitcherId === 'all' || entry.pitcherId === filter.pitcherId) &&
     (filter.kind === 'all' || entry.kind === filter.kind) &&
     (filter.batterHand === 'all' || (entry.batterHand ?? 'unknown') === filter.batterHand) &&
     (filter.count === 'all' || entry.count === filter.count)
   )
+  const points: BaseballPitchPlotPoint[] = kept.flatMap(entry => entry.location ? [{
+    eventId: entry.eventId,
+    playId: entry.playId,
+    x: entry.location.x,
+    y: entry.location.y,
+    kind: entry.kind,
+    sequence: sequence.get(entry.eventId)!,
+    label: `${name(entry.pitcherId)} to ${name(entry.batterId)}, ${entry.count}: ${RESULT_LABELS[entry.result]}`,
+    context: [entry.halfLabel, `Pitch ${sequence.get(entry.eventId)}`, entry.count, RESULT_LABELS[entry.result]]
+      .filter(Boolean)
+      .join(' · '),
+  }] : [])
   return {
-    points: kept.flatMap(entry => entry.location ? [{
-      eventId: entry.eventId,
-      playId: entry.playId,
-      x: entry.location.x,
-      y: entry.location.y,
-      kind: entry.kind,
-      label: `${name(entry.pitcherId)} to ${name(entry.batterId)}, ${entry.count}: ${RESULT_LABELS[entry.result]}`,
-    }] : []),
+    points,
+    clusters: baseballPitchPlotClusters(points),
     unlocated: kept.filter(entry => !entry.location).length,
     pitchers,
     counts,
   }
+}
+
+/**
+ * Groups points by spot in game order: each point joins the first group whose first pitch
+ * is within the overlap distance, so the same filtered pitches always group the same way.
+ */
+export function baseballPitchPlotClusters(points: readonly BaseballPitchPlotPoint[]): BaseballPitchPlotCluster[] {
+  const clusters: BaseballPitchPlotCluster[] = []
+  for (const point of points) {
+    const display = baseballPitchPadDisplay({ x: point.x, y: point.y })
+    const near = clusters.find(cluster =>
+      Math.hypot(cluster.x - display.x, cluster.y - display.y) < BASEBALL_PITCH_PLOT_OVERLAP
+    )
+    if (near) near.points.push(point)
+    else clusters.push({ id: point.eventId, x: display.x, y: display.y, points: [point] })
+  }
+  return clusters
 }
 
 export interface BaseballPitchCountRow {

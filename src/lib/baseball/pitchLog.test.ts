@@ -7,6 +7,7 @@ import {
   baseballPitchKind,
   baseballPitchLog,
   baseballPitchPlot,
+  baseballPitchPlotClusters,
 } from './pitchLog'
 import { baseballScoreboardView } from './trackerView'
 import { baseballSetup, ctx, expectOk, inPlay, pitch, pitches, projection, startedGame, strikeout } from './testFixtures'
@@ -107,6 +108,48 @@ describe('Baseball pitch plot', () => {
     expect(baseballPitchPlot(sport, log, { ...filter, batterHand: 'R' }).points).toHaveLength(0)
     expect(baseballPitchPlot(sport, log, { ...filter, batterHand: 'unknown' }).points).toHaveLength(3)
     expect(baseballPitchPlot(sport, log, { ...filter, pitcherId: 'opp-p1' }).points).toHaveLength(0)
+  })
+})
+
+describe('Baseball pitch plot overlaps', () => {
+  const spot = { x: 0.5, y: 0.5 }
+
+  it('puts identical-location pitches with identical filters into one chooser, in game order', () => {
+    let state = startedGame()
+    for (const result of ['called_strike', 'called_strike', 'foul', 'foul', 'foul'] as const) {
+      state = pitch(state, { result, pitchLocation: spot })
+    }
+    const sport = sportOf(state)
+    const plot = baseballPitchPlot(sport, logOf(state), { ...BASEBALL_PITCH_DEFAULT_FILTER, kind: 'foul', count: '0-2' })
+    expect(plot.points).toHaveLength(3)
+    expect(plot.clusters).toHaveLength(1)
+    const [cluster] = plot.clusters
+    expect(cluster.points.map(point => point.eventId)).toEqual(plot.points.map(point => point.eventId))
+    expect(new Set(cluster.points.map(point => point.playId)).size).toBe(3)
+    // Same filters, same pitch label: the context still tells them apart.
+    expect(new Set(cluster.points.map(point => point.label)).size).toBe(1)
+    expect(cluster.points.map(point => point.context)).toEqual([
+      'Top 1 · Pitch 3 · 0-2 · Foul',
+      'Top 1 · Pitch 4 · 0-2 · Foul',
+      'Top 1 · Pitch 5 · 0-2 · Foul',
+    ])
+    // Grouping is stable for the same input.
+    expect(baseballPitchPlotClusters(plot.points)).toEqual(plot.clusters)
+
+    // Without filters all five share the spot.
+    const all = baseballPitchPlot(sport, logOf(state))
+    expect(all.clusters).toHaveLength(1)
+    expect(all.clusters[0].points.map(point => point.sequence)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('keeps marks apart once they are farther than a fingertip and joins each to the first nearby group', () => {
+    let state = startedGame()
+    // Pad frame span is 2.5 zone widths, so 0.1 zone = 0.04 display (joins) and 0.2 = 0.08 (apart).
+    state = pitch(state, { result: 'ball', pitchLocation: { x: 0.5, y: 0.5 } })
+    state = pitch(state, { result: 'ball', pitchLocation: { x: 0.6, y: 0.5 } })
+    state = pitch(state, { result: 'called_strike', pitchLocation: { x: 0.7, y: 0.5 } })
+    const plot = baseballPitchPlot(sportOf(state), logOf(state))
+    expect(plot.clusters.map(cluster => cluster.points.map(point => point.sequence))).toEqual([[1, 2], [3]])
   })
 })
 
