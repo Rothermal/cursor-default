@@ -299,10 +299,10 @@ describe('Basketball release entry guards', () => {
     const context = source('src/context/GameContext.tsx')
     const handler = between(
       context,
-      'const enableBasketballCloudSync = useCallback(',
+      'const enableEventCloudSync = useCallback(',
       '\n\n  const markEventCloudGameReopened'
     )
-    const transportIndex = handler.indexOf('await enableBasketballEventCloud')
+    const transportIndex = handler.indexOf('await enable({')
     const persistIndex = handler.indexOf('saveParkedGameRecordStateAtomically')
     const hydrateIndex = handler.indexOf("dispatch({ type: 'HYDRATE_STATE'")
 
@@ -314,7 +314,8 @@ describe('Basketball release entry guards', () => {
     expect(transportIndex).toBeGreaterThanOrEqual(0)
     expect(persistIndex).toBeGreaterThan(transportIndex)
     expect(hydrateIndex).toBeGreaterThan(persistIndex)
-    expect(handler).toContain('Another local game already owns this cloud Basketball game.')
+    expect(handler).toContain("sportId === 'hockey' ? enableHockeyEventCloud : enableBasketballEventCloud")
+    expect(handler).toContain('Another local game already owns this cloud ${label} game.')
   })
 
   it('keeps one anchored clock strip mounted above both Basketball workspaces', () => {

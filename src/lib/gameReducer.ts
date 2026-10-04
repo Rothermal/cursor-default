@@ -24,7 +24,7 @@ import { rebuildGameEventProjection } from './gameEvents/projection'
 import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
 import { playerIdMapForRoster, shotChartForRoster } from './rosterAlignment'
-import { normalizeBasketballEventCloudPolicyState } from './basketball/eventCloudPolicy'
+import { normalizeEventCloudPolicyState } from './eventCloudPolicy'
 
 export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyncState {
   return {
@@ -180,7 +180,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'HYDRATE_STATE': {
       const s = action.state
       const cs = s.cloudSync
-      const normalizedState = normalizeBasketballEventCloudPolicyState({
+      const normalizedState = normalizeEventCloudPolicyState({
         ...s,
         gameDataAuthority: normalizeGameDataAuthority(s.gameDataAuthority),
         eventStream: normalizeGameEventStream(s.eventStream),

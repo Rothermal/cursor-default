@@ -12,6 +12,11 @@ import {
 } from '../lib/basketball/cloudSync'
 import { basketballSummaryPath } from '../lib/basketball/summary'
 import {
+  createHockeyIndependentRecorderState,
+  loadHockeyCloudDataAuthority,
+  loadHockeyCloudGameById,
+} from '../lib/hockey/cloudSync'
+import {
   resolveEventRecorderOpenSource,
   type EventRecorderOpenSource,
 } from '../lib/gameEvents/cloudOpen'
@@ -366,6 +371,92 @@ export default function Games() {
     )
   }
 
+  /**
+   * HKY-5B: a Hockey event game resumes this recorder's matching local copy first, then their
+   * cloud stream, or starts an independent stream. Final games and viewers go to Game Info.
+   * Returns false for a legacy Hockey game, which opens through the aggregate path.
+   */
+  const openHockeyEventGame = async (game: GameRow): Promise<boolean> => {
+    if (!userId) return true
+    setError(null)
+    setLoadingGameId(game.id)
+    let authority: 'sport_events' | 'legacy'
+    try {
+      authority = await loadHockeyCloudDataAuthority(game.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Hockey authority could not load')
+      setLoadingGameId(null)
+      return true
+    }
+    if (authority === 'legacy') {
+      setLoadingGameId(null)
+      return false
+    }
+    const canTrack = game.team_id ? canTrackGames(teamRolesById[game.team_id] ?? null) : game.created_by === userId
+    if (game.status === 'final' || !canTrack) {
+      setLoadingGameId(null)
+      navigate(gameInfoPath(game.id, game.team_id))
+      return true
+    }
+    if (state.sport?.id === 'hockey' && state.gameDataAuthority === 'sport_events' && state.cloudSync.gameId === game.id) {
+      setLoadingGameId(null)
+      navigate('/game')
+      return true
+    }
+    let source: EventRecorderOpenSource<GameState>
+    try {
+      source = await resolveEventRecorderOpenSource(
+        'hockey',
+        game.id,
+        activeLocalGameId,
+        parkedGames,
+        () => loadHockeyCloudGameById(userId, game.id)
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load Hockey game')
+      setLoadingGameId(null)
+      return true
+    }
+    if (currentUserIdRef.current !== userId) {
+      setError('The signed-in account changed. Open the Hockey game again.')
+      setLoadingGameId(null)
+      return true
+    }
+    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+    if (source.kind === 'local') {
+      if (hasActiveGame && activeLocalGameId !== source.localGameId && !prepareActiveGameMutation('resume_commit')) {
+        setLoadingGameId(null)
+        return true
+      }
+      const resumed = resumeParkedGame(source.localGameId)
+      setLoadingGameId(null)
+      if (resumed) navigate('/game')
+      return true
+    }
+    let hockeyGame = source.kind === 'cloud' ? source.state : null
+    if (source.kind === 'empty') {
+      if (!window.confirm('Start your own recorder stream for this game? Select Cancel to stay in Cloud Games.')) {
+        setLoadingGameId(null)
+        return true
+      }
+      hockeyGame = await createHockeyIndependentRecorderState(userId, game.id).catch(err => {
+        setError(err instanceof Error ? err.message : 'Could not start recorder stream')
+        return null
+      })
+      if (currentUserIdRef.current !== userId) {
+        setError('The signed-in account changed. Open the Hockey game again.')
+        hockeyGame = null
+      }
+    }
+    if (!hockeyGame || (hasActiveGame && !prepareActiveGameMutation('resume_commit')) || !openGameSnapshot(hockeyGame)) {
+      setLoadingGameId(null)
+      return true
+    }
+    setLoadingGameId(null)
+    navigate('/game')
+    return true
+  }
+
   const handleOpenGame = async (game: GameRow) => {
     if (!userId) return
     const gameSportId =
@@ -585,6 +676,10 @@ export default function Games() {
         return
       }
       setLoadingGameId(null)
+    }
+    if (gameSportId === 'hockey') {
+      const handled = await openHockeyEventGame(game)
+      if (handled) return
     }
     const canTrackCurrentGame = game.team_id
       ? canTrackGames(teamRole)

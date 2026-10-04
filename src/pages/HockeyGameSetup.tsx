@@ -34,6 +34,8 @@ import {
   type HockeySetupLoadStatus,
   type HockeySetupEntry,
 } from '../lib/hockey'
+import { ensureHockeyReleaseCapabilities } from '../lib/hockey/releaseCapabilities'
+import { hockeySetupCloudGate, type HockeySetupCapabilityState, type HockeySetupStorage } from '../lib/hockey/setupCloud'
 import { getHockeyEventCreationPolicy } from '../lib/sportAvailability'
 import { supabase } from '../lib/supabase'
 
@@ -85,6 +87,10 @@ function HockeySetupForm() {
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '' })
   const [error, setError] = useState<string | null>(null)
   const [viewFlipped, setViewFlipped] = useState(false)
+  const [storage, setStorage] = useState<HockeySetupStorage>('cloud')
+  const [capability, setCapability] = useState<HockeySetupCapabilityState>({ status: 'idle' })
+  const [capabilityAttempt, setCapabilityAttempt] = useState(0)
+  const cloudGate = hockeySetupCloudGate({ cloudAvailable, storage, capability })
 
   // Only a selection that resolves to one of the recorder's Hockey teams loads a roster.
   const team = teamsStatus === 'ready' ? teams.find(entry => entry.id === teamId) ?? null : null
@@ -154,6 +160,17 @@ function HockeySetupForm() {
     return () => { cancelled = true }
   }, [resolvedTeamId, rosterAttempt])
 
+  // The handshake keeps Cloud unavailable until the HKY-5A migrations are applied.
+  useEffect(() => {
+    if (!cloudAvailable || storage !== 'cloud' || !user) return
+    let cancelled = false
+    setCapability({ status: 'checking' })
+    void ensureHockeyReleaseCapabilities(user.id, { force: capabilityAttempt > 0 }).then(result => {
+      if (!cancelled) setCapability({ status: 'done', result })
+    })
+    return () => { cancelled = true }
+  }, [cloudAvailable, storage, user, capabilityAttempt])
+
   const update = (next: HockeySetupDraft) => {
     setDraft(next)
     setError(null)
@@ -189,6 +206,10 @@ function HockeySetupForm() {
       setError(teamGate.message)
       return
     }
+    if (!cloudGate.canStart) {
+      setError(cloudGate.message ?? 'Checking Hockey cloud support…')
+      return
+    }
     const built = buildHockeyMatchSetup(draft, teamGate.source)
     if (!built.ok) {
       setError(built.message)
@@ -201,6 +222,7 @@ function HockeySetupForm() {
       opponentName: draft.opponentName,
       date,
       context: { recorderUserId: user?.id ?? null, occurredAt: new Date().toISOString() },
+      cloudPolicy: cloudGate.cloudPolicy,
     })
     if (!created.ok) {
       setError(created.message)
@@ -221,8 +243,38 @@ function HockeySetupForm() {
     <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
       <div>
         <h1 className="text-lg font-bold">New Hockey game</h1>
-        <p className="text-sm text-content-muted">Saved on this device only. Event Hockey does not sync to the cloud yet.</p>
+        {!cloudAvailable && (
+          <p className="text-sm text-content-muted">Saved on this device. Sign in to sync Hockey games to the cloud.</p>
+        )}
       </div>
+
+      {cloudAvailable && (
+        <Section title="Sync">
+          <Segmented
+            label="Save to"
+            options={[{ value: 'cloud', label: 'Cloud' }, { value: 'device', label: 'This device only' }]}
+            value={storage}
+            onChange={(value: HockeySetupStorage) => { setStorage(value); setError(null) }}
+          />
+          <p className="text-sm text-content-muted">
+            {storage === 'cloud'
+              ? 'Events sync as you record them, and the game appears in Cloud Games.'
+              : 'The game stays on this device. You can enable cloud sync later from the Game menu.'}
+          </p>
+          {storage === 'cloud' && !cloudGate.canStart && cloudGate.checking && (
+            <p className="text-sm text-content-muted" role="status">Checking Hockey cloud support…</p>
+          )}
+          {storage === 'cloud' && !cloudGate.canStart && !cloudGate.checking && (
+            <div role="alert" className="space-y-2 rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
+              <p>{cloudGate.message}</p>
+              <div className="flex gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setCapabilityAttempt(attempt => attempt + 1)}>Retry</button>
+                <button type="button" className="btn-secondary" onClick={() => setStorage('device')}>This device only</button>
+              </div>
+            </div>
+          )}
+        </Section>
+      )}
 
       <Section title="Teams">
         {cloudAvailable && (
@@ -423,7 +475,14 @@ function HockeySetupForm() {
         <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>
       )}
       <div className="sticky bottom-0 -mx-4 border-t border-line bg-canvas/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
-        <button type="button" className="btn-primary w-full" onClick={start}>Start game</button>
+        <button
+          type="button"
+          className="btn-primary w-full"
+          onClick={start}
+          disabled={!cloudGate.canStart}
+        >
+          Start game
+        </button>
       </div>
     </main>
   )

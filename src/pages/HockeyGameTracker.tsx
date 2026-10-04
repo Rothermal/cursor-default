@@ -12,6 +12,7 @@ import HockeyTimeline from '../components/hockey/HockeyTimeline'
 import HockeyTimelineEditor, { type HockeyTimelineAction } from '../components/hockey/HockeyTimelineEditor'
 import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
+import { HockeyCloudMenuSection, HockeyCloudSyncAlerts } from '../components/hockey/HockeyCloudSync'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
@@ -405,6 +406,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           {error}
         </p>
       )}
+      <HockeyCloudSyncAlerts state={state} />
 
       <div className="grid grid-cols-2 gap-1 rounded-md border border-line bg-surface p-1" role="tablist" aria-label="Tracker view">
         {(['track', 'timeline'] as const).map(id => (
@@ -572,6 +574,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
               Reopen game
             </MenuButton>
           )}
+          <HockeyCloudMenuSection state={state} onDone={() => setMenuOpen(false)} />
         </GameMenu>
       )}
 
