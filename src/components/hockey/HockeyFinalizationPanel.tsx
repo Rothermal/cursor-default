@@ -1,5 +1,5 @@
 import type { FlushCloudSyncResult } from '../../context/GameContext'
-import type { GameState } from '../../types'
+import type { EventFinalizationSideLabels } from '../../lib/gameEvents/finalizationLabels'
 import {
   finalizeHockeyGame,
   loadHockeyCanonicalPublication,
@@ -52,7 +52,8 @@ const HOCKEY_FINALIZATION_ADAPTER: EventFinalizationAdapter<
 interface HockeyFinalizationPanelProps {
   gameId: string
   gameStatus: string
-  baseState: GameState
+  /** Team names of the inspected cloud game; Hockey reopen needs no local authority state. */
+  sideLabels: EventFinalizationSideLabels
   currentUserId: string | null
   canManage: boolean
   trackedScore: number | null

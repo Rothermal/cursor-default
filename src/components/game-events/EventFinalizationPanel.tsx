@@ -2,19 +2,22 @@ import { AlertTriangle, CheckCircle2, LockKeyhole, RefreshCw, RotateCcw, X } fro
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { FlushCloudSyncResult } from '../../context/GameContext'
 import type { GameState } from '../../types'
-import { gameSideDisplayName } from '../../lib/display'
 import type {
   EventCanonicalPublication,
   EventCanonicalPublicationHistoryEntry,
   EventFinalizationReadiness,
   EventPrimaryFinalizationConflict,
 } from '../../lib/gameEvents/finalization'
+import {
+  eventFinalizationPreviewSideLabels,
+  type EventFinalizationSideLabels,
+} from '../../lib/gameEvents/finalizationLabels'
 
 /** What the shared review dialog reads from a sport's finalization preview. */
 export interface EventFinalizationPreviewView {
   recorder: { displayName: string }
   readiness: EventFinalizationReadiness
-  projection: { eventStream: { events: unknown[] } }
+  projection: { state: Pick<GameState, 'gameInfo'>; eventStream: { events: unknown[] } }
   snapshot: unknown
   score: { tracked: number; opponent: number } | null
   endReason: string | null
@@ -27,7 +30,8 @@ export interface EventFinalizationReopenInput<Publication, Mode extends string> 
   /** Null unless the sport offered reopen modes for this publication. */
   mode: Mode | null
   publication: Publication | null
-  baseState: GameState
+  /** Authority input for sports that need it (Basketball anchored reopen); never display labels. */
+  baseState: GameState | null
   userId: string | null
 }
 
@@ -72,7 +76,9 @@ interface EventFinalizationPanelProps<
   adapter: EventFinalizationAdapter<Publication, HistoryEntry, Preview, Result, ReopenResult, Mode>
   gameId: string
   gameStatus: string
-  baseState: GameState
+  /** Team names of the inspected cloud game, never the game active on this device. */
+  sideLabels: EventFinalizationSideLabels
+  baseState?: GameState | null
   currentUserId: string | null
   canManage: boolean
   trackedScore: number | null
@@ -94,7 +100,8 @@ export default function EventFinalizationPanel<
   adapter,
   gameId,
   gameStatus,
-  baseState,
+  sideLabels,
+  baseState = null,
   currentUserId,
   canManage,
   trackedScore,
@@ -120,6 +127,7 @@ export default function EventFinalizationPanel<
   const reopenMode = reopenModes
     ? reopenModes.find(option => option.value === chosenReopenMode)?.value ?? reopenModes[0]?.value ?? null
     : null
+  const previewLabels = eventFinalizationPreviewSideLabels(preview?.projection.state, sideLabels)
   const ids = {
     title: `${adapter.sportId}-finalization-title`,
     history: `${adapter.sportId}-publication-history-title`,
@@ -299,7 +307,7 @@ export default function EventFinalizationPanel<
             <div className="grid grid-cols-3 divide-x divide-line text-center">
               <div>
                 <p className="text-xl font-bold text-info-content">{trackedScore ?? '-'}</p>
-                <p className="truncate text-[11px] text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
+                <p className="truncate text-[11px] text-content-muted" title={sideLabels.tracked}>{sideLabels.tracked}</p>
               </div>
               <div>
                 <CheckCircle2 size={20} className="mx-auto text-success-content" />
@@ -307,7 +315,7 @@ export default function EventFinalizationPanel<
               </div>
               <div>
                 <p className="text-xl font-bold text-content">{opponentScore ?? '-'}</p>
-                <p className="truncate text-[11px] text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
+                <p className="truncate text-[11px] text-content-muted" title={sideLabels.opponent}>{sideLabels.opponent}</p>
               </div>
             </div>
             <p className="mt-3 text-xs text-content-muted">
@@ -453,11 +461,11 @@ export default function EventFinalizationPanel<
               <div className="mt-4 grid grid-cols-2 divide-x divide-line border-y border-line py-3 text-center">
                 <div>
                   <p className="text-3xl font-bold text-info-content">{preview.score.tracked}</p>
-                  <p className="truncate text-xs text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
+                  <p className="truncate text-xs text-content-muted" title={previewLabels.tracked}>{previewLabels.tracked}</p>
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-content">{preview.score.opponent}</p>
-                  <p className="truncate text-xs text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
+                  <p className="truncate text-xs text-content-muted" title={previewLabels.opponent}>{previewLabels.opponent}</p>
                 </div>
               </div>
             )}

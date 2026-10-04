@@ -772,6 +772,11 @@ export default function GameInfo() {
   const trackedTeamName = team
     ? teamDisplayName(team)
     : game?.tracked_team_name ?? 'My Team'
+  // The game being inspected, which may not be the game active on this device.
+  const inspectedSideLabels = {
+    tracked: trackedTeamName,
+    opponent: game?.opponent_name || 'Opponent',
+  }
   const canTrackCurrentGame = Boolean(
     game && userId && (game.team_id ? canTrackGames(teamRole) : game.created_by === userId)
   )
@@ -861,6 +866,7 @@ export default function GameInfo() {
                 <BasketballFinalizationPanel
                   gameId={game.id}
                   gameStatus={game.status}
+                  sideLabels={inspectedSideLabels}
                   baseState={state}
                   currentUserId={userId}
                   canManage={canManageRecorderAuthority}
@@ -927,7 +933,7 @@ export default function GameInfo() {
                 <HockeyFinalizationPanel
                   gameId={game.id}
                   gameStatus={game.status}
-                  baseState={state}
+                  sideLabels={inspectedSideLabels}
                   currentUserId={userId}
                   canManage={canManageRecorderAuthority}
                   trackedScore={game.home_team_score ?? null}

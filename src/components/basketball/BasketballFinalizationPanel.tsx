@@ -18,6 +18,7 @@ import {
   type BasketballReopenResult,
 } from '../../lib/basketball/finalization'
 import type { BasketballReopenMode } from '../../lib/basketball/types'
+import type { EventFinalizationSideLabels } from '../../lib/gameEvents/finalizationLabels'
 import EventFinalizationPanel, { type EventFinalizationAdapter } from '../game-events/EventFinalizationPanel'
 
 function isAnchoredPublication(publication: BasketballCanonicalPublication | null): boolean {
@@ -43,7 +44,10 @@ const BASKETBALL_FINALIZATION_ADAPTER: EventFinalizationAdapter<
   loadConflicts: loadBasketballPrimaryFinalizationConflicts,
   resolveConflict: resolveBasketballPrimaryFinalizationConflict,
   reopen: ({ gameId, reason, mode, publication, baseState, userId }) => {
-    const authorityState = publication
+    if (publication && !baseState) {
+      throw new Error('Basketball reopen authority is unavailable.')
+    }
+    const authorityState = publication && baseState
       ? basketballCanonicalAuthorityState(baseState, publication)
       : null
     const anchored = isAnchoredPublication(publication) && authorityState
@@ -71,6 +75,7 @@ const BASKETBALL_FINALIZATION_ADAPTER: EventFinalizationAdapter<
 interface BasketballFinalizationPanelProps {
   gameId: string
   gameStatus: string
+  sideLabels: EventFinalizationSideLabels
   baseState: GameState
   currentUserId: string | null
   canManage: boolean
