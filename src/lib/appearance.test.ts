@@ -93,6 +93,11 @@ describe('appearance bootstrap/runtime contract', () => {
         ['diamond-line', 'diamond-grass'], ['diamond-line', 'diamond-dirt'],
         ['diamond-ink', 'diamond-grass'], ['diamond-ink', 'diamond-dirt'],
         ['diamond-tracked', 'diamond-ink'], ['diamond-opponent', 'diamond-ink'],
+        // Pitch plot marks sit on the muted surface behind the strike zone.
+        ['zone-ball', 'surface-muted'], ['zone-called', 'surface-muted'], ['zone-swinging', 'surface-muted'],
+        ['zone-foul', 'surface-muted'], ['zone-in-play', 'surface-muted'], ['zone-hbp', 'surface-muted'],
+        ['zone-ball', 'surface'], ['zone-called', 'surface'], ['zone-swinging', 'surface'],
+        ['zone-foul', 'surface'], ['zone-in-play', 'surface'], ['zone-hbp', 'surface'],
       ]) {
         const a = tokens[foreground], b = tokens[background]
         expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/${background} graphics`).toBeGreaterThanOrEqual(3)

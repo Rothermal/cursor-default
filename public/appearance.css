@@ -37,6 +37,12 @@
   --diamond-ink: 15 23 42;
   --diamond-tracked: 250 204 21;
   --diamond-opponent: 56 189 248;
+  --zone-ball: 0 114 178;
+  --zone-called: 213 94 0;
+  --zone-swinging: 170 51 119;
+  --zone-foul: 120 96 0;
+  --zone-in-play: 0 128 94;
+  --zone-hbp: 91 33 182;
   --accent: 29 78 216;
   --accent-hover: 30 64 175;
   --accent-content: 255 255 255;
@@ -146,6 +152,12 @@
   --diamond-ink: 15 23 42;
   --diamond-tracked: 250 204 21;
   --diamond-opponent: 56 189 248;
+  --zone-ball: 86 180 233;
+  --zone-called: 240 140 70;
+  --zone-swinging: 230 140 195;
+  --zone-foul: 240 215 90;
+  --zone-in-play: 70 205 155;
+  --zone-hbp: 185 160 250;
   color-scheme: dark;
   --canvas: 24 25 28;
   --surface: 33 35 39;

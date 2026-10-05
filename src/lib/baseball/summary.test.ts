@@ -73,6 +73,7 @@ describe('Baseball Summary route', () => {
     expect(parseBaseballSummaryTab(new URLSearchParams('tab=box'))).toBe('box')
     expect(parseBaseballSummaryTab(new URLSearchParams('tab=plays'))).toBe('plays')
     expect(parseBaseballSummaryTab(new URLSearchParams('tab=spray'))).toBe('spray')
+    expect(parseBaseballSummaryTab(new URLSearchParams('tab=pitches'))).toBe('pitches')
     expect(parseBaseballSummaryTab(new URLSearchParams('tab=nonsense'))).toBe('overview')
     expect(baseballSummaryPath('box')).toBe('/summary?tab=box')
   })

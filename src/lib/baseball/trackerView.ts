@@ -3,6 +3,7 @@ import { baseballSportState } from './commands'
 import type {
   BaseballBase,
   BaseballCapturePreferences,
+  BaseballMatchRules,
   BaseballPitchResult,
   BaseballSportGameState,
   BaseballTeamSide,
@@ -160,15 +161,19 @@ function pitcherCount(sport: BaseballSportGameState): BaseballPitcherCount {
   const fieldingSide: BaseballTeamSide = projection.battingSide === 'tracked' ? 'opponent' : 'tracked'
   const pitcherId = projection.lineups[fieldingSide].pitcherId
   const pitches = projection.pitchingLines[pitcherId]?.pitches ?? 0
-  const rules = setup.rulesSnapshot
-  let alert: BaseballPitcherCount['alert'] = null
+  return { label: baseballPersonLabel(sport, pitcherId).name, pitches, alert: baseballPitchCountAlert(setup.rulesSnapshot, pitches) }
+}
+
+/** The profile limit, or the highest warning threshold a pitch total has reached (shared with the Summary, BSB-5C). */
+export function baseballPitchCountAlert(
+  rules: Pick<BaseballMatchRules, 'pitchCountLimit' | 'pitchCountWarnings'>,
+  pitches: number
+): BaseballPitcherCount['alert'] {
   if (rules.pitchCountLimit !== null && pitches >= rules.pitchCountLimit) {
-    alert = { kind: 'limit', threshold: rules.pitchCountLimit }
-  } else {
-    const reached = rules.pitchCountWarnings.filter(threshold => pitches >= threshold)
-    if (reached.length > 0) alert = { kind: 'warning', threshold: Math.max(...reached) }
+    return { kind: 'limit', threshold: rules.pitchCountLimit }
   }
-  return { label: baseballPersonLabel(sport, pitcherId).name, pitches, alert }
+  const reached = rules.pitchCountWarnings.filter(threshold => pitches >= threshold)
+  return reached.length > 0 ? { kind: 'warning', threshold: Math.max(...reached) } : null
 }
 
 export function baseballLineScoreView(sport: BaseballSportGameState, names: BaseballTeamNames): BaseballLineScoreView {
