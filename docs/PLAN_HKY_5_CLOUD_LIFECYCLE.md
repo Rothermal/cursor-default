@@ -303,3 +303,17 @@ Filled in as each slice lands.
   with a setup snapshot is already excluded. Enable is refused for a game recorded signed
   out or by another account, because sync requires every event to be this recorder's.
   Game Info recorders, finalize, reopen and the read-only finalized tracker are HKY-5B2.
+- **HKY-5B2** (recorders, finalize, reopen): the Basketball recorder and finalization code
+  moved into sport-neutral `src/lib/gameEvents/recorders.ts`, `finalization.ts`,
+  `EventRecorderManager`, `EventFinalizationPanel` and `useEventRecorderPresence`, driven by
+  each sport's RPC names; Basketball keeps its messages, DOM ids and anchored reopen modes
+  through a thin adapter. Hockey's Game Info shows recorders, primary selection, readiness,
+  conflicts, Finalize, publication history and Reopen with a reason. Finalize accepts an
+  ended or abandoned primary (Q2), previews the score the server's policy produces, and
+  reads the stored score back; if the server counted differently, its score is shown with a
+  note. Hockey has no reopen handoff read (only Basketball's 064 has one), so the manager's
+  own reopen result is handed to the matching parked copy: the primary recorder's ended
+  stream gets `hockey.match_reopened` with the reason, never earlier than its last event,
+  and applying it twice changes nothing. A finalized cloud game is read-only: capture,
+  corrections, additions, remove/restore and Undo return `cloud_final`, the tracker shows a
+  banner and hides local Reopen, and Game Info opens only the recorder's existing stream.

@@ -125,8 +125,50 @@ approval on the first bind.
 | Edit the same event on two devices with one account | Conflict banner, Review, keep local or cloud |
 | Team game kept offline, a source player deleted elsewhere, then reconnect | Binding error; the team owner sees Preserve history, which binds with the frozen player |
 
+## HKY-5B2 Recorders, finalize and reopen
+
+### Automated
+
+`src/lib/hockey/finalization.test.ts` (10 cases):
+
+- published score: goals plus adjustments, one goal for a decided shootout, also when the
+  game is abandoned after the shootout; ended publishes as completed, abandoned as
+  abandoned, suspended and running games do not publish;
+- canonical snapshot: version 2 envelope, payload schema 1, setup only (no projection),
+  round-trips through the parser; another recorder, a cached projection or another schema
+  is refused;
+- prepare confirms the exact checkpoint with the Hockey wrapper and rechecks readiness;
+  finalize sends the snapshot to `finalize_hockey_event_game` and returns the stored score
+  (the preview score, flagged unconfirmed, when it cannot be read back); a suspended primary
+  is refused before any checkpoint call;
+- reopen trims the reason and refuses a short one; history has no reopen mode;
+- a finalized binding refuses capture, corrections, Undo and remove with one message, and
+  accepts capture again once the binding is in progress;
+- the reopen handoff appends `hockey.match_reopened` with the reason only to the primary
+  recorder's ended stream, never earlier than its last event, once; anyone else's copy
+  only returns to in progress; another game id is refused.
+
+`src/lib/hockey/recorders.test.ts` (2 cases): the fixed Hockey wrappers for recorders,
+history and primary selection, and the duplicate-primary and echo checks.
+
+The Basketball recorder, finalization and reopen tests pass unchanged on the shared code.
+
+### Manual (after the owner applies 072 and 073)
+
+| Step | Expected |
+|---|---|
+| Owner opens Game Info for a synced Hockey game while it is in progress | Recorder Streams list; no Finalize until the primary ends or is abandoned |
+| Second scorer records an independent stream; owner selects it as primary | Primary changes and the history lists the selection |
+| Primary ends the game; owner chooses Review Finalization | Review shows the score (with the shootout note when one decided it) |
+| Finalize and Lock | Game Info shows Final with the server's score; Cloud Games shows final |
+| Recorder opens the game afterwards | Tracker shows the read-only banner; capture, Timeline edits and Undo are refused; no local Reopen |
+| Suspended primary | Finalize stays unavailable |
+| Owner reopens with a reason on the recorder's device | Publication history shows it invalidated; a parked copy of the game is in progress again with the reason in the Timeline (a cleanly synced final copy may already have been cleared on reload: opening the game then loads the recorder's stream, and the Game menu Reopen continues it) |
+| Recorder corrects a goal and syncs; owner finalizes again | Publication 2 with the corrected score |
+| Viewer opens Game Info for a final game | Score and recorder presence; no Finalize or Reopen; opening says there is no stream of theirs |
+
 ### Pending
 
 - Apply 072 and 073 to the Supabase project (owner).
-- Two-device live check after HKY-5B: one recorder, a viewer on a second device, finalize,
-  reopen, correct and re-finalize.
+- Two-device live check after HKY-5B2: one recorder, a viewer on a second device, finalize,
+  reopen, correct and re-finalize (the manual table above).
