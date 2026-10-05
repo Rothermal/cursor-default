@@ -6,6 +6,7 @@ import {
   parseSportPersonalCloudRecord,
   reconcileSportPersonalSettings,
   sportPersonalSettingsCacheScope,
+  staleSportPersonalSave,
   validSportPersonalSettingsCache,
   type SportPersonalSettingsAdapter,
 } from '../lib/sportPersonalSettings'
@@ -310,21 +311,13 @@ export function useSportPersonalSettings<TSettings>(
       }, scope)
       return true
     }
-    if (expectedRevision !== stateRef.current.sync.revision) {
-      commit({
-        ...stateRef.current,
-        sync: {
-          ...stateRef.current.sync,
-          status: 'conflict',
-          error: null,
-          conflict: {
-            device: parsed.value,
-            cloud: structuredClone(stateRef.current.settings),
-            cloudRevision: stateRef.current.sync.revision,
-            cloudUpdatedAt: stateRef.current.sync.lastSyncedAt ?? new Date().toISOString(),
-          },
-        },
-      })
+    const stale = staleSportPersonalSave(parsed.value, expectedRevision, {
+      settings: stateRef.current.settings,
+      revision: stateRef.current.sync.revision,
+      lastSyncedAt: stateRef.current.sync.lastSyncedAt,
+    })
+    if (stale) {
+      commit({ ...stateRef.current, sync: { ...stateRef.current.sync, status: 'conflict', error: null, conflict: stale } })
       return false
     }
     const baseRevision = stateRef.current.sync.revision

@@ -126,3 +126,23 @@ export function reconcileSportPersonalSettings<TSettings>(
   if (!localRecord) return { action: 'use_defaults', settings: structuredClone(bootstrapSettings) }
   return { action: 'upload_local', settings: localRecord.settings, expectedRevision: null }
 }
+
+/**
+ * A save made from an older revision than the one now shown (another device's change arrived
+ * through focus, online or Refresh after the draft was taken) is a conflict for the recorder
+ * to resolve with Use Cloud or Keep This Device, never a silent overwrite.
+ */
+export function staleSportPersonalSave<TSettings>(
+  device: TSettings,
+  expectedRevision: number | null,
+  current: { settings: TSettings; revision: number | null; lastSyncedAt: string | null },
+  now = new Date().toISOString()
+): { device: TSettings; cloud: TSettings; cloudRevision: number | null; cloudUpdatedAt: string } | null {
+  if (expectedRevision === current.revision) return null
+  return {
+    device,
+    cloud: structuredClone(current.settings),
+    cloudRevision: current.revision,
+    cloudUpdatedAt: current.lastSyncedAt ?? now,
+  }
+}

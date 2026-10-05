@@ -190,6 +190,17 @@ wins without a pending edit, a pending edit uploads on its base revision and con
 otherwise, untouched defaults never upload, invalid or newer cloud copies and foreign caches
 fail closed, account-scoped caches).
 
+`src/lib/settingsDraft.test.ts` (2 cases, review fix): an edited personal draft keeps the
+revision it started from when focus, online or Refresh brings another device's change, so its
+save becomes a Use Cloud / Keep This Device conflict; an untouched or matching draft adopts the
+saved copy and its revision.
+
+`src/lib/hockey/setupSettingsSource.test.ts` (4 cases, review fix): team defaults that fail to
+load fall back to built-in rules but stay eligible; an in-flight read (including a retry) is
+never treated as loaded and never consumes the roster; error, retry and a successful load apply
+the team rules and lineup once; later refreshes neither fall back nor re-apply; recorder edits
+made meanwhile win; personal settings apply without a team.
+
 `src/lib/hockey/migration074.test.ts` (5 cases): the SQL profile copy equals every client
 profile, validation runs before the shared core, the team write is owner/admin, Hockey-only,
 locked and audited, contract 2 lists the new writes, and only the two writes and the handshake
@@ -212,6 +223,7 @@ HKY-5A check now applies migrations only up to 073.
 | Owner opens Team Manage for a Hockey team | Hockey Defaults: rules and a role for each active player; Save Shared Defaults |
 | Scorer or viewer opens the same page | Read only |
 | Deactivate a default starter, reopen Team Manage | Warning and Remove unavailable players before saving |
+| Start a team game while offline, then reconnect and tap Retry team defaults | Built-in rules with a warning first; after the retry the team rules and lineup fill in unless already changed |
 | Start a team game | Rules say they start from the team defaults; goalies and starters are filled in; changing them, the profile, length or clock changes only this game |
 | Start a team game with a default player no longer on the roster | Note that the player stays out of this game |
 | Cloud game before 074 is applied | Setup offers Retry or This device only |

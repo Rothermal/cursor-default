@@ -1,11 +1,11 @@
 import { RefreshCw, Save } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSettings } from '../../context/SettingsContext'
 import { useSportPersonalSettings, type SportPersonalSettingsStatus } from '../../hooks/useSportPersonalSettings'
 import { hockeySettingsFingerprint, hockeySettingsRules } from '../../lib/hockey/settings'
 import { hockeyPersonalSettingsAdapter } from '../../lib/hockey/settingsSync'
-import type { HockeySettingsV1 } from '../../lib/hockey/types'
+import { createSettingsDraft, editSettingsDraft, syncSettingsDraft } from '../../lib/settingsDraft'
 import { getHockeyEventCreationPolicy } from '../../lib/sportAvailability'
 import HockeyRulesFields from './HockeyRulesFields'
 
@@ -56,19 +56,19 @@ export default function HockeySettings() {
 
 function PersonalHockeyRules() {
   const personal = useSportPersonalSettings(hockeyPersonalSettingsAdapter)
-  const [draft, setDraft] = useState<HockeySettingsV1>(() => structuredClone(personal.settings))
-  const previousSaved = useRef(hockeySettingsFingerprint(personal.settings))
+  const [state, setState] = useState(() =>
+    createSettingsDraft(personal.settings, personal.sync.revision, hockeySettingsFingerprint))
+  const draft = state.draft
   const dirty = hockeySettingsFingerprint(draft) !== hockeySettingsFingerprint(personal.settings)
   const busy = personal.sync.status === 'checking' || personal.sync.status === 'saving'
   const conflict = personal.sync.conflict
 
-  // Adopt loaded or saved settings unless there are unsaved edits.
+  // Adopt loaded or saved settings, and their revision, unless there are unsaved edits. An
+  // edited draft keeps the revision it started from, so saving it after another device's
+  // change becomes a conflict rather than an overwrite.
   useEffect(() => {
-    const next = hockeySettingsFingerprint(personal.settings)
-    const current = hockeySettingsFingerprint(draft)
-    if (current === previousSaved.current && current !== next) setDraft(structuredClone(personal.settings))
-    previousSaved.current = next
-  }, [draft, personal.settings])
+    setState(current => syncSettingsDraft(current, personal.settings, personal.sync.revision, hockeySettingsFingerprint))
+  }, [personal.settings, personal.sync.revision])
 
   return (
     <div className="space-y-3 border-b border-line pb-3">
@@ -101,22 +101,22 @@ function PersonalHockeyRules() {
           <div className="grid grid-cols-2 gap-2">
             <button type="button" className="btn-secondary text-sm" onClick={() => {
               personal.useCloud()
-              setDraft(structuredClone(conflict.cloud))
+              setState(createSettingsDraft(conflict.cloud, conflict.cloudRevision, hockeySettingsFingerprint))
             }}>Use Cloud</button>
             <button type="button" className="btn-secondary text-sm" onClick={() => void personal.keepDevice()}>Keep This Device</button>
           </div>
         </div>
       )}
-      <HockeyRulesFields idPrefix="hockey-personal" settings={draft} disabled={busy} onChange={setDraft} />
+      <HockeyRulesFields idPrefix="hockey-personal" settings={draft} disabled={busy} onChange={next => setState(current => editSettingsDraft(current, next))} />
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" className="btn-secondary" disabled={!dirty} onClick={() => setDraft(structuredClone(personal.settings))}>
+        <button type="button" className="btn-secondary" disabled={!dirty} onClick={() => setState(createSettingsDraft(personal.settings, personal.sync.revision, hockeySettingsFingerprint))}>
           Discard
         </button>
         <button
           type="button"
           className="btn-primary inline-flex items-center justify-center gap-2"
           disabled={!dirty || busy || !hockeySettingsRules(draft)}
-          onClick={() => void personal.save(draft)}
+          onClick={() => void personal.save(draft, state.baseRevision)}
         >
           {personal.sync.status === 'saving' ? <RefreshCw size={17} className="animate-spin" /> : <Save size={17} />}
           Save

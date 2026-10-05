@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import HockeyRink from '../components/hockey/HockeyRink'
 import { sports } from '../config/sports'
@@ -17,7 +17,6 @@ import {
   findHockeyRulesProfile,
   hockeyDraftRules,
   hockeyPositionLabel,
-  hockeyTeamRulesSettings,
   hockeyRulesProfiles,
   HOCKEY_POSITIONS,
   HOCKEY_SETUP_PERIOD_MINUTES,
@@ -40,9 +39,14 @@ import {
   type HockeySetupDraft,
   type HockeySetupLoadStatus,
   type HockeySetupEntry,
-  type HockeySetupSettingsLayer,
 } from '../lib/hockey'
 import { hockeyPersonalSettingsAdapter, hockeyTeamSettingsAdapter } from '../lib/hockey/settingsSync'
+import {
+  emptyHockeySetupSettingsProgress,
+  hockeyTeamDefaultsState,
+  nextHockeySetupSettingsStep,
+  type HockeySetupSettingsInputs,
+} from '../lib/hockey/setupSettingsSource'
 import { ensureHockeyReleaseCapabilities } from '../lib/hockey/releaseCapabilities'
 import { hockeySetupCloudGate, type HockeySetupCapabilityState, type HockeySetupStorage } from '../lib/hockey/setupCloud'
 import { getHockeyEventCreationPolicy } from '../lib/sportAvailability'
@@ -113,39 +117,35 @@ function HockeySetupForm() {
   // own Hockey settings. Each source is applied once it has settled; edits here always win.
   const personal = useSportPersonalSettings(hockeyPersonalSettingsAdapter)
   const teamSettings = useSportTeamSettings(hockeyTeamSettingsAdapter, resolvedTeamId)
-  const teamSettingsSettled = Boolean(resolvedTeamId && teamSettings.settledTeamId === resolvedTeamId)
-  const teamSettingsLoaded = teamSettingsSettled &&
-    teamSettings.status !== 'error' && teamSettings.status !== 'backend_update_required'
-  const rulesKey = resolvedTeamId
-    ? (teamSettingsSettled ? `team:${resolvedTeamId}` : null)
-    : teamId || personal.sync.status === 'checking' ? null : 'personal'
-  const lineupKey = teamSettingsLoaded && rosterStatus === 'ready' && rosterTeamId === resolvedTeamId
+  const rosterKey = rosterStatus === 'ready' && resolvedTeamId && rosterTeamId === resolvedTeamId
     ? `${rosterTeamId}:${rosterAttempt}`
     : null
-  const appliedRulesKey = useRef<string | null>(null)
-  const appliedLineupKey = useRef<string | null>(null)
-  const layer = useMemo<HockeySetupSettingsLayer | null>(() => (
-    rulesKey === 'personal'
-      ? { authority: 'personal', settings: personal.settings }
-      : rulesKey && teamSettingsLoaded
-        ? { authority: 'team', settings: hockeyTeamRulesSettings(teamSettings.settings) }
-        : null
-  ), [personal.settings, rulesKey, teamSettings.settings, teamSettingsLoaded])
+  const settingsInputs: HockeySetupSettingsInputs = {
+    selectedTeamId: teamId,
+    resolvedTeamId,
+    personalChecking: personal.sync.status === 'checking',
+    personalSettings: personal.settings,
+    teamStatus: teamSettings.status,
+    teamSettledTeamId: teamSettings.settledTeamId,
+    teamSettings: teamSettings.settings,
+    rosterKey,
+  }
+  const teamDefaults = hockeyTeamDefaultsState(settingsInputs)
+  const [settingsProgress, setSettingsProgress] = useState(emptyHockeySetupSettingsProgress)
 
   useEffect(() => {
-    if (rulesKey && rulesKey !== appliedRulesKey.current) {
-      appliedRulesKey.current = rulesKey
-      setDraft(current => applyHockeySetupSettings(current, layer))
-    }
-    // A roster reload clears every pick, so the next loaded roster is prefilled again.
-    if (!lineupKey) appliedLineupKey.current = null
-    if (lineupKey && lineupKey !== appliedLineupKey.current) {
-      appliedLineupKey.current = lineupKey
-      const defaults = teamSettings.settings.lineupDefaults
-      setDraft(current => prefillHockeyDraftLineup(current, defaults).draft)
-    }
-  }, [layer, lineupKey, rulesKey, teamSettings.settings.lineupDefaults])
+    const step = nextHockeySetupSettingsStep(settingsProgress, settingsInputs)
+    if (step.progress === settingsProgress) return
+    setSettingsProgress(step.progress)
+    const { rules, lineup } = step
+    if (rules) setDraft(current => applyHockeySetupSettings(current, rules.layer))
+    if (lineup) setDraft(current => prefillHockeyDraftLineup(current, lineup).draft)
+    // settingsInputs is rebuilt every render; its fields are the dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsProgress, teamId, resolvedTeamId, personal.sync.status, personal.settings, teamSettings.status,
+    teamSettings.settledTeamId, teamSettings.settings, rosterKey])
 
+  const lineupKey = settingsProgress.lineupKey !== null && settingsProgress.lineupKey === rosterKey ? rosterKey : null
   const missingDefaults = lineupKey
     ? (() => {
         const onRoster = new Set(draft.entries.flatMap(entry => (entry.playerId ? [entry.playerId.toLowerCase()] : [])))
@@ -391,10 +391,13 @@ function HockeySetupForm() {
               : 'Starts from your Hockey settings. Changes here apply to this game only.'
             : 'Built-in profile rules. Changes here apply to this game only.'}
         </p>
-        {resolvedTeamId && teamSettingsSettled && !teamSettingsLoaded && (
-          <p role="status" className="text-sm text-warning-content">
-            {teamSettings.error ?? 'Team defaults could not load.'} Using built-in rules and no default lineup.
-          </p>
+        {teamDefaults === 'unavailable' && settingsProgress.rulesKey !== `team:${resolvedTeamId}` && (
+          <div role="status" className="space-y-2 text-sm text-warning-content">
+            <p>{teamSettings.error ?? 'Team defaults could not load.'} Using built-in rules and no default lineup.</p>
+            <button type="button" className="btn-secondary text-sm" onClick={() => void teamSettings.refresh()}>
+              Retry team defaults
+            </button>
+          </div>
         )}
         <label className="block text-sm font-medium text-content">
           Rules profile
