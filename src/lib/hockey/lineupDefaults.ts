@@ -62,6 +62,44 @@ export function pruneHockeyLineupDefaults(
   }
 }
 
+export type HockeyDefaultRole = 'bench' | 'starter' | 'starting_goalie' | 'backup_goalie'
+
+export function hockeyDefaultRole(lineup: HockeyLineupDefaults, playerId: string): HockeyDefaultRole {
+  if (lineup.startingGoaliePlayerId === playerId) return 'starting_goalie'
+  if (lineup.backupGoaliePlayerId === playerId) return 'backup_goalie'
+  return lineup.starterPlayerIds.includes(playerId) ? 'starter' : 'bench'
+}
+
+/**
+ * Gives one player one default role. A goalie slot moves to the new player, and the
+ * starter list keeps its limit; the result always parses (ids sorted like the parser).
+ */
+export function setHockeyDefaultRole(
+  lineup: HockeyLineupDefaults,
+  playerId: string,
+  role: HockeyDefaultRole
+): HockeyLineupDefaults {
+  const clear = (id: string | null) => (id === playerId ? null : id)
+  const next: HockeyLineupDefaults = {
+    version: 1,
+    starterPlayerIds: lineup.starterPlayerIds.filter(id => id !== playerId),
+    startingGoaliePlayerId: clear(lineup.startingGoaliePlayerId),
+    backupGoaliePlayerId: clear(lineup.backupGoaliePlayerId),
+  }
+  if (role === 'starter' && next.starterPlayerIds.length < HOCKEY_MAX_DEFAULT_STARTERS) {
+    next.starterPlayerIds = [...next.starterPlayerIds, playerId].sort()
+  }
+  if (role === 'starting_goalie') next.startingGoaliePlayerId = playerId
+  if (role === 'backup_goalie') next.backupGoaliePlayerId = playerId
+  return next
+}
+
+/** Default lineup ids that are no longer on the active roster. */
+export function staleHockeyLineupPlayerIds(lineup: HockeyLineupDefaults, activeIds: ReadonlySet<string>): string[] {
+  return [...lineup.starterPlayerIds, lineup.startingGoaliePlayerId, lineup.backupGoaliePlayerId]
+    .filter((id): id is string => id !== null && !activeIds.has(id))
+}
+
 function normalizeId(value: unknown): string | undefined {
   return typeof value === 'string' && UUID.test(value) ? value.toLowerCase() : undefined
 }

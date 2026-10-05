@@ -25,13 +25,14 @@ import { at, hockeySetup } from './testFixtures'
 
 const hockey = sports.find(sport => sport.id === 'hockey')!
 const READY: HockeyReleaseCapabilities = {
-  contractVersion: 1,
-  migration: 73,
+  contractVersion: 2,
+  migration: 74,
   eventTransportVersion: 4,
   recoveryVersion: 1,
   recorderResolutionVersion: 1,
   canonicalFinalizationVersion: 1,
   setupSnapshotVersion: 1,
+  settingsContractVersion: 1,
 }
 
 function hockeyGame(options: { policy?: 'automatic' | 'local_only' | 'none'; recorder?: string | null; team?: boolean } = {}): GameState {
@@ -200,17 +201,19 @@ describe('HKY-5B Enable cloud sync', () => {
 })
 
 describe('HKY-5B release handshake', () => {
-  it('accepts only the exact migration 073 contract', async () => {
+  it('accepts only the exact migration 074 contract', async () => {
     await expect(loadHockeyReleaseCapabilities(clientWith(READY))).resolves.toEqual({ status: 'ready', capabilities: READY })
     await expect(loadHockeyReleaseCapabilities(clientWith({ ...READY, extra: 1 }))).resolves.toMatchObject({ status: 'invalid_response' })
-    await expect(loadHockeyReleaseCapabilities(clientWith({ ...READY, migration: 72 }))).resolves.toMatchObject({ status: 'invalid_response' })
+    await expect(loadHockeyReleaseCapabilities(clientWith({ ...READY, migration: 73 }))).resolves.toMatchObject({ status: 'invalid_response' })
   })
 
   it('reads contract 0 as migrations not applied and a newer contract as a stale client', async () => {
     await expect(loadHockeyReleaseCapabilities(clientWith({ contractVersion: 0 }))).resolves.toMatchObject({ status: 'backend_update_required' })
+    // The migration 073 contract without settings: 074 is not applied yet.
+    await expect(loadHockeyReleaseCapabilities(clientWith({ contractVersion: 1 }))).resolves.toMatchObject({ status: 'backend_update_required' })
     await expect(loadHockeyReleaseCapabilities(clientWith(null, { code: 'PGRST202', message: 'Could not find the function' })))
       .resolves.toMatchObject({ status: 'backend_update_required' })
-    await expect(loadHockeyReleaseCapabilities(clientWith({ contractVersion: 2 }))).resolves.toMatchObject({ status: 'client_update_required' })
+    await expect(loadHockeyReleaseCapabilities(clientWith({ contractVersion: 3 }))).resolves.toMatchObject({ status: 'client_update_required' })
   })
 
   it('caches a ready result per account and re-checks when forced or the account changes', async () => {

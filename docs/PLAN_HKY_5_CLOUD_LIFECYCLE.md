@@ -317,3 +317,22 @@ Filled in as each slice lands.
   and applying it twice changes nothing. A finalized cloud game is read-only: capture,
   corrections, additions, remove/restore and Undo return `cloud_final`, the tracker shows a
   banner and hides local Reopen, and Game Info opens only the recorder's existing stream.
+- **HKY-5C** (settings and Team Manage): migration `074_hockey_settings.sql` adds the two
+  fixed saves over `_save_sport_settings_revisioned_core`. Instead of re-implementing each
+  override field, the server keeps a copy of the seven version-1 profiles
+  (`_hockey_profile_rules`), layers the overrides on the stored profile and validates the
+  whole result (`_hockey_rules_error`), so cross-field rules (ties need a shootout or
+  repeating overtime, minimum and overtime skaters) match the client. A unit test keeps
+  the copy equal to `profiles.ts`, and `supabase/tests/hky5c` runs 56 client-parser cases
+  and the role flow against a scratch database. Personal settings needed a sport-neutral
+  hook (`useSportPersonalSettings`, Basketball's flow); unlike Basketball it never uploads
+  untouched defaults. Settings → Sports → Hockey and Team Manage share `HockeyRulesFields`
+  (profile, periods, length, clock; other rules follow the profile). The lineup editor
+  gives each active player one role: Bench, Starter (up to six), Starting goalie or Backup
+  goalie. Setup applies team defaults for a team game and personal settings otherwise,
+  once each has loaded; the settings apply while the recorder keeps their profile, and a
+  recorder who already changed the profile, length or clock keeps those choices. The
+  lineup prefill runs once per loaded roster and only when no goalie or starter is picked;
+  default players missing from the roster are counted in a note. Contract 2 means the
+  client needs 074 before Hockey cloud games work again (Retry or This device only until
+  then).

@@ -238,6 +238,58 @@ export async function saveBaseballTeamSettings<TSettings>(
   }
 }
 
+/** HKY-5C fixed Hockey personal settings save (migration 074). */
+export async function saveHockeyUserSettings<TSettings>(
+  expectedRevision: number | null,
+  settings: TSettings,
+  client: SportSettingsCloudClient | null =
+    supabase as unknown as SportSettingsCloudClient | null
+): Promise<SportSettingsCloudWriteResult<TSettings>> {
+  if (!client) return { status: 'not_configured' }
+
+  const { data, error } = await client.rpc(
+    'save_hockey_user_settings_revisioned',
+    {
+      p_expected_revision: expectedRevision,
+      p_settings: settings,
+    }
+  )
+  if (error) return cloudFailure(error, 'user')
+
+  const result = parseSportSettingsSaveResult<TSettings>(data)
+  return result ?? {
+    status: 'error',
+    error: 'Cloud Hockey settings returned an invalid save result.',
+  }
+}
+
+/** HKY-5C fixed Hockey team settings save (migration 074). */
+export async function saveHockeyTeamSettings<TSettings>(
+  teamId: string,
+  expectedRevision: number | null,
+  settings: TSettings,
+  client: SportSettingsCloudClient | null =
+    supabase as unknown as SportSettingsCloudClient | null
+): Promise<SportSettingsCloudWriteResult<TSettings>> {
+  if (!client) return { status: 'not_configured' }
+
+  const { data, error } = await client.rpc(
+    'save_hockey_team_settings_revisioned',
+    {
+      p_team_id: teamId,
+      p_expected_revision: expectedRevision,
+      p_settings: settings,
+    }
+  )
+  if (error) return cloudFailure(error, 'team')
+
+  const result = parseSportSettingsSaveResult<TSettings>(data)
+  return result ?? {
+    status: 'error',
+    error: 'Shared Hockey settings returned an invalid save result.',
+  }
+}
+
 export function parseSportSettingsSaveResult<TSettings = unknown>(
   value: unknown
 ): SportSettingsSaveResult<TSettings> | null {
@@ -316,7 +368,9 @@ export function isSportSettingsBackendUpdateRequired(
         combined.includes('save_user_sport_settings_revisioned') ||
         combined.includes('save_team_sport_settings_revisioned') ||
         combined.includes('save_basketball_user_settings_revisioned') ||
-        combined.includes('save_basketball_team_settings_revisioned')
+        combined.includes('save_basketball_team_settings_revisioned') ||
+        combined.includes('save_hockey_user_settings_revisioned') ||
+        combined.includes('save_hockey_team_settings_revisioned')
       )
     )
   )

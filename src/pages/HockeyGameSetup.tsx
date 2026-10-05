@@ -1,26 +1,33 @@
 import { Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import HockeyRink from '../components/hockey/HockeyRink'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { useSettings } from '../context/SettingsContext'
+import { useSportPersonalSettings } from '../hooks/useSportPersonalSettings'
+import { useSportTeamSettings } from '../hooks/useSportTeamSettings'
 import {
   addHockeyDraftPlayers,
+  applyHockeySetupSettings,
   buildHockeyMatchSetup,
   createHockeyEventGameState,
   createHockeySetupDraft,
   findHockeyRulesProfile,
   hockeyDraftRules,
   hockeyPositionLabel,
+  hockeyTeamRulesSettings,
   hockeyRulesProfiles,
   HOCKEY_POSITIONS,
   HOCKEY_SETUP_PERIOD_MINUTES,
   normalizeHockeyPosition,
   parseHockeyJerseyList,
+  prefillHockeyDraftLineup,
   removeHockeyDraftEntry,
+  setHockeyDraftClockModel,
   setHockeyDraftGoalie,
+  setHockeyDraftPeriodLength,
   setHockeyDraftProfile,
   setHockeyDraftRoster,
   setHockeyEntryDressed,
@@ -33,7 +40,9 @@ import {
   type HockeySetupDraft,
   type HockeySetupLoadStatus,
   type HockeySetupEntry,
+  type HockeySetupSettingsLayer,
 } from '../lib/hockey'
+import { hockeyPersonalSettingsAdapter, hockeyTeamSettingsAdapter } from '../lib/hockey/settingsSync'
 import { ensureHockeyReleaseCapabilities } from '../lib/hockey/releaseCapabilities'
 import { hockeySetupCloudGate, type HockeySetupCapabilityState, type HockeySetupStorage } from '../lib/hockey/setupCloud'
 import { getHockeyEventCreationPolicy } from '../lib/sportAvailability'
@@ -99,6 +108,54 @@ function HockeySetupForm() {
   const rules = useMemo(() => hockeyDraftRules(draft), [draft])
   const profile = findHockeyRulesProfile(draft.profileId)
   const trackedName = team?.name ?? (localTeamName.trim() || 'Home')
+
+  // HKY-5C: a team game starts from the team's defaults, any other game from the recorder's
+  // own Hockey settings. Each source is applied once it has settled; edits here always win.
+  const personal = useSportPersonalSettings(hockeyPersonalSettingsAdapter)
+  const teamSettings = useSportTeamSettings(hockeyTeamSettingsAdapter, resolvedTeamId)
+  const teamSettingsSettled = Boolean(resolvedTeamId && teamSettings.settledTeamId === resolvedTeamId)
+  const teamSettingsLoaded = teamSettingsSettled &&
+    teamSettings.status !== 'error' && teamSettings.status !== 'backend_update_required'
+  const rulesKey = resolvedTeamId
+    ? (teamSettingsSettled ? `team:${resolvedTeamId}` : null)
+    : teamId || personal.sync.status === 'checking' ? null : 'personal'
+  const lineupKey = teamSettingsLoaded && rosterStatus === 'ready' && rosterTeamId === resolvedTeamId
+    ? `${rosterTeamId}:${rosterAttempt}`
+    : null
+  const appliedRulesKey = useRef<string | null>(null)
+  const appliedLineupKey = useRef<string | null>(null)
+  const layer = useMemo<HockeySetupSettingsLayer | null>(() => (
+    rulesKey === 'personal'
+      ? { authority: 'personal', settings: personal.settings }
+      : rulesKey && teamSettingsLoaded
+        ? { authority: 'team', settings: hockeyTeamRulesSettings(teamSettings.settings) }
+        : null
+  ), [personal.settings, rulesKey, teamSettings.settings, teamSettingsLoaded])
+
+  useEffect(() => {
+    if (rulesKey && rulesKey !== appliedRulesKey.current) {
+      appliedRulesKey.current = rulesKey
+      setDraft(current => applyHockeySetupSettings(current, layer))
+    }
+    // A roster reload clears every pick, so the next loaded roster is prefilled again.
+    if (!lineupKey) appliedLineupKey.current = null
+    if (lineupKey && lineupKey !== appliedLineupKey.current) {
+      appliedLineupKey.current = lineupKey
+      const defaults = teamSettings.settings.lineupDefaults
+      setDraft(current => prefillHockeyDraftLineup(current, defaults).draft)
+    }
+  }, [layer, lineupKey, rulesKey, teamSettings.settings.lineupDefaults])
+
+  const missingDefaults = lineupKey
+    ? (() => {
+        const onRoster = new Set(draft.entries.flatMap(entry => (entry.playerId ? [entry.playerId.toLowerCase()] : [])))
+        const lineup = teamSettings.settings.lineupDefaults
+        return [...lineup.starterPlayerIds, lineup.startingGoaliePlayerId, lineup.backupGoaliePlayerId]
+          .filter(id => id !== null && !onRoster.has(id)).length
+      })()
+    : 0
+  // Settings apply only while the draft keeps their profile (hockeyDraftSettingsBase).
+  const rulesFromSettings = Boolean(draft.settingsLayer && draft.settingsLayer.settings.baseProfile.profileId === draft.profileId)
 
   useEffect(() => {
     if (!cloudAvailable) return
@@ -327,6 +384,18 @@ function HockeySetupForm() {
       </Section>
 
       <Section title="Rules">
+        <p className="text-xs text-content-muted">
+          {rulesFromSettings
+            ? draft.settingsLayer?.authority === 'team'
+              ? `Starts from ${trackedName}'s team defaults. Changes here apply to this game only.`
+              : 'Starts from your Hockey settings. Changes here apply to this game only.'
+            : 'Built-in profile rules. Changes here apply to this game only.'}
+        </p>
+        {resolvedTeamId && teamSettingsSettled && !teamSettingsLoaded && (
+          <p role="status" className="text-sm text-warning-content">
+            {teamSettings.error ?? 'Team defaults could not load.'} Using built-in rules and no default lineup.
+          </p>
+        )}
         <label className="block text-sm font-medium text-content">
           Rules profile
           <select
@@ -348,14 +417,14 @@ function HockeySetupForm() {
               max={HOCKEY_SETUP_PERIOD_MINUTES.max}
               className="input-field mt-1"
               value={draft.periodLengthMinutes ?? Math.round(rules.regulation.periodLengthMs / 60_000)}
-              onChange={event => update({ ...draft, periodLengthMinutes: event.target.value === '' ? null : Number(event.target.value) })}
+              onChange={event => update(setHockeyDraftPeriodLength(draft, event.target.value === '' ? null : Number(event.target.value)))}
             />
           </label>
           <Segmented
             label="Clock"
             options={[{ value: 'anchored', label: 'Run clock' }, { value: 'none', label: 'No clock' }]}
             value={rules.clockModel}
-            onChange={(value: HockeyClockModel) => update({ ...draft, clockModel: value })}
+            onChange={(value: HockeyClockModel) => update(setHockeyDraftClockModel(draft, value))}
           />
         </div>
         <p className="text-xs text-content-muted">
@@ -395,7 +464,15 @@ function HockeySetupForm() {
           <p className="text-sm text-content-muted">This team has no active players. Add them in Team Manage, or use a local roster.</p>
         )}
         {teamId && rosterStatus === 'ready' && (
-          <p className="text-xs text-content-muted">The team roster is read-only here; nothing is written back to the team.</p>
+          <p className="text-xs text-content-muted">
+            The team roster is read-only here; nothing is written back to the team.
+            {lineupKey && ' Starters and goalies start from the team defaults.'}
+          </p>
+        )}
+        {missingDefaults > 0 && (
+          <p role="status" className="text-xs text-warning-content">
+            {missingDefaults === 1 ? 'One default lineup player is' : `${missingDefaults} default lineup players are`} not on the active roster and stay out of this game.
+          </p>
         )}
         <p className="text-sm font-medium text-content" aria-live="polite">
           Goalie: {goalie ? entryName(goalie) : 'not chosen'} · Skaters {draft.starterIds.length} of {rules.skatersPerSide} · {dressed.length} dressed

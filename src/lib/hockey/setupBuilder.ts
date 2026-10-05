@@ -3,8 +3,10 @@ import { createInitialState } from '../gameReducer'
 import { createHockeyUuid } from './id'
 import { initializeHockeyEventGame, startHockeyGame, type HockeyCommandContext, type HockeyCommandResult } from './live'
 import { defaultHockeyDressedAs, normalizeHockeyPosition, sortHockeyActors } from './positions'
-import { createHockeyMatchRules, findHockeyRulesProfile, DEFAULT_HOCKEY_PROFILE_ID } from './profiles'
+import type { HockeyLineupDefaults } from './lineupDefaults'
+import { findHockeyRulesProfile, DEFAULT_HOCKEY_PROFILE_ID, withExplicitHockeySuddenDeath } from './profiles'
 import { HOCKEY_RULES_FIELDS } from './rules'
+import { resolveHockeySettingsHierarchy } from './settings'
 import { validateHockeyMatchSetup } from './setup'
 import { hockeyLocalPlayerKey } from './stats'
 import type { EventCloudPolicy } from '../eventCloudPolicy'
@@ -18,6 +20,8 @@ import type {
   HockeyRuleOverrides,
   HockeyRuleSource,
   HockeyRulesField,
+  HockeySettingsAuthority,
+  HockeySettingsV1,
   HockeyTrackedTeam,
 } from './types'
 import { HOCKEY_SETUP_VERSION } from './types'
@@ -38,17 +42,29 @@ export interface HockeySetupEntry extends HockeySetupRosterPlayer {
 }
 
 /**
- * The editable HKY-2E setup. Nothing here is saved: Start freezes it into setup v1.
- * There are no team defaults yet (HKY-5C), so the recorder picks every starter.
+ * Personal or team settings the match starts from (HKY-5C). They apply only while the
+ * draft uses their profile; another profile starts from its built-in rules.
+ */
+export interface HockeySetupSettingsLayer {
+  authority: HockeySettingsAuthority
+  settings: HockeySettingsV1
+}
+
+/**
+ * The editable HKY-2E setup. Nothing here is saved: Start freezes it into setup v1, and
+ * nothing is written back to personal or team settings.
  */
 export interface HockeySetupDraft {
   trackedTeam: Exclude<HockeyTrackedTeam, 'neutral'>
   opponentName: string
   profileId: HockeyProfileId
-  /** Match override; null keeps the profile's length. */
+  /** Match override; null keeps the settings' (or profile's) length. */
   periodLengthMinutes: number | null
-  /** Match override; null keeps the profile's clock. */
+  /** Match override; null keeps the settings' (or profile's) clock. */
   clockModel: HockeyClockModel | null
+  settingsLayer: HockeySetupSettingsLayer | null
+  /** The recorder changed the profile, length or clock; settings no longer pick the profile. */
+  rulesEdited: boolean
   firstPeriodAttackingDirection: HockeyAttackingDirection
   entries: HockeySetupEntry[]
   goalieId: string | null
@@ -66,6 +82,8 @@ export function createHockeySetupDraft(roster: readonly HockeySetupRosterPlayer[
     profileId: DEFAULT_HOCKEY_PROFILE_ID,
     periodLengthMinutes: null,
     clockModel: null,
+    settingsLayer: null,
+    rulesEdited: false,
     firstPeriodAttackingDirection: 'left_to_right',
     entries: sortHockeyActors(roster.map(entryFromRoster)),
     goalieId: null,
@@ -137,24 +155,67 @@ export function toggleHockeyDraftStarter(draft: HockeySetupDraft, id: string): H
 
 /** Changing the profile keeps the direction and roster but drops overrides it may not fit. */
 export function setHockeyDraftProfile(draft: HockeySetupDraft, profileId: HockeyProfileId): HockeySetupDraft {
-  const next = { ...draft, profileId, periodLengthMinutes: null, clockModel: null }
-  const limit = hockeyDraftRules(next).skatersPerSide
-  return { ...next, starterIds: next.starterIds.slice(0, limit) }
+  return withStarterLimit({ ...draft, profileId, periodLengthMinutes: null, clockModel: null, rulesEdited: true })
 }
 
-/** The rules Start would freeze: the profile with this match's overrides. */
+export function setHockeyDraftPeriodLength(draft: HockeySetupDraft, minutes: number | null): HockeySetupDraft {
+  return { ...draft, periodLengthMinutes: minutes, rulesEdited: true }
+}
+
+export function setHockeyDraftClockModel(draft: HockeySetupDraft, clockModel: HockeyClockModel): HockeySetupDraft {
+  return { ...draft, clockModel, rulesEdited: true }
+}
+
+/**
+ * Starts the match from personal or team settings. Until the recorder edits the rules,
+ * the draft also takes the settings' profile and drops its own length and clock picks.
+ */
+export function applyHockeySetupSettings(draft: HockeySetupDraft, layer: HockeySetupSettingsLayer | null): HockeySetupDraft {
+  const next: HockeySetupDraft = { ...draft, settingsLayer: layer ? structuredClone(layer) : null }
+  if (draft.rulesEdited) return withStarterLimit(next)
+  return withStarterLimit({
+    ...next,
+    profileId: layer?.settings.baseProfile.profileId ?? DEFAULT_HOCKEY_PROFILE_ID,
+    periodLengthMinutes: null,
+    clockModel: null,
+  })
+}
+
+/** Where each rule comes from before this match's own length and clock picks. */
+export function hockeyDraftSettingsBase(draft: HockeySetupDraft): {
+  rules: HockeyMatchRules
+  sourceByField: Record<HockeyRulesField, HockeyRuleSource>
+} {
+  const layer = draft.settingsLayer
+  if (layer && layer.settings.baseProfile.profileId === draft.profileId) {
+    const resolved = resolveHockeySettingsHierarchy({
+      authority: layer.authority,
+      personalSettings: layer.authority === 'personal' ? layer.settings : undefined,
+      teamSettings: layer.authority === 'team' ? layer.settings : undefined,
+    })
+    if (resolved.ok) return { rules: resolved.value.rules, sourceByField: resolved.value.sourceByField }
+  }
+  const profile = findHockeyRulesProfile(draft.profileId) ?? findHockeyRulesProfile(DEFAULT_HOCKEY_PROFILE_ID)!
+  return {
+    rules: withExplicitHockeySuddenDeath(structuredClone(profile.rules) as HockeyMatchRules),
+    sourceByField: Object.fromEntries(HOCKEY_RULES_FIELDS.map(field => [field, 'built_in'])) as Record<HockeyRulesField, HockeyRuleSource>,
+  }
+}
+
+/** The rules Start would freeze: the settings (or profile) with this match's overrides. */
 export function hockeyDraftRules(draft: HockeySetupDraft): HockeyMatchRules {
-  return createHockeyMatchRules(draft.profileId, hockeyDraftOverrides(draft))
+  const base = hockeyDraftSettingsBase(draft).rules
+  return withExplicitHockeySuddenDeath(structuredClone({ ...base, ...hockeyDraftOverrides(draft) }) as HockeyMatchRules)
 }
 
 export function hockeyDraftOverrides(draft: HockeySetupDraft): HockeyRuleOverrides {
-  const profile = findHockeyRulesProfile(draft.profileId) ?? findHockeyRulesProfile(DEFAULT_HOCKEY_PROFILE_ID)!
+  const base = hockeyDraftSettingsBase(draft).rules
   const overrides: HockeyRuleOverrides = {}
   const lengthMs = draft.periodLengthMinutes === null ? null : Math.round(draft.periodLengthMinutes * 60_000)
-  if (lengthMs !== null && lengthMs !== profile.rules.regulation.periodLengthMs) {
-    overrides.regulation = { ...profile.rules.regulation, periodLengthMs: lengthMs }
+  if (lengthMs !== null && lengthMs !== base.regulation.periodLengthMs) {
+    overrides.regulation = { ...base.regulation, periodLengthMs: lengthMs }
   }
-  if (draft.clockModel !== null && draft.clockModel !== profile.rules.clockModel) {
+  if (draft.clockModel !== null && draft.clockModel !== base.clockModel) {
     overrides.clockModel = draft.clockModel
     overrides.clock = draft.clockModel === 'none' ? null : { display: 'count_down', mode: 'stop_time' }
   }
@@ -162,10 +223,41 @@ export function hockeyDraftOverrides(draft: HockeySetupDraft): HockeyRuleOverrid
 }
 
 export function hockeyDraftRulesSource(draft: HockeySetupDraft): Record<HockeyRulesField, HockeyRuleSource> {
+  const base = hockeyDraftSettingsBase(draft).sourceByField
   const overridden = new Set(Object.keys(hockeyDraftOverrides(draft)))
   return Object.fromEntries(
-    HOCKEY_RULES_FIELDS.map(field => [field, overridden.has(field) ? 'match' : 'built_in'])
+    HOCKEY_RULES_FIELDS.map(field => [field, overridden.has(field) ? 'match' : base[field]])
   ) as Record<HockeyRulesField, HockeyRuleSource>
+}
+
+/**
+ * Prefills the lineup from team defaults once a team roster loads (HKY-5C). Picks the
+ * recorder already made win, so it changes nothing when any goalie or starter is chosen.
+ * Default players missing from the active roster are counted, never guessed.
+ */
+export function prefillHockeyDraftLineup(
+  draft: HockeySetupDraft,
+  defaults: HockeyLineupDefaults
+): { draft: HockeySetupDraft; missing: number } {
+  if (draft.goalieId || draft.starterIds.length > 0) return { draft, missing: 0 }
+  const byPlayer = new Map(draft.entries.flatMap(entry => (entry.playerId ? [[entry.playerId.toLowerCase(), entry.id] as const] : [])))
+  let next = draft
+  let missing = 0
+  const entryFor = (playerId: string | null) => {
+    if (!playerId) return null
+    const id = byPlayer.get(playerId) ?? null
+    if (!id) missing += 1
+    return id
+  }
+  const starting = entryFor(defaults.startingGoaliePlayerId)
+  if (starting) next = setHockeyDraftGoalie(next, starting)
+  const backup = entryFor(defaults.backupGoaliePlayerId)
+  if (backup) next = setHockeyEntryDressedAs(next, backup, 'goalie')
+  for (const playerId of defaults.starterPlayerIds) {
+    const id = entryFor(playerId)
+    if (id) next = toggleHockeyDraftStarter(next, id)
+  }
+  return { draft: next, missing }
 }
 
 export type HockeySetupLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -298,6 +390,11 @@ function entryFromRoster(player: HockeySetupRosterPlayer): HockeySetupEntry {
     dressed: true,
     dressedAs: defaultHockeyDressedAs(position),
   }
+}
+
+function withStarterLimit(draft: HockeySetupDraft): HockeySetupDraft {
+  const limit = hockeyDraftRules(draft).skatersPerSide
+  return draft.starterIds.length > limit ? { ...draft, starterIds: draft.starterIds.slice(0, limit) } : draft
 }
 
 function withoutLineupPick(draft: HockeySetupDraft, id: string): HockeySetupDraft {

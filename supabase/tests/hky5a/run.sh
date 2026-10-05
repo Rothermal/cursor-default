@@ -32,7 +32,8 @@ echo "== applying migrations up to 071 into the template"
 "${P[@]}" -c "create database base"
 "${P[@]}" -d base -f "$HERE/bootstrap.sql" >/dev/null
 for f in "$REPO"/supabase/migrations/*.sql; do
-  case "$(basename "$f")" in 072_*|073_*) continue ;; esac
+  # Later migrations (074+) are not part of this check; HKY-5C has its own (../hky5c).
+  [ "$((10#$(basename "$f" | cut -c1-3)))" -gt 71 ] && continue
   "${P[@]}" -d base -f "$f" >"$WORK/apply.log" 2>&1 || { echo "FAIL $f"; tail -5 "$WORK/apply.log"; exit 1; }
 done
 
