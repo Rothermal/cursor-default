@@ -1,4 +1,9 @@
 import type { ReactNode } from 'react'
+import {
+  baseballPitcherDecisionMarks,
+  type BaseballPitcherDecisions,
+  type BaseballTeamSide,
+} from '../../lib/baseball'
 import type {
   BaseballBoxBatting,
   BaseballBoxFielding,
@@ -12,18 +17,21 @@ import type {
 export default function BaseballBoxScore({
   box,
   names,
+  decisions = null,
   onOpenPlayer,
 }: {
   box: BaseballBoxScoreModel
   names: BaseballTeamNames
+  /** BSB-5D: the current decisions, shown beside each pitcher. */
+  decisions?: BaseballPitcherDecisions | null
   onOpenPlayer: (id: string) => void
 }) {
   return (
     <div className="space-y-4">
       <BattingTable title={`${names.tracked} batting`} batting={box.batting.tracked} onOpenPlayer={onOpenPlayer} />
       <BattingTable title={`${names.opponent} batting`} batting={box.batting.opponent} />
-      <PitchingTable title={`${names.tracked} pitching`} pitching={box.pitching.tracked} onOpenPlayer={onOpenPlayer} />
-      <PitchingTable title={`${names.opponent} pitching`} pitching={box.pitching.opponent} />
+      <PitchingTable title={`${names.tracked} pitching`} pitching={box.pitching.tracked} side="tracked" decisions={decisions} onOpenPlayer={onOpenPlayer} />
+      <PitchingTable title={`${names.opponent} pitching`} pitching={box.pitching.opponent} side="opponent" decisions={decisions} />
       <FieldingTable title={`${names.tracked} fielding`} fielding={box.fielding} onOpenPlayer={onOpenPlayer} />
     </div>
   )
@@ -135,7 +143,13 @@ function BattingTable({ title, batting, onOpenPlayer }: { title: string; batting
   )
 }
 
-function PitchingTable({ title, pitching, onOpenPlayer }: { title: string; pitching: BaseballBoxPitching; onOpenPlayer?: (id: string) => void }) {
+function PitchingTable({ title, pitching, side, decisions, onOpenPlayer }: {
+  title: string
+  pitching: BaseballBoxPitching
+  side: BaseballTeamSide
+  decisions: BaseballPitcherDecisions | null
+  onOpenPlayer?: (id: string) => void
+}) {
   const pitches = (count: number, strikes: number, lowerBound: boolean) => `${lowerBound ? '≥' : ''}${count}-${strikes}`
   return (
     <Card title={title}>
@@ -144,7 +158,7 @@ function PitchingTable({ title, pitching, onOpenPlayer }: { title: string; pitch
           <tr key={row.id} className="border-t border-line">
             <PlayerCell
               name={row.name}
-              position=""
+              position={baseballPitcherDecisionMarks(decisions, side, row.id).join(', ')}
               onOpen={row.tracked && onOpenPlayer ? () => onOpenPlayer(row.id) : undefined}
             />
             <td className="px-1">{row.ip}</td>

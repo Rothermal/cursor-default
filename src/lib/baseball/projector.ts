@@ -267,6 +267,65 @@ export function replayBaseballPitches(setup: BaseballMatchSetup, events: readonl
   return pitches
 }
 
+/** What the decision suggestion (BSB-5D) needs from each applied event. */
+export interface BaseballDecisionStep {
+  eventId: string
+  eventType: string
+  scoreBefore: Record<BaseballTeamSide, number>
+  scoreAfter: Record<BaseballTeamSide, number>
+  /** Runs the event counted, in order: the batting side and the pitcher charged. */
+  runs: Array<{ side: BaseballTeamSide; pitcherId: string }>
+  /** The pitcher the event credited, when it credits one. */
+  pitcherId: string | null
+  /** Each side's pitcher of record just before the event. */
+  pitchersBefore: Record<BaseballTeamSide, string>
+  /** The side in the field and its runners on base just before the event. */
+  fieldingSide: BaseballTeamSide
+  runnersOnBefore: number
+}
+
+export interface BaseballDecisionTrail {
+  steps: BaseballDecisionStep[]
+  /** The epoch the replay ended in, or null when the game is not final. */
+  endEpochId: string | null
+  /** The replay stopped at an invalid event. */
+  incomplete: boolean
+}
+
+/**
+ * Score, runs and pitchers event by event, from the same replay that builds the lines, so the
+ * decision suggestion follows corrected history. Stops at the first invalid event.
+ */
+export function replayBaseballDecisionTrail(setup: BaseballMatchSetup, events: readonly GameEvent[]): BaseballDecisionTrail {
+  const replay = new BaseballReplay(setup)
+  const steps: BaseballDecisionStep[] = []
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    const before = replay.projection
+    const scoreBefore = { ...before.score }
+    const battingSide = before.battingSide
+    const runnersOnBefore = BASES.filter(base => before.bases[base] !== null).length
+    const pitchersBefore = { tracked: before.lineups.tracked.pitcherId, opponent: before.lineups.opponent.pitcherId }
+    try {
+      replay.apply(event as BaseballEvent)
+    } catch (error) {
+      if (!(error instanceof BaseballReplayError)) throw error
+      return { steps, endEpochId: null, incomplete: true }
+    }
+    steps.push({
+      eventId: event.id,
+      eventType: event.eventType,
+      scoreBefore,
+      scoreAfter: { ...replay.projection.score },
+      runs: replay.runPitchersByLastEvent.map(pitcherId => ({ side: battingSide, pitcherId })),
+      pitcherId: replay.creditByLastEvent?.pitcherId ?? null,
+      pitchersBefore,
+      fieldingSide: otherSide(battingSide),
+      runnersOnBefore,
+    })
+  }
+  return { steps, endEpochId: replay.endEpochId, incomplete: false }
+}
+
 export interface BaseballEventCredit {
   /** Null on runner plays, which credit no batter. */
   batterId: string | null
@@ -340,6 +399,10 @@ class BaseballReplay {
   private legacyLineupRules = false
   /** Runner ids whose runs counted on the event applied last. */
   runnersScoredByLastEvent: string[] = []
+  /** The pitcher charged with each of those runs, in the same order. */
+  runPitchersByLastEvent: string[] = []
+  /** The game end event of the current completed-game epoch (BSB-5D); null while not final. */
+  endEpochId: string | null = null
   /** Who the event applied last credited; null for events that credit nobody. */
   creditByLastEvent: BaseballEventCredit | null = null
 
@@ -353,6 +416,7 @@ class BaseballReplay {
     const p = this.projection
     this.currentEventId = event.id
     this.runnersScoredByLastEvent = []
+    this.runPitchersByLastEvent = []
     this.creditByLastEvent = null
     this.stamped = new Map(
       event.actors.flatMap(actor => (actor.participantId ? [[actor.role, actor.participantId] as const] : []))
@@ -369,6 +433,15 @@ class BaseballReplay {
       this.expectCurrentPeriod(event)
       p.status = 'in_progress'
       p.result = null
+      this.endEpochId = null
+      return
+    }
+    if (event.eventType === 'baseball.pitcher_decisions') {
+      // Decisions belong to the completed game they were made for; their content is checked
+      // at read time so a later edit flags them rather than breaking the replay.
+      if (p.status !== 'final' || this.endEpochId === null) fail('Pitcher decisions are set after the game is final.')
+      this.expectCurrentPeriod(event)
+      if (event.payload.epochId !== this.endEpochId) fail('These decisions were made for an earlier ending of the game.')
       return
     }
     if (p.status === 'pregame') {
@@ -385,6 +458,7 @@ class BaseballReplay {
     switch (event.eventType) {
       case 'baseball.game_ended':
         this.applyGameEnd(event.payload.outcome, event.payload.forfeitWinner, event.payload.note)
+        this.endEpochId = this.projection.result?.outcome === 'suspended' || this.projection.result?.outcome === 'abandoned' ? null : event.id
         return
       case 'baseball.score_adjustment': {
         const side = event.teamSide as BaseballTeamSide
@@ -1086,6 +1160,7 @@ class BaseballReplay {
     terminal: Terminal | null
   ): void {
     this.runnersScoredByLastEvent.push(movement.runnerId)
+    this.runPitchersByLastEvent.push(runner.responsiblePitcherId)
     const p = this.projection
     const side = p.battingSide
     p.score[side] += 1

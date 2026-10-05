@@ -220,6 +220,8 @@ export function baseballEventLabel(
       return BASEBALL_GAME_END_LABELS[payload.outcome as BaseballGameEndOutcome]
     case 'baseball.game_reopened':
       return `Game reopened (${payload.reason as string})`
+    case 'baseball.pitcher_decisions':
+      return 'Pitcher decisions set'
     default:
       return 'Event'
   }
