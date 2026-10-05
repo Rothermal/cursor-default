@@ -117,6 +117,8 @@ export function baseballSummaryPlays(
     const first = unit[0]
     // The game start opens the record but is not a play anyone reads back.
     if (first.eventType === 'baseball.game_started') continue
+    // Decisions show on the Overview and Box score; they are not a play.
+    if (first.eventType === 'baseball.pitcher_decisions') continue
     if (!parseBaseballPeriod(first.period)) continue
     const batterId = batterOf(first)
     if (pending && (pending.half !== first.period.id || (batterId !== null && pending.batterId !== batterId))) flush()

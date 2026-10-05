@@ -327,6 +327,30 @@ export interface BaseballScoreAdjustmentPayload extends BaseballCapturePayload {
   reason: string
 }
 
+/** One side's pitcher decisions (BSB-5D): participant ids for our pitchers, opponent pitcher ids for theirs. */
+export interface BaseballSideDecisions extends JsonObject {
+  win: string | null
+  loss: string | null
+  save: string | null
+  holds: string[]
+}
+
+export interface BaseballPitcherDecisions extends JsonObject {
+  tracked: BaseballSideDecisions
+  opponent: BaseballSideDecisions
+}
+
+/**
+ * Pitcher decisions for one completed-game epoch: the game end event they were made for.
+ * Reopening the game ends that epoch, so these stop counting even though the event stays.
+ */
+export interface BaseballPitcherDecisionsPayload extends BaseballCapturePayload {
+  epochId: string
+  decisions: BaseballPitcherDecisions
+}
+
+export const BASEBALL_MAX_HOLDS = 10
+
 export type BaseballPayloadByType = {
   'baseball.game_started': BaseballCapturePayload
   'baseball.pitch': BaseballPitchPayload
@@ -337,6 +361,7 @@ export type BaseballPayloadByType = {
   'baseball.game_ended': BaseballGameEndedPayload
   'baseball.game_reopened': BaseballGameReopenedPayload
   'baseball.score_adjustment': BaseballScoreAdjustmentPayload
+  'baseball.pitcher_decisions': BaseballPitcherDecisionsPayload
 }
 
 export type BaseballEventType = keyof BaseballPayloadByType

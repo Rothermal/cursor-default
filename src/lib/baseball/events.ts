@@ -29,6 +29,7 @@ import type {
 } from './types'
 import {
   BASEBALL_EVENT_SCHEMA_VERSION,
+  BASEBALL_MAX_HOLDS,
   BASEBALL_MAX_SUBSTITUTION_CHANGES,
   BASEBALL_SUBSTITUTION_SCHEMA_VERSION,
 } from './types'
@@ -261,7 +262,37 @@ export const baseballEventDefinitions: GameEventDefinition<GameEvent>[] = [
       ? null
       : 'A score adjustment needs a non-zero whole delta and a reason.'
   ),
+  definition('baseball.pitcher_decisions', NEUTRAL, payload =>
+    exactKeys(payload, ['captureCommandId', 'epochId', 'decisions']) &&
+    isCaptureId(payload.captureCommandId) &&
+    isId(payload.epochId) &&
+    isPlainObject(payload.decisions) &&
+    exactKeys(payload.decisions, ['tracked', 'opponent']) &&
+    isSideDecisions(payload.decisions.tracked) &&
+    isSideDecisions(payload.decisions.opponent)
+      ? null
+      : 'Invalid pitcher decisions payload.'
+  ),
 ]
+
+/**
+ * Shape only; whether each pitcher pitched for that side, and the W/L/SV/HLD combinations,
+ * are checked against the game when the decisions are read (`baseballDecisionIssues`), so an
+ * edit that invalidates stored decisions flags them instead of breaking the replay.
+ */
+function isSideDecisions(value: unknown): boolean {
+  if (!isPlainObject(value) || !exactKeys(value, ['win', 'loss', 'save', 'holds'])) return false
+  const nullableId = (id: unknown) => id === null || isId(id)
+  return (
+    nullableId(value.win) &&
+    nullableId(value.loss) &&
+    nullableId(value.save) &&
+    Array.isArray(value.holds) &&
+    value.holds.length <= BASEBALL_MAX_HOLDS &&
+    value.holds.every(id => isId(id)) &&
+    new Set(value.holds).size === value.holds.length
+  )
+}
 
 function validatePitchPayload(payload: Record<string, unknown>, event: GameEvent): string | null {
   if (!exactKeys(payload, ['captureCommandId', 'result', 'pitchLocation', 'inPlay', 'movements'])) {

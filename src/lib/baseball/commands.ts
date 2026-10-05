@@ -12,6 +12,7 @@ import { createBaseballEvent } from './events'
 import { baseballPeriod } from './periods'
 import { replayBaseballEvents } from './projector'
 import { createBaseballSportGameState, validateBaseballMatchSetup } from './state'
+import { baseballDecisionEpochId } from './units'
 import type {
   BaseballBase,
   BaseballBaserunningPlay,
@@ -32,6 +33,7 @@ import type {
   BaseballSubstitution,
   BaseballTeamSide,
   BaseballUndoReceipt,
+  BaseballPitcherDecisions,
 } from './types'
 
 export type BaseballCommandErrorCode =
@@ -230,6 +232,28 @@ export function reopenBaseballGame(
   return append(state, context, 'baseball.game_reopened', 'neutral', {
     captureCommandId: captureId(context),
     reason,
+  })
+}
+
+/**
+ * Records pitcher decisions for the current completed game (BSB-5D). Only the shape and the
+ * epoch are checked here; `saveBaseballPitcherDecisions` checks the choices against the game.
+ */
+export function setBaseballPitcherDecisions(
+  state: GameState,
+  decisions: BaseballPitcherDecisions,
+  context: BaseballCommandContext
+): BaseballCommandResult {
+  const sport = baseballSportState(state)
+  if (!sport || state.sport?.id !== 'baseball') return notBaseball(state)
+  if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Start a Baseball event game first.')
+  const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
+  const epochId = sport.projection.status === 'final' ? baseballDecisionEpochId(inspection.activeEvents) : null
+  if (!epochId) return failure(state, 'rejected', 'Pitcher decisions are set after the game is final.')
+  return append(state, context, 'baseball.pitcher_decisions', 'neutral', {
+    captureCommandId: captureId(context),
+    epochId,
+    decisions,
   })
 }
 

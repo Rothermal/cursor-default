@@ -1,6 +1,6 @@
 # Plan: BSB-5 Baseball Game Summary
 
-Status: approved (PR #465 merged 2026-10-03). BSB-5A merged (PR #469); BSB-5B merged (PR #471); BSB-5C in review. Owner questions Q1-Q6 are open;
+Status: approved (PR #465 merged 2026-10-03). BSB-5A merged (PR #469); BSB-5B merged (PR #471); BSB-5C merged (PR #473); BSB-5D in review. Owner questions Q1-Q6 are open;
 slices follow the recommended answers until Mark decides otherwise.
 Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)), BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)) and BSB-4
@@ -330,7 +330,7 @@ Filled in as each slice merges.
   `BaseballFieldShapes`, the painted field split out of `BaseballDiamond`. Rows and marks open
   the read-only play details, whose note links to `/game?tab=timeline`; the Plays tab also
   has a "Correct on the Timeline" link.
-- **BSB-5C (in review):** `replayBaseballPitches` in the projector lists every recorded
+- **BSB-5C (merged, PR #473):** `replayBaseballPitches` in the projector lists every recorded
   pitch with the count before it, the replay-credited batter and pitcher and the batter's
   hand at that time (setup for our players, the slot details for the opponent); Quick PA
   records no pitches. `pitchLog.ts` turns that into the pitch log (six plot kinds: ball,
@@ -347,3 +347,23 @@ Filled in as each slice merges.
   numbered mark (`baseballPitchPlotClusters`, grouped in game order against each group's
   first pitch), and tapping it opens a list of those pitches with half, game pitch number,
   count and result, each opening its play. Event data and locations are unchanged.
+- **BSB-5D (in review):** `baseball.pitcher_decisions` (schema 1, neutral) carries
+  `{ epochId, decisions: { tracked, opponent } }`, each side `{ win, loss, save, holds }`.
+  The replay accepts it only while the game is final and only for the current epoch (the
+  final game end's id; Reopen, suspend and abandon clear it) and checks nothing else, so an
+  edit never breaks the replay. `units.ts` adds `baseballDecisionEpochId` and makes the
+  event a capture unit, so Undo and the Timeline remove it like a play; the Plays tab skips
+  it. `decisions.ts` builds the view (newest decisions of the epoch win as a whole, mound
+  order per side from `replayBaseballLineupHistory`), the read-time checks that raise
+  "Check decisions", and the suggestion from `replayBaseballDecisionTrail` (score before
+  and after, runs with the pitcher charged, each side's pitcher of record and runners on
+  before every event). W: the winners' pitcher of record at the step that gave them the
+  lead for good, blank when that is a starter under `floor(5 x scheduled / 9)` innings. L:
+  the pitcher charged with the go-ahead run. SV (OBR 9.19): the last winning pitcher, not
+  the W (blank while W is blank) or the starter, at least one out, leading from his first
+  credited event to the end, and lead <= 3 with three outs, lead <= runners + 2, or nine
+  outs. SV is left blank with a note for softball variants, projection warnings, a Quick
+  PA entry or a score adjustment after entry. Holds are never suggested. The Summary
+  Overview shows the decisions with Set or Change decisions; the sheet seeds the stored
+  decisions or the suggestion, shows the notes, blocks saving on problems and offers "Use
+  the suggestion". The box score marks W, L, SV and HLD beside each pitcher. No migration.
