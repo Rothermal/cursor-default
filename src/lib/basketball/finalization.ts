@@ -1,10 +1,23 @@
 import type { GameState } from '../../types'
 import { eventRevisionCheckpoint, eventStreamFingerprint } from '../gameEvents/cloudTransport'
-import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
+import { isPlainObject } from '../gameEvents/envelope'
+import {
+  confirmEventPrimaryCheckpoint,
+  loadEventCanonicalPublication,
+  loadEventCanonicalPublicationHistory,
+  loadEventFinalizationReadiness,
+  loadEventPrimaryFinalizationConflicts,
+  resolveEventPrimaryFinalizationConflict,
+  type EventCanonicalPublication,
+  type EventCanonicalPublicationHistoryEntry,
+  type EventFinalizationReadiness,
+  type EventFinalizationRpcs,
+  type EventPrimaryFinalizationConflict,
+} from '../gameEvents/finalization'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream, normalizeGameEventStream } from '../gameEvents/stream'
-import type { GameEvent, GameEventStream } from '../gameEvents/types'
+import type { GameEventStream } from '../gameEvents/types'
 import { supabase } from '../supabase'
 import {
   basketballAnchoredFinalizationBlockerMessage,
@@ -29,6 +42,18 @@ import { createBasketballSportGameState, normalizeBasketballSportGameState } fro
 export const BASKETBALL_CANONICAL_PAYLOAD_SCHEMA_VERSION = 1
 export const EVENT_PLATFORM_CANONICAL_ENVELOPE_VERSION = 2
 
+const BASKETBALL_FINALIZATION_RPCS: EventFinalizationRpcs = {
+  label: 'Basketball',
+  readiness: 'get_basketball_finalization_readiness',
+  conflicts: 'get_basketball_primary_conflicts_for_finalization',
+  resolveConflict: 'resolve_basketball_primary_conflict_for_finalization',
+  confirmCheckpoint: 'confirm_basketball_primary_checkpoint_for_finalization',
+  publication: 'get_basketball_canonical_publication',
+  publicationHistory: 'get_basketball_canonical_publication_history_v1',
+  finalize: 'finalize_basketball_event_game',
+  reopen: 'reopen_basketball_event_game',
+}
+
 export interface BasketballCanonicalSnapshot {
   version: typeof EVENT_PLATFORM_CANONICAL_ENVELOPE_VERSION
   canonicalSchemaVersion: typeof BASKETBALL_CANONICAL_PAYLOAD_SCHEMA_VERSION
@@ -43,42 +68,11 @@ export interface BasketballCanonicalSnapshot {
   }
 }
 
-export interface BasketballFinalizationReadiness {
-  gameStatus: string
-  canFinalize: boolean
-  canReopen: boolean
-  primaryRecorderId: string | null
-  primaryDisplayName: string | null
-  primaryEnded: boolean
-  primaryCheckpointCurrent: boolean
-  primaryConflictCount: number
-  primaryLocked: boolean
-  activePublicationId: string | null
-  finalizedAt: string | null
-  nonPrimaryAttentionCount: number
-}
+export type BasketballFinalizationReadiness = EventFinalizationReadiness
 
-export interface BasketballCanonicalPublication {
-  publicationId: string
-  publicationNumber: number
-  primaryRecorderId: string
-  primaryDisplayName: string
-  snapshot: BasketballCanonicalSnapshot
-  snapshotFingerprint: string
-  finalizedBy: string
-  finalizedByDisplayName: string
-  finalizedAt: string
-}
+export type BasketballCanonicalPublication = EventCanonicalPublication<BasketballCanonicalSnapshot>
 
-export interface BasketballPrimaryFinalizationConflict {
-  conflictId: string
-  recorderId: string
-  recorderDisplayName: string
-  eventId: string
-  localEvent: GameEvent
-  remoteEvent: GameEvent
-  detectedAt: string
-}
+export type BasketballPrimaryFinalizationConflict = EventPrimaryFinalizationConflict
 
 export interface BasketballFinalizationPreview {
   gameId: string
@@ -101,20 +95,8 @@ export interface BasketballFinalizationResult {
   endReason: 'completed' | 'abandoned'
 }
 
-export interface BasketballCanonicalPublicationHistoryEntry {
-  publicationId: string
-  publicationNumber: number
-  primaryRecorderId: string
-  primaryDisplayName: string
-  finalizedBy: string
-  finalizedByDisplayName: string
-  finalizedAt: string
-  invalidatedBy: string | null
-  invalidatedByDisplayName: string | null
-  invalidatedAt: string | null
-  invalidationReason: string | null
+export type BasketballCanonicalPublicationHistoryEntry = EventCanonicalPublicationHistoryEntry & {
   reopenMode: BasketballReopenMode | null
-  isActive: boolean
 }
 
 export interface BasketballReopenResult {
@@ -131,35 +113,10 @@ export interface BasketballFinalizationMutationOptions {
   assertCurrent?: () => void
 }
 
-export async function loadBasketballFinalizationReadiness(
+export function loadBasketballFinalizationReadiness(
   gameId: string
 ): Promise<BasketballFinalizationReadiness> {
-  if (!supabase) throw new Error('Supabase client not configured')
-  const { data, error } = await supabase.rpc('get_basketball_finalization_readiness', {
-    p_game_id: gameId,
-  })
-  if (error) throw new Error(`Basketball finalization readiness could not load: ${error.message}`)
-  const row = firstRow(data)
-  return {
-    gameStatus: requiredString(row.game_status, 'game status'),
-    canFinalize: requiredBoolean(row.can_finalize, 'finalization capability'),
-    canReopen: requiredBoolean(row.can_reopen, 'reopen capability'),
-    primaryRecorderId: nullableString(row.primary_recorded_by, 'primary recorder'),
-    primaryDisplayName: nullableString(row.primary_display_name, 'primary recorder name'),
-    primaryEnded: requiredBoolean(row.primary_ended, 'primary terminal status'),
-    primaryCheckpointCurrent: requiredBoolean(
-      row.primary_checkpoint_current,
-      'primary checkpoint status'
-    ),
-    primaryConflictCount: requiredInteger(row.primary_conflict_count, 'primary conflict count'),
-    primaryLocked: requiredBoolean(row.primary_locked, 'primary lock status'),
-    activePublicationId: nullableString(row.active_publication_id, 'active publication'),
-    finalizedAt: nullableTimestamp(row.finalized_at, 'finalized time'),
-    nonPrimaryAttentionCount: requiredInteger(
-      row.non_primary_attention_count,
-      'non-primary attention count'
-    ),
-  }
+  return loadEventFinalizationReadiness(BASKETBALL_FINALIZATION_RPCS, gameId)
 }
 
 export async function prepareBasketballFinalization(
@@ -385,104 +342,28 @@ export async function reopenBasketballCloudGame(
   }
 }
 
-export async function loadBasketballCanonicalPublication(
+export function loadBasketballCanonicalPublication(
   gameId: string
 ): Promise<BasketballCanonicalPublication | null> {
-  if (!supabase) throw new Error('Supabase client not configured')
-  const { data, error } = await supabase.rpc('get_basketball_canonical_publication', {
-    p_game_id: gameId,
-  })
-  if (error) throw new Error(`Canonical Basketball result could not load: ${error.message}`)
-  if (!Array.isArray(data) || data.length === 0) return null
-  const row = objectRow(data[0])
-  const snapshot = parseBasketballCanonicalSnapshot(row.canonical_snapshot)
-  const primaryRecorderId = requiredString(row.primary_recorded_by, 'primary recorder')
-  if (snapshot.gameId !== gameId || snapshot.primaryRecorderId !== primaryRecorderId) {
-    throw new Error('Canonical Basketball publication identity is invalid.')
-  }
-  return {
-    publicationId: requiredString(row.publication_id, 'publication id'),
-    publicationNumber: requiredInteger(row.publication_number, 'publication number'),
-    primaryRecorderId,
-    primaryDisplayName: requiredString(row.primary_display_name, 'primary recorder name'),
-    snapshot,
-    snapshotFingerprint: requiredString(row.snapshot_fingerprint, 'snapshot fingerprint'),
-    finalizedBy: requiredString(row.finalized_by, 'finalization actor'),
-    finalizedByDisplayName: requiredString(
-      row.finalized_by_display_name,
-      'finalization actor name'
-    ),
-    finalizedAt: requiredTimestamp(row.finalized_at, 'finalized time'),
-  }
+  return loadEventCanonicalPublication(
+    BASKETBALL_FINALIZATION_RPCS,
+    gameId,
+    parseBasketballCanonicalSnapshot
+  )
 }
 
-export async function loadBasketballCanonicalPublicationHistory(
+export function loadBasketballCanonicalPublicationHistory(
   gameId: string
 ): Promise<BasketballCanonicalPublicationHistoryEntry[]> {
-  if (!supabase) throw new Error('Supabase client not configured')
-  const { data, error } = await supabase.rpc(
-    'get_basketball_canonical_publication_history_v1',
-    { p_game_id: gameId }
+  return loadEventCanonicalPublicationHistory(
+    BASKETBALL_FINALIZATION_RPCS,
+    gameId,
+    row => ({
+      reopenMode: row.invalidation_mode === undefined
+        ? null
+        : nullableBasketballReopenMode(row.invalidation_mode),
+    })
   )
-  if (error) throw new Error(`Basketball publication history could not load: ${error.message}`)
-  if (!Array.isArray(data)) throw new Error('Basketball publication history response is invalid.')
-
-  const history = data.map(raw => {
-    const row = objectRow(raw)
-    const isActive = requiredBoolean(row.is_active, 'publication active state')
-    const invalidatedBy = nullableString(row.invalidated_by, 'invalidation actor')
-    const invalidatedByDisplayName = nullableString(
-      row.invalidated_by_display_name,
-      'invalidation actor name'
-    )
-    const invalidatedAt = nullableTimestamp(row.invalidated_at, 'invalidation time')
-    const invalidationReason = nullableString(row.invalidation_reason, 'invalidation reason')
-    const reopenMode = row.invalidation_mode === undefined
-      ? null
-      : nullableBasketballReopenMode(row.invalidation_mode)
-    if (
-      (isActive && (
-        invalidatedBy !== null ||
-        invalidatedByDisplayName !== null ||
-        invalidatedAt !== null ||
-        invalidationReason !== null
-      )) ||
-      (!isActive && (
-        invalidatedBy === null ||
-        invalidatedByDisplayName === null ||
-        invalidatedAt === null ||
-        invalidationReason === null
-      ))
-    ) {
-      throw new Error('Basketball publication invalidation metadata is inconsistent.')
-    }
-    return {
-      publicationId: requiredString(row.publication_id, 'publication id'),
-      publicationNumber: requiredInteger(row.publication_number, 'publication number'),
-      primaryRecorderId: requiredString(row.primary_recorded_by, 'primary recorder'),
-      primaryDisplayName: requiredString(row.primary_display_name, 'primary recorder name'),
-      finalizedBy: requiredString(row.finalized_by, 'finalization actor'),
-      finalizedByDisplayName: requiredString(
-        row.finalized_by_display_name,
-        'finalization actor name'
-      ),
-      finalizedAt: requiredTimestamp(row.finalized_at, 'finalization time'),
-      invalidatedBy,
-      invalidatedByDisplayName,
-      invalidatedAt,
-      invalidationReason,
-      reopenMode,
-      isActive,
-    }
-  })
-  if (
-    new Set(history.map(item => item.publicationId)).size !== history.length ||
-    new Set(history.map(item => item.publicationNumber)).size !== history.length ||
-    history.filter(item => item.isActive).length > 1
-  ) {
-    throw new Error('Basketball publication history contains duplicate authority.')
-  }
-  return history
 }
 
 export function basketballCanonicalAuthorityState(
@@ -553,76 +434,35 @@ export async function loadBasketballAnchoredFinalizationBlockers(
   }))
 }
 
-export async function loadBasketballPrimaryFinalizationConflicts(
+export function loadBasketballPrimaryFinalizationConflicts(
   gameId: string
 ): Promise<BasketballPrimaryFinalizationConflict[]> {
-  if (!supabase) throw new Error('Supabase client not configured')
-  const { data, error } = await supabase.rpc(
-    'get_basketball_primary_conflicts_for_finalization',
-    { p_game_id: gameId }
-  )
-  if (error) throw new Error(`Primary conflicts could not load: ${error.message}`)
-  if (!Array.isArray(data)) throw new Error('Primary conflict response is invalid.')
-  const conflicts = data.map(raw => {
-    const row = objectRow(raw)
-    if (!isGameEventEnvelope(row.local_event) || !isGameEventEnvelope(row.remote_event)) {
-      throw new Error('Primary conflict contains an invalid event.')
-    }
-    return {
-      conflictId: requiredString(row.conflict_id, 'conflict id'),
-      recorderId: requiredString(row.recorded_by, 'recorder id'),
-      recorderDisplayName: requiredString(row.recorder_display_name, 'recorder name'),
-      eventId: requiredString(row.event_id, 'event id'),
-      localEvent: row.local_event,
-      remoteEvent: row.remote_event,
-      detectedAt: requiredTimestamp(row.detected_at, 'conflict time'),
-    }
-  })
-  if (new Set(conflicts.map(conflict => conflict.conflictId)).size !== conflicts.length) {
-    throw new Error('Primary conflict response contains duplicate conflicts.')
-  }
-  return conflicts
+  return loadEventPrimaryFinalizationConflicts(BASKETBALL_FINALIZATION_RPCS, gameId)
 }
 
-export async function resolveBasketballPrimaryFinalizationConflict(
+export function resolveBasketballPrimaryFinalizationConflict(
   conflictId: string,
   resolution: 'local' | 'remote'
 ): Promise<void> {
-  if (!supabase) throw new Error('Supabase client not configured')
-  const { error } = await supabase.rpc(
-    'resolve_basketball_primary_conflict_for_finalization',
-    {
-      p_conflict_id: conflictId,
-      p_resolution: resolution,
-    }
+  return resolveEventPrimaryFinalizationConflict(
+    BASKETBALL_FINALIZATION_RPCS,
+    conflictId,
+    resolution
   )
-  if (error) throw new Error(`Primary conflict could not resolve: ${error.message}`)
 }
 
-async function confirmPrimaryCheckpoint(
+function confirmPrimaryCheckpoint(
   gameId: string,
   recorderId: string,
   projection: BasketballRecorderProjection
 ): Promise<void> {
-  if (!supabase) throw new Error('Supabase client not configured')
-  const revisions = eventRevisionCheckpoint(projection.state)
-  const maxSequence = projection.eventStream.events.reduce<number>(
-    (max, event) => isGameEventEnvelope(event) ? Math.max(max, event.sequence) : max,
-    -1
+  return confirmEventPrimaryCheckpoint(
+    BASKETBALL_FINALIZATION_RPCS,
+    gameId,
+    recorderId,
+    projection.state,
+    projection.eventStream
   )
-  const { error } = await supabase.rpc(
-    'confirm_basketball_primary_checkpoint_for_finalization',
-    {
-      p_game_id: gameId,
-      p_primary_recorded_by: recorderId,
-      p_stream_version: projection.eventStream.version,
-      p_event_revisions: revisions,
-      p_event_count: revisions.length,
-      p_max_sequence: maxSequence,
-      p_stream_fingerprint: eventStreamFingerprint(projection.state),
-    }
-  )
-  if (error) throw new Error(`Primary checkpoint could not confirm: ${error.message}`)
 }
 
 export function createBasketballCanonicalSnapshot(
@@ -783,10 +623,6 @@ function requiredString(value: unknown, label: string): string {
   return value
 }
 
-function nullableString(value: unknown, label: string): string | null {
-  if (value === null) return null
-  return requiredString(value, label)
-}
 
 function requiredBoolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') throw new Error(`Invalid ${label}.`)
@@ -807,10 +643,6 @@ function requiredTimestamp(value: unknown, label: string): string {
   return timestamp
 }
 
-function nullableTimestamp(value: unknown, label: string): string | null {
-  if (value === null) return null
-  return requiredTimestamp(value, label)
-}
 
 function nullableBasketballReopenMode(value: unknown): BasketballReopenMode | null {
   if (value === null) return null

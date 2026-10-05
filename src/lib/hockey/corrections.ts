@@ -1,6 +1,7 @@
 import type { GameState } from '../../types'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
+import { HOCKEY_FINAL_CLOUD_GAME_MESSAGE, isFinalHockeyCloudGame } from './cloudPolicy'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEvent, GameEventActor, GameEventMutation } from '../gameEvents/types'
 import {
@@ -659,6 +660,7 @@ function applyChecked(
   now: string,
   updateGoalies: boolean
 ): HockeyCorrectionResult {
+  if (isFinalHockeyCloudGame(state)) return refused(state, HOCKEY_FINAL_CLOUD_GAME_MESSAGE)
   const byId = new Map(mutations.map(mutation => [mutation.eventId, mutation]))
   let candidate = streamEvents(state).flatMap(event => {
     const mutation = byId.get(event.id)

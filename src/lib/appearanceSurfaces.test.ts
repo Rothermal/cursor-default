@@ -39,6 +39,10 @@ const surfaces = [
   "src/components/basketball-aggregate/BasketballAggregateDestination.tsx",
   "src/components/basketball/BasketballRecorderManager.tsx",
   "src/components/basketball/BasketballFinalizationPanel.tsx",
+  "src/components/game-events/EventRecorderManager.tsx",
+  "src/components/game-events/EventFinalizationPanel.tsx",
+  "src/components/hockey/HockeyRecorderManager.tsx",
+  "src/components/hockey/HockeyFinalizationPanel.tsx",
   "src/pages/GameInfo.tsx",
   "src/pages/Games.tsx",
   "src/pages/TeamRoster.tsx",
@@ -433,7 +437,7 @@ describe('Converted application surface color ownership', () => {
     ['src/components/settings/BasketballTeamSettingsPanel.tsx', 'grid h-9 w-9 shrink-0'],
     ['src/components/settings/SoccerTeamSettingsPanel.tsx', 'h-9 w-9 shrink-0 grid'],
     ['src/components/soccer/SoccerFormationEditor.tsx', 'h-9 rounded-md border border-line px-3'],
-    ['src/components/basketball/BasketballFinalizationPanel.tsx', 'mt-3 min-h-11 w-full bg-accent'],
+    ['src/components/game-events/EventFinalizationPanel.tsx', 'mt-3 min-h-11 w-full bg-accent'],
   ])('keeps disabled fill and text on standalone controls in %s', (path, prefix) => {
     const source = readFileSync(path, 'utf8')
     const classes = source.match(/className="[^"]*"/g)?.filter(value => value.includes(prefix)) ?? []

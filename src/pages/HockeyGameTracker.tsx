@@ -13,6 +13,7 @@ import HockeyTimelineEditor, { type HockeyTimelineAction } from '../components/h
 import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { HockeyCloudMenuSection, HockeyCloudSyncAlerts } from '../components/hockey/HockeyCloudSync'
+import { HOCKEY_FINAL_CLOUD_GAME_MESSAGE, isFinalHockeyCloudGame } from '../lib/hockey/cloudPolicy'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
@@ -167,6 +168,8 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const direction = projection.trackedAttackingDirection ?? sport.setup.firstPeriodAttackingDirection
   const flipped = sport.capturePreferences.rinkFlipped
   const inProgress = projection.status === 'in_progress'
+  // A finalized cloud game is server authority; the guard in the commands refuses edits too.
+  const cloudFinal = isFinalHockeyCloudGame(state)
   const active = Boolean(projection.activePeriodId)
   const trackedLabel = state.gameInfo?.teamName || 'Tracked'
   const opponentLabel = state.gameInfo?.opponentName || 'Opponent'
@@ -407,6 +410,11 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         </p>
       )}
       <HockeyCloudSyncAlerts state={state} />
+      {cloudFinal && (
+        <p role="status" className="rounded-md border border-line bg-surface-muted px-3 py-2 text-sm text-content-muted">
+          This game is finalized and read-only. An owner or admin can reopen it from Game Info.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-1 rounded-md border border-line bg-surface p-1" role="tablist" aria-label="Tracker view">
         {(['track', 'timeline'] as const).map(id => (
@@ -428,9 +436,11 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           {...hockeyTimeline(state, { tracked: trackedLabel, opponent: opponentLabel })}
           participants={sport.setup.participants}
           sideLabel={sideLabel}
-          correctionBlocked={projection.status === 'suspended' || projection.status === 'abandoned'
-            ? 'Reopen the game from the Game menu to correct it.'
-            : null}
+          correctionBlocked={cloudFinal
+            ? HOCKEY_FINAL_CLOUD_GAME_MESSAGE
+            : projection.status === 'suspended' || projection.status === 'abandoned'
+              ? 'Reopen the game from the Game menu to correct it.'
+              : null}
           onCorrect={(row, action) => setCorrection({ row, action })}
           onAdd={() => setCorrection({ row: null, action: 'add' })}
         />
@@ -566,7 +576,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
               </MenuButton>
             </>
           )}
-          {!inProgress && projection.status !== 'pregame' && (
+          {!inProgress && !cloudFinal && projection.status !== 'pregame' && (
             <MenuButton
               onClick={fromMenu(() => askReason('Why is the match reopening?', reason =>
                 reopenHockeyMatch(state, { reason }, context())))}

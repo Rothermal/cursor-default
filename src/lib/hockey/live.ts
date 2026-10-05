@@ -11,6 +11,7 @@ import {
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream, stableJson } from '../gameEvents/stream'
 import type { GameEvent, GameEventActor, GameEventLocation, GameEventMutation, GameEventPeriod } from '../gameEvents/types'
+import { HOCKEY_FINAL_CLOUD_GAME_MESSAGE, isFinalHockeyCloudGame } from './cloudPolicy'
 import { createHockeyEvent, isHockeyReason, type CreateHockeyEventInput } from './events'
 import { hockeyPeriod } from './periods'
 import {
@@ -44,6 +45,7 @@ export type HockeyCommandErrorCode =
   | 'clock_unavailable'
   | 'reason_required'
   | 'rejected'
+  | 'cloud_final'
 
 export type HockeyCommandResult =
   | { ok: true; state: GameState; events: GameEvent[] }
@@ -461,6 +463,8 @@ export function runHockeyCommand(
   const sport = hockeySportState(state)
   if (!sport || state.sport?.id !== 'hockey') return failure(state, 'not_hockey', 'This is not a Hockey event game.')
   if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Set up the Hockey game first.')
+  // Capture, corrections and recorded-later additions all pass here; a finalized game is server authority.
+  if (isFinalHockeyCloudGame(state)) return failure(state, 'cloud_final', HOCKEY_FINAL_CLOUD_GAME_MESSAGE)
   if (context.replaceEventIds) return runHockeyCorrection(state, sport, context, context.replaceEventIds, build)
   if (context.place) return runHockeyAddition(state, sport, context, context.place, build)
   const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
