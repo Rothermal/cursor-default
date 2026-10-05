@@ -1,9 +1,12 @@
 import { isPlainObject } from '../gameEvents/envelope'
+import { stableJson } from '../gameEvents/stream'
+import { emptyHockeyLineupDefaults, parseHockeyLineupDefaults, type HockeyLineupDefaults } from './lineupDefaults'
 import { DEFAULT_HOCKEY_PROFILE_ID, findHockeyRulesProfile, withExplicitHockeySuddenDeath } from './profiles'
 import type { HockeyRulesProfile } from './profiles'
 import { HOCKEY_RULES_FIELDS, validateHockeyMatchRules } from './rules'
 import type {
   HockeyMatchRules,
+  HockeyProfileId,
   HockeyRuleOverrides,
   HockeyRuleSource,
   HockeyRulesField,
@@ -158,4 +161,76 @@ function applyHockeyRuleOverrides(rules: HockeyMatchRules, overrides: HockeyRule
     }
   }
   return next
+}
+
+/** Team settings (HKY-5C): the shared rules shape plus Starter/Bench and goalie defaults. */
+export interface HockeyTeamSettingsV1 extends HockeySettingsV1 {
+  lineupDefaults: HockeyLineupDefaults
+}
+
+export type HockeyTeamSettingsParseResult =
+  | { ok: true; value: HockeyTeamSettingsV1 }
+  | { ok: false; error: string }
+
+export function defaultHockeyTeamSettings(): HockeyTeamSettingsV1 {
+  return { ...defaultHockeySettings(), lineupDefaults: emptyHockeyLineupDefaults() }
+}
+
+/** Exact team parser; `null`/`undefined` mean nothing is saved. */
+export function parseHockeyTeamSettings(value: unknown): HockeyTeamSettingsParseResult {
+  if (value === null || value === undefined) return { ok: true, value: defaultHockeyTeamSettings() }
+  if (!isPlainObject(value) || !Object.prototype.hasOwnProperty.call(value, 'lineupDefaults')) {
+    return { ok: false, error: 'team settings contain unknown or missing fields' }
+  }
+  const { lineupDefaults, ...rules } = value
+  const parsed = parseHockeySettings(rules)
+  if (!parsed.ok) return parsed
+  const lineup = parseHockeyLineupDefaults(lineupDefaults)
+  if (!lineup) return { ok: false, error: 'default lineup is invalid' }
+  return { ok: true, value: { ...parsed.value, lineupDefaults: lineup } }
+}
+
+/** The rules part of team settings, for `resolveHockeySettingsHierarchy`. */
+export function hockeyTeamRulesSettings(settings: HockeyTeamSettingsV1): HockeySettingsV1 {
+  return {
+    settingsSchemaVersion: settings.settingsSchemaVersion,
+    baseProfile: structuredClone(settings.baseProfile),
+    ruleOverrides: structuredClone(settings.ruleOverrides),
+  }
+}
+
+/** Rules the settings describe on their own (no match layer). */
+export function hockeySettingsRules(settings: HockeySettingsV1): HockeyMatchRules | null {
+  const profile = findHockeyRulesProfile(settings.baseProfile.profileId, settings.baseProfile.profileVersion)
+  if (!profile) return null
+  const rules = applyHockeyRuleOverrides(profile.rules, settings.ruleOverrides)
+  return validateHockeyMatchRules(rules) === null ? withExplicitHockeySuddenDeath(rules) : null
+}
+
+/**
+ * Stores `rules` as overrides of the settings' profile: only fields that differ from the
+ * profile are kept, so choosing a profile value again removes its override.
+ */
+export function hockeySettingsWithRules<T extends HockeySettingsV1>(settings: T, rules: HockeyMatchRules): T {
+  const profile = findHockeyRulesProfile(settings.baseProfile.profileId, settings.baseProfile.profileVersion)
+  if (!profile) return settings
+  const base = withExplicitHockeySuddenDeath(structuredClone(profile.rules) as HockeyMatchRules)
+  const ruleOverrides: HockeyRuleOverrides = {}
+  for (const field of HOCKEY_RULES_FIELDS) {
+    if (stableJson(rules[field]) !== stableJson(base[field])) {
+      ;(ruleOverrides as Record<string, unknown>)[field] = structuredClone(rules[field])
+    }
+  }
+  return { ...settings, ruleOverrides }
+}
+
+/** Choosing another profile starts from its rules; overrides of the old one are dropped. */
+export function hockeySettingsWithProfile<T extends HockeySettingsV1>(settings: T, profileId: HockeyProfileId): T {
+  const profile = findHockeyRulesProfile(profileId)
+  if (!profile) return settings
+  return { ...settings, baseProfile: { profileId, profileVersion: profile.version }, ruleOverrides: {} }
+}
+
+export function hockeySettingsFingerprint(settings: HockeySettingsV1 | HockeyTeamSettingsV1): string {
+  return stableJson(settings)
 }

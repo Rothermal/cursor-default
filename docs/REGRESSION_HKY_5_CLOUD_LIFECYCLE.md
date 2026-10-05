@@ -172,3 +172,64 @@ The Basketball recorder, finalization and reopen tests pass unchanged on the sha
 - Apply 072 and 073 to the Supabase project (owner).
 - Two-device live check after HKY-5B2: one recorder, a viewer on a second device, finalize,
   reopen, correct and re-finalize (the manual table above).
+
+## HKY-5C Settings and Team Manage
+
+### Automated
+
+`src/lib/hockey/settingsDefaults.test.ts` (8 cases): exact team settings parsing (lineup
+required, personal settings refuse one), overrides kept only where they differ from the
+profile, a new profile dropping old overrides, one default role per player with at most six
+starters, setup starting from personal and team settings with their sources, recorder edits
+winning over later settings, the frozen setup carrying team sources, the lineup prefill
+(goalies, starters, missing players, nothing when a pick exists) and starters trimmed to
+the settings' skaters.
+
+`src/lib/sportPersonalSettings.test.ts` (5 cases): the sport-neutral reconciliation (cloud
+wins without a pending edit, a pending edit uploads on its base revision and conflicts
+otherwise, untouched defaults never upload, invalid or newer cloud copies and foreign caches
+fail closed, account-scoped caches).
+
+`src/lib/settingsDraft.test.ts` (2 cases, review fix): an edited personal draft keeps the
+revision it started from when focus, online or Refresh brings another device's change, so its
+save becomes a Use Cloud / Keep This Device conflict; an untouched or matching draft adopts the
+saved copy and its revision.
+
+`src/lib/hockey/setupSettingsSource.test.ts` (4 cases, review fix): team defaults that fail to
+load fall back to built-in rules but stay eligible; an in-flight read (including a retry) is
+never treated as loaded and never consumes the roster; error, retry and a successful load apply
+the team rules and lineup once; later refreshes neither fall back nor re-apply; recorder edits
+made meanwhile win; personal settings apply without a team.
+
+`src/lib/hockey/migration074.test.ts` (5 cases): the SQL profile copy equals every client
+profile, validation runs before the shared core, the team write is owner/admin, Hockey-only,
+locked and audited, contract 2 lists the new writes, and only the two writes and the handshake
+are granted.
+
+`supabase/tests/hky5c/run.sh` (scratch PostgreSQL 16, every migration): all 56 parser cases
+agree with `_validate_hockey_settings_payload`; personal saves with revision conflicts; team
+saves refused for a scorer, a viewer, an outsider, a Basketball team and an inactive goalie,
+applied by the owner and an admin, readable by a viewer, two `hockey_settings_changed` audit
+rows; private helpers not executable by `authenticated`; the exact contract 2 response. The
+HKY-5A check now applies migrations only up to 073.
+
+### Manual (after the owner applies 074)
+
+| Step | Expected |
+|---|---|
+| Signed out, Settings → Sports → Hockey: choose College, Running clock, Save | Saved on this device; a new game without a team starts from College with a running clock |
+| Sign in on the same device | The saved settings become the account's copy (synced) |
+| Change the settings on a second device, then save an older edit offline on the first and reconnect | Use Cloud or Keep This Device |
+| Owner opens Team Manage for a Hockey team | Hockey Defaults: rules and a role for each active player; Save Shared Defaults |
+| Scorer or viewer opens the same page | Read only |
+| Deactivate a default starter, reopen Team Manage | Warning and Remove unavailable players before saving |
+| Start a team game while offline, then reconnect and tap Retry team defaults | Built-in rules with a warning first; after the retry the team rules and lineup fill in unless already changed |
+| Start a team game | Rules say they start from the team defaults; goalies and starters are filled in; changing them, the profile, length or clock changes only this game |
+| Start a team game with a default player no longer on the roster | Note that the player stays out of this game |
+| Cloud game before 074 is applied | Setup offers Retry or This device only |
+
+### Pending
+
+- Apply 074 to the Supabase project (owner). Until then Hockey cloud setup reports a backend
+  update, because the client now expects contract 2.
+

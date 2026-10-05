@@ -15,6 +15,7 @@ import AuditTrailPanel from '../components/AuditTrailPanel'
 import PlayerGuardiansDialog from '../components/PlayerGuardiansDialog'
 import BasketballTeamSettingsPanel from '../components/settings/BasketballTeamSettingsPanel'
 import BaseballTeamSettingsPanel from '../components/settings/BaseballTeamSettingsPanel'
+import HockeyTeamSettingsPanel from '../components/settings/HockeyTeamSettingsPanel'
 import BasketballPositionField from '../components/basketball/BasketballPositionField'
 import { normalizeBasketballPosition } from '../lib/basketball/positions'
 import BaseballPositionField from '../components/baseball/BaseballPositionField'
@@ -1964,6 +1965,22 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           selectedTeam?.seasons.sport === 'baseball' && (
             <section className="card">
               <BaseballTeamSettingsPanel
+                key={selectedTeam.id}
+                teamId={selectedTeam.id}
+                teamName={teamDisplayName(selectedTeam)}
+                mayEdit={mayManageRoster}
+                roster={players.map(player => ({ id: player.id, label: `#${player.jersey_number || '-'} ${playerDisplayName(player)}` }))}
+                rosterReady={rosterLoadedTeamId === selectedTeam.id}
+                onAuditChange={() => setAuditRefresh(value => value + 1)}
+              />
+            </section>
+          )}
+
+        {isManagementRoute &&
+          !managementRouteMessage &&
+          selectedTeam?.seasons.sport === 'hockey' && (
+            <section className="card">
+              <HockeyTeamSettingsPanel
                 key={selectedTeam.id}
                 teamId={selectedTeam.id}
                 teamName={teamDisplayName(selectedTeam)}
