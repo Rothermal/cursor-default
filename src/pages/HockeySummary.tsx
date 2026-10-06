@@ -2,8 +2,12 @@ import { AlertTriangle, ChevronLeft, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
+import HockeyTimeline, { HockeyTimelineDetail } from '../components/hockey/HockeyTimeline'
+import { HockeyFaceoffMapView, HockeyShootoutView, HockeyShotMapView } from '../components/hockey/HockeySummaryReview'
+import { isFinalHockeyCloudGame } from '../lib/hockey/cloudPolicy'
+import { hockeyTimeline, type HockeyTimelineRow } from '../lib/hockey/timeline'
+import { hockeyShootoutSummary } from '../lib/hockey/summaryShootout'
 import {
-  HOCKEY_SUMMARY_TABS,
   hockeyDecisionSummary,
   hockeyGoalieRows,
   hockeyPenaltyRows,
@@ -14,6 +18,7 @@ import {
   hockeySummaryNames,
   hockeySummaryPath,
   hockeySummaryResult,
+  hockeySummaryTabs,
   hockeyTeamStatRows,
   parseHockeySummaryQuery,
   type HockeyNames,
@@ -76,6 +81,23 @@ export default function HockeySummary() {
     ? hockeySummaryNames(source!.state, sport.setup)
     : { tracked: 'Tracked', opponent: 'Opponent' }
   const remote = Boolean(source && source.kind !== 'local')
+  const [detail, setDetail] = useState<HockeyTimelineRow | null>(null)
+  const timeline = useMemo(
+    () => (source && sport ? hockeyTimeline(source.state, names) : null),
+    // `names` is derived from the source.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [source]
+  )
+  const openDetail = (eventId: string) => {
+    const row = timeline?.rows.find(entry => entry.events.some(event => event.id === eventId))
+    if (row) setDetail(row)
+  }
+  const tabs = sport ? hockeySummaryTabs(sport.projection) : []
+  const tab = tabs.some(entry => entry.tab === query.tab) ? query.tab : 'overview'
+  // Corrections stay on the tracker: only this device's game, and not once it is final in the cloud.
+  const correctable = source?.kind === 'local' && !isFinalHockeyCloudGame(source.state)
+  const shootout = sport && source?.lines ? hockeyShootoutSummary(sport, source.lines) : null
+  const sideLabel = (side: 'tracked' | 'opponent') => names[side]
 
   return (
     <main className="mx-auto max-w-2xl space-y-3 px-4 pb-6">
@@ -141,24 +163,47 @@ export default function HockeySummary() {
 
       {source && sport && source.healthy && source.lines && (
         <>
-          <div role="tablist" aria-label="Summary views" className="grid grid-cols-3 gap-1 rounded-md border border-line p-1">
-            {HOCKEY_SUMMARY_TABS.map(entry => (
+          <div role="tablist" aria-label="Summary views" className="grid grid-cols-4 gap-1 rounded-md border border-line p-1">
+            {tabs.map(entry => (
               <button
                 key={entry.tab}
                 type="button"
                 role="tab"
-                aria-selected={query.tab === entry.tab}
-                className={`min-h-11 min-w-0 rounded px-1 text-sm font-semibold ${query.tab === entry.tab ? 'bg-accent text-accent-content' : 'text-content'}`}
+                aria-selected={tab === entry.tab}
+                className={`min-h-11 min-w-0 truncate rounded px-1 text-sm font-semibold ${tab === entry.tab ? 'bg-accent text-accent-content' : 'text-content'}`}
                 onClick={() => navigate(hockeySummaryPath({ ...query, tab: entry.tab }), { replace: true })}
               >
                 {entry.label}
               </button>
             ))}
           </div>
-          {query.tab === 'overview' && <Overview source={source} sport={sport} lines={source.lines} names={names} />}
-          {query.tab === 'skaters' && <Skaters sport={sport} lines={source.lines} />}
-          {query.tab === 'goalies' && <Goalies source={source} sport={sport} lines={source.lines} names={names} />}
-          {source.kind === 'local' && (
+          {tab === 'overview' && <Overview source={source} sport={sport} lines={source.lines} names={names} />}
+          {tab === 'skaters' && <Skaters sport={sport} lines={source.lines} />}
+          {tab === 'goalies' && <Goalies source={source} sport={sport} lines={source.lines} names={names} />}
+          {tab === 'timeline' && timeline && (
+            <HockeyTimeline
+              rows={timeline.rows}
+              historyMessage={timeline.historyMessage}
+              participants={sport.setup.participants}
+              names={timeline.names}
+              sideLabel={sideLabel}
+            />
+          )}
+          {tab === 'shots' && (
+            <HockeyShotMapView sport={sport} events={source.inspection.activeEvents} names={names} onOpen={openDetail} />
+          )}
+          {tab === 'faceoffs' && <HockeyFaceoffMapView sport={sport} events={source.inspection.activeEvents} names={names} />}
+          {tab === 'shootout' && shootout && <HockeyShootoutView summary={shootout} names={names} onOpen={openDetail} />}
+          {detail && timeline && (
+            <HockeyTimelineDetail
+              row={detail}
+              names={timeline.names}
+              sideLabel={sideLabel}
+              correctionBlocked={null}
+              onClose={() => setDetail(null)}
+            />
+          )}
+          {correctable && (
             <p className="text-xs text-content-muted">
               To change a play, <Link to="/game?tab=timeline" className="font-semibold underline">correct it on the Timeline</Link>.
             </p>

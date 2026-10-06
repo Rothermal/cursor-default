@@ -326,3 +326,34 @@ Filled in as each slice lands.
   summary for a Hockey event game, final or not. The tracker opens on its Timeline with
   `?tab=timeline`, which the Summary links to for corrections.
 - Regression: [HKY-6A1](REGRESSION_HKY_6_RELEASE.md#hky-6a1-summary-source-overview-skaters-and-goalies).
+
+### HKY-6A2 (implemented)
+
+- **Timeline**: the Summary reuses `hockeyTimeline` and `HockeyTimeline` on the selected
+  source's state, without correction actions, so every source is read only. The footer
+  link to the tracker's Timeline shows only for this device's game while it is not final in
+  the cloud.
+- `src/lib/hockey/summaryRink.ts`:
+  - **Shot map**: `hockeyShotMapShots` lists active shots in game order (shootout attempts
+    are not shots). A location is turned half a turn when it was played the other way, so
+    the tracked side always attacks to the right and the opponent to the left.
+    The whole active stream is put in game order before shots are picked out, so a
+    recorded-later or re-timed shot keeps the period anchors it is placed by.
+    `hockeyShotMap` applies side, player, period, outcome and strength filters; strength is
+    recorded on goals only (HKY-3B), so a strength filter keeps goals. Shots within 5 ft of
+    a group's first shot share it (`hockeyShotMapClusters`, game order, so the same filters
+    always group the same way). Unlocated shots are counted and listed.
+  - **Faceoff map**: `hockeyFaceoffMap` turns each faceoff's dot to the tracked side's
+    left-to-right view (`rotateHockeyFaceoffDot`: left and right swap, upper and lower
+    swap) and tallies won-lost and whole-number % at each dot, for the team or one tracked
+    taker, by period.
+- `src/lib/hockey/summaryShootout.ts`: `hockeyShootoutSummary` groups the replayed attempts
+  by round (the first side first), finds the deciding attempt by replaying the attempts
+  with `refreshHockeyShootout`, and lists tracked shooters (`hky_so_att`, `hky_so_g`) and
+  goalies (`hky_so_sa`, `hky_so_sv`). The tab shows only once a shootout starts
+  (`hockeySummaryTabs`).
+- `HockeyRink` can be review only: without `onLocation` taps on the ice do nothing, without
+  `onFlip` there is no Flip button, a `cluster` marker draws its count, and `overlay` draws
+  the faceoff tallies. `HockeyTimelineDetail` is exported so map marks, the chooser,
+  unlocated rows and shootout rows open the same read-only detail.
+- Regression: [HKY-6A2](REGRESSION_HKY_6_RELEASE.md#hky-6a2-summary-timeline-shot-map-faceoff-map-and-shootout).

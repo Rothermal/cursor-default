@@ -225,7 +225,7 @@ function Badge({ children }: { children: string }) {
   )
 }
 
-function HockeyTimelineDetail({
+export function HockeyTimelineDetail({
   row,
   names,
   sideLabel,

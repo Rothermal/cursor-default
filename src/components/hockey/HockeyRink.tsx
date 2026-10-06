@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { GameEventLocation } from '../../lib/gameEvents/types'
 import {
   HOCKEY_CREASE_RADIUS_FT,
@@ -20,7 +21,7 @@ import {
 } from '../../lib/hockey/rinkGeometry'
 import type { HockeyAttackingDirection } from '../../lib/hockey'
 
-export type HockeyRinkMarkerKind = 'goal' | 'saved' | 'missed' | 'blocked' | 'event'
+export type HockeyRinkMarkerKind = 'goal' | 'saved' | 'missed' | 'blocked' | 'event' | 'cluster'
 
 export interface HockeyRinkMarker {
   id: string
@@ -30,6 +31,8 @@ export interface HockeyRinkMarker {
   teamSide: 'tracked' | 'opponent'
   kind: HockeyRinkMarkerKind
   label: string
+  /** Marks sharing one spot (`cluster` only), drawn as the number. */
+  count?: number
 }
 
 interface HockeyRinkProps {
@@ -46,11 +49,15 @@ interface HockeyRinkProps {
    * tap plus Won or Lost. Taps elsewhere still go to `onLocation`.
    */
   onFaceoffDot?: (dotId: HockeyFaceoffDotId) => void
-  onFlip: () => void
-  onLocation: (location: GameEventLocation) => void
+  /** Without it the view cannot be flipped and no Flip button shows. */
+  onFlip?: () => void
+  /** Without it the rink is review only: taps on the ice do nothing (HKY-6A2 Summary). */
+  onLocation?: (location: GameEventLocation) => void
   onMarker?: (markerId: string) => void
   trackedLabel?: string
   opponentLabel?: string
+  /** Extra SVG drawn over the rink in feet, such as the Summary's faceoff tallies. */
+  overlay?: ReactNode
 }
 
 const L = HOCKEY_RINK_LENGTH_FT
@@ -82,7 +89,9 @@ export default function HockeyRink({
   onMarker,
   trackedLabel = 'Tracked',
   opponentLabel = 'Opponent',
+  overlay,
 }: HockeyRinkProps) {
+  const interactive = Boolean(onLocation) && !disabled
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
     : oppositeHockeyDirection(trackedDirection)
@@ -96,7 +105,7 @@ export default function HockeyRink({
           {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
           <span className="truncate">{captureSide === 'tracked' ? trackedLabel : opponentLabel} attack</span>
         </div>
-        <button
+        {onFlip && <button
           type="button"
           onClick={onFlip}
           className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-line-strong bg-surface text-content-muted"
@@ -104,17 +113,17 @@ export default function HockeyRink({
           title="Flip rink view"
         >
           <RefreshCw size={17} />
-        </button>
+        </button>}
       </div>
 
       <div className="relative aspect-[200/85] w-full">
         <svg
           viewBox={`0 0 ${L} ${W}`}
-          className={`block h-full w-full origin-center transition-transform motion-reduce:transition-none ${flipped ? 'rotate-180' : ''} ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
+          className={`block h-full w-full origin-center transition-transform motion-reduce:transition-none ${flipped ? 'rotate-180' : ''} ${disabled ? 'cursor-not-allowed' : interactive ? 'cursor-crosshair' : ''}`}
           role="group"
           aria-label="Hockey rink"
           onClick={event => {
-            if (disabled) return
+            if (!interactive || !onLocation) return
             const bounds = event.currentTarget.getBoundingClientRect()
             const displayX = (event.clientX - bounds.left) / bounds.width
             const displayY = (event.clientY - bounds.top) / bounds.height
@@ -201,10 +210,13 @@ export default function HockeyRink({
             />
           )}
 
+          {overlay}
+
           {markers.map(marker => (
             <HockeyMarker
               key={marker.id}
               marker={marker}
+              flipped={flipped}
               onSelect={onMarker ? () => onMarker(marker.id) : undefined}
             />
           ))}
@@ -250,7 +262,7 @@ function FaceoffDotTarget({ dotId, onSelect }: { dotId: HockeyFaceoffDotId; onSe
   )
 }
 
-function HockeyMarker({ marker, onSelect }: { marker: HockeyRinkMarker; onSelect?: () => void }) {
+function HockeyMarker({ marker, flipped, onSelect }: { marker: HockeyRinkMarker; flipped: boolean; onSelect?: () => void }) {
   const x = marker.x * L
   const y = marker.y * W
   const color = marker.teamSide === 'tracked' ? 'rgb(var(--rink-tracked))' : 'rgb(var(--rink-opponent))'
@@ -279,6 +291,17 @@ function HockeyMarker({ marker, onSelect }: { marker: HockeyRinkMarker; onSelect
         </g>
       ) : marker.kind === 'blocked' ? (
         <rect x={x - 2.2} y={y - 2.2} width="4.4" height="4.4" fill="none" stroke={color} strokeWidth="1.1" />
+      ) : marker.kind === 'cluster' ? (
+        <g>
+          <circle cx={x} cy={y} r="4.2" fill="none" stroke={color} strokeWidth="0.9" />
+          <text
+            x={x} y={y} dy="0.35em" textAnchor="middle"
+            fontSize="5" fontWeight="700" fill="rgb(var(--rink-ice))"
+            transform={flipped ? `rotate(180 ${x} ${y})` : undefined}
+          >
+            {marker.count ?? ''}
+          </text>
+        </g>
       ) : marker.kind === 'event' ? (
         <path d={`M ${x} ${y - 2.8} L ${x + 2.8} ${y} L ${x} ${y + 2.8} L ${x - 2.8} ${y} Z`} fill="none" stroke={color} strokeWidth="1.1" />
       ) : (

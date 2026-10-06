@@ -20,13 +20,22 @@ import type { GameEvent } from '../gameEvents/types'
  * fresh replay of the selected source; nothing here writes events.
  */
 
-export type HockeySummaryTab = 'overview' | 'skaters' | 'goalies'
+export type HockeySummaryTab = 'overview' | 'skaters' | 'goalies' | 'timeline' | 'shots' | 'faceoffs' | 'shootout'
 
 export const HOCKEY_SUMMARY_TABS: ReadonlyArray<{ tab: HockeySummaryTab; label: string }> = [
   { tab: 'overview', label: 'Overview' },
   { tab: 'skaters', label: 'Skaters' },
   { tab: 'goalies', label: 'Goalies' },
+  { tab: 'timeline', label: 'Timeline' },
+  { tab: 'shots', label: 'Shots' },
+  { tab: 'faceoffs', label: 'Faceoffs' },
+  { tab: 'shootout', label: 'Shootout' },
 ]
+
+/** The tabs a game shows: Shootout only once a shootout has started (HKY-6A2). */
+export function hockeySummaryTabs(projection: Pick<HockeyMatchProjection, 'shootout'>): typeof HOCKEY_SUMMARY_TABS {
+  return HOCKEY_SUMMARY_TABS.filter(entry => entry.tab !== 'shootout' || projection.shootout !== null)
+}
 
 export type HockeySummaryFrom = 'tracker' | 'sport' | 'games' | 'game-info'
 

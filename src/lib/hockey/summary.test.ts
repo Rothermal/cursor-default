@@ -25,6 +25,7 @@ import {
   type HockeySummarySourceDependencies,
 } from './summarySource'
 import { CLOCKLESS, ctx, expectOk, hockeySetup, initializedHockeyGame } from './testFixtures'
+import { hockeyTimeline } from './timeline'
 
 const NAMES = { tracked: 'Blades', opponent: 'Rivals' }
 
@@ -167,6 +168,9 @@ describe('Hockey Summary source (HKY-6A1)', () => {
     expect(final.sport?.projection.score).toEqual({ tracked: 2, opponent: 1 })
     const live = await loadHockeySummarySource(state, 'game-1', deps(state, 'in_progress'))
     expect(live).toMatchObject({ kind: 'cloud_primary', healthy: true, recorderName: 'Mark' })
+    // The Summary Timeline (HKY-6A2) reads each remote source's own stream.
+    const captured = (source: HockeySummarySource) => hockeyTimeline(source.state, NAMES).rows.filter(row => row.capture).length
+    expect([captured(final), captured(live)]).toEqual([8, 8])
     // A local copy of a final game reads the publication.
     const boundFinal = { ...state, cloudSync: { ...state.cloudSync, gameId: 'game-1', gameStatus: 'final' as const } }
     expect((await loadHockeySummarySource(boundFinal, null, deps(state, 'final'))).kind).toBe('canonical')
