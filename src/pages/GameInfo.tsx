@@ -16,6 +16,7 @@ import {
   loadBasketballCloudGameById,
 } from '../lib/basketball/cloudSync'
 import { basketballSummaryPath } from '../lib/basketball/summary'
+import { hockeySummaryPath } from '../lib/hockey/summary'
 import {
   createHockeyIndependentRecorderState,
   loadHockeyCloudDataAuthority,
@@ -1029,6 +1030,15 @@ export default function GameInfo() {
               <section className="rounded-lg border border-danger-line bg-danger px-3 py-2">
                 <p className="text-sm font-medium text-danger-content">{error ?? parkingError}</p>
               </section>
+            )}
+
+            {game.sport_id === 'hockey' && hockeyDataAuthority === 'sport_events' && (
+              <Link
+                to={hockeySummaryPath({ gameId: game.id, from: 'game-info', teamId: team?.id ?? fallbackTeamId })}
+                className="btn-secondary block w-full text-center"
+              >
+                {game.status === 'final' ? 'View final summary' : 'View summary'}
+              </Link>
             )}
 
             {sport?.id === 'soccer' ||

@@ -2,6 +2,7 @@ import type { GameState } from '../types'
 import type { ParkedGameSummary } from './gameParking'
 import { basketballSummaryPath } from './basketball/summary'
 import { baseballSummaryPath } from './baseball/summary'
+import { hockeySummaryPath } from './hockey/summary'
 
 type ResumableGameState = Pick<
   GameState,
@@ -70,6 +71,14 @@ export function routeForResumedGame(state: ResumableGameState): string {
     state.eventStream?.events.length &&
     ['final', 'abandoned'].includes(String(state.sportGameState.projection?.status))
   ) return baseballSummaryPath()
+  // A finished Hockey event game opens on its Summary; the tracker is one tap away (HKY-6A1).
+  if (
+    state.sport.id === 'hockey' &&
+    state.gameDataAuthority === 'sport_events' &&
+    state.sportGameState?.sportId === 'hockey' &&
+    state.eventStream?.events.length &&
+    ['ended', 'abandoned'].includes(String(state.sportGameState.projection?.status))
+  ) return hockeySummaryPath({ from: 'tracker' })
   if (state.players.length === 0) return '/players'
   return '/game'
 }

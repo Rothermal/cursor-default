@@ -1,6 +1,6 @@
 import { ChevronLeft, Menu, Pause, Play, X } from 'lucide-react'
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import HockeyFaceoffControl from '../components/hockey/HockeyFaceoffControl'
 import HockeyGoalieDialog, { type HockeyGoalieChange } from '../components/hockey/HockeyGoalieDialog'
 import HockeyPenaltyBox from '../components/hockey/HockeyPenaltyBox'
@@ -14,6 +14,7 @@ import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
 import { HockeyCloudMenuSection, HockeyCloudSyncAlerts } from '../components/hockey/HockeyCloudSync'
 import { HOCKEY_FINAL_CLOUD_GAME_MESSAGE, isFinalHockeyCloudGame } from '../lib/hockey/cloudPolicy'
+import { hockeySummaryPath } from '../lib/hockey/summary'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
@@ -107,7 +108,10 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [faceoffDot, setFaceoffDot] = useState<HockeyFaceoffDotId | null>(null)
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
-  const [tab, setTab] = useState<'track' | 'timeline'>('track')
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  // The Summary links corrections here with `?tab=timeline`.
+  const [tab, setTab] = useState<'track' | 'timeline'>(() => (searchParams.get('tab') === 'timeline' ? 'timeline' : 'track'))
   const [correction, setCorrection] = useState<{ row: HockeyTimelineRow | null; action: HockeyTimelineAction } | null>(null)
   const projection = sport.projection
   const running = projection.clock?.running === true
@@ -526,6 +530,9 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
 
       {menuOpen && (
         <GameMenu onClose={() => setMenuOpen(false)}>
+          <MenuButton onClick={fromMenu(() => navigate(hockeySummaryPath({ from: 'tracker' })))}>
+            {inProgress ? 'Summary (in progress)' : 'Summary'}
+          </MenuButton>
           {projection.clock && inProgress && active && (
             <MenuButton disabled={running} onClick={fromMenu(setClock)}>
               Set clock{running ? ' (pause first)' : ''}
