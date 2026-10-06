@@ -40,7 +40,9 @@ import { isSoccerSummaryRoute } from './lib/soccer/summary'
 import BasketballSummary from './pages/BasketballSummary'
 import { isBasketballSummaryRoute } from './lib/basketball/summary'
 import BaseballSummary from './pages/BaseballSummary'
+import HockeySummary from './pages/HockeySummary'
 import { isBaseballSummaryRoute } from './lib/baseball/summary'
+import { isHockeySummaryRoute } from './lib/hockey/summary'
 import PwaStatus from './components/PwaStatus'
 import HockeyGameSetup from './pages/HockeyGameSetup'
 import HockeyGameTracker from './pages/HockeyGameTracker'
@@ -97,6 +99,8 @@ function GameSummaryRoute() {
   if (isBasketballSummaryRoute(state, searchParams)) return <BasketballSummary />
   // Baseball event games never fall through to the legacy grid Summary.
   if (isBaseballSummaryRoute(state, searchParams)) return <BaseballSummary />
+  // Hockey event games, local or cloud by gameId, open the Hockey Summary (HKY-6A1).
+  if (isHockeySummaryRoute(state, searchParams)) return <HockeySummary />
   if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary />
   return <SoccerSummary />
 }

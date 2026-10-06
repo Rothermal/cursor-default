@@ -293,3 +293,31 @@ Each slice adds its own section to `docs/REGRESSION_HKY_6_RELEASE.md`:
 ## 8. Delivery Record
 
 Filled in as each slice lands.
+
+### HKY-6A1 (implemented)
+
+- `src/lib/hockey/gameLines.ts`: `hockeyGameLinesInput` runs one replay of the active
+  events and keeps the replay order and the score before each goal;
+  `deriveHockeyGameLines` returns per-participant lines (the catalog plus `hky_gp`,
+  `hky_gs`, `hky_eng`, `hky_gwg`, `hky_w`, `hky_l`, `hky_otl`, `hky_t`, `hky_so`,
+  `hky_toi_ms`, and match-scoped `hky_so_att`, `hky_so_g`, `hky_so_sa`, `hky_so_sv`), the
+  goal list and coverage. Null for an unhealthy replay.
+- **Time in net** (anchored games only): a stint runs from its change to the side's next
+  change or the end of the game; a change between periods takes effect when the next period
+  starts; each period counts only the time played (its clock at the period end, so an early
+  end counts up to that time); an empty net is credited to nobody; positions are clock times
+  after any clock correction. A total is incomplete while the game is in progress or
+  suspended, while the clock runs, or when a change sits earlier than the one before it.
+  GAA is goals against per regulation-length game, shown only with a complete total.
+- **Shootout lines**: shots against count goals and saves; a miss is not a shot against.
+- **Game-winning goal**: an opponent win has none (`none`), so only a tracked winner can be
+  `unattributed`.
+- `src/lib/hockey/summarySource.ts`: local, `cloud_primary` (the recorder marked primary)
+  or `canonical`; a local game bound to a final cloud game reads the publication.
+- `src/lib/hockey/summary.ts` and `src/pages/HockeySummary.tsx`: Overview, Skaters and
+  Goalies; cloud Summaries have Refresh. Routing in `App.tsx` before the legacy fallback.
+- Entry points: the tracker's Game menu (Summary, or Summary (in progress)); ended and
+  abandoned parked games resume on the Summary (`routeForResumedGame`); Game Info's View
+  summary for a Hockey event game, final or not. The tracker opens on its Timeline with
+  `?tab=timeline`, which the Summary links to for corrections.
+- Regression: [HKY-6A1](REGRESSION_HKY_6_RELEASE.md#hky-6a1-summary-source-overview-skaters-and-goalies).
