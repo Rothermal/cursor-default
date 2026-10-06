@@ -47,10 +47,10 @@ No migration and no event, payload, setup or rules change.
 
 | Area | Cases | Result |
 |---|---|---|
-| Review models (`summaryReview.test.ts`) | Shots from two periods played at opposite ends land at one spot (tracked side to the right, opponent to the left); two shots there share one cluster in game order; an unlocated shot is listed; shooters and periods for the filters; side, player, period, outcome and strength filters (strength recorded on goals only); a filter that hides one of a cluster's shots leaves a single mark; dot rotation (left and right swap, upper and lower swap, twice is the identity); faceoffs at opposite ends tallied at one dot from the tracked side's view, by taker and by period; no shootout summary or tab before the shootout starts; rounds with the first side first, the deciding attempt, shooter and goalie lines (a miss is not a shot against), no shootout attempt on the shot map or in goals; the Summary Timeline reads the source oldest first by period | 7 pass |
+| Review models (`summaryReview.test.ts`) | Shots from two periods played at opposite ends land at one spot (tracked side to the right, opponent to the left); two shots there share one cluster in game order; an unlocated shot is listed; shooters and periods for the filters; side, player, period, outcome and strength filters (strength recorded on goals only); a filter that hides one of a cluster's shots leaves a single mark; dot rotation (left and right swap, upper and lower swap, twice is the identity); faceoffs at opposite ends tallied at one dot from the tracked side's view, by taker and by period; no shootout summary or tab before the shootout starts; rounds with the first side first, the deciding attempt, shooter and goalie lines (a miss is not a shot against), no shootout attempt on the shot map or in goals; the Summary Timeline reads the source oldest first by period; a recorded-later period 1 shot and faceoff and a period 2 faceoff re-timed into period 1 appear in the Timeline's order on the shot list, in the cluster, in the unlocated list and in both period filters (review fix: the whole stream is ordered before picking shots or faceoffs, so placed events keep their period anchors) | 8 pass |
 | Summary (`summary.test.ts`) | Adds: the Timeline reads the publication of a final cloud game and the primary stream of a live one | 11 pass |
-| Hockey folder | `npx vitest run src/lib/hockey/` | 29 files, 376 tests pass |
-| Full suite | `npx vitest run` | 282 files, 2641 tests pass |
+| Hockey folder | `npx vitest run src/lib/hockey/` | 29 files, 377 tests pass |
+| Full suite | `npx vitest run` | 282 files, 2642 tests pass |
 | `pnpm typecheck`, `pnpm lint`, `pnpm build` | | Pass (lint: the 3 existing fast-refresh warnings) |
 
 ### Browser

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
+import { addHockeyEvents, correctHockeyEvents, hockeyCorrectionInput } from './corrections'
 import { recordHockeyFaceoff, recordHockeyShootoutAttempt, recordHockeyShot, startHockeyShootout } from './captureCommands'
 import { endHockeyMatch, endHockeyPeriod, startHockeyGame, startNextHockeyPeriod } from './live'
 import { HOCKEY_FACEOFF_DOT_IDS } from './rinkGeometry'
@@ -13,7 +14,7 @@ import {
 } from './summaryRink'
 import { hockeyShootoutSummary } from './summaryShootout'
 import { hockeySummaryFromState, type HockeySummarySource } from './summarySource'
-import { CLOCKLESS, ctx, expectOk, hockeySetup, initializedHockeyGame } from './testFixtures'
+import { at, CLOCKLESS, ctx, expectOk, hockeySetup, initializedHockeyGame } from './testFixtures'
 import { hockeyTimeline } from './timeline'
 
 const NAMES = { tracked: 'Blades', opponent: 'Rivals' }
@@ -168,5 +169,53 @@ describe('Summary Timeline', () => {
     ])
     expect(capture[0].label).toMatch(/Blades goal/)
     expect(timeline.historyMessage).toBeNull()
+  })
+})
+
+describe('Summary maps follow the replay order', () => {
+  const OPTIONS = { recorderUserId: null, now: at(9000), updateGoalies: false }
+  const P1 = { periodId: 'regulation-1', elapsedMs: null, placement: 'game_time' as const }
+
+  /** Period 2 is live; a period 1 shot and faceoff are recorded later, and a period 2 faceoff is re-timed into period 1. */
+  function placedGame(): GameState {
+    let state = expectOk(startHockeyGame(initializedHockeyGame(hockeySetup({ rules: CLOCKLESS })), ctx(0)))
+    state = expectOk(endHockeyPeriod(state, {}, ctx(1)))
+    state = expectOk(startNextHockeyPeriod(state, ctx(2)))
+    // The tracked side attacks right to left in period 2, so this is the right net in the summary frame.
+    state = expectOk(recordHockeyShot(state, { side: 'tracked', outcome: 'saved', shooter: { participantId: 'p3' }, location: { x: 0.1, y: 0.6 } }, ctx(3)))
+    state = expectOk(recordHockeyFaceoff(state, { dotId: 'center', winner: 'opponent', takerParticipantId: 'p4' }, ctx(4)))
+    state = expectOk(recordHockeyFaceoff(state, { dotId: 'center', winner: 'tracked', takerParticipantId: 'p5' }, ctx(5)))
+    state = expectOk(addHockeyEvents(state, {
+      kind: 'shot', input: { side: 'tracked', outcome: 'goal', shooter: { participantId: 'p2' }, location: { x: 0.9, y: 0.4 } },
+    }, P1, OPTIONS))
+    state = expectOk(addHockeyEvents(state, {
+      kind: 'faceoff', input: { dotId: 'center', winner: 'tracked', takerParticipantId: 'p2' },
+    }, P1, OPTIONS))
+    const retime = hockeyTimeline(state, NAMES).rows.find(row => row.events[0].actors.some(actor => actor.participantId === 'p5'))!
+    return expectOk(correctHockeyEvents(state, retime.events.map(event => event.id), hockeyCorrectionInput(retime.events)!, { ...OPTIONS, place: P1 }))
+  }
+
+  it('lists placed shots and faceoffs where the Timeline puts them, across periods', () => {
+    const source = healthy(placedGame())
+    const { setup } = source.sport!
+    const events = source.inspection.activeEvents
+    const timeline = hockeyTimeline(source.state, NAMES).rows.filter(row => row.capture)
+    const timelineOrder = (type: string) => timeline.flatMap(row => row.events.filter(event => event.eventType === type).map(event => event.id))
+
+    const shots = hockeyShotMapShots(setup, events, NAMES)
+    expect(shots.map(shot => shot.eventId)).toEqual(timelineOrder('hockey.shot'))
+    expect(shots.map(shot => shot.periodLabel)).toEqual(['Period 1', 'Period 2'])
+    const map = hockeyShotMap(setup, shots)
+    expect(map.clusters).toHaveLength(1)
+    expect(map.clusters[0].shots.map(shot => shot.periodLabel)).toEqual(['Period 1', 'Period 2'])
+    expect(map.periods.map(period => period.label)).toEqual(['Period 1', 'Period 2'])
+    const unlocated = hockeyShotMap(setup, shots.map(shot => ({ ...shot, point: null }))).unlocated
+    expect(unlocated.map(shot => shot.periodLabel)).toEqual(['Period 1', 'Period 2'])
+
+    expect(timelineOrder('hockey.faceoff')).toHaveLength(3)
+    const faceoffs = hockeyFaceoffMap(setup, events)
+    expect(faceoffs.periods.map(period => period.label)).toEqual(['Period 1', 'Period 2'])
+    expect(faceoffs.takers.map(taker => taker.id)).toEqual(['p2', 'p4', 'p5'])
+    expect(hockeyFaceoffMap(setup, events, { participantId: null, periodId: 'regulation-1' }).total).toEqual({ won: 2, lost: 0, percent: 100 })
   })
 })

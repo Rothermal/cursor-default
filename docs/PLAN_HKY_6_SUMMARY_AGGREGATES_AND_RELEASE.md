@@ -337,6 +337,8 @@ Filled in as each slice lands.
   - **Shot map**: `hockeyShotMapShots` lists active shots in game order (shootout attempts
     are not shots). A location is turned half a turn when it was played the other way, so
     the tracked side always attacks to the right and the opponent to the left.
+    The whole active stream is put in game order before shots are picked out, so a
+    recorded-later or re-timed shot keeps the period anchors it is placed by.
     `hockeyShotMap` applies side, player, period, outcome and strength filters; strength is
     recorded on goals only (HKY-3B), so a strength filter keeps goals. Shots within 5 ft of
     a group's first shot share it (`hockeyShotMapClusters`, game order, so the same filters

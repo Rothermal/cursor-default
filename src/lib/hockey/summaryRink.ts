@@ -131,7 +131,7 @@ export function hockeyShotMapShots(
   events: readonly GameEvent[],
   names: HockeySummaryNames
 ): HockeyShotMapShot[] {
-  return orderHockeyEvents(events.filter(event => event.eventType === 'hockey.shot' && !event.deletedAt)).map(event => {
+  return inGameOrder(events, 'hockey.shot').map(event => {
     const shot = event as HockeyEvent<'hockey.shot'>
     const side = shot.teamSide as HockeySide
     const shooterActor = shot.actors.find(actor => actor.role === 'shooter')
@@ -236,7 +236,7 @@ export function hockeyFaceoffMap(
   events: readonly GameEvent[],
   filters: HockeyFaceoffMapFilters = DEFAULT_HOCKEY_FACEOFF_MAP_FILTERS
 ): HockeyFaceoffMap {
-  const faceoffs = orderHockeyEvents(events.filter(event => event.eventType === 'hockey.faceoff' && !event.deletedAt))
+  const faceoffs = inGameOrder(events, 'hockey.faceoff')
     .map(event => event as HockeyEvent<'hockey.faceoff'>)
   const taker = (event: HockeyEvent<'hockey.faceoff'>) => event.actors.find(actor => actor.role === 'taker')?.participantId ?? null
   const counts = Object.fromEntries(HOCKEY_FACEOFF_DOT_IDS.map(id => [id, { won: 0, lost: 0 }])) as Record<
@@ -281,6 +281,15 @@ export const HOCKEY_FACEOFF_MAP_DOT_ORDER: ReadonlyArray<{ id: HockeyFaceoffDotI
 
 // ---------------------------------------------------------------------------
 // Internals
+
+/**
+ * Active events of one type in game order. The whole stream is ordered first: placed
+ * (recorded-later or re-timed) events need the period start and end anchors to find their
+ * place, so ordering a one-type subset would move them after the live captures.
+ */
+function inGameOrder(events: readonly GameEvent[], eventType: string): GameEvent[] {
+  return orderHockeyEvents(events.filter(event => !event.deletedAt)).filter(event => event.eventType === eventType)
+}
 
 function tally(counts: { won: number; lost: number }): HockeyFaceoffTally {
   const taken = counts.won + counts.lost
