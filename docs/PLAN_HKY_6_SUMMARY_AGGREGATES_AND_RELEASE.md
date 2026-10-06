@@ -307,8 +307,13 @@ Filled in as each slice lands.
   starts; each period counts only the time played (its clock at the period end, so an early
   end counts up to that time); an empty net is credited to nobody; positions are clock times
   after any clock correction. A total is incomplete while the game is in progress or
-  suspended, while the clock runs, or when a change sits earlier than the one before it.
+  suspended, while the clock runs, when a change sits earlier than the one before it, or
+  when a change sits past the end of its period (a clock corrected back behind a change).
   GAA is goals against per regulation-length game, shown only with a complete total.
+- **Power play and penalty kill**: confirmed goal strength is kept as recorded, so when a
+  side's power-play goals exceed the power plays its recorded penalties give, the ratio is
+  not shown: power play shows the goals (`1 PPG`), the other side's penalty kill shows `–`,
+  and a note says the chances are incomplete.
 - **Shootout lines**: shots against count goals and saves; a miss is not a shot against.
 - **Game-winning goal**: an opponent win has none (`none`), so only a tracked winner can be
   `unattributed`.

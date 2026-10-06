@@ -260,4 +260,42 @@ describe('Hockey Summary views (HKY-6A1)', () => {
     expect(team['Penalty kill']).toEqual({ tracked: '1/1', opponent: '0/0' })
     expect(hockeyPenaltyRows(source.sport!, NAMES)[0].time).toBe('1:00')
   })
+
+  it('keeps confirmed power-play goals but drops the ratio when they exceed the recorded chances', () => {
+    const anchored = () => expectOk(startHockeyClock(expectOk(startHockeyGame(initializedHockeyGame(hockeySetup()), ctx(0))), ctx(1)))
+    const teamStats = (state: GameState) => {
+      const source = healthy(state)
+      return Object.fromEntries(hockeyTeamStatRows(source.sport!, source.inspection.activeEvents).map(row => [row.label, row]))
+    }
+
+    // A confirmed PP goal whose penalty was never recorded.
+    let missed = expectOk(recordHockeyShot(anchored(), { side: 'tracked', outcome: 'goal', strength: 'pp' }, ctx(61)))
+    missed = expectOk(pauseHockeyClock(missed, ctx(62)))
+    let team = teamStats(missed)
+    expect(team['Power play'].values).toEqual({ tracked: '1 PPG', opponent: '0/0' })
+    expect(team['Penalty kill'].values).toEqual({ tracked: '0/0', opponent: '–' })
+    expect(team['Power play'].note).toMatch(/chances are incomplete/)
+
+    // Two confirmed PP goals on one recorded opponent minor.
+    let over = expectOk(recordHockeyPenalties(anchored(), {
+      penalties: [{ side: 'opponent', class: 'minor', infraction: 'tripping', offenderKind: 'player', offender: { label: '#8' } }],
+    }, ctx(61)))
+    over = expectOk(recordHockeyShot(over, { side: 'tracked', outcome: 'goal', strength: 'pp' }, ctx(91)))
+    over = expectOk(recordHockeyShot(over, { side: 'tracked', outcome: 'goal', strength: 'pp' }, ctx(121)))
+    over = expectOk(pauseHockeyClock(over, ctx(122)))
+    team = teamStats(over)
+    expect(team['Power play'].values).toEqual({ tracked: '2 PPG', opponent: '0/0' })
+    expect(team['Penalty kill'].values).toEqual({ tracked: '0/0', opponent: '–' })
+
+    // One goal on that one chance keeps the ratio and no note.
+    let within = expectOk(recordHockeyPenalties(anchored(), {
+      penalties: [{ side: 'opponent', class: 'minor', infraction: 'tripping', offenderKind: 'player', offender: { label: '#8' } }],
+    }, ctx(61)))
+    within = expectOk(recordHockeyShot(within, { side: 'tracked', outcome: 'goal', strength: 'pp' }, ctx(91)))
+    within = expectOk(pauseHockeyClock(within, ctx(92)))
+    team = teamStats(within)
+    expect(team['Power play'].values).toEqual({ tracked: '1/1', opponent: '0/0' })
+    expect(team['Penalty kill'].values).toEqual({ tracked: '0/0', opponent: '0/1' })
+    expect(team['Power play'].note).toBeUndefined()
+  })
 })

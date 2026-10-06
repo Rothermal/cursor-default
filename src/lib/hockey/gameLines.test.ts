@@ -3,7 +3,8 @@ import type { GameState } from '../../types'
 import { adjustHockeyScore, changeHockeyGoalie, recordHockeyShootoutAttempt, recordHockeyShot, startHockeyShootout, type RecordHockeyShotInput } from './captureCommands'
 import { addHockeyEvents, removeHockeyEvents } from './corrections'
 import { hockeyGoalStrengthLabel, type HockeyGameLines } from './gameLines'
-import { endHockeyMatch, endHockeyPeriod, pauseHockeyClock, startHockeyClock, startHockeyGame, startNextHockeyPeriod } from './live'
+import { endHockeyMatch, endHockeyPeriod, pauseHockeyClock, setHockeyClock, startHockeyClock, startHockeyGame, startNextHockeyPeriod } from './live'
+import { hockeyGoalieRows } from './summary'
 import { hockeySummaryFromState } from './summarySource'
 import { at, CLOCKLESS, ctx, expectOk, hockeySetup, initializedHockeyGame, projection } from './testFixtures'
 import type { HockeyProfileId, HockeyRuleOverrides } from './types'
@@ -171,5 +172,30 @@ describe('Hockey per-game lines (HKY-6 §3)', () => {
     expect(ended.coverage.timeInNet).toBe('complete')
     expect(ended.participants.p1.hky_toi_ms).toBe(270_000)
     expect(ended.participants.p30.hky_toi_ms).toBe(120_000)
+  })
+
+  it('marks goalie time incomplete when the clock is corrected back behind a change', () => {
+    // Anchored youth game: clock starts at 1 s, so an event at t s has elapsed (t - 1) s.
+    let state = expectOk(startHockeyClock(expectOk(startHockeyGame(initializedHockeyGame(hockeySetup()), ctx(0))), ctx(1)))
+    state = goal(state, { side: 'opponent' }, 121)
+    state = expectOk(changeHockeyGoalie(state, { side: 'tracked', inParticipantId: 'p30', reason: 'tactical' }, ctx(301)))
+    state = expectOk(pauseHockeyClock(state, ctx(302)))
+    state = expectOk(setHockeyClock(state, { elapsedMs: 120_000, reason: 'Clock was wrong' }, ctx(303)))
+    state = expectOk(endHockeyPeriod(state, { reason: 'Test' }, ctx(304)))
+    for (let period = 2, second = 305; period <= 3; period++, second += 2) {
+      state = expectOk(startNextHockeyPeriod(state, ctx(second)))
+      state = expectOk(endHockeyPeriod(state, { reason: 'Test' }, ctx(second + 1)))
+    }
+    state = expectOk(endHockeyMatch(state, { reason: 'Test' }, ctx(320)))
+    expect(projection(state).status).toBe('ended')
+
+    const ended = lines(state)
+    // p30 entered at 5:00 in a period that now ends at 2:00: the boundary cannot be closed.
+    expect(ended.goalieTime?.p1).toEqual({ ms: 120_000, coverage: 'incomplete' })
+    expect(ended.goalieTime?.p30.coverage).toBe('incomplete')
+    expect(ended.coverage.timeInNet).toBe('incomplete')
+    const source = hockeySummaryFromState('local', state, null, null)
+    const p1 = hockeyGoalieRows(source.sport!, source.lines!, source.inspection.activeEvents).find(row => row.id === 'p1')!
+    expect(p1).toMatchObject({ timeInNet: '2:00', timeInNetComplete: false, goalsAgainstAverage: null })
   })
 })

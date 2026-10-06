@@ -181,6 +181,8 @@ function Overview({ source, sport, lines, names }: {
   const scoring = hockeyScoringRows(sport, lines, names)
   const penalties = hockeyPenaltyRows(sport, names)
   const decision = hockeyDecisionSummary(sport, lines)
+  const teamRows = hockeyTeamStatRows(sport, events)
+  const teamNotes = [...new Set(teamRows.flatMap(row => (row.note ? [row.note] : [])))]
   const shootout = sport.projection.shootout
 
   return (
@@ -249,7 +251,7 @@ function Overview({ source, sport, lines, names }: {
                 </tr>
               </thead>
               <tbody>
-                {hockeyTeamStatRows(sport, events).map(row => (
+                {teamRows.map(row => (
                   <tr key={row.label} className="border-t border-line text-content">
                     <td className="py-1 text-left">{row.values.tracked}</td>
                     <th scope="row" className="py-1 text-center text-xs font-semibold text-content-muted">{row.label}</th>
@@ -261,6 +263,7 @@ function Overview({ source, sport, lines, names }: {
             {!sport.projection.clock && (
               <p className="mt-2 text-xs text-content-muted">Power-play chances need a game clock; this game shows power-play goals.</p>
             )}
+            {teamNotes.map(note => <p key={note} className="mt-2 text-xs text-content-muted">{note}</p>)}
           </section>
 
           <section className="rounded-md border border-line bg-surface p-3" aria-label="Scoring summary">

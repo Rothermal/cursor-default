@@ -153,6 +153,8 @@ export function hockeyPeriodRows(projection: HockeyMatchProjection): { periods: 
 export interface HockeyTeamStatRow {
   label: string
   values: Record<HockeySide, string>
+  /** Why a value is shown without its ratio. */
+  note?: string
 }
 
 /** Both sides' team totals. Power plays need the clock; a clockless game shows goals only. */
@@ -179,20 +181,30 @@ export function hockeyTeamStatRows(
     const lost = side === 'tracked' ? projection.faceoffs.lost : projection.faceoffs.won
     return won + lost === 0 ? '0-0' : `${won}-${lost} (${percent(won, won + lost)})`
   }
+  // Confirmed goal strength is kept as recorded (HKY-0), so a power-play goal can exceed the
+  // chances the recorded penalties give. Then the ratio is not known: the goals stay shown.
+  const ratioKnown = (side: HockeySide) => chances !== null && ppGoals(side) <= chances[side]
+  const incompleteNote = 'More power-play goals than recorded power plays, so chances are incomplete.'
   const rows: HockeyTeamStatRow[] = [
     { label: 'Shots on goal', values: both(side => String(projection.shotsOnGoal[side])) },
-    chances
-      ? { label: 'Power play', values: both(side => `${ppGoals(side)}/${chances[side]}`) }
-      : { label: 'Power-play goals', values: both(side => String(ppGoals(side))) },
   ]
   if (chances) {
+    const complete = ratioKnown('tracked') && ratioKnown('opponent')
+    rows.push({
+      label: 'Power play',
+      values: both(side => (ratioKnown(side) ? `${ppGoals(side)}/${chances[side]}` : `${ppGoals(side)} PPG`)),
+      ...(complete ? {} : { note: incompleteNote }),
+    })
     rows.push({
       label: 'Penalty kill',
       values: both(side => {
         const against = chances[other(side)]
-        return `${against - ppGoals(other(side))}/${against}`
+        return ratioKnown(other(side)) ? `${against - ppGoals(other(side))}/${against}` : '–'
       }),
+      ...(complete ? {} : { note: incompleteNote }),
     })
+  } else {
+    rows.push({ label: 'Power-play goals', values: both(side => String(ppGoals(side))) })
   }
   rows.push(
     { label: 'Short-handed goals', values: both(side => String(projection.goalsByStrength[side].sh)) },

@@ -285,8 +285,9 @@ interface GamePosition {
  *   stints with it.
  *
  * A total is incomplete when the game is still in progress or suspended, the clock was left
- * running, or a change sits earlier than the change before it (a clock set back behind an
- * earlier change), because then the stints cannot be closed reliably.
+ * running, a change sits earlier than the change before it, or a change sits past the end
+ * of its period (a clock set back behind an earlier change), because then the stints cannot
+ * be closed reliably. Partial time stays visible; GAA needs a complete total.
  */
 function goalieTimeInNet(projection: HockeyMatchProjection): Record<string, HockeyGoalieTimeLine> {
   const periods = projection.periods
@@ -327,6 +328,8 @@ function goalieTimeInNet(projection: HockeyMatchProjection): Record<string, Hock
       const stint = stints[index]
       const next = stints[index + 1] ?? null
       if (next && before(next.at, stint.at)) ordered = false
+      // A boundary past its period's end (a clock corrected back behind a change) cannot be closed.
+      if (stint.at.periodIndex < periods.length && stint.at.elapsedMs > played(periods[stint.at.periodIndex])) ordered = false
       if (!stint.participantId) continue
       const line = lines[stint.participantId] ?? { ms: 0, coverage: 'complete' as HockeyTimeInNetCoverage }
       line.ms += next && before(next.at, stint.at) ? 0 : span(stint.at, next?.at ?? null)
