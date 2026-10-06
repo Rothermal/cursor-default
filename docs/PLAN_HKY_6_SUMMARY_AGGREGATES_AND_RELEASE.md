@@ -113,8 +113,11 @@ One migration:
   and tournament scopes cover team games; the player request also covers the player's
   personal games (the Basketball rule).
 - **Separate aggregate handshake**: a new `get_hockey_aggregate_capabilities` returns its
-  own exact contract (`{ sportId: 'hockey', aggregateContractVersion: 1, migration: N }`)
-  after checking active app access and the two wrappers. `get_hockey_release_capabilities`
+  own exact contract (`{ contractVersion: 1, sportId: 'hockey', aggregateContractVersion: 1,
+  migration: N }`) after checking active app access and the two wrappers. `contractVersion`
+  is the field the shared checker compares, so this check follows its convention: a
+  missing function or a `contractVersion` of 0 or lower is `backend_update_required`, a
+  higher one is `client_update_required`, and any other difference is `invalid_response`. `get_hockey_release_capabilities`
   stays exactly contract 2 / migration 74, so Cloud setup, Enable cloud sync and settings
   keep working with or without the aggregate migration. Only the Hockey destinations call
   the new check, through the shared exact checker
@@ -263,7 +266,9 @@ Each slice adds its own section to `docs/REGRESSION_HKY_6_RELEASE.md`:
   and refinalized) in a scratch database alongside client parity cases, the scope and
   player wrappers by role, aggregate sums and rates on fixtures, coverage labels,
   malformed-publication isolation, the four-row compatibility table in §2 HKY-6B1 (Cloud
-  setup and sync still start when the aggregate check fails), and Soccer and Basketball
+  setup and sync still start when the aggregate check fails), the aggregate check's
+  responses through the shared checker (the exact response, a missing function, version 0,
+  a newer version and a malformed response), and Soccer and Basketball
   destinations and handshakes unchanged,
 - **6C**: every new-game entry point opens the event setup, existing stat-grid Hockey
   games still open, rollback to `opt_in` restores the toggle, and the owner checklist,
