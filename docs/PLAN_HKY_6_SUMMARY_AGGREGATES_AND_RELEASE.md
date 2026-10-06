@@ -112,9 +112,25 @@ One migration:
   `get_hockey_player_aggregate_publications`, with Basketball's signatures. Team, season
   and tournament scopes cover team games; the player request also covers the player's
   personal games (the Basketball rule).
-- **Handshake**: `get_hockey_release_capabilities` contract 3 adds
-  `aggregateContractVersion: 1` and checks the two wrappers. A client without the
-  migration says season stats need a backend update, and everything else keeps working.
+- **Separate aggregate handshake**: a new `get_hockey_aggregate_capabilities` returns its
+  own exact contract (`{ sportId: 'hockey', aggregateContractVersion: 1, migration: N }`)
+  after checking active app access and the two wrappers. `get_hockey_release_capabilities`
+  stays exactly contract 2 / migration 74, so Cloud setup, Enable cloud sync and settings
+  keep working with or without the aggregate migration. Only the Hockey destinations call
+  the new check, through the shared exact checker
+  (`src/lib/eventReleaseCapabilities.ts`); Soccer's and Basketball's checks and the shared
+  parser are unchanged. Compatibility:
+
+  | Client | Database | Cloud setup, sync, settings | Season stats |
+  |---|---|---|---|
+  | HKY-5C (contract 2 only) | 074 | Work | Old generic destination |
+  | HKY-5C | 074 + 6B1 | Work (contract 2 unchanged) | Old generic destination |
+  | HKY-6B2 | 074 only | Work | "Season stats need a backend update", nothing else changes |
+  | HKY-6B2 | 074 + 6B1 | Work | Hockey destinations |
+
+  A missing function reads as `backend_update_required`, a newer aggregate contract as
+  `client_update_required`, for the destinations only. The owner applies 6B1 before
+  deploying 6B2, as for 074, but the order no longer breaks cloud games either way.
 - Legacy Hockey games are not touched: no sport backfill and no legacy page RPC (§7 Q2).
 
 ### HKY-6B2 Client: aggregates and the five destinations
@@ -165,24 +181,37 @@ One migration:
 
 ## 3. Per-game derivations
 
-These are new and pure. The Summary uses them for one game and the aggregates sum them.
-Every one reads only the replayed projection and the frozen setup, so a correction
-re-derives it.
+These are new and pure, in one module (`src/lib/hockey/gameLines.ts`) that the Summary
+and the aggregates both call. The replayed totals alone cannot answer two of them (which
+goal won the game, and whether a goal was into an empty net), so its input is one bundle:
+
+- the frozen setup,
+- the complete replay result (`replayHockeyEvents`: projection, participant stats,
+  diagnostics),
+- the validated active events in Hockey replay order: `orderHockeyEvents` over the
+  stream after inspection, with removed events (`deletedAt`) dropped and the current
+  revision of each event used, so recorded-later additions and re-timed events sit where
+  HKY-4C placement puts them. Nothing new is persisted and no event schema changes; the
+  score before each goal comes from the same replay pass (`beforeEach`).
+
+A local game, a cloud primary stream and a canonical publication all reach the module the
+same way, so a correction re-derives every line.
 
 | Id | Meaning | Rule |
 |---|---|---|
-| `hky_gp` | Games played | Every dressed tracked participant in the frozen setup |
+| `hky_gp` | Games played | Skaters: dressed in the frozen setup. Goalies: dressed and in net for some time (any goalie interval), so a backup who never plays has no goalie GP (§7 Q7) |
 | `hky_gs` | Goalie games started | The starting goalie in the opening lineup |
-| `hky_eng` | Empty-net goals | A tracked goal with `emptyNet` |
-| `hky_gwg` | Game-winning goals | The tracked goal that put the winner one past the loser's final total, in regulation or overtime. Not counted for a shootout winner or a tie |
+| `hky_eng` | Empty-net goals | An active tracked goal whose stored `emptyNet` is true, credited to its shooter |
+| `hky_gwg` | Game-winning goals | Walking the ordered goals, the winner's goal that made its score one more than the loser's final regulation and overtime total. Not counted for a shootout winner or a tie. If that goal has no tracked shooter (an unattributed goal), or a score adjustment changes either side's total, no player gets the GWG and the game's line says GWG is unattributed |
 | `hky_w`, `hky_l`, `hky_otl`, `hky_t` | Goalie decisions | From `goalieOfRecord` and the result's `outcome` and `decidedIn`: a loss in overtime or the shootout is `otl`, a tie is `t` for the goalie in net at the end |
 | `hky_so` | Shutouts | The only tracked goalie in net for the whole game (no other interval), and opponent regulation and overtime goals are 0 |
-| `hky_toi_ms` | Goalie time in net | Sum of goalie intervals; anchored clock only, otherwise absent for that game |
+| `hky_toi_ms` | Goalie time in net | Anchored clock only. Goalie intervals are change markers, so 6A1 defines how each span closes (period end, an intermission change, an empty net, a suspended game, a corrected clock) and when the total is marked incomplete. An incomplete total is shown with that label and is left out of season GAA |
 | `hky_so_att`, `hky_so_g`, `hky_so_sa`, `hky_so_sv` | Shootout lines | Match-scoped only; shown in the Summary, never summed into season totals (HKY-0 §8) |
 
 The existing catalog ids stay as they are. Coverage flags travel with each game's line:
-plus/minus is complete only when no goal was skipped, and time-based stats exist only for
-anchored games.
+plus/minus is complete only when no goal was skipped, GWG is attributed or unattributed,
+and time in net exists only for anchored games and is complete or incomplete. The Summary
+shows each flag next to the value, and the destinations count coverage as `n of m games`.
 
 ---
 
@@ -224,10 +253,18 @@ Each slice adds its own section to `docs/REGRESSION_HKY_6_RELEASE.md`:
   later additions), skater and goalie rows, shot and faceoff maps, a cloud final game
   reviewed without changing the active game, and phone and desktop browser checks in
   Light and Dark,
+- **6A and 6B, per-game lines**: paired histories with equal replay totals that must
+  differ (the same 2-0 game with the scorers' goals in the other order, so the GWG moves;
+  the same game with and without `emptyNet` on one goal), a removed winning goal, a
+  recorded-later goal placed before the winner, an unattributed winner, a score
+  adjustment, a backup goalie who never plays, and goalie time across period ends and a
+  pulled goalie,
 - **6B**: the completion predicate (completed, ended early, abandoned, suspended, reopened
   and refinalized) in a scratch database alongside client parity cases, the scope and
   player wrappers by role, aggregate sums and rates on fixtures, coverage labels,
-  malformed-publication isolation, and Soccer and Basketball destinations unchanged,
+  malformed-publication isolation, the four-row compatibility table in §2 HKY-6B1 (Cloud
+  setup and sync still start when the aggregate check fails), and Soccer and Basketball
+  destinations and handshakes unchanged,
 - **6C**: every new-game entry point opens the event setup, existing stat-grid Hockey
   games still open, rollback to `opt_in` restores the toggle, and the owner checklist,
 - every slice: `pnpm typecheck`, `pnpm lint`, `pnpm test` and `pnpm build`.
@@ -244,6 +281,7 @@ Each slice adds its own section to `docs/REGRESSION_HKY_6_RELEASE.md`:
 | Q4 | Goalie decisions: count an overtime or shootout loss as OTL, separate from regulation losses (W-L-OTL-T)? | Yes |
 | Q5 | When HKY-6 is complete, make new Hockey games event-only on every device (stage `released`, toggle removed), with rollback to `opt_in`? | Yes, in HKY-6C, after your live game on the HKY-6A and 6B build |
 | Q6 | HKY-0 §10 listed capture switches (faceoffs off, no on-ice prompt). Add them now, or wait for field use? | Wait. Add only the rink orientation default now |
+| Q7 | Goalie games played: count a dressed backup who never enters the net? | No. A goalie's GP needs time in net; skaters count when dressed |
 
 ---
 
