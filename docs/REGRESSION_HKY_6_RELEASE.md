@@ -77,3 +77,22 @@ Then periods 3 and overtime, and a shootout decided 2-0 on the opponent's second
   source tests with injected reads only.
 - Installed PWA and a real phone.
 - The owner's live game on the HKY-6A and 6B build (plan §7 Q5).
+
+## HKY-6B1 Server: Hockey aggregate sources
+
+Migration 075 only. No client calls it yet, and no event, payload, setup or rules change.
+
+### Automated
+
+| Area | Cases | Result |
+|---|---|---|
+| Migration text (`migration075.test.ts`) | The paging core equals the 060 body with only the Hockey sport, the skipped generic predicate for Hockey and the Hockey branch; only the three fixed Hockey functions are granted and both private helpers are revoked; the handshake's exact contract 1 and contract 0 shapes; `get_hockey_release_capabilities` is not touched | 3 pass |
+| Database check (`PG_RUN_AS=postgres supabase/tests/hky6b1/run.sh`, PostgreSQL 16, every migration through 075) | Five games bound, uploaded, checkpointed and finalized from the HKY-5A cases. Completion: completed and reopened-then-ended count, ended early with a reason and abandoned do not, and the personal tie does. Team and season pages for viewer, scorer and owner hold only the two completed team games; `canManage` false for a viewer, true for the owner; items carry the snapshot and the participant source map; tournament page empty; outsider sees nothing. Keyset paging with page size 1 gives two pages and a null cursor at the end. Player page: three games for the scorer (with the personal game), two with the team filter, two for a viewer, none for an outsider. A reopened game leaves the team page. Refusals: the private core, a bad scope type, page size 51, a half cursor, a Baseball core call. Basketball and Soccer pages still answer. Handshake: exact contract 1; release contract still 2 / migration 74; with the player wrapper dropped (rolled back) contract 0 and release still 2; suspended account refused on the handshake and the page; anonymous refused | 25 ok, 8 refused, passed |
+| Full suite | `npx vitest run` | 283 files, 2645 tests pass |
+| `pnpm typecheck`, `pnpm lint`, `pnpm build` | | Pass (lint: the 3 existing fast-refresh warnings) |
+
+### Not yet checked
+
+- 075 applied to the live project (the owner applies it before HKY-6B2 deploys).
+- Pages against real published games in the live project; HKY-6B2's destinations exercise
+  them from the client.
