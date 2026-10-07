@@ -10,6 +10,7 @@ import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { BasketballPlayerAggregateDestination } from '../components/basketball-aggregate/BasketballPlayerAggregateDestination'
+import { HockeyPlayerAggregateDestination } from '../components/hockey-aggregate/HockeyPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { careerSportOptions } from '../lib/careerSportOptions'
 import type { GameState } from '../types'
@@ -41,7 +42,8 @@ export default function CareerStats() {
   const sportParam = searchParams.get('sport')
   const isSoccerDestination = sportParam === 'soccer'
   const isBasketballDestination = sportParam === 'basketball'
-  const isAggregateDestination = isSoccerDestination || isBasketballDestination
+  const isHockeyDestination = sportParam === 'hockey'
+  const isAggregateDestination = isSoccerDestination || isBasketballDestination || isHockeyDestination
 
   const { isConfigured, user } = useAuth()
   const { state, openGameSnapshot, parkingError, prepareActiveGameMutation } = useGame()
@@ -469,6 +471,16 @@ export default function CareerStats() {
           />
         ) : isBasketballDestination && player ? (
           <BasketballPlayerAggregateDestination
+            variant="career"
+            scope={{ type: 'career', playerId }}
+            identity={{
+              playerId,
+              displayName: playerDisplayName(player),
+              number: null,
+            }}
+          />
+        ) : isHockeyDestination && player ? (
+          <HockeyPlayerAggregateDestination
             variant="career"
             scope={{ type: 'career', playerId }}
             identity={{

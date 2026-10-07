@@ -12,6 +12,7 @@ import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { BasketballPlayerAggregateDestination } from '../components/basketball-aggregate/BasketballPlayerAggregateDestination'
+import { HockeyPlayerAggregateDestination } from '../components/hockey-aggregate/HockeyPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
@@ -160,7 +161,7 @@ export default function PlayerProfile() {
         nickname: tp.players.nickname,
       } as PlayerRow)
 
-      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball') {
+      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball' || teamData.seasons.sport === 'hockey') {
         setLoading(false)
         return
       }
@@ -402,7 +403,7 @@ export default function PlayerProfile() {
   const careerQuery =
     `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
   const isAggregateDestination =
-    team.seasons.sport === 'soccer' || team.seasons.sport === 'basketball'
+    team.seasons.sport === 'soccer' || team.seasons.sport === 'basketball' || team.seasons.sport === 'hockey'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -473,6 +474,22 @@ export default function PlayerProfile() {
               displayName: playerDisplayName(player),
               number: player.jersey_number,
               teamIds: [teamId],
+            }}
+            seasonName={team.seasons.name}
+          />
+        ) : team.seasons.sport === 'hockey' ? (
+          <HockeyPlayerAggregateDestination
+            variant="profile"
+            scope={{
+              type: 'player',
+              playerId,
+              teamId,
+              seasonId: seasonIdFromUrl ?? team.season_id,
+            }}
+            identity={{
+              playerId,
+              displayName: playerDisplayName(player),
+              number: player.jersey_number,
             }}
             seasonName={team.seasons.name}
           />

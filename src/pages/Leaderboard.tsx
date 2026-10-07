@@ -8,6 +8,7 @@ import { playerInfoPath, teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { SoccerAggregateDestination } from '../components/soccer-aggregate/SoccerAggregateDestination'
 import { BasketballAggregateDestination } from '../components/basketball-aggregate/BasketballAggregateDestination'
+import { HockeyAggregateDestination } from '../components/hockey-aggregate/HockeyAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -99,8 +100,10 @@ export default function Leaderboard() {
     sport?.id === 'soccer' || scopedSport?.id === 'soccer'
   const isBasketballDestination =
     sport?.id === 'basketball' || scopedSport?.id === 'basketball'
+  const isHockeyDestination =
+    sport?.id === 'hockey' || scopedSport?.id === 'hockey'
   const isCanonicalAggregateDestination =
-    isSoccerDestination || isBasketballDestination
+    isSoccerDestination || isBasketballDestination || isHockeyDestination
 
   const pushLeaderboardParams = useCallback(
     (seasonId: string, teamId: string) => {
@@ -433,6 +436,16 @@ export default function Leaderboard() {
 
         {isBasketballDestination && selectedSeasonId && (
           <BasketballAggregateDestination
+            variant="season"
+            scope={{ type: 'season', id: selectedSeasonId }}
+            teamIds={filteredTeams.map(team => team.id)}
+            teamIdForLinks={selectedTeamId || null}
+            seasonId={selectedSeasonId}
+          />
+        )}
+
+        {isHockeyDestination && selectedSeasonId && (
+          <HockeyAggregateDestination
             variant="season"
             scope={{ type: 'season', id: selectedSeasonId }}
             teamIds={filteredTeams.map(team => team.id)}

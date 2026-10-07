@@ -40,7 +40,7 @@ describe('soccer aggregate destination route contracts', () => {
   it('routes Player Profile soccer scopes before legacy season RPCs', () => {
     const source = page('PlayerProfile')
     const guard =
-      "if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball')"
+      "if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball' || teamData.seasons.sport === 'hockey')"
     expect(source).toContain("type: 'player'")
     expect(source).toContain('seasonId: seasonIdFromUrl ?? team.season_id')
     expect(source).toContain(guard)

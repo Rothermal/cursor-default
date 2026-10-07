@@ -394,3 +394,54 @@ Filled in as each slice lands.
   finalizes five games from the HKY-5A cases in a throwaway cluster and reads the pages as
   team roles.
 - Regression: [HKY-6B1](REGRESSION_HKY_6_RELEASE.md#hky-6b1-server-hockey-aggregate-sources).
+
+### HKY-6B2 (implemented)
+
+- Needs migration 075. With only 074 applied, the five destinations show "Season stats
+  need a backend update"; games, Summaries and cloud sync are unaffected.
+- **Transport** (`src/lib/hockey/aggregateTransport.ts`): checks
+  `get_hockey_aggregate_capabilities` through the shared `createReleaseCapabilityChecker`
+  (contract 0 is `backend_update_required`, a newer one `client_update_required`), then
+  drains the scope or player wrapper by keyset cursor (page size 20, at most 50), rejects
+  a repeated cursor, shares one in-flight load per client and scope while each caller can
+  cancel on its own, isolates a malformed item as a `malformed_source` exclusion and
+  projects in batches of five, yielding between them. Deviation from §2: Hockey has its
+  own transport module with the Soccer and Basketball contract; nothing was moved behind
+  a shared adapter, so the other sports' transports are untouched.
+- **Projection** (`aggregateProjection.ts`): each publication is parsed with
+  `parseHockeyCanonicalSnapshot`, checked for its game id, sport and primary recorder,
+  and replayed with `hockeySummaryFromState`. Only completed games count (§7 Q3).
+  An overtime or shootout loss is OTL (Q4) and the score is the published result's.
+  Participants map to stable players through `participantSourceMap`. A tracked
+  participant with a non-zero line and no mapping makes the result partial. Shootout
+  lines are never summed. A goalie's GP needs time in net (Q7), so a dressed backup who
+  never played is left out of their game history. Team record and totals come from team
+  games only, and two disagreeing publications of one game are both left out.
+- **Stats** (`aggregateStats.ts`): rates are computed at read time from totals. These
+  are points per game, S%, FO%, SV% and GAA.
+  - GAA is goals against divided by time in net as a share of each game's regulation
+    length. It is shown only when every game the goalie played was timed, and so is time
+    in net. Clockless games count against that coverage.
+  - Plus/minus counts only games whose every goal had a complete on-ice set. It shows
+    `n of m games` beside it and needs at least one such game.
+  - Rankings put nulls last. They break ties on points for skaters and saves for goalies,
+    then by name. Goalies rank only against goalies. A ranking metric is offered only when
+    some player has a value.
+  - Active-roster players with no games are zero rows among the skaters.
+- **Destinations** (`src/components/hockey-aggregate/`, `useHockeyAggregateDestination`):
+  - Team and tournament views have Overview (GP-W-L-OTL-T, GF, GA, DIFF, and For/Against
+    team totals), Players (category chips, Rank by, Career and player links) and Games.
+    The season leaderboard opens on Players.
+  - Profile and Career show category sections for the roles played.
+  - The profile keeps the team-season totals and lists personal games in a separate
+    Personal section. Career groups games by team season, with personal games as their
+    own segment.
+  - Every game links to its Hockey Summary with `from=team`, so Back returns to Team
+    Info.
+  - The views refresh on focus. A failed refresh keeps the last result.
+  - Page guards: `TeamStats`, `TournamentStats` and `PlayerProfile` skip their legacy
+    loads for `hockey` as for Soccer and Basketball. Leaderboard and Career add
+    `isHockeyDestination`.
+- Season stats count event games only (Q2). Old stat-grid Hockey games keep their own
+  Game Info and Summary.
+- Regression: [HKY-6B2](REGRESSION_HKY_6_RELEASE.md#hky-6b2-client-hockey-season-stats).

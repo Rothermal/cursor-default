@@ -9,6 +9,7 @@ import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
 import { BasketballAggregateDestinationPage } from '../components/basketball-aggregate/BasketballAggregateDestination'
+import { HockeyAggregateDestinationPage } from '../components/hockey-aggregate/HockeyAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -102,7 +103,7 @@ export default function TeamStats() {
       const teamData = teamRes.data as unknown as TeamRow
       setTeam(teamData)
       setTournaments((tourRes.data ?? []) as TournamentRow[])
-      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball') {
+      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball' || teamData.seasons.sport === 'hockey') {
         setGames([])
         setLogRows([])
         setLoading(false)
@@ -337,9 +338,13 @@ export default function TeamStats() {
     )
   }
 
-  if (team.seasons.sport === 'basketball') {
+  if (team.seasons.sport === 'basketball' || team.seasons.sport === 'hockey') {
+    // Hockey (HKY-6B2) shares Basketball's layout with its own destination.
+    const AggregateDestinationPage = team.seasons.sport === 'hockey'
+      ? HockeyAggregateDestinationPage
+      : BasketballAggregateDestinationPage
     return (
-      <BasketballAggregateDestinationPage
+      <AggregateDestinationPage
         variant="team"
         scope={{ type: 'team', id: teamId }}
         teamIds={[teamId]}
