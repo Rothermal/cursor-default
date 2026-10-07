@@ -1,18 +1,19 @@
 export const SOCCER_RELEASED_IN_PRODUCTION = true
 export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
 /**
- * XS-1 per-sport event stages (HKY-2E). Rollback: set a row to 'internal'. Existing
- * event games stay reachable at every stage; only new games are gated.
+ * XS-1 per-sport event stages (HKY-2E). Existing event games stay reachable at every
+ * stage; only new games are gated. `released` makes every new game an event game with no
+ * device toggle (HKY-6C). Rollback: `released` -> `opt_in`, `opt_in` -> `internal`.
  */
 export const SPORT_EVENT_RELEASE_STAGES = {
-  hockey: 'opt_in',
+  hockey: 'released',
   baseball: 'opt_in',
 } as const satisfies Record<string, SportEventReleaseStage>
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
 export type SportReleaseStage = 'unreleased' | 'preview' | 'released'
 export type BasketballEventReleaseStage = 'internal' | 'opt_in'
-export type SportEventReleaseStage = 'internal' | 'opt_in'
+export type SportEventReleaseStage = 'internal' | 'opt_in' | 'released'
 
 export interface SportAvailabilityPolicy {
   releaseStage: SportReleaseStage | null
@@ -53,9 +54,9 @@ interface SportEventCreationPolicyOptions {
 }
 
 /**
- * HKY-2E (Q2): new Hockey event games need the owner's device toggle in production,
- * which defaults off. Development keeps the preview without the toggle. Event Hockey
- * stays local-only at every stage; HKY-6 owns the wider release.
+ * HKY-2E (Q2): at `opt_in`, new Hockey event games need the owner's device toggle in
+ * production, which defaults off, and development keeps the preview without it. HKY-6C
+ * releases Hockey: every new game is an event game and the toggle is gone.
  */
 export function getHockeyEventCreationPolicy(
   enabledOnDevice: boolean,
@@ -64,11 +65,31 @@ export function getHockeyEventCreationPolicy(
     releaseStage = SPORT_EVENT_RELEASE_STAGES.hockey,
   }: SportEventCreationPolicyOptions = {}
 ): SportEventCreationPolicy {
+  return sportEventCreationPolicy(enabledOnDevice, development, releaseStage)
+}
+
+/**
+ * Whether a new Hockey game opens the event setup rather than the stat grid: always once
+ * released, otherwise only with the device toggle on and the policy allowing it.
+ */
+export function hockeyNewGamesUseEventTracker(
+  enabledOnDevice: boolean,
+  options: SportEventCreationPolicyOptions = {}
+): boolean {
+  const policy = getHockeyEventCreationPolicy(enabledOnDevice, options)
+  return policy.canCreateNewEventGame && (policy.releaseStage === 'released' || enabledOnDevice)
+}
+
+function sportEventCreationPolicy(
+  enabledOnDevice: boolean,
+  development: boolean,
+  releaseStage: SportEventReleaseStage
+): SportEventCreationPolicy {
   const preferenceAvailable = releaseStage === 'opt_in'
   return {
     releaseStage,
     preferenceAvailable,
-    canCreateNewEventGame: development || (preferenceAvailable && enabledOnDevice),
+    canCreateNewEventGame: development || releaseStage === 'released' || (preferenceAvailable && enabledOnDevice),
     canAccessExistingEventGames: true,
   }
 }
@@ -85,13 +106,7 @@ export function getBaseballEventCreationPolicy(
     releaseStage = SPORT_EVENT_RELEASE_STAGES.baseball,
   }: SportEventCreationPolicyOptions = {}
 ): SportEventCreationPolicy {
-  const preferenceAvailable = releaseStage === 'opt_in'
-  return {
-    releaseStage,
-    preferenceAvailable,
-    canCreateNewEventGame: development || (preferenceAvailable && enabledOnDevice),
-    canAccessExistingEventGames: true,
-  }
+  return sportEventCreationPolicy(enabledOnDevice, development, releaseStage)
 }
 
 export function getSportAvailabilityPolicy(

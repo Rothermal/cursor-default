@@ -134,3 +134,77 @@ roster.
 
 - 075 applied to the live project and the destinations on real published games.
 - Player Profile and Career reached from the live Team Info roster.
+
+## HKY-6C Release
+
+Hockey's event stage is `released` (owner approval in the project thread, 2026-10-07). No
+migration, event, payload, setup or rules change.
+
+### What changes
+
+- Every new Hockey game opens the event setup: Sport Dashboard New Game, Team Info Start
+  Game, `/setup?sport=hockey` links and team-only `/setup?teamId=` links for a Hockey team
+  (`hockeyNewGamesUseEventTracker`). The `events=1` links keep working.
+- Settings -> Sports -> Hockey no longer shows the device toggle. A stored opt-in is kept
+  but unused, so a rollback to `opt_in` brings the owner's choice back.
+- New setting: **Start new games with the rink flipped** (this device only). Hockey setup
+  seeds the new game's `capturePreferences.rinkFlipped` from it; the flip stays out of
+  events, projection and fingerprints (`live.test.ts`) and can still be changed in the
+  tracker.
+- Existing stat-grid Hockey games still open, track and review through the generic
+  Setup, tracker, Summary and Game Info, locally and in the cloud. Existing event games
+  open at every stage.
+- **Rollback**: set `SPORT_EVENT_RELEASE_STAGES.hockey` back to `'opt_in'` in
+  `src/lib/sportAvailability.ts`. New games then go to the stat grid unless the device
+  toggle is on; nothing stored is rewritten.
+
+### Automated
+
+| Area | Cases | Result |
+|---|---|---|
+| Release policy (`releasePolicy.test.ts`) | Stage is `released`: new event games without the toggle, toggle hidden, existing games reachable. Rollback to `opt_in` restores the toggle in both directions; `internal` hides it and ignores a stored opt-in; development keeps the preview. Device settings default off and fail closed (`rinkFlippedByDefault` only on an explicit `true`). Every entry point (setup route, Sport Dashboard, Team Info, team-only setup link before any new game starts) uses the shared check; the orientation default only seeds the display flip; the audited policy consumers are App, Hockey settings, Game Setup, Hockey setup, Sport Dashboard and Team Info | 11 pass |
+| Hockey library | 32 files under `src/lib/hockey` (HKY-1 to HKY-6) | 409 tests pass |
+| Full suite | `npx vitest run` | 285 files, 2676 tests pass |
+| `pnpm typecheck`, `pnpm lint`, `pnpm build` | | Pass (lint: the 3 existing fast-refresh warnings) |
+
+### Browser
+
+Development build at 390 px, Chromium, Supabase not configured (Hockey enabled in
+Settings -> App): Settings -> Sports -> Hockey shows the rink orientation switch and no
+event-tracker toggle; turning the switch on stores `rinkFlippedByDefault: true`. Sport
+Dashboard New Game opens `/setup?sport=hockey&events=1`, and a direct
+`/setup?sport=hockey` link opens the same "New Hockey game" setup.
+
+### Evidence by HKY-0 §15 theme
+
+| Theme | Where it is covered |
+|---|---|
+| Soccer and Basketball trackers, summaries, cloud and aggregates unchanged | Full suite on every HKY PR, including the Soccer and Basketball route and release-guard tests (`soccer/aggregateDestinationRoutes.test.ts`, `basketball/releaseEntryGuards.test.ts`); HKY-5A, 6B1 database checks re-read Basketball and Soccer pages |
+| Legacy stat-grid Hockey games open and review through the generic path | `releasePolicy.test.ts` (tracker route never consults the stage), `sportIsolation.test.ts`, `legacyRules.test.ts`; HKY-6B2 keeps stat-grid games out of season stats only |
+| Hockey, Soccer and Basketball games share the parking manifest | `sportIsolation.test.ts`, `gameSyncFingerprint.test.ts` |
+| Local-only Hockey without Supabase | HKY-2E and HKY-6C browser checks with Supabase unconfigured; missing cloud policy is local-only (`cloudSync.test.ts`) |
+| Park and resume keep events, clock, penalties, goalie and direction | `live.test.ts`, `penalties.test.ts`, `sportIsolation.test.ts` |
+| Strength for coincidental minors, PP goal release, double minor, 5v3, empty net | `penalties.test.ts`, `specialTeams.test.ts`, `outcomes.test.ts` |
+| Edit and remove rebuild score, goalie stats and strength | `corrections.test.ts`, `timeline.test.ts`, `placement.test.ts` |
+| Opponent identities never enter the player pool | `setup.test.ts`, `setupBuilder.test.ts`, `aggregates.test.ts` (opponents are never player rows) |
+| Independent recorder streams never combine | `recorders.test.ts`, `finalization.test.ts`, HKY-5A database check |
+| Viewer, scorer and admin permissions | HKY-5A and HKY-6B1 database checks, `settingsDefaults.test.ts`, Team Manage read-only panels |
+| Mobile rink, dialogs, penalty box and clock never overlap | HKY-2E to HKY-6B2 browser checks at 390 px; owner checklist below |
+| Actor pickers never use a stale opening five | `capture.test.ts`, `plays.test.ts` |
+| XS extractions keep Soccer and Basketball behavior | `src/lib/surface/location.ts` (HKY-2A) and the shared recorder/finalization modules (HKY-5B2) shipped with the existing Soccer and Basketball tests green |
+| Legacy Hockey stays available locally and in the cloud | This release changes only where new games start; Game Info, Summary and the stat-grid tracker are untouched |
+
+### Owner checklist (pending until done)
+
+Apply migration 075 first if it is not applied yet.
+
+- [ ] One live game at phone size: setup from Team Info, the clock, shots, a penalty
+      and power-play goal, a goalie change, end of game.
+- [ ] Finalize in Game Info; the published score matches.
+- [ ] The five destinations (Leaderboard, Team Stats, Tournament Stats, Player Profile,
+      Career) show the game, and each game opens its Summary.
+- [ ] Reopen with a reason, correct one event, finalize again; the destinations update.
+- [ ] A viewer on a second device sees the final game and the stats read only.
+- [ ] Settings -> Sports -> Hockey: no event-tracker toggle; the rink orientation default
+      flips the next new game.
+- [ ] An old stat-grid Hockey game still opens from Cloud Games or Game Info.

@@ -447,3 +447,23 @@ Filled in as each slice lands.
 - Season stats count event games only (Q2). Old stat-grid Hockey games keep their own
   Game Info and Summary.
 - Regression: [HKY-6B2](REGRESSION_HKY_6_RELEASE.md#hky-6b2-client-hockey-season-stats).
+
+### HKY-6C (implemented)
+
+- The owner approved switching the stage in the project thread on 2026-10-07; the PR merges
+  after the owner's live game on the HKY-6A and 6B build (§7 Q5).
+- `SPORT_EVENT_RELEASE_STAGES.hockey` is `released`. `SportEventReleaseStage` gains
+  `released`; the shared policy then allows new event games with no device toggle
+  (`preferenceAvailable` false). Baseball stays `opt_in`.
+- `hockeyNewGamesUseEventTracker(enabledOnDevice)` decides where a new Hockey game goes:
+  always the event setup once released, otherwise only with the toggle on. Sport
+  Dashboard, Team Info Start Game, the `/setup?sport=hockey` route and a team-only
+  `/setup?teamId=` link for a Hockey team (redirected before any new game starts) use it.
+- Settings -> Sports -> Hockey hides the toggle while it is unavailable and adds **Start new
+  games with the rink flipped** (`statkeeper_settings.hockey.rinkFlippedByDefault`, device
+  only), which Hockey setup copies into the new game's `capturePreferences.rinkFlipped`.
+  Capture switches stay out (§7 Q6).
+- Stat-grid Hockey games keep their Setup, tracker, Summary and Game Info for existing
+  games; no stored data is rewritten.
+- Rollback: the stage back to `'opt_in'`.
+- Regression and owner checklist: [HKY-6C](REGRESSION_HKY_6_RELEASE.md#hky-6c-release).

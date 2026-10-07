@@ -18,7 +18,7 @@ import {
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import {
   getBaseballEventCreationPolicy,
-  getHockeyEventCreationPolicy,
+  hockeyNewGamesUseEventTracker,
   getSportAvailabilityPolicy,
 } from '../lib/sportAvailability'
 import { gameSideDisplayName } from '../lib/display'
@@ -142,13 +142,9 @@ export default function SportDashboard() {
       navigate('/setup?sport=basketball')
       return
     }
-    // HKY-2E: with the device toggle on, new Hockey games use the event tracker. Its setup
-    // page replaces the active game only when Start is pressed.
-    if (
-      sport.id === 'hockey' &&
-      hockeyEventTrackerEnabled &&
-      getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame
-    ) {
+    // HKY-6C: new Hockey games use the event tracker (before release, only with the device
+    // toggle on). Its setup page replaces the active game only when Start is pressed.
+    if (sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)) {
       navigate('/setup?sport=hockey&events=1')
       return
     }

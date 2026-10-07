@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { mergeStoredSettings } from '../settingsStorage'
-import { getHockeyEventCreationPolicy, SPORT_EVENT_RELEASE_STAGES } from '../sportAvailability'
+import { getHockeyEventCreationPolicy, hockeyNewGamesUseEventTracker, SPORT_EVENT_RELEASE_STAGES } from '../sportAvailability'
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
@@ -14,20 +14,32 @@ function implementationFiles(directory: string): string[] {
   })
 }
 
-describe('HKY-2E hockeyEvent release stage', () => {
-  it('ships as a production opt-in', () => {
-    expect(SPORT_EVENT_RELEASE_STAGES.hockey).toBe('opt_in')
+describe('HKY-6C hockeyEvent release stage', () => {
+  it('ships released: every new Hockey game is an event game, with no device toggle', () => {
+    expect(SPORT_EVENT_RELEASE_STAGES.hockey).toBe('released')
+    expect(getHockeyEventCreationPolicy(false, { development: false })).toEqual({
+      releaseStage: 'released',
+      preferenceAvailable: false,
+      canCreateNewEventGame: true,
+      canAccessExistingEventGames: true,
+    })
+    expect(hockeyNewGamesUseEventTracker(false, { development: false })).toBe(true)
+    expect(hockeyNewGamesUseEventTracker(true, { development: false })).toBe(true)
   })
 
-  it('needs the device toggle in production and keeps existing games reachable', () => {
-    const off = getHockeyEventCreationPolicy(false, { development: false })
-    expect(off).toEqual({
+  it('rolls back to opt_in: the device toggle decides again', () => {
+    const optIn = { development: false, releaseStage: 'opt_in' as const }
+    expect(getHockeyEventCreationPolicy(false, optIn)).toEqual({
       releaseStage: 'opt_in',
       preferenceAvailable: true,
       canCreateNewEventGame: false,
       canAccessExistingEventGames: true,
     })
-    expect(getHockeyEventCreationPolicy(true, { development: false }).canCreateNewEventGame).toBe(true)
+    expect(getHockeyEventCreationPolicy(true, optIn).canCreateNewEventGame).toBe(true)
+    expect(hockeyNewGamesUseEventTracker(false, optIn)).toBe(false)
+    expect(hockeyNewGamesUseEventTracker(true, optIn)).toBe(true)
+    // Development keeps the preview but still follows the toggle for where new games go.
+    expect(hockeyNewGamesUseEventTracker(false, { development: true, releaseStage: 'opt_in' })).toBe(false)
   })
 
   it('rolls back to internal by hiding the toggle and ignoring a stored opt-in', () => {
@@ -35,6 +47,7 @@ describe('HKY-2E hockeyEvent release stage', () => {
     expect(internal.preferenceAvailable).toBe(false)
     expect(internal.canCreateNewEventGame).toBe(false)
     expect(internal.canAccessExistingEventGames).toBe(true)
+    expect(hockeyNewGamesUseEventTracker(true, { development: false, releaseStage: 'internal' })).toBe(false)
   })
 
   it('keeps the development preview without the toggle', () => {
@@ -42,7 +55,10 @@ describe('HKY-2E hockeyEvent release stage', () => {
     expect(getHockeyEventCreationPolicy(false, { development: true, releaseStage: 'internal' }).canCreateNewEventGame).toBe(true)
   })
 
-  it('stores the device toggle default-off and fails closed on malformed values', () => {
+  it('stores the device settings default-off and fails closed on malformed values', () => {
+    expect(mergeStoredSettings({}).hockey).toEqual({ eventTrackerEnabled: false, rinkFlippedByDefault: false })
+    expect(mergeStoredSettings({ hockey: { rinkFlippedByDefault: true } }).hockey.rinkFlippedByDefault).toBe(true)
+    expect(mergeStoredSettings({ hockey: { rinkFlippedByDefault: 1 } }).hockey.rinkFlippedByDefault).toBe(false)
     expect(mergeStoredSettings({}).hockey.eventTrackerEnabled).toBe(false)
     expect(mergeStoredSettings({ hockey: { eventTrackerEnabled: true } }).hockey.eventTrackerEnabled).toBe(true)
     expect(mergeStoredSettings({ hockey: { eventTrackerEnabled: 'true' } }).hockey.eventTrackerEnabled).toBe(false)
@@ -50,11 +66,11 @@ describe('HKY-2E hockeyEvent release stage', () => {
   })
 })
 
-describe('HKY-2E route gates', () => {
+describe('HKY-2E and HKY-6C route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
-    expect(setupRoute).toContain("requestedSport === 'hockey' && searchParams.get('events') === '1'")
+    expect(setupRoute).toContain("requestedSport === 'hockey' && (searchParams.get('events') === '1' || hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled))")
     expect(setupRoute).toContain('<HockeyGameSetup />')
     expect(source('src/pages/HockeyGameSetup.tsx'))
       .toContain('if (!getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame)')
@@ -68,14 +84,33 @@ describe('HKY-2E route gates', () => {
     expect(source('src/pages/HockeyGameTracker.tsx')).not.toMatch(/sportAvailability|Policy\(/)
   })
 
+  it('sends new Hockey games from every entry point to the event setup once released', () => {
+    expect(source('src/pages/SportDashboard.tsx')).toContain("sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)")
+    const teamInfo = source('src/pages/TeamInfo.tsx')
+    expect(teamInfo).toContain("sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)")
+    expect(teamInfo).toContain('navigate(`${gameSetupPath(team.id, sport.id)}&events=1`)')
+    // A team-only /setup link resolves the team's sport, then hands Hockey to the event setup.
+    const gameSetup = source('src/pages/GameSetup.tsx')
+    expect(gameSetup).toContain("requestedSport.id === 'hockey' && requestedTeamId && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)")
+    expect(gameSetup.indexOf("requestedSport.id === 'hockey' && requestedTeamId")).toBeLessThan(gameSetup.indexOf('if (!startNewGame(requestedSport))'))
+  })
+
+  it('seeds the rink orientation default only into the new game\'s display preference', () => {
+    const setup = source('src/pages/HockeyGameSetup.tsx')
+    expect(setup).toContain('hockeyRinkFlippedByDefault ? setHockeyRinkFlipped(created.state, true) : created.state')
+  })
+
   it('keeps the policy consumers audited', () => {
     const consumers = implementationFiles('src')
-      .filter(path => path !== 'src/lib/sportAvailability.ts' && source(path).includes('getHockeyEventCreationPolicy'))
+      .filter(path => path !== 'src/lib/sportAvailability.ts' && /getHockeyEventCreationPolicy|hockeyNewGamesUseEventTracker/.test(source(path)))
       .sort()
     expect(consumers).toEqual([
+      'src/App.tsx',
       'src/components/settings/HockeySettings.tsx',
+      'src/pages/GameSetup.tsx',
       'src/pages/HockeyGameSetup.tsx',
       'src/pages/SportDashboard.tsx',
+      'src/pages/TeamInfo.tsx',
     ])
   })
 })

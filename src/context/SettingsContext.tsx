@@ -21,6 +21,8 @@ interface SettingsContextType {
   setBasketballEventTrackerPreviewEnabled: (enabled: boolean) => void
   hockeyEventTrackerEnabled: boolean
   setHockeyEventTrackerEnabled: (enabled: boolean) => void
+  hockeyRinkFlippedByDefault: boolean
+  setHockeyRinkFlippedByDefault: (flipped: boolean) => void
   baseballEventTrackerEnabled: boolean
   setBaseballEventTrackerEnabled: (enabled: boolean) => void
   basketballDeviceSettings: BasketballDeviceSettings
@@ -113,6 +115,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setHockeyRinkFlippedByDefault = useCallback((flipped: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      hockey: {
+        ...prev.hockey,
+        rinkFlippedByDefault: flipped,
+      },
+    }))
+  }, [])
+
   const setBaseballEventTrackerEnabled = useCallback((enabled: boolean) => {
     setSettings(prev => ({
       ...prev,
@@ -148,6 +160,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setBasketballEventTrackerPreviewEnabled,
         hockeyEventTrackerEnabled: settings.hockey.eventTrackerEnabled,
         setHockeyEventTrackerEnabled,
+        hockeyRinkFlippedByDefault: settings.hockey.rinkFlippedByDefault,
+        setHockeyRinkFlippedByDefault,
         baseballEventTrackerEnabled: settings.baseball.eventTrackerEnabled,
         setBaseballEventTrackerEnabled,
         basketballDeviceSettings: settings.basketball,

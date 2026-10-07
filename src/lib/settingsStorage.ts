@@ -8,8 +8,10 @@ export interface BasketballDeviceSettings {
 }
 
 export interface HockeyDeviceSettings {
-  /** HKY-2E: owner opt-in for new Hockey event games; defaults off. */
+  /** HKY-2E: owner opt-in for new Hockey event games; defaults off. Unused once released. */
   eventTrackerEnabled: boolean
+  /** HKY-6C: new games start with the rink drawn flipped; display only, never in events. */
+  rinkFlippedByDefault: boolean
 }
 
 export interface BaseballDeviceSettings {
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   hockey: {
     eventTrackerEnabled: false,
+    rinkFlippedByDefault: false,
   },
   baseball: {
     eventTrackerEnabled: false,
@@ -103,6 +106,7 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
     hockey: {
       // Only an explicit true opts in; malformed values fail closed.
       eventTrackerEnabled: hockey.eventTrackerEnabled === true,
+      rinkFlippedByDefault: hockey.rinkFlippedByDefault === true,
     },
     baseball: {
       // Only an explicit true opts in; malformed values fail closed.

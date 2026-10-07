@@ -5,7 +5,7 @@ import { useGame } from '../context/GameContext'
 import { useSettings } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { teamInfoPath } from '../lib/teamInfo'
+import { gameSetupPath, teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
 import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
@@ -13,6 +13,7 @@ import { useBasketballTeamSettings } from '../hooks/useBasketballTeamSettings'
 import {
   getBasketballEventCreationPolicy,
   getSportAvailabilityPolicy,
+  hockeyNewGamesUseEventTracker,
 } from '../lib/sportAvailability'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 import {
@@ -101,6 +102,7 @@ export default function GameSetup() {
     basketballSettingsSync,
     basketballEventTrackerPreviewEnabled,
     setBasketballSettingsPageActive,
+    hockeyEventTrackerEnabled,
   } = useSettings()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
@@ -355,6 +357,11 @@ export default function GameSetup() {
         setLoadingRequestedTeamSport(false)
         return
       }
+      // HKY-6C: a team-only link to a Hockey team opens the event setup instead.
+      if (requestedSport.id === 'hockey' && requestedTeamId && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)) {
+        navigate(`${gameSetupPath(requestedTeamId, 'hockey')}&events=1`, { replace: true })
+        return
+      }
 
       const hasActiveGame = Boolean(state.sport && state.players.length > 0)
       const sportMismatch = sport?.id !== requestedSport.id
@@ -384,7 +391,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-  }, [dispatch, isCloudFlow, isSportEnabled, navigate, prepareActiveGameMutation, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
+  }, [dispatch, hockeyEventTrackerEnabled, isCloudFlow, isSportEnabled, navigate, prepareActiveGameMutation, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
