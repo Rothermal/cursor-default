@@ -140,6 +140,9 @@ describe('Hockey Summary routing (HKY-6A1)', () => {
     expect(hockeySummaryBackPath(query)).toBe('/game-info?gameId=g+1&teamId=t')
     expect(parseHockeySummaryQuery(new URLSearchParams('tab=nope')).tab).toBe('overview')
     expect(hockeySummaryBackPath({ ...query, from: 'tracker' })).toBe('/game')
+    expect(parseHockeySummaryQuery(new URLSearchParams('from=team&teamId=t')).from).toBe('team')
+    expect(hockeySummaryBackPath({ ...query, from: 'team' })).toBe('/team?teamId=t')
+    expect(hockeySummaryBackPath({ ...query, from: 'team', teamId: null })).toBe('/sport/hockey')
   })
 
   it('resumes ended and abandoned games on the Summary, and the rest on the tracker', () => {

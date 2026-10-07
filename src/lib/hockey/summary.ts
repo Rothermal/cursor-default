@@ -37,7 +37,7 @@ export function hockeySummaryTabs(projection: Pick<HockeyMatchProjection, 'shoot
   return HOCKEY_SUMMARY_TABS.filter(entry => entry.tab !== 'shootout' || projection.shootout !== null)
 }
 
-export type HockeySummaryFrom = 'tracker' | 'sport' | 'games' | 'game-info'
+export type HockeySummaryFrom = 'tracker' | 'sport' | 'games' | 'game-info' | 'team'
 
 export interface HockeySummaryQuery {
   gameId: string | null
@@ -64,7 +64,7 @@ export function parseHockeySummaryQuery(params: URLSearchParams): HockeySummaryQ
   return {
     gameId: params.get('gameId') || null,
     tab: HOCKEY_SUMMARY_TABS.some(entry => entry.tab === tab) ? (tab as HockeySummaryTab) : 'overview',
-    from: from === 'tracker' || from === 'sport' || from === 'games' || from === 'game-info' ? from : null,
+    from: from === 'tracker' || from === 'sport' || from === 'games' || from === 'game-info' || from === 'team' ? from : null,
     teamId: params.get('teamId') || null,
   }
 }
@@ -90,6 +90,8 @@ export function hockeySummaryBackPath(query: HockeySummaryQuery): string {
       if (query.teamId) params.set('teamId', query.teamId)
       return `/game-info?${params.toString()}`
     }
+    case 'team':
+      return query.teamId ? `/team?teamId=${encodeURIComponent(query.teamId)}` : '/sport/hockey'
     default:
       return '/sport/hockey'
   }

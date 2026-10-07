@@ -96,3 +96,41 @@ Migration 075 only. No client calls it yet, and no event, payload, setup or rule
 - 075 applied to the live project (the owner applies it before HKY-6B2 deploys).
 - Pages against real published games in the live project; HKY-6B2's destinations exercise
   them from the client.
+
+## HKY-6B2 Client: Hockey season stats
+
+Client only. Needs migration 075; no event, payload, setup, rules or migration change.
+
+### Automated
+
+| Area | Cases | Result |
+|---|---|---|
+| Projection, composition, transport, player views (`aggregates.test.ts`) | Replay and stable-player mapping. A shootout loss is OTL with the published score, and shootout lines are not summed. Games ended early, abandoned, not final, malformed or from another sport or recorder are left out. Goalie time in net and GAA across regulation lengths. Goalies kept to their games, and the team record. Roster zero rows, with scopes kept apart. Partial quality for unmapped players, disagreeing duplicates and malformed items. Plus/minus counted only from complete games, with an incomplete game's partial value left out of season and career totals, and hidden with none. GP ranked by the games in the category's role for mixed-role players. The player line per game. Career segments split by team season and personal. Profile totals exclude personal games. Visible categories for a new player and a goalie. Outcome, game-line, quality and error copy. Transport: the handshake first, every page by cursor, the player page for player scopes, stopping on backend or client update, rejecting a repeated cursor, one shared load, and one caller cancelling without failing the other | 21 pass |
+| Page routes (`aggregateDestinationRoutes.test.ts`) | Leaderboard, Team Stats, Tournament Stats, Player Profile and Career guard Hockey before their legacy RPCs; every game links to the Hockey Summary; the Hockey views read no legacy storage | 6 pass |
+| Summary origin (`summary.test.ts`) | `from=team` parses and goes back to Team Info, or the Hockey dashboard without a team | Pass |
+| Existing guards | The Soccer route test's Player Profile guard now includes Hockey; the appearance test covers both new components | Pass |
+| Full suite | `npx vitest run` | 285 files, 2674 tests pass |
+| `pnpm typecheck`, `pnpm lint`, `pnpm build` | | Pass (lint: the 3 existing fast-refresh warnings) |
+
+### Browser
+
+Checked at 390 px wide in Chromium, with the components in a temporary page against a
+stubbed Supabase. The stub answered the handshake, the 075 pages (three published
+fixture games: a 2-1 win, a shootout loss and a timed tie with a goalie change) and the
+roster.
+
+- Team Overview: GP 3, 1-0-1-1, GF 4, GA 4. The For/Against table reads 4-3 goals,
+  because GF and GA include the shootout winner's goal; a note under the table says so.
+- Players: Scoring with a roster player at zero. Goaltending lists only the two goalies,
+  with the "GAA and time in net show once every game a goalie played was timed" note.
+  Plus/minus shows "0 of 3 games are complete".
+- Games: newest first, with W, L (SO) and T.
+- Season view with the handshake at contract 0: "Season stats need a backend update".
+- Career for the relief goalie: the Goaltending section with "Timed in 1 of 2 games", and
+  one season segment with both games.
+- Profile: Scoring, Shooting and Faceoffs, plus the season's games with each game's line.
+
+### Not yet checked
+
+- 075 applied to the live project and the destinations on real published games.
+- Player Profile and Career reached from the live Team Info roster.

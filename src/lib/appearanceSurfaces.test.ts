@@ -43,6 +43,8 @@ const surfaces = [
   "src/components/game-events/EventFinalizationPanel.tsx",
   "src/components/hockey/HockeyRecorderManager.tsx",
   "src/components/hockey/HockeyFinalizationPanel.tsx",
+  "src/components/hockey-aggregate/HockeyAggregateDestination.tsx",
+  "src/components/hockey-aggregate/HockeyPlayerAggregateDestination.tsx",
   "src/pages/GameInfo.tsx",
   "src/pages/Games.tsx",
   "src/pages/TeamRoster.tsx",
