@@ -227,8 +227,8 @@ export function rankHockeyAggregatePlayers<T extends HockeyAggregatePlayerLine>(
   return players
     .filter(player => hockeyAggregateRoleGames(player, category.role) > 0 || isRosterOnly(player, category.role))
     .sort((left, right) => {
-      const a = hockeyAggregateMetricValue(left, metricId)
-      const b = hockeyAggregateMetricValue(right, metricId)
+      const a = rankValue(left, category, metricId)
+      const b = rankValue(right, category, metricId)
       if (a !== b) {
         if (a === null) return 1
         if (b === null) return -1
@@ -238,6 +238,11 @@ export function rankHockeyAggregatePlayers<T extends HockeyAggregatePlayerLine>(
         left.displayName.localeCompare(right.displayName) ||
         left.playerId.localeCompare(right.playerId)
     })
+}
+
+/** GP ranks by the games played in the category's role, the count the table shows. */
+function rankValue(player: HockeyAggregatePlayerLine, category: HockeyAggregateCategory, metricId: HockeyAggregateMetricId): number | null {
+  return metricId === 'hky_gp' ? hockeyAggregateRoleGames(player, category.role) : hockeyAggregateMetricValue(player, metricId)
 }
 
 /** A roster player with no games yet shows as a zero row among the skaters. */

@@ -422,10 +422,12 @@ Filled in as each slice lands.
   - GAA is goals against divided by time in net as a share of each game's regulation
     length. It is shown only when every game the goalie played was timed, and so is time
     in net. Clockless games count against that coverage.
-  - Plus/minus counts only games whose every goal had a complete on-ice set. It shows
-    `n of m games` beside it and needs at least one such game.
+  - Plus/minus counts only games whose every goal had a complete on-ice set: an
+    incomplete game's partial value stays on its own line but not in season, personal
+    or career totals. It shows `n of m games` beside it and needs at least one such game.
   - Rankings put nulls last. They break ties on points for skaters and saves for goalies,
-    then by name. Goalies rank only against goalies. A ranking metric is offered only when
+    then by name. Goalies rank only against goalies, and GP ranks by the games in the
+    category's role, as the table shows it. A ranking metric is offered only when
     some player has a value.
   - Active-roster players with no games are zero rows among the skaters.
 - **Destinations** (`src/components/hockey-aggregate/`, `useHockeyAggregateDestination`):

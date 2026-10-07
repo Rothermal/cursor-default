@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
 import {
   aggregateHockeyMatches,
+  emptyHockeyAggregatePlayer,
   projectHockeyCanonicalAggregateSource,
   type HockeyAggregateMatch,
   type HockeyCanonicalAggregateSource,
@@ -287,6 +288,39 @@ describe('Hockey aggregate composition (HKY-6B2)', () => {
     const noneCounted = aggregateHockeyMatches({ type: 'team', id: TEAM }, [match(winGame(), 'g22')]).players.find(player => player.playerId === 'sp2')!
     expect(hockeyAggregateMetricValue(noneCounted, 'hky_pm')).toBeNull()
     expect(hockeyAggregateRankingMetrics([noneCounted], HOCKEY_AGGREGATE_CATEGORIES.find(category => category.id === 'plus_minus')!)).toEqual(['hky_gp'])
+  })
+
+  it('leaves an incomplete game\'s partial plus/minus out of the totals but keeps its other stats', () => {
+    const complete = { status: 'complete' as const, skaterParticipantIds: ['p2', 'p3', 'p4', 'p5', 'p6'], goalie: 'p1' }
+    const first = shot(clockless(), { side: 'tracked', outcome: 'goal', shooter: { participantId: 'p2' }, onIce: complete }, 1)
+    let second = shot(clockless(), { side: 'tracked', outcome: 'goal', shooter: { participantId: 'p2' }, onIce: complete }, 1)
+    second = shot(second, { side: 'tracked', outcome: 'goal', shooter: { participantId: 'p2' } }, 2)
+    const partial = match(finishClockless(second), 'g31', { date: '2026-09-02' })
+    expect(partial.plusMinusComplete).toBe(false)
+    expect(partial.players.find(row => row.playerId === 'sp2')!.stats.hky_pm).toBe(1)
+    const result = aggregateHockeyMatches({ type: 'team', id: TEAM }, [match(finishClockless(first), 'g30'), partial])
+    const two = result.players.find(player => player.playerId === 'sp2')!
+    expect(two.plusMinus).toEqual({ included: 1, total: 2 })
+    expect(formatHockeyAggregateMetric(two, 'hky_pm')).toBe('+1')
+    expect(two.stats.hky_g).toBe(3)
+    // Career segments rebuild through the same accumulator.
+    const career = aggregateHockeyMatches({ type: 'career', id: 'sp2' }, [match(finishClockless(first), 'g30'), partial])
+    expect(hockeyPlayerCareerSegments(career, { playerId: 'sp2', displayName: 'Two', number: null })[0].player.stats.hky_pm).toBe(1)
+  })
+
+  it('ranks games played by the games in the category\'s role', () => {
+    const mixed = emptyHockeyAggregatePlayer('a', 'A', null)
+    Object.assign(mixed, { goalieGames: 1, skaterGames: 3 })
+    mixed.stats.hky_gp = 4
+    const goalie = emptyHockeyAggregatePlayer('b', 'B', null)
+    Object.assign(goalie, { goalieGames: 3 })
+    goalie.stats.hky_gp = 3
+    const skater = emptyHockeyAggregatePlayer('c', 'C', null)
+    Object.assign(skater, { skaterGames: 4 })
+    skater.stats.hky_gp = 4
+    const category = (id: string) => HOCKEY_AGGREGATE_CATEGORIES.find(entry => entry.id === id)!
+    expect(rankHockeyAggregatePlayers([mixed, goalie, skater], category('goaltending'), 'hky_gp').map(player => player.playerId)).toEqual(['b', 'a'])
+    expect(rankHockeyAggregatePlayers([goalie, mixed, skater], category('scoring'), 'hky_gp').map(player => player.playerId)).toEqual(['c', 'a'])
   })
 
   it('lists the scoped player\'s line in each game for player scopes', () => {

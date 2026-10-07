@@ -455,6 +455,9 @@ export function addHockeyMatchPlayer(
   teamId: string | null
 ): void {
   addHockeyAggregateStats(player.stats, row.stats)
+  // Plus/minus totals count only games whose every goal had a complete on-ice set; the
+  // game's other stats still count, and its own line keeps its partial value.
+  if (!row.plusMinusComplete) player.stats.hky_pm -= row.stats.hky_pm ?? 0
   if (row.role === 'goalie') {
     if (row.stats.hky_gp > 0) {
       player.goalieGames += 1
