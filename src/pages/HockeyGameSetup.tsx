@@ -48,6 +48,7 @@ import {
   type HockeySetupSettingsInputs,
 } from '../lib/hockey/setupSettingsSource'
 import { ensureHockeyReleaseCapabilities } from '../lib/hockey/releaseCapabilities'
+import { setHockeyRinkFlipped } from '../lib/hockey/live'
 import { hockeySetupCloudGate, type HockeySetupCapabilityState, type HockeySetupStorage } from '../lib/hockey/setupCloud'
 import { getHockeyEventCreationPolicy } from '../lib/sportAvailability'
 import { supabase } from '../lib/supabase'
@@ -79,6 +80,7 @@ export default function HockeyGameSetup() {
 
 function HockeySetupForm() {
   const { state, dispatch, prepareActiveGameMutation, startNewGame } = useGame()
+  const { hockeyRinkFlippedByDefault } = useSettings()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -288,7 +290,8 @@ function HockeySetupForm() {
     const hasGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0 || state.eventStream))
     if (hasGame && !prepareActiveGameMutation('new_game_commit')) return
     if (!startNewGame(hockey)) return
-    dispatch({ type: 'HYDRATE_STATE', state: created.state })
+    // The device's rink orientation default (HKY-6C) is display only, outside fingerprints.
+    dispatch({ type: 'HYDRATE_STATE', state: hockeyRinkFlippedByDefault ? setHockeyRinkFlipped(created.state, true) : created.state })
     navigate('/game')
   }
 

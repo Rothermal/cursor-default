@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
-import { SettingsProvider } from './context/SettingsContext'
+import { SettingsProvider, useSettings } from './context/SettingsContext'
+import { hockeyNewGamesUseEventTracker } from './lib/sportAvailability'
 import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
 import SportSelect from './pages/SportSelect'
@@ -52,11 +53,15 @@ const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/Appea
 
 function GameSetupRoute() {
   const { state } = useGame()
+  const { hockeyEventTrackerEnabled } = useSettings()
   const [searchParams] = useSearchParams()
   const requestedSport = searchParams.get('sport')
   if (requestedSport === 'soccer') return <SoccerGameSetup />
   // HockeyGameSetup applies the hockeyEvent creation policy and shows the notice when off.
-  if (requestedSport === 'hockey' && searchParams.get('events') === '1') return <HockeyGameSetup />
+  // Once Hockey is released (HKY-6C), every new Hockey game opens it.
+  if (requestedSport === 'hockey' && (searchParams.get('events') === '1' || hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled))) {
+    return <HockeyGameSetup />
+  }
   // BaseballEventSetup applies the baseballEvent creation policy and shows the notice when off.
   if (requestedSport === 'baseball' && searchParams.get('events') === '1') return <BaseballEventSetup />
   if (requestedSport) return <GameSetup />
