@@ -116,8 +116,8 @@ One migration:
   own exact contract (`{ contractVersion: 1, sportId: 'hockey', aggregateContractVersion: 1,
   migration: N }`) after checking active app access and the two wrappers. `contractVersion`
   is the field the shared checker compares, so this check follows its convention: a
-  missing function or a `contractVersion` of 0 or lower is `backend_update_required`, a
-  higher one is `client_update_required`, and any other difference is `invalid_response`. `get_hockey_release_capabilities`
+  missing function or a `contractVersion` of 0 is `backend_update_required`, a
+  higher one is `client_update_required`, and a negative one or any other difference is `invalid_response`. `get_hockey_release_capabilities`
   stays exactly contract 2 / migration 74, so Cloud setup, Enable cloud sync and settings
   keep working with or without the aggregate migration. Only the Hockey destinations call
   the new check, through the shared exact checker
@@ -357,3 +357,40 @@ Filled in as each slice lands.
   the faceoff tallies. `HockeyTimelineDetail` is exported so map marks, the chooser,
   unlocated rows and shootout rows open the same read-only detail.
 - Regression: [HKY-6A2](REGRESSION_HKY_6_RELEASE.md#hky-6a2-summary-timeline-shot-map-faceoff-map-and-shootout).
+
+### HKY-6B1 (implemented)
+
+- `supabase/migrations/075_hockey_aggregate_sources.sql`, not yet applied. The owner
+  applies it before deploying HKY-6B2; no client calls it yet.
+- **Completion predicate** `_hockey_canonical_snapshot_completed`: canonical schema 1,
+  sport `hockey`, and the latest active event among `hockey.match_ended`,
+  `match_abandoned`, `match_suspended` and `match_reopened` is `match_ended` with a null or
+  missing reason. Deviation from §2: "latest" is stream order (sequence, then id), the order
+  `is_hockey_primary_stream_ended` (073) used to accept the game when it was published,
+  rather than the shared helper's replay order, so the two server checks always agree on
+  which event is the end. Private (revoked from public).
+- **Paging core**: `_event_aggregate_publication_page` is the 060 body with three changes:
+  `'hockey'` in the sport check, the generic completion predicate skipped for Hockey, and
+  a Hockey completion branch after the Basketball one. `migration075.test.ts` rebuilds
+  the expected body from 060 with exactly those changes and compares it with 075, so any
+  other drift fails. A partial index covers active Hockey publications by finalized time.
+- **Wrappers** `get_hockey_scope_aggregate_publications` and
+  `get_hockey_player_aggregate_publications` have Basketball's signatures and delegate
+  with `'hockey'`; the player page includes the player's personal games.
+- **Handshake** `get_hockey_aggregate_capabilities` needs a signed-in, active account and
+  returns exactly `{ contractVersion: 1, sportId: 'hockey', aggregateContractVersion: 1,
+  migration: 75 }`, or `{ contractVersion: 0 }` when Hockey is not an event-platform sport
+  or the publications table, participants table, predicate, core or either wrapper is
+  missing. `get_hockey_release_capabilities` is unchanged (contract 2, migration 74).
+- **Plan fix**: §2 now says a `contractVersion` of 0 is `backend_update_required` and a
+  negative one is `invalid_response`, which is what the shared parser does.
+- **Adding Baseball or Football (XS-2)**: the sport must already be on the event platform
+  (`is_event_platform_sport`, the publication sport constraint and its setup version in
+  `bind_event_game_v2`, as 072-073 did for Hockey). Then one migration: a completion
+  predicate for its end event, the paging core re-created from the latest body with the
+  sport added and its branch, fixed scope and player wrappers, a partial index, and its own
+  aggregate handshake; plus a diff test like `migration075.test.ts`.
+- `supabase/tests/hky6b1` is the database check: it binds, uploads, checkpoints and
+  finalizes five games from the HKY-5A cases in a throwaway cluster and reads the pages as
+  team roles.
+- Regression: [HKY-6B1](REGRESSION_HKY_6_RELEASE.md#hky-6b1-server-hockey-aggregate-sources).
