@@ -15,37 +15,49 @@ import HockeyRulesFields from './HockeyRulesFields'
  * (HKY-5C) syncs with the account and applies to new games without a team.
  */
 export default function HockeySettings() {
-  const { hockeyEventTrackerEnabled, setHockeyEventTrackerEnabled } = useSettings()
+  const {
+    hockeyEventTrackerEnabled,
+    setHockeyEventTrackerEnabled,
+    hockeyRinkFlippedByDefault,
+    setHockeyRinkFlippedByDefault,
+  } = useSettings()
   const policy = getHockeyEventCreationPolicy(hockeyEventTrackerEnabled)
 
   return (
     <section className="card space-y-3">
       <h2 className="text-lg font-semibold text-content">🏒 Hockey settings</h2>
-      <div className="space-y-2 border-y border-info-line bg-info px-3 py-3">
-        <div className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
-          <span id="hockey-event-tracker-label">New event tracker (preview)</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={hockeyEventTrackerEnabled}
-            aria-labelledby="hockey-event-tracker-label"
-            disabled={!policy.preferenceAvailable}
-            onClick={() => setHockeyEventTrackerEnabled(!hockeyEventTrackerEnabled)}
-            className={`relative h-7 w-12 shrink-0 rounded-full disabled:cursor-not-allowed disabled:bg-control-disabled ${
-              hockeyEventTrackerEnabled ? 'bg-accent' : 'bg-control'
-            }`}
-          >
-            <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full shadow transition-transform ${
-              hockeyEventTrackerEnabled ? 'translate-x-5 bg-accent-content' : 'bg-content'
-            }`} />
-          </button>
+      {/* HKY-6C: once released, every new game is an event game and the toggle is gone. */}
+      {policy.preferenceAvailable && (
+        <div className="space-y-2 border-y border-info-line bg-info px-3 py-3">
+          <div className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
+            <span id="hockey-event-tracker-label">New event tracker (preview)</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hockeyEventTrackerEnabled}
+              aria-labelledby="hockey-event-tracker-label"
+              onClick={() => setHockeyEventTrackerEnabled(!hockeyEventTrackerEnabled)}
+              className={`relative h-7 w-12 shrink-0 rounded-full disabled:cursor-not-allowed disabled:bg-control-disabled ${
+                hockeyEventTrackerEnabled ? 'bg-accent' : 'bg-control'
+              }`}
+            >
+              <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full shadow transition-transform ${
+                hockeyEventTrackerEnabled ? 'translate-x-5 bg-accent-content' : 'bg-content'
+              }`} />
+            </button>
+          </div>
+          <p className="text-xs text-info-content">
+            New Hockey games use the rink tracker on this device.
+          </p>
         </div>
-        <p className="text-xs text-info-content">
-          {policy.preferenceAvailable
-            ? 'New Hockey games use the rink tracker on this device.'
-            : 'Unavailable in this build.'}
-        </p>
-      </div>
+      )}
+      <SettingSwitch
+        id="hockey-rink-flipped"
+        label="Start new games with the rink flipped"
+        detail="This device only. You can still flip the rink during a game; it never changes recorded events."
+        checked={hockeyRinkFlippedByDefault}
+        onChange={setHockeyRinkFlippedByDefault}
+      />
       <PersonalHockeyRules />
       <Link to="/settings/sports" className="btn-secondary inline-block text-center">
         Back to Sports
@@ -137,4 +149,34 @@ function personalStatusLabel(status: SportPersonalSettingsStatus): string {
     case 'backend_update_required': return 'Backend update required; saved on this device'
     case 'error': return 'Cloud settings unavailable'
   }
+}
+
+function SettingSwitch({ id, label, detail, checked, onChange }: {
+  id: string
+  label: string
+  detail: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
+        <span id={`${id}-label`}>{label}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-labelledby={`${id}-label`}
+          aria-describedby={`${id}-detail`}
+          onClick={() => onChange(!checked)}
+          className={`relative h-7 w-12 shrink-0 rounded-full ${checked ? 'bg-accent' : 'bg-control'}`}
+        >
+          <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full shadow transition-transform ${
+            checked ? 'translate-x-5 bg-accent-content' : 'bg-content'
+          }`} />
+        </button>
+      </div>
+      <p id={`${id}-detail`} className="text-xs text-content-muted">{detail}</p>
+    </div>
+  )
 }

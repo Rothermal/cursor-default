@@ -1,8 +1,12 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
-import { SettingsProvider } from './context/SettingsContext'
+import { SettingsProvider, useSettings } from './context/SettingsContext'
+import { hockeyNewGamesUseEventTracker } from './lib/sportAvailability'
+import { gameSetupRouteTarget, loadTeamSportId } from './lib/gameSetupRoute'
+import { gameSetupPath } from './lib/teamInfo'
+import { supabase } from './lib/supabase'
 import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
 import SportSelect from './pages/SportSelect'
@@ -52,17 +56,52 @@ const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/Appea
 
 function GameSetupRoute() {
   const { state } = useGame()
+  const { user } = useAuth()
+  const { hockeyEventTrackerEnabled } = useSettings()
   const [searchParams] = useSearchParams()
   const requestedSport = searchParams.get('sport')
-  if (requestedSport === 'soccer') return <SoccerGameSetup />
-  // HockeyGameSetup applies the hockeyEvent creation policy and shows the notice when off.
-  if (requestedSport === 'hockey' && searchParams.get('events') === '1') return <HockeyGameSetup />
-  // BaseballEventSetup applies the baseballEvent creation policy and shows the notice when off.
-  if (requestedSport === 'baseball' && searchParams.get('events') === '1') return <BaseballEventSetup />
-  if (requestedSport) return <GameSetup />
-  if (searchParams.has('teamId') && state.sport?.id !== 'soccer') return <GameSetup />
-  if (state.sport?.id !== 'soccer') return <GameSetup />
-  return <SoccerGameSetup />
+  const teamId = searchParams.get('teamId')
+  const activeSportId = state.sport?.id ?? null
+  // A team-only link while Soccer is mounted needs the team's sport first (HKY-6C).
+  const needsTeamSport = !requestedSport && Boolean(teamId) && activeSportId === 'soccer'
+  const [teamSport, setTeamSport] = useState<{ teamId: string; sportId: string | null } | null>(null)
+  useEffect(() => {
+    if (!needsTeamSport || !teamId) return
+    let cancelled = false
+    void loadTeamSportId(user ? supabase : null, teamId).then(sportId => {
+      if (!cancelled) setTeamSport({ teamId, sportId })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [needsTeamSport, teamId, user])
+
+  const hockeyNewGamesUseEvents = hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)
+  const target = gameSetupRouteTarget({
+    requestedSport,
+    eventsRequested: searchParams.get('events') === '1',
+    teamId,
+    activeSportId,
+    hockeyNewGamesUseEvents,
+    teamSportId: teamSport && teamSport.teamId === teamId ? teamSport.sportId : undefined,
+  })
+  switch (target) {
+    case 'soccer':
+      return <SoccerGameSetup />
+    // HockeyGameSetup applies the hockeyEvent creation policy and shows the notice when off.
+    // Once Hockey is released (HKY-6C), every new Hockey game opens it.
+    case 'hockey_events':
+      return requestedSport === 'hockey'
+        ? <HockeyGameSetup />
+        : <Navigate to={`${gameSetupPath(teamId ?? '', 'hockey')}&events=1`} replace />
+    // BaseballEventSetup applies the baseballEvent creation policy and shows the notice when off.
+    case 'baseball_events':
+      return <BaseballEventSetup />
+    case 'resolve_team_sport':
+      return <p className="p-6 text-center text-sm text-content-muted animate-pulse">Loading team...</p>
+    default:
+      return <GameSetup />
+  }
 }
 
 function PlayerSetupRoute() {
