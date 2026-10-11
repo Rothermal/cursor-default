@@ -53,7 +53,9 @@ describe('BSB-3D route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
-    expect(setupRoute).toContain("requestedSport === 'baseball' && searchParams.get('events') === '1'")
+    expect(setupRoute).toContain("eventsRequested: searchParams.get('events') === '1'")
+    expect(source('src/lib/gameSetupRoute.ts'))
+      .toContain("if (requestedSport === 'baseball' && eventsRequested) return 'baseball_events'")
     expect(setupRoute).toContain('<BaseballEventSetup />')
     expect(source('src/pages/BaseballEventSetup.tsx'))
       .toContain('if (!getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame)')

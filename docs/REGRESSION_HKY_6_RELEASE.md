@@ -164,7 +164,8 @@ migration, event, payload, setup or rules change.
 |---|---|---|
 | Release policy (`releasePolicy.test.ts`) | Stage is `released`: new event games without the toggle, toggle hidden, existing games reachable. Rollback to `opt_in` restores the toggle in both directions; `internal` hides it and ignores a stored opt-in; development keeps the preview. Device settings default off and fail closed (`rinkFlippedByDefault` only on an explicit `true`). Every entry point (setup route, Sport Dashboard, Team Info, team-only setup link before any new game starts) uses the shared check; the orientation default only seeds the display flip; the audited policy consumers are App, Hockey settings, Game Setup, Hockey setup, Sport Dashboard and Team Info | 11 pass |
 | Hockey library | 32 files under `src/lib/hockey` (HKY-1 to HKY-6) | 409 tests pass |
-| Full suite | `npx vitest run` | 285 files, 2676 tests pass |
+| Setup route (`gameSetupRoute.test.ts`) | A team-only link while a Soccer game is mounted (started or before kickoff) waits for the team's sport: Hockey opens the event setup, Soccer keeps the Soccer setup, other sports the generic setup, an unreadable team the Soccer setup; explicit sport links, plain `/setup` resumes and team-only links with another sport mounted are unchanged | 3 pass |
+| Full suite | `npx vitest run` | 286 files, 2679 tests pass |
 | `pnpm typecheck`, `pnpm lint`, `pnpm build` | | Pass (lint: the 3 existing fast-refresh warnings) |
 
 ### Browser

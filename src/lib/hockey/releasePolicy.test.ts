@@ -70,8 +70,11 @@ describe('HKY-2E and HKY-6C route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
-    expect(setupRoute).toContain("requestedSport === 'hockey' && (searchParams.get('events') === '1' || hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled))")
+    expect(setupRoute).toContain('const hockeyNewGamesUseEvents = hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)')
+    expect(setupRoute).toContain('gameSetupRouteTarget({')
     expect(setupRoute).toContain('<HockeyGameSetup />')
+    expect(source('src/lib/gameSetupRoute.ts'))
+      .toContain("if (requestedSport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'")
     expect(source('src/pages/HockeyGameSetup.tsx'))
       .toContain('if (!getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame)')
   })

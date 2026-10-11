@@ -459,6 +459,8 @@ Filled in as each slice lands.
   always the event setup once released, otherwise only with the toggle on. Sport
   Dashboard, Team Info Start Game, the `/setup?sport=hockey` route and a team-only
   `/setup?teamId=` link for a Hockey team (redirected before any new game starts) use it.
+  While a Soccer game is mounted, `/setup` resolves a team-only link's sport first
+  (`src/lib/gameSetupRoute.ts`), so the link no longer falls into the active Soccer setup.
 - Settings -> Sports -> Hockey hides the toggle while it is unavailable and adds **Start new
   games with the rink flipped** (`statkeeper_settings.hockey.rinkFlippedByDefault`, device
   only), which Hockey setup copies into the new game's `capturePreferences.rinkFlipped`.
