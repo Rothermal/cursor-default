@@ -109,9 +109,50 @@ server's finalization rejects shots with any other schema version.
   "Backcourt shot. Are the ends right?" with **Switch ends** or **Keep as a backcourt
   shot**. This catches a wrong tip-off direction on the first shot.
 - The 2PT/3PT chip still defaults from the point, measured from that team's basket.
-- Recorded-later shots and Timeline shot edits use the full court for full-court games,
-  default to the direction in force at the shot's time, and keep the stamp while the
-  marker moves.
+- Live capture always uses the current direction, which is never ambiguous. Shots
+  added or edited afterwards follow §3.4.
+
+### 3.4 Target basket for added and edited shots
+
+A shot's time cannot always tell which way its team was attacking: clockless games
+have no elapsed time, a recorded-later shot is appended at the time of entry, and an
+anchored clock can be set back so a period and time repeat. So the app infers the
+basket only when the shot's period leaves no doubt, and otherwise asks.
+
+- The shot editor and the recorded-later shot sheet on a full-court game show a
+  **Shot at: Left basket / Right basket** control with the full court.
+- **Unambiguous period:** the period has one direction throughout (no active Switch
+  ends event between its start and its end, or now for the current period). The
+  control is preselected to the shooting side's basket for that period and can be
+  changed.
+- **Ambiguous period** (a Switch ends inside it, or a period whose direction the
+  projection cannot give): nothing is preselected and Save stays disabled until the
+  recorder picks a basket. The app never falls back to the current direction.
+- **Editing a located shot** keeps its stored direction. Moving the marker never
+  changes it; only an explicit change of the Shot at control re-stamps it, and the
+  value is then re-checked against the new target basket.
+- **Adding a location to an unlocated shot** follows the same unambiguous or ambiguous
+  rule for the shot's period.
+- **Changing a shot's side or period** keeps the stored direction, because it records
+  which basket the ball went to. The editor shows the Shot at control so the recorder
+  can change it on purpose. Removing a location clears the direction with it.
+- Half-court games (no direction event) keep today's half-court editor and `'unknown'`
+  frame; a shot never moves between frames.
+- Located plays (BKE-7C) follow the same rules, with the acting side in place of the
+  shooting side.
+
+### 3.5 Half-court view and shots beyond half court
+
+Folding a full-court shot onto its target basket keeps its distance, so a heave from
+beyond the midcourt line does not fit on the 47 ft half-court drawing.
+
+- The Half court view draws only shots whose rim-relative point lies on the half court
+  (`y <= HALFCOURT_Y`). Points are rotated, never clamped or moved.
+- Shots beyond half court are listed under the chart as **Beyond half court: N**, with
+  each row opening the shot detail and its full-court spot. The row respects the same
+  filters as the chart.
+- Totals, percentages, values and stored coordinates always include these shots. The
+  Full court view draws every shot where it was taken.
 
 ---
 
@@ -128,7 +169,9 @@ server's finalization rejects shots with any other schema version.
 - All current callers move to `basketballShotFeet`.
 - Tests: literal pre-BKE-7 streams replay with identical projections and fingerprints; a
   full-court shot and the same half-court shot get the same value and zone; halftime for
-  4 quarters, 2 halves, odd counts and overtime; Switch ends forward-only.
+  4 quarters, 2 halves, the eight-segment youth profile (switch at segment 5), odd counts
+  and overtime; Switch ends forward-only; the §3.4 period-direction query (unambiguous,
+  Switch ends inside the period, current period); the §3.5 half-court membership test.
 
 ### BKE-7B Live full court
 
@@ -139,7 +182,9 @@ server's finalization rejects shots with any other schema version.
   opening-lineup step and every other Event start path, default right.
 - Tapped half preselects the team, backcourt prompt, Switch ends in Actions, shot
   commands stamp the direction.
-- Shot detail, Timeline shot edit and recorded-later shot add on the full court.
+- Shot detail, Timeline shot edit and recorded-later shot add on the full court, with
+  the §3.4 Shot at control, preselection only for unambiguous periods, and stamp
+  preservation on edit.
 - Phone screenshots: 375 px wide, both directions, flip on and off.
 
 ### BKE-7C Located plays (§7 Q3)
@@ -153,7 +198,8 @@ server's finalization rejects shots with any other schema version.
 
 - Summary shot chart: **Full court** (tracked team attacks right, opponent left; a half
   turn for halves played the other way, as `hockeySummaryPoint` does) and
-  **Half court** (every shown shot folded onto one basket, today's view). Default per §7 Q2.
+  **Half court** (shown shots folded onto one basket, today's view, with shots beyond half
+  court listed per §3.5). Default per §7 Q2.
   Half-court-frame shots from older games show on their side's summary end.
 - A Plays map of located plays with the existing side, player and period filters.
 - Local, cloud-primary, alternate and canonical sources all read the same way.
@@ -184,7 +230,17 @@ server's finalization rejects shots with any other schema version.
 
 - a full local game on a phone with quarters: tip-off direction, shots at both ends,
   halftime switch, an overtime period, a backcourt heave, Switch ends and its Undo,
-- the same with halves, and a clockless game,
+- the same with halves, with the eight-segment youth profile (ends switch at segment 5),
+  and a clockless game,
+- clockless: attack right, Switch ends, then add an earlier missed layup at the right
+  basket from the Timeline; the sheet asks for the basket, and choosing Right keeps it a
+  two at the right end in Summary,
+- anchored: set the clock back so a time repeats across a Switch ends; a recorded-later
+  shot at that time asks for the basket,
+- editing a located shot's position, side and period keeps its basket; adding a location
+  to an unlocated shot in an unambiguous period preselects the basket,
+- both teams' backcourt heaves: the Full court view draws them where taken, the Half
+  court view lists them under Beyond half court, and totals include them,
 - stored coordinates identical with the flip on and off,
 - a pre-BKE-7 game in progress still tracks on the half court and its Summary is
   unchanged,
