@@ -1,6 +1,7 @@
 import type { GameEvent, GameEventActor, GameEventLocation, GameEventPeriod, JsonObject } from '../gameEvents/types'
 import type { GameEventDefinition } from '../gameEvents/registry'
-import { isThreePointer, normalizedCourtLocationToFeet } from './courtGeometry'
+import { isThreePointer } from './courtGeometry'
+import { basketballShotFeet } from './fullCourtGeometry'
 import { createBasketballUuid } from './id'
 import type {
   BasketballMatchEvent,
@@ -145,10 +146,11 @@ function shotEnvelopeMatchesPayload(event: GameEvent): boolean {
   if (!event.location) {
     return payload.valueSource === 'quick_entry' || payload.valueSource === 'manual_override'
   }
-  if (event.location.attackingDirection !== 'unknown') return false
+  // The direction names the frame: unknown is the half court, a known one the full
+  // court aimed at that direction's basket (BKE-7 §3.1).
   if (payload.valueSource !== 'court' && payload.valueSource !== 'manual_override') return false
   if (payload.valueSource === 'manual_override') return true
-  const point = normalizedCourtLocationToFeet(event.location)
+  const point = basketballShotFeet(event.location)
   return payload.value === (isThreePointer(point.x, point.y) ? 3 : 2)
 }
 

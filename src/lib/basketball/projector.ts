@@ -35,6 +35,11 @@ import {
   validatePendingBasketballEqualPlayOverride,
 } from './lineupProjection'
 import {
+  applyBasketballCourtEvent,
+  applyBasketballCourtPeriodStart,
+  isBasketballCourtEvent,
+} from './courtDirectionEvents'
+import {
   isRecordedLaterBasketballLineupEvent,
   orderBasketballEventsForProjection,
 } from './lineupReplay'
@@ -115,7 +120,9 @@ export function projectBasketballEvents(
     }
 
     const next = structuredClone(projection)
-    let error = isBasketballClockEvent(event)
+    let error = isBasketballCourtEvent(event)
+      ? applyBasketballCourtEvent(next, event)
+      : isBasketballClockEvent(event)
       ? applyBasketballClockEvent(next, sportState, event)
       : isBasketballLineupEvent(event)
         ? applyBasketballLineupEvent(next, sportState, event)
@@ -368,6 +375,7 @@ function applyPeriodStarted(
   projection.currentPeriodId = segment.id
   projection.status = 'in_progress'
   startBasketballClockPeriod(projection, segment.id)
+  applyBasketballCourtPeriodStart(projection, sportState.setup.rulesSnapshot, segment)
   updateBasketballBonusStatus(projection, segment.id, sportState.setup.rulesSnapshot)
   return null
 }

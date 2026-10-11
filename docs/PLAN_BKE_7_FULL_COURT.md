@@ -4,8 +4,8 @@ Moves the Basketball Event tracker from a half-court drawing to a horizontal ful
 the way Soccer's pitch and Hockey's rink work: each team attacks one basket, the ends
 switch at halftime, and the basket you tap tells the app which team shot.
 
-Status: proposed. Implementation starts only after the owner approves or merges this plan.
-Owner questions are in §7.
+Status: approved (merged 2026-10-11, PR #483); built with the §7 recommendations. BKE-7A is
+implemented; see §8.
 
 ---
 
@@ -263,4 +263,26 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
 
 ## 8. Delivery record
 
-Empty until implementation starts.
+### BKE-7A (implemented)
+
+- `fullCourtGeometry.ts`: `FULL_COURT_LENGTH` (94 ft), `basketballShotFeet` (frame-aware,
+  target-relative feet; the right basket is a half turn of the left), its inverse
+  `basketballFullCourtLocation`, `isBasketballBeyondHalfCourt`, and direction helpers.
+- `courtDirectionEvents.ts`: `basketball.attacking_direction_set` (neutral, no location,
+  payload `{ captureCommandId, trackedDirection, reason }`), its projection into the optional
+  `projection.court` (`trackedAttackingDirection`, `periodDirections`, `tipOffEventId`), the
+  halftime rule on period start, and the §3.4 queries `basketballPeriodDirection` (a
+  direction only when the period used one) and `basketballCurrentDirection`.
+- Shot validation reads every court shot through `basketballShotFeet`; the projection
+  rejects a full-court location in a half-court game and a half-court location in a
+  full-court game. Timeline, Summary shots, the shot chart record and shot edit value checks
+  use the helper.
+- Direction rows are Timeline match control and read-only for now (Switch ends removal
+  arrives with its button in BKE-7B). The half-court shot editor refuses full-court shots.
+- Slice A re-check of §2: migrations 057 and 064 read only scoring payloads, schema version
+  and a fixed list of lifecycle types, and the BKE-4E aggregate projection does not read
+  locations, so neither the new event nor full-court locations need server changes.
+- Tests (`fullCourt.test.ts`): frame equivalence at both baskets, backcourt membership and
+  value, halves with overtime, quarters, the eight-segment youth profile (switch at segment
+  5), odd counts, Switch ends forward-only and its removal, frame mixing, a second or late
+  tip-off, no-op switches, half-court games unchanged, Timeline labels.
