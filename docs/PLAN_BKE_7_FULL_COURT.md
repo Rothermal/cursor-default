@@ -273,6 +273,9 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   `projection.court` (`trackedAttackingDirection`, `periodDirections`, `tipOffEventId`), the
   halftime rule on period start, and the §3.4 queries `basketballPeriodDirection` (a
   direction only when the period used one) and `basketballCurrentDirection`.
+- The tip-off is accepted only directly after the first period's start, before any
+  other event, so a game has one frame throughout. Switch ends is accepted only during a
+  period, never in a break, so an ended period's direction history never changes.
 - Shot validation reads every court shot through `basketballShotFeet`; the projection
   rejects a full-court location in a half-court game and a half-court location in a
   full-court game. Timeline, Summary shots, the shot chart record and shot edit value checks
@@ -285,4 +288,4 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
 - Tests (`fullCourt.test.ts`): frame equivalence at both baskets, backcourt membership and
   value, halves with overtime, quarters, the eight-segment youth profile (switch at segment
   5), odd counts, Switch ends forward-only and its removal, frame mixing, a second or late
-  tip-off, no-op switches, half-court games unchanged, Timeline labels.
+  tip-off, a tip-off after play, Switch ends in a break, no-op switches, half-court games unchanged, Timeline labels.

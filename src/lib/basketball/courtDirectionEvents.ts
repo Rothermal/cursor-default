@@ -81,15 +81,19 @@ export function isBasketballCourtEvent(
 }
 
 /**
- * Tip-off sets the first direction, once, during the first period; Switch ends
- * changes it from that point forward (BKE-7 §3.2).
+ * Tip-off sets the first direction, once, right after the first period starts and
+ * before any other event; Switch ends changes it from that point forward, during a
+ * period only (BKE-7 §3.2).
  */
 export function applyBasketballCourtEvent(
   projection: BasketballMatchProjection,
-  event: BasketballAttackingDirectionSetEvent
+  event: BasketballAttackingDirectionSetEvent,
+  priorEvents: readonly BasketballMatchEvent[]
 ): string | null {
-  if (projection.status !== 'in_progress' && projection.status !== 'period_break') {
-    return 'The ends can be set only during a Basketball match.'
+  // A break belongs to no period, so a switch there would rewrite an ended period's
+  // history (§3.4); the recorder switches once the next period starts.
+  if (projection.status !== 'in_progress') {
+    return 'The ends can be set only during a Basketball period.'
   }
   const periodId = projection.currentPeriodId
   if (!periodId || event.period.id !== periodId) {
@@ -99,6 +103,10 @@ export function applyBasketballCourtEvent(
   if (event.payload.reason === 'tip_off') {
     if (projection.court) return 'The tip-off direction is already set.'
     if (projection.periods.length !== 1) return 'The tip-off direction is set in the first period.'
+    // One frame for the whole game: nothing but the first period's start comes before it.
+    if (priorEvents.some(prior => prior.eventType !== 'basketball.period_started')) {
+      return 'The tip-off direction is set before anything else is recorded.'
+    }
     projection.court = {
       trackedAttackingDirection: direction,
       periodDirections: { [periodId]: [direction] },

@@ -300,6 +300,31 @@ describe('BKE-7A attacking direction', () => {
     expect(basketballPeriodDirection(second, rules, 'regulation-2', 'opponent').direction).toBe('right_to_left')
   })
 
+  it('rejects Switch ends during a break and keeps the ended period unambiguous', () => {
+    const rules = halves()
+    const stream = new Stream(rules)
+      .start('regulation-1')
+      .direction('regulation-1', 'left_to_right', 'tip_off')
+      .end('regulation-1')
+      .direction('regulation-1', 'right_to_left')
+    expect(stream.project().diagnostics[0]?.message).toBe('The ends can be set only during a Basketball period.')
+
+    const valid = new Stream(rules)
+      .start('regulation-1')
+      .direction('regulation-1', 'left_to_right', 'tip_off')
+      .end('regulation-1')
+      .start('regulation-2')
+      .direction('regulation-2', 'left_to_right')
+    const { projection, diagnostics } = valid.project()
+    expect(diagnostics).toEqual([])
+    expect(basketballPeriodDirection(projection, rules, 'regulation-1', 'tracked')).toEqual({
+      direction: 'left_to_right',
+      used: ['left_to_right'],
+    })
+    expect(basketballPeriodDirection(projection, rules, 'regulation-2', 'tracked').used)
+      .toEqual(['right_to_left', 'left_to_right'])
+  })
+
   it('keeps earlier shots valid when a Switch ends is removed', () => {
     const rules = halves()
     const stream = new Stream(rules)
@@ -355,6 +380,16 @@ describe('BKE-7A attacking direction', () => {
       .start('regulation-1').end('regulation-1').start('regulation-2')
       .direction('regulation-2', 'left_to_right', 'tip_off')
     expect(lateTipOff.project().diagnostics[0]?.message).toBe('The tip-off direction is set in the first period.')
+
+    // A tip-off after any play would leave half-court shots in a full-court game.
+    const tipOffAfterPlay = new Stream(rules)
+      .start('regulation-1')
+      .shot('regulation-1', halfCourtShot, 2)
+      .direction('regulation-1', 'left_to_right', 'tip_off')
+      .shot('regulation-1', fullCourtShot, 2)
+    const afterPlay = tipOffAfterPlay.project()
+    expect(afterPlay.diagnostics[0]?.message).toBe('The tip-off direction is set before anything else is recorded.')
+    expect('court' in afterPlay.projection).toBe(false)
 
     const noOp = new Stream(rules)
       .start('regulation-1')
