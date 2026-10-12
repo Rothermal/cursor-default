@@ -8,10 +8,12 @@ import {
   applyBasketballShotEdit,
   basketballShotActorOptions,
   basketballShotActorSelectionKey,
+  basketballShotCourtDraftText,
   basketballShotRelationshipOptionsByKind,
   basketballShotRelationshipSelectionKey,
   buildBasketballShotEditDraft,
   previewBasketballShotEdit,
+  reconcileBasketballShotCourtDraft,
   reconcileBasketballShotEditDraftRelationships,
   type BasketballShotEditDraft,
   type BasketballShotEditPreview,
@@ -22,6 +24,10 @@ import {
   zoneForForcedShotType,
 } from '../../lib/basketball/courtGeometry'
 import BasketballCourt from '../shot-chart/BasketballCourt'
+import {
+  BasketballFullCourtPlacement,
+  BasketballShotAtControl,
+} from './BasketballShotCourtFields'
 
 interface BasketballShotEditorProps {
   eventId: string
@@ -99,10 +105,25 @@ export default function BasketballShotEditor({
     timestamp: 0,
   }] : []
 
+  const flipped = basketballCourtOrientationForState(state) === 'flipped'
+  const court = draft.court
+  const located = court ? Boolean(court.point) : Boolean(draft.location)
+  const locationText = court
+    ? basketballShotCourtDraftText(court)
+    : draft.location
+      ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
+      : 'No court location'
+  const basketMissing = Boolean(court?.point && !court.direction)
+
   const update = (changes: Partial<BasketballShotEditDraft>) => {
-    setDraft(current => current
-      ? reconcileBasketballShotEditDraftRelationships(state, { ...current, ...changes })
-      : current)
+    setDraft(current => {
+      if (!current) return current
+      const next = { ...current, ...changes }
+      return reconcileBasketballShotEditDraftRelationships(state, {
+        ...next,
+        court: reconcileBasketballShotCourtDraft(state, next.court, next.periodId, next.teamSide),
+      })
+    })
     setPreview(null)
     setError(null)
   }
@@ -142,25 +163,31 @@ export default function BasketballShotEditor({
       <BasketballEditorFrame title="Place shot" onClose={() => setPlacingLocation(false)} closeRef={closeRef}>
         <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted px-3 py-3">
           <div className="border-y border-line bg-surface">
-            <BasketballCourt
+            {court ? (
+              <BasketballFullCourtPlacement
+                court={court}
+                made={draft.made}
+                value={draft.value}
+                flipped={flipped}
+                onPoint={point => update({ court: { ...court, point } })}
+              />
+            ) : <BasketballCourt
               shots={marker}
               onCourtTap={(x, y) => update({ location: { x, y } })}
-              flipped={basketballCourtOrientationForState(state) === 'flipped'}
+              flipped={flipped}
               className="w-full"
               emptyHint="Tap to place"
-            />
+            />}
           </div>
           <p className="mt-3 text-center text-sm font-medium text-content-muted">
-            {draft.location
-              ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
-              : 'Tap the court to place the shot.'}
+            {located ? locationText : 'Tap the court to place the shot.'}
           </p>
         </div>
         <footer className="shrink-0 border-t border-line bg-surface px-4 py-3">
           <button
             type="button"
             onClick={() => setPlacingLocation(false)}
-            disabled={!draft.location}
+            disabled={!located}
             className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 disabled:bg-control-disabled disabled:text-content-disabled"
           >
             <Check size={17} aria-hidden />
@@ -234,11 +261,16 @@ export default function BasketballShotEditor({
 
         {draft.attempt === 'field_goal' && (
           <BasketballEditorSection title="Court location">
-            <p className="text-sm font-medium text-content">
-              {draft.location
-                ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
-                : 'No court location'}
-            </p>
+            <p className="text-sm font-medium text-content">{locationText}</p>
+            {court?.point && (
+              <BasketballShotAtControl
+                direction={court.direction}
+                flipped={flipped}
+                onChange={direction => update({
+                  court: { ...court, direction, directionSource: 'recorder' },
+                })}
+              />
+            )}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -246,25 +278,27 @@ export default function BasketballShotEditor({
                 className="btn-secondary flex min-h-11 items-center justify-center gap-2"
               >
                 <LocateFixed size={17} aria-hidden />
-                {draft.location ? 'Move' : 'Locate'}
+                {located ? 'Move' : 'Locate'}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmRemoveLocation(true)}
-                disabled={!draft.location}
+                disabled={!located}
                 className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-danger-content disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 <MapPinOff size={17} aria-hidden />
                 Remove
               </button>
             </div>
-            {confirmRemoveLocation && draft.location && (
+            {confirmRemoveLocation && located && (
               <div className="mt-3 rounded-md border border-danger-line bg-danger p-3">
                 <p className="text-sm font-semibold text-danger-content">Return this field goal to unlocated?</p>
                 <div className="mt-2 flex gap-2">
                   <button type="button" onClick={() => setConfirmRemoveLocation(false)} className="btn-secondary min-h-10 flex-1">Keep</button>
                   <button type="button" onClick={() => {
-                    update({ location: null })
+                    update(court
+                      ? { court: { point: null, direction: null, directionSource: null } }
+                      : { location: null })
                     setConfirmRemoveLocation(false)
                   }} className="min-h-10 flex-1 rounded-md bg-danger text-sm font-bold text-content">Remove</button>
                 </div>
@@ -298,7 +332,7 @@ export default function BasketballShotEditor({
       </div>
       <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
-        <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
+        <button type="button" onClick={requestPreview} disabled={basketMissing} className="btn-primary flex min-h-11 items-center justify-center gap-2 disabled:bg-control-disabled disabled:text-content-disabled">
           <Pencil size={16} aria-hidden />
           Review
         </button>

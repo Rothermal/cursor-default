@@ -24,6 +24,7 @@ import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import RecentEventsPopup from '../components/RecentEventsPopup'
 import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
 import BasketballLifecycleControls from '../components/basketball/BasketballLifecycleControls'
+import BasketballCourtEndsPanel from '../components/basketball/BasketballCourtEndsPanel'
 import BasketballEventBonusPanel from '../components/basketball/BasketballEventBonusPanel'
 import BasketballReopenDialog from '../components/basketball/BasketballReopenDialog'
 import BasketballLateParticipantDialog from '../components/basketball/BasketballLateParticipantDialog'
@@ -1663,6 +1664,9 @@ export default function GameTracker() {
               <Link2 size={16} aria-hidden />
               Steal + Turnover
             </button>
+          )}
+          {isBasketballEventMode && basketballWorkspace === 'actions' && (
+            <BasketballCourtEndsPanel disabled={!basketballPeriodActive} />
           )}
           {isBasketballEventMode && basketballWorkspace === 'actions' && timeoutInventory && (
             <section className="border-y border-info-line bg-info px-3 py-3" aria-labelledby="basketball-timeouts-title">

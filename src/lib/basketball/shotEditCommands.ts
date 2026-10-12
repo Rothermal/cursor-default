@@ -4,12 +4,13 @@ import { applyGameEventAppendsAndMutations } from '../gameEvents/mutations'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
-import type { GameEventActor, GameEventMutation } from '../gameEvents/types'
+import type { GameEventActor, GameEventLocation, GameEventMutation } from '../gameEvents/types'
 import {
   basketballActorForSelection,
   createBasketballCaptureCommandId,
   nextBasketballEventSequence,
   normalizeBasketballCourtLocation,
+  normalizeBasketballFullCourtLocation,
   type BasketballCaptureActorSelection,
   type BasketballCommandErrorCode,
   type BasketballCommandResult,
@@ -21,12 +22,14 @@ import {
   normalizedCourtLocationToFeet,
   type BasketballCourtPoint,
 } from './courtGeometry'
+import { basketballPeriodDirection } from './courtDirectionEvents'
 import { basketballShotFeet } from './fullCourtGeometry'
 import { createBasketballUuid } from './id'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballStatEvent } from './statEvents'
 import type {
+  BasketballAttackingDirection,
   BasketballAssistEvent,
   BasketballBlockEvent,
   BasketballMatchEvent,
@@ -47,15 +50,34 @@ export type BasketballShotRelationshipSelection =
       actor: BasketballCaptureActorSelection
     }
 
+/**
+ * A shot's place on the full court (BKE-7 §3.4). `direction` is the basket it was taken
+ * at; it is never inferred from a moved marker and stays null until known or chosen.
+ */
+export interface BasketballShotCourtDraft {
+  /** 0..1 along the length and across, or null for an unlocated shot. */
+  point: { x: number; y: number } | null
+  direction: BasketballAttackingDirection | null
+  /**
+   * `stored` keeps the shot's own basket; `period` is the default for an unambiguous
+   * period and follows period and side changes; `recorder` is an explicit choice.
+   */
+  directionSource: 'stored' | 'period' | 'recorder' | null
+}
+
 export interface BasketballShotEditDraft {
   eventId: string
   sourceFingerprint: string
+  periodId: string
   attempt: BasketballShotEvent['payload']['attempt']
   teamSide: BasketballTeamSide
   shooter: BasketballCaptureActorSelection
   made: boolean
   value: 1 | 2 | 3
+  /** Half-court feet; used only by half-court games (`court` null). */
   location: BasketballCourtPoint | null
+  /** Set for a full-court game, where it replaces `location`. */
+  court: BasketballShotCourtDraft | null
   relationships: Record<BasketballShotRelationshipKind, BasketballShotRelationshipSelection>
   newRelationshipEventIds: Record<BasketballShotRelationshipKind, string>
   correctionCaptureCommandId: string
@@ -95,7 +117,10 @@ export interface BasketballHistoricalShotDraft {
   shooter: BasketballCaptureActorSelection
   made: boolean
   value: 2 | 3
+  /** Half-court feet; used only by half-court games (`court` null). */
   location: BasketballCourtPoint | null
+  /** Set for a full-court game, where it replaces `location`. */
+  court: BasketballShotCourtDraft | null
   relationships: Record<BasketballShotRelationshipKind, BasketballShotRelationshipSelection>
   relationshipEventIds: Record<BasketballShotRelationshipKind, string>
   captureCommandId: string
@@ -142,10 +167,7 @@ export function buildBasketballShotEditDraft(
   const prepared = prepareShotEditState(state, eventId)
   if (!prepared.ok) return prepared
   const { shot, active } = prepared.value
-  if (shot.location && shot.location.attackingDirection !== 'unknown') {
-    // This editor works in half-court feet; full-court shots get the full-court editor.
-    return commandFailure('invalid_location', 'Edit this shot on the full court.')
-  }
+  const fullCourt = isFullCourtState(prepared.value.state)
   const shooter = actorToSelection(actorForRole(shot, 'shooter'))
   const relationships = Object.fromEntries(
     (['assist', 'rebound', 'block'] as const).map(kind => {
@@ -162,12 +184,22 @@ export function buildBasketballShotEditDraft(
     value: {
       eventId: shot.id,
       sourceFingerprint: eventStreamFingerprint(prepared.value.state),
+      periodId: shot.period.id,
       attempt: shot.payload.attempt,
       teamSide: shot.teamSide,
       shooter,
       made: shot.payload.made,
       value: shot.payload.value,
-      location: shot.location ? normalizedCourtLocationToFeet(shot.location) : null,
+      location: !fullCourt && shot.location ? normalizedCourtLocationToFeet(shot.location) : null,
+      court: fullCourt
+        ? shot.location && shot.location.attackingDirection !== 'unknown'
+          ? {
+              point: { x: shot.location.x, y: shot.location.y },
+              direction: shot.location.attackingDirection,
+              directionSource: 'stored',
+            }
+          : { point: null, direction: null, directionSource: null }
+        : null,
       relationships,
       newRelationshipEventIds: {
         assist: createBasketballUuid(),
@@ -210,6 +242,9 @@ export function buildBasketballHistoricalShotDraft(
       made: true,
       value: 2,
       location: null,
+      court: isFullCourtState(prepared.value)
+        ? { point: null, direction: null, directionSource: null }
+        : null,
       relationships: {
         assist: { mode: 'none' },
         rebound: { mode: 'none' },
@@ -270,8 +305,8 @@ export function previewBasketballHistoricalShot(
       recorderUserId,
       consequenceLines: [
         `Add a ${draft.made ? 'made' : 'missed'} ${draft.value}-point field goal to ${periodLabel}.`,
-        draft.location
-          ? `Court location: ${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft.`
+        events.value[0].location
+          ? `Court location: ${basketballShotLocationText(events.value[0].location)}.`
           : 'The field goal will remain unlocated.',
         ...(relationCount > 0
           ? [`Record ${relationCount} linked related ${relationCount === 1 ? 'stat' : 'stats'}.`]
@@ -651,11 +686,9 @@ function buildHistoricalShotEvents(
     { allowUnavailable: true }
   )
   if (!shooter.ok) return shooter
-  const location = draft.location === null
-    ? { ok: true as const, value: null }
-    : normalizeBasketballCourtLocation(draft.location)
+  const location = shotDraftLocation(draft)
   if (!location.ok) return location
-  const storedPoint = location.value ? normalizedCourtLocationToFeet(location.value) : null
+  const storedPoint = location.value ? basketballShotFeet(location.value) : null
   const detectedValue = storedPoint && isThreePointer(storedPoint.x, storedPoint.y) ? 3 : 2
   const hasRelations = Object.values(draft.relationships).some(selection => selection.mode !== 'none')
   let nextSequence = nextBasketballEventSequence(state.eventStream.events, recorderUserId)
@@ -791,7 +824,10 @@ function buildShotEditPlan(
   occurredAt: string
 ): BasketballCommandResult<ShotEditPlan> {
   const original = prepared.shot
-  if (original.payload.attempt === 'free_throw' && (draft.value !== 1 || draft.location !== null)) {
+  if (
+    original.payload.attempt === 'free_throw' &&
+    (draft.value !== 1 || draft.location !== null || Boolean(draft.court?.point))
+  ) {
     return commandFailure('command_failed', 'A free throw must remain an unlocated 1-point attempt.')
   }
   if (original.payload.attempt === 'field_goal' && draft.value !== 2 && draft.value !== 3) {
@@ -805,9 +841,7 @@ function buildShotEditPlan(
     { allowUnavailable: true }
   )
   if (!shooter.ok) return shooter
-  const location = draft.location === null
-    ? { ok: true as const, value: null }
-    : normalizeBasketballCourtLocation(draft.location)
+  const location = shotDraftLocation(draft)
   if (!location.ok) return location
   const valueSource = shotValueSource(original, draft, location.value)
   const shotPayload = {
@@ -1026,6 +1060,77 @@ function newRelationshipSideAllowed(
   return !draft.made && draft.value !== 1 && side !== draft.teamSide
 }
 
+function isFullCourtState(state: GameState): boolean {
+  return state.sportGameState?.sportId === 'basketball' &&
+    Boolean(state.sportGameState.projection.court)
+}
+
+/** The stored location a draft saves: the full court in a full-court game, else the half court. */
+function shotDraftLocation(
+  draft: Pick<BasketballShotEditDraft, 'location' | 'court'>
+): BasketballCommandResult<GameEventLocation | null> {
+  if (draft.court) {
+    if (!draft.court.point) return { ok: true, value: null }
+    if (!draft.court.direction) {
+      return commandFailure('invalid_location', 'Choose the basket this shot was taken at.')
+    }
+    return normalizeBasketballFullCourtLocation(draft.court.point, draft.court.direction)
+  }
+  return draft.location === null
+    ? { ok: true, value: null }
+    : normalizeBasketballCourtLocation(draft.location)
+}
+
+/** "Right basket, 23.9 ft" for full-court shots, "x, y ft" for half-court ones. */
+export function basketballShotLocationText(location: GameEventLocation): string {
+  const feet = basketballShotFeet(location)
+  if (location.attackingDirection === 'unknown') return `${feet.x.toFixed(1)}, ${feet.y.toFixed(1)} ft`
+  const basket = location.attackingDirection === 'left_to_right' ? 'Right' : 'Left'
+  return `${basket} basket, ${Math.hypot(feet.x, feet.y).toFixed(1)} ft`
+}
+
+/** A full-court draft's spot as text: basket and distance once the basket is known. */
+export function basketballShotCourtDraftText(court: BasketballShotCourtDraft): string {
+  if (!court.point) return 'No court location'
+  if (!court.direction) return 'Placed. Choose the basket below.'
+  return basketballShotLocationText({ ...court.point, attackingDirection: court.direction })
+}
+
+/**
+ * The basket a side attacked throughout a period, or null when the period used both
+ * (BKE-7 §3.4): the recorder must then choose.
+ */
+export function basketballShotDraftPeriodDirection(
+  state: GameState,
+  periodId: string,
+  teamSide: BasketballTeamSide
+): BasketballAttackingDirection | null {
+  if (state.sportGameState?.sportId !== 'basketball') return null
+  return basketballPeriodDirection(
+    state.sportGameState.projection,
+    state.sportGameState.setup.rulesSnapshot,
+    periodId,
+    teamSide
+  ).direction
+}
+
+/**
+ * Keeps a stored or chosen basket, and refreshes the period default after a period,
+ * side or placement change (BKE-7 §3.4). Removing the location clears the basket.
+ */
+export function reconcileBasketballShotCourtDraft(
+  state: GameState,
+  court: BasketballShotCourtDraft | null,
+  periodId: string,
+  teamSide: BasketballTeamSide
+): BasketballShotCourtDraft | null {
+  if (!court) return null
+  if (!court.point) return { point: null, direction: null, directionSource: null }
+  if (court.directionSource === 'stored' || court.directionSource === 'recorder') return court
+  const direction = basketballShotDraftPeriodDirection(state, periodId, teamSide)
+  return { point: court.point, direction, directionSource: direction ? 'period' : null }
+}
+
 function shotValueSource(
   original: BasketballShotEvent,
   draft: BasketballShotEditDraft,
@@ -1058,11 +1163,21 @@ function consequenceLines(
       `${draft.made ? 'made' : 'missed'} ${draft.value}-point.`
     )
   }
-  const originalLocation = original.location ? basketballShotFeet(original.location) : null
-  if (!sameJson(originalLocation, draft.location)) {
-    lines.push(draft.location
-      ? `Court location: ${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft.`
-      : 'Court location will be removed.')
+  if (draft.court) {
+    const nextLocation = shotDraftLocation(draft)
+    const location = nextLocation.ok ? nextLocation.value : original.location
+    if (!sameJson(original.location, location)) {
+      lines.push(location
+        ? `Court location: ${basketballShotLocationText(location)}.`
+        : 'Court location will be removed.')
+    }
+  } else {
+    const originalLocation = original.location ? basketballShotFeet(original.location) : null
+    if (!sameJson(originalLocation, draft.location)) {
+      lines.push(draft.location
+        ? `Court location: ${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft.`
+        : 'Court location will be removed.')
+    }
   }
   if (
     before.sportGameState?.sportId === 'basketball' &&

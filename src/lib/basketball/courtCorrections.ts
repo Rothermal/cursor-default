@@ -19,6 +19,7 @@ import type {
   BasketballCommandResult,
   BasketballStateCommandResult,
 } from './commands'
+import { isBasketballTipOffEvent } from './courtDirectionEvents'
 import type { BasketballDirectStatId } from './directCommands'
 
 const COURT_EVENT_TYPES = new Set([
@@ -461,7 +462,9 @@ function buildCaptureUnit(
   )
   const primary = shot ?? events[0]
   const captureCommandId = captureCommandIdForEvent(primary)
-  const boundary = events.some(event => LIFECYCLE_BOUNDARY_TYPES.has(event.eventType))
+  const boundary = events.some(event =>
+    LIFECYCLE_BOUNDARY_TYPES.has(event.eventType) || isBasketballTipOffEvent(event)
+  )
   return {
     id: captureCommandId ?? key,
     captureCommandId,
@@ -483,7 +486,8 @@ function captureUnitActorLabel(players: Player[], event: BasketballMatchEvent): 
     event.eventType === 'basketball.period_started' ||
     event.eventType === 'basketball.period_ended' ||
     event.eventType === 'basketball.match_ended' ||
-    event.eventType === 'basketball.match_reopened'
+    event.eventType === 'basketball.match_reopened' ||
+    event.eventType === 'basketball.attacking_direction_set'
   ) return 'Game'
   return actorLabel(players, event)
 }
@@ -541,6 +545,8 @@ function captureUnitLabel(
           : 'Game abandoned'
     }
     case 'basketball.match_reopened': return 'Game reopened'
+    case 'basketball.attacking_direction_set':
+      return events[0].payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'
     case 'basketball.assist': return 'Assist'
     case 'basketball.rebound':
       return events[0].payload.kind === 'offensive' ? 'Offensive rebound' : 'Defensive rebound'

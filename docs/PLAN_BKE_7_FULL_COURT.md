@@ -291,3 +291,43 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   value, halves with overtime, quarters, the eight-segment youth profile (switch at segment
   5), odd counts, Switch ends forward-only and its removal, frame mixing, a second or late
   tip-off, a tip-off after play, Switch ends in a break, no-op switches, half-court games unchanged, Timeline labels.
+
+### BKE-7B (implemented)
+
+- `fullCourtPolicy.ts`: `BASKETBALL_FULL_COURT_FOR_NEW_GAMES` (true) is the rollback
+  switch, pulled forward from BKE-7D so every new start path reads one place; false
+  starts new Event games on the half court again. Existing games keep their frame.
+- Start paths: `prepareBasketballGameStart` takes `tipOffDirection` and appends the period
+  start and the tip-off in one command (same period and elapsed time). Player Setup shows
+  `BasketballTipOffChoice` ("Tip-off basket for <Team>", Left/Right in the court's opening
+  view, default right) on the anchored opening-lineup step and on the clockless roster
+  step. An independent cloud recorder stream starts with the default right tip-off; the
+  recorder fixes it with Switch ends. Games started before BKE-7B stay half court.
+- Live court: `BasketballFullCourt` (horizontal 94 x 50 drawing, both ends from the shared
+  `courtDrawing.tsx`, team labels with arrows, flip as a half turn, tap-vs-scroll from the
+  shared `courtTap.ts`). `ShotChartPanel` uses it only for full-court games; the legacy
+  tracker and half-court Event games keep `BasketballCourt`.
+- Capture: the tapped half picks the team attacking that basket (the active player stays
+  when on that team, else the team row). The popup's Team control can change it; choosing
+  the team whose basket is far from the tap shows "Backcourt shot. Are the ends right?"
+  with Switch ends or Keep as a backcourt shot. `captureBasketballCourtEvent` takes a
+  0..1 `fullCourtPoint` in full-court games, stamps the shooting side's current direction
+  and measures value from that basket.
+- Switch ends: `switchBasketballEnds` appends one direction event during a period (fails
+  in half-court games and final cloud games) and clears the quick-Undo receipt. The Actions
+  tab has a Court ends section. Switch ends is an ordinary capture unit (Undo, Timeline
+  remove and restore); the tip-off stays a read-only boundary.
+- Shots: detail reads "Paint at the right basket (11.4 ft)". The shot editor and
+  recorded-later shot add place on the full court and show the §3.4 Shot at control
+  (`BasketballShotCourtDraft`: `stored`, `period` or `recorder`); a period that used one
+  direction preselects it, otherwise Review stays disabled until a basket is chosen. Edit
+  keeps the stored basket when the marker moves or the team or period changes; removing the
+  location clears it; value checks re-run against the chosen basket.
+- Tests (`fullCourtLive.test.ts`): start with and without a tip-off, direction stamping and
+  value, side selection through Switch ends and halftime, Undo/remove of Switch ends with the
+  tip-off read-only, edit basket preservation and re-check, added-shot preselection, location
+  text. Independent cloud stream tests now expect the tip-off.
+- Phone screenshots (375 px, Chromium): setup choice, tracker court with both directions,
+  popup, backcourt prompt, flip on and off, Court ends, after Switch ends, shot detail,
+  editor and full-court placement; shared in the project files under
+  `basketball-full-court/bke-7b/`.

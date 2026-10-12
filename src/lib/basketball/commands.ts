@@ -27,6 +27,11 @@ import {
 } from './courtGeometry'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballClockEvent } from './clockEvents'
+import {
+  basketballCurrentDirection,
+  createBasketballAttackingDirectionEvent,
+} from './courtDirectionEvents'
+import { basketballShotFeet } from './fullCourtGeometry'
 import { basketballClockMomentAt, basketballClockRecoveryIssue } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
 import { basketballBoundaryReviewPendingSides } from './lineupProjection'
@@ -46,6 +51,7 @@ import {
 } from './state'
 import { createBasketballStatEvent } from './statEvents'
 import type {
+  BasketballAttackingDirection,
   BasketballMatchParticipant,
   BasketballReopenMode,
   BasketballMatchRulesV2,
@@ -98,6 +104,12 @@ export interface BasketballStartOptions {
   eventId?: string
   participantIds?: string[]
   reviewedSetup?: BasketballReviewedStartSetup
+  /**
+   * The tracked team's first basket (BKE-7 §3.2). Set, the game is full court and the
+   * tip-off is appended with the Period 1 start; omitted, it stays a half-court game.
+   */
+  tipOffDirection?: BasketballAttackingDirection
+  tipOffEventId?: string
 }
 
 export interface BasketballReviewedStartSetup {
@@ -168,7 +180,13 @@ export type BasketballCourtEventChoice =
 export interface BasketballCourtCaptureOptions {
   recorderUserId: string | null
   playerId: string
-  point: BasketballCourtPoint
+  /** Half-court feet, for a half-court game. */
+  point?: BasketballCourtPoint
+  /**
+   * Full-court tap (0..1 along the length and across), for a full-court game. The
+   * shot is stamped with the shooting side's current direction (BKE-7 §3.3).
+   */
+  fullCourtPoint?: { x: number; y: number }
   event: BasketballCourtEventChoice
   occurredAt?: string
   eventIds?: string[]
@@ -325,24 +343,39 @@ export function prepareBasketballGameStart(
   const occurredAtResult = normalizeBasketballCommandTimestamp(options.occurredAt)
   if (!occurredAtResult.ok) return { ...occurredAtResult, state }
 
-  const appended = addGameEvent(
-    initialized.state,
-    createBasketballLifecycleEvent({
-      id: options.eventId,
-      eventType: 'basketball.period_started',
-      payload: { periodId: firstPeriod.id, captureCommandId: null },
+  const sequence = nextBasketballEventSequence(
+    initialized.state.eventStream?.events ?? [],
+    options.recorderUserId
+  )
+  const period = { id: firstPeriod.id, order: firstPeriod.order }
+  const elapsedMs = isBasketballMatchRulesV3(setupResult.value.rulesSnapshot) &&
+    setupResult.value.rulesSnapshot.clockModel === 'anchored'
+      ? 0
+      : null
+  const startEvents: BasketballMatchEvent[] = [createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.period_started',
+    payload: { periodId: firstPeriod.id, captureCommandId: null },
+    recorderUserId: options.recorderUserId,
+    sequence,
+    period,
+    elapsedMs,
+    occurredAt: occurredAtResult.value,
+  })]
+  if (options.tipOffDirection) {
+    startEvents.push(createBasketballTipOffEvent({
+      id: options.tipOffEventId,
+      direction: options.tipOffDirection,
       recorderUserId: options.recorderUserId,
-      sequence: nextBasketballEventSequence(
-        initialized.state.eventStream?.events ?? [],
-        options.recorderUserId
-      ),
-      period: { id: firstPeriod.id, order: firstPeriod.order },
-      elapsedMs: isBasketballMatchRulesV3(setupResult.value.rulesSnapshot) &&
-        setupResult.value.rulesSnapshot.clockModel === 'anchored'
-          ? 0
-          : null,
+      sequence: sequence + 1,
+      period,
+      elapsedMs,
       occurredAt: occurredAtResult.value,
-    }),
+    }))
+  }
+  const appended = addGameEvents(
+    initialized.state,
+    startEvents,
     gameEventRegistry,
     gameEventProjectors
   )
@@ -953,7 +986,7 @@ export function captureBasketballCourtEvent(
         )
   }
 
-  const location = normalizeBasketballCourtLocation(options.point)
+  const location = basketballCaptureLocation(state, target.teamSide, options)
   if (!location.ok) return { ...location, state }
   const shooter = basketballActorForSelection(
     state,
@@ -997,7 +1030,8 @@ export function captureBasketballCourtEvent(
     ? options.captureCommandId ?? createBasketballCaptureCommandId()
     : null
   const shotId = eventIds[0] ?? createBasketballUuid()
-  const detectedValue = isThreePointer(options.point.x, options.point.y) ? 3 : 2
+  const shotFeet = basketballShotFeet(location.value)
+  const detectedValue = isThreePointer(shotFeet.x, shotFeet.y) ? 3 : 2
   const selectedValue = options.event.shotType === '3pt' ? 3 : 2
   const events: BasketballMatchEvent[] = [createBasketballStatEvent({
     id: shotId,
@@ -1397,6 +1431,105 @@ export function basketballActorForSelection(
     ok: true,
     value: { role, kind: selection.kind, label },
   }
+}
+
+/** The tap's stored location: the game's frame, stamped with the acting side's direction. */
+function basketballCaptureLocation(
+  state: GameState,
+  teamSide: BasketballTeamSide,
+  options: Pick<BasketballCourtCaptureOptions, 'point' | 'fullCourtPoint'>
+): BasketballCommandResult<GameEventLocation> {
+  const projection = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection
+    : null
+  const direction = projection ? basketballCurrentDirection(projection, teamSide) : null
+  if (!direction) {
+    if (!options.point) return commandFailure('invalid_location', 'Tap the half court to place this shot.')
+    return normalizeBasketballCourtLocation(options.point)
+  }
+  const point = options.fullCourtPoint
+  if (!point) return commandFailure('invalid_location', 'Tap the full court to place this shot.')
+  return normalizeBasketballFullCourtLocation(point, direction)
+}
+
+/** A full-court point (0..1 each way) aimed at `direction`'s basket. */
+export function normalizeBasketballFullCourtLocation(
+  point: { x: number; y: number },
+  direction: BasketballAttackingDirection
+): BasketballCommandResult<GameEventLocation> {
+  if (
+    !Number.isFinite(point.x) || !Number.isFinite(point.y) ||
+    point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1
+  ) {
+    return commandFailure('invalid_location', 'Basketball court location must be on the court.')
+  }
+  return { ok: true, value: { x: point.x, y: point.y, attackingDirection: direction } }
+}
+
+export interface BasketballTipOffEventInput {
+  id?: string
+  direction: BasketballAttackingDirection
+  recorderUserId: string | null
+  sequence: number
+  period: GameEventPeriod
+  elapsedMs: number | null
+  occurredAt: string
+}
+
+/** The tip-off, appended in the same command as the first period's start. */
+export function createBasketballTipOffEvent(input: BasketballTipOffEventInput): BasketballMatchEvent {
+  return createBasketballAttackingDirectionEvent({
+    id: input.id,
+    payload: {
+      captureCommandId: createBasketballCaptureCommandId(),
+      trackedDirection: input.direction,
+      reason: 'tip_off',
+    },
+    recorderUserId: input.recorderUserId,
+    sequence: input.sequence,
+    period: input.period,
+    elapsedMs: input.elapsedMs,
+    occurredAt: input.occurredAt,
+  })
+}
+
+export interface BasketballSwitchEndsOptions {
+  recorderUserId: string | null
+  occurredAt?: string
+  eventId?: string
+}
+
+/** Switch ends from now on (BKE-7 §3.2): one capture unit, so Undo and Remove handle it. */
+export function switchBasketballEnds(
+  state: GameState,
+  options: BasketballSwitchEndsOptions
+): BasketballStateCommandResult {
+  if (isFinalBasketballCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
+  }
+  const context = getBasketballCommandContext(state, options.recorderUserId, options.occurredAt)
+  if (!context.ok) return { ...context, state }
+  const current = basketballCurrentDirection(context.value.sportState.projection, 'tracked')
+  if (!current) return failure(state, 'command_failed', 'Switch ends needs a full-court game.')
+  const event = createBasketballAttackingDirectionEvent({
+    id: options.eventId,
+    payload: {
+      captureCommandId: createBasketballCaptureCommandId(),
+      trackedDirection: current === 'left_to_right' ? 'right_to_left' : 'left_to_right',
+      reason: 'switch_ends',
+    },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: context.value.period,
+    elapsedMs: context.value.elapsedMs,
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    clearBasketballUndoReceipt(state),
+    event,
+    'Switch ends did not produce a complete event projection.'
+  )
 }
 
 export function normalizeBasketballCourtLocation(

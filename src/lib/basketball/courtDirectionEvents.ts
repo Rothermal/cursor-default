@@ -74,6 +74,11 @@ export const basketballCourtEventDefinitions: GameEventDefinition<GameEvent>[] =
   },
 }]
 
+/** The tip-off fixes the game's frame, so it is a read-only boundary; Switch ends is not. */
+export function isBasketballTipOffEvent(event: BasketballMatchEvent): boolean {
+  return event.eventType === BASKETBALL_ATTACKING_DIRECTION_EVENT && event.payload.reason === 'tip_off'
+}
+
 export function isBasketballCourtEvent(
   event: BasketballMatchEvent
 ): event is BasketballAttackingDirectionSetEvent {
