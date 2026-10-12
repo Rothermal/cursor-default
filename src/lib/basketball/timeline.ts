@@ -3,7 +3,8 @@ import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
-import { classifyShotZone, normalizedCourtLocationToFeet } from './courtGeometry'
+import { classifyShotZone } from './courtGeometry'
+import { basketballShotFeet } from './fullCourtGeometry'
 import { basketballHistoricalDisplayMs } from './historicalTime'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { resolveBasketballPeriodSegment } from './rules'
@@ -315,7 +316,7 @@ export function basketballShotDetailFromReview(
   const related = allReviews.filter(item =>
     isRelatedStat(item.event) && item.event.payload.relatedEventId === shot.id
   )
-  const location = shot.location ? normalizedCourtLocationToFeet(shot.location) : null
+  const location = shot.location ? basketballShotFeet(shot.location) : null
   const zone = location ? classifyShotZone(location.x, location.y) : null
 
   return {
@@ -710,6 +711,11 @@ function eventTitle(
       ? 'Game completed'
       : event.payload.reason === 'suspended' ? 'Game suspended' : 'Game abandoned'
     case 'basketball.match_reopened': return 'Game reopened'
+    case 'basketball.attacking_direction_set': {
+      const team = state.gameInfo?.teamName.trim() || 'Tracked team'
+      const basket = event.payload.trackedDirection === 'left_to_right' ? 'right' : 'left'
+      return `${event.payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'}: ${team} shoots at the ${basket} basket`
+    }
     case 'basketball.clock_started': return 'Clock started'
     case 'basketball.clock_paused': return event.payload.source === 'expiration'
       ? 'Clock expired'
@@ -787,7 +793,8 @@ function familiesForEvent(event: BasketballMatchEvent): BasketballTimelineFamily
     event.eventType === 'basketball.period_started' ||
     event.eventType === 'basketball.period_ended' ||
     event.eventType === 'basketball.match_ended' ||
-    event.eventType === 'basketball.match_reopened'
+    event.eventType === 'basketball.match_reopened' ||
+    event.eventType === 'basketball.attacking_direction_set'
   ) families.push('match_control')
   return families
 }

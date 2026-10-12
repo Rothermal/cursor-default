@@ -16,6 +16,7 @@ import { basketballStatEventDefinitions } from './statEvents'
 import { basketballAdministrativeEventDefinitions } from './administrativeEvents'
 import { basketballClockEventDefinitions } from './clockEvents'
 import { basketballLineupEventDefinitions } from './lineupEvents'
+import { basketballCourtEventDefinitions } from './courtDirectionEvents'
 
 export type BasketballLifecyclePayloadByType = {
   'basketball.period_started': BasketballPeriodPayload
@@ -76,6 +77,7 @@ export const basketballLifecycleEventDefinitions: GameEventDefinition<GameEvent>
 
 export const basketballEventDefinitions: GameEventDefinition<GameEvent>[] = [
   ...basketballLifecycleEventDefinitions,
+  ...basketballCourtEventDefinitions,
   ...basketballStatEventDefinitions,
   ...basketballAdministrativeEventDefinitions,
   ...basketballClockEventDefinitions,

@@ -1,7 +1,8 @@
 import type { ShotRecord } from '../../types'
 import type { GameEventActor } from '../gameEvents/types'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
-import { normalizedCourtLocationToFeet, zoneForForcedShotType } from './courtGeometry'
+import { zoneForForcedShotType } from './courtGeometry'
+import { basketballShotFeet } from './fullCourtGeometry'
 import type {
   BasketballMatchEvent,
   BasketballMatchProjection,
@@ -58,9 +59,12 @@ export function applyBasketballStatEvent(
     case 'basketball.free_throw_trip':
       validateFreeThrowTripRelationship(projection, event, context)
       return null
-    case 'basketball.shot':
+    case 'basketball.shot': {
+      const frameError = basketballLocationFrameError(projection, event)
+      if (frameError) return frameError
       applyShot(projection, event, context)
       return null
+    }
     case 'basketball.assist':
       incrementActorStat(projection, event.teamSide, actorForRole(event, 'assister'), 'ast')
       validateAssistRelationship(projection, event, context)
@@ -171,7 +175,7 @@ function applyShot(
   validateFreeThrowAttemptRelationship(projection, event, context)
   if (event.payload.attempt !== 'field_goal' || !event.location) return
 
-  const point = normalizedCourtLocationToFeet(event.location)
+  const point = basketballShotFeet(event.location)
   const x = roundCourtFeet(point.x)
   const y = roundCourtFeet(point.y)
   const shotType = event.payload.value === 3 ? '3pt' : '2pt'
@@ -185,6 +189,21 @@ function applyShot(
     playerId: projectionPlayerId(projection, actor, event.teamSide),
     timestamp: Date.parse(event.occurredAt),
   })
+}
+
+/**
+ * A located event uses its game's frame: a full-court game (one with a tip-off
+ * direction) stores known directions, a half-court game `'unknown'` (BKE-7 §5).
+ */
+export function basketballLocationFrameError(
+  projection: BasketballMatchProjection,
+  event: BasketballMatchEvent
+): string | null {
+  if (!event.location) return null
+  const fullCourt = event.location.attackingDirection !== 'unknown'
+  if (fullCourt && !projection.court) return 'A full-court location needs a full-court game.'
+  if (!fullCourt && projection.court) return 'A full-court game stores full-court locations.'
+  return null
 }
 
 function applyTurnover(

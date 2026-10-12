@@ -4,6 +4,8 @@ export const BASKETBALL_GAME_STATE_VERSION = 1
 export const BASKETBALL_EVENT_SCHEMA_VERSION = 1
 
 export type BasketballTeamSide = 'tracked' | 'opponent'
+/** Which basket the tracked team attacks on the full court (BKE-7). */
+export type BasketballAttackingDirection = 'left_to_right' | 'right_to_left'
 export type BasketballTrackedTeamDesignation = 'home' | 'away' | 'neutral'
 export type BasketballRosterStatus = 'starter' | 'bench' | 'dnp'
 export type BasketballSegmentKind = 'regulation' | 'overtime'
@@ -471,10 +473,20 @@ export interface BasketballMatchProjection {
   score: BasketballScoreProjection
   clock: BasketballAnchoredClockProjection | null
   lineup?: BasketballLineupProjection
+  /** Present only for full-court games, from their tip-off event (BKE-7). */
+  court?: BasketballCourtProjection
   relationshipWarnings: BasketballRelationshipWarning[]
   endedAt: string | null
   endReason: BasketballMatchEndReason | null
   result: BasketballMatchResult
+}
+
+export interface BasketballCourtProjection {
+  /** The tracked team's direction now. */
+  trackedAttackingDirection: BasketballAttackingDirection
+  /** Every tracked direction in force during each started period, oldest first. */
+  periodDirections: Record<string, BasketballAttackingDirection[]>
+  tipOffEventId: string
 }
 
 export interface BasketballCapturePreferences {
@@ -555,6 +567,14 @@ export interface BasketballClockAdjustedPayload extends BasketballCapturePayload
   fromElapsedMs: number
   toElapsedMs: number
   reason: string
+}
+
+export type BasketballAttackingDirectionReason = 'tip_off' | 'switch_ends'
+
+export interface BasketballAttackingDirectionSetPayload extends BasketballCapturePayload {
+  captureCommandId: string
+  trackedDirection: BasketballAttackingDirection
+  reason: BasketballAttackingDirectionReason
 }
 
 export interface BasketballStoppagePayload extends BasketballCapturePayload {
@@ -747,6 +767,13 @@ export type BasketballStoppageEvent = BasketballClockGameEvent<
   'basketball.stoppage'
 >
 
+export type BasketballAttackingDirectionSetEvent = BasketballClockGameEvent<
+  BasketballAttackingDirectionSetPayload,
+  'basketball.attacking_direction_set'
+>
+
+export type BasketballCourtEvent = BasketballAttackingDirectionSetEvent
+
 export type BasketballClockEvent =
   | BasketballClockStartedEvent
   | BasketballClockPausedEvent
@@ -858,6 +885,7 @@ export type BasketballAdministrativeEvent =
 
 export type BasketballMatchEvent =
   | BasketballLifecycleEvent
+  | BasketballCourtEvent
   | BasketballClockEvent
   | BasketballLineupEvent
   | BasketballStatEvent

@@ -35,6 +35,7 @@ const READ_ONLY_EVENT_TYPES = new Set<BasketballMatchEvent['eventType']>([
   'basketball.participant_resolved',
   'basketball.match_ended',
   'basketball.match_reopened',
+  'basketball.attacking_direction_set',
 ])
 
 export type BasketballTimelineRemovalScope = 'event' | 'capture_group'
