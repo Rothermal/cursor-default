@@ -54,17 +54,16 @@ export function applyBasketballStatEvent(
 
   const actorError = validateEventActors(projection, event)
   if (actorError) return actorError
+  const frameError = basketballLocationFrameError(projection, event)
+  if (frameError) return frameError
 
   switch (event.eventType) {
     case 'basketball.free_throw_trip':
       validateFreeThrowTripRelationship(projection, event, context)
       return null
-    case 'basketball.shot': {
-      const frameError = basketballLocationFrameError(projection, event)
-      if (frameError) return frameError
+    case 'basketball.shot':
       applyShot(projection, event, context)
       return null
-    }
     case 'basketball.assist':
       incrementActorStat(projection, event.teamSide, actorForRole(event, 'assister'), 'ast')
       validateAssistRelationship(projection, event, context)

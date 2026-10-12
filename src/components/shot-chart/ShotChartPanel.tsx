@@ -147,7 +147,12 @@ interface ShotChartPanelProps {
   /** Keeps chart review available while blocking new events for an unavailable player. */
   captureDisabled?: boolean
   captureDisabledMessage?: string
-  onAdministrative?: (kind: 'foul' | 'free_throw', side: 'tracked' | 'opponent') => void
+  /** `fullCourtPoint` is the tapped full-court spot a foul keeps (BKE-7C). */
+  onAdministrative?: (
+    kind: 'foul' | 'free_throw',
+    side: 'tracked' | 'opponent',
+    fullCourtPoint: { x: number; y: number } | null
+  ) => void
 }
 
 export default function ShotChartPanel({
@@ -709,10 +714,12 @@ export default function ShotChartPanel({
           captureSide={pendingTap.side}
           onAdministrative={onAdministrative ? kind => {
             const side = pendingTap.side === 'opponent' ? 'opponent' : 'tracked'
+            const fullCourtPoint = pendingTap.fullCourtPoint ?? null
             setPendingTap(null)
             setCaptureError(null)
-            onAdministrative(kind, side)
+            onAdministrative(kind, side, fullCourtPoint)
           } : undefined}
+          turnoverAvailable={isEventBasketball}
           onSelectPlayer={handlePopupSelectPlayer}
           sideOptions={pendingTap.fullCourtPoint ? [
             { side: 'home', label: trackedName },

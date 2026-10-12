@@ -35,6 +35,7 @@ import { basketballShotFeet } from './fullCourtGeometry'
 import { basketballClockMomentAt, basketballClockRecoveryIssue } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
 import { basketballBoundaryReviewPendingSides } from './lineupProjection'
+import { basketballPlayCaptureLocation } from './playLocations'
 import { createBasketballUuid } from './id'
 import {
   createBasketballMatchRules,
@@ -165,7 +166,7 @@ export interface BasketballCommandContextOptions {
   allowClockRecovery?: boolean
 }
 
-export type BasketballCourtStatId = 'oreb' | 'dreb' | 'stl' | 'blk' | 'ast'
+export type BasketballCourtStatId = 'oreb' | 'dreb' | 'stl' | 'blk' | 'ast' | 'to'
 
 export type BasketballCourtEventChoice =
   | {
@@ -972,6 +973,10 @@ export function captureBasketballCourtEvent(
       elapsedMs,
       occurredAt,
       teamSide: target.teamSide,
+      // A full-court tap keeps the play's spot (BKE-7C); assists never have one.
+      location: options.event.statId === 'ast'
+        ? null
+        : basketballPlayCaptureLocation(state, target.teamSide, options.fullCourtPoint),
       actors: [actor.value],
     })
     const appended = addGameEvent(captureState, event, gameEventRegistry, gameEventProjectors)
@@ -1593,6 +1598,12 @@ function standaloneStatDescriptor(statId: BasketballCourtStatId) {
         role: 'assister',
         payload: { relatedEventId: null, captureCommandId: null },
       }
+    case 'to':
+      return {
+        eventType: 'basketball.turnover' as const,
+        role: 'committed_by',
+        payload: { kind: 'player' as const, captureCommandId: null },
+      }
   }
 }
 
@@ -1604,6 +1615,7 @@ interface StandaloneBasketballStatEventInput {
   elapsedMs: number | null
   occurredAt: string
   teamSide: BasketballTeamSide
+  location: GameEventLocation | null
   actors: GameEventActor[]
 }
 
@@ -1631,6 +1643,13 @@ function createStandaloneBasketballStatEvent(
       return createBasketballStatEvent({ ...input, eventType: 'basketball.block', payload: relatedPayload })
     case 'ast':
       return createBasketballStatEvent({ ...input, eventType: 'basketball.assist', payload: relatedPayload })
+    case 'to':
+      // A team row commits a team turnover; anyone else a player turnover.
+      return createBasketballStatEvent({
+        ...input,
+        eventType: 'basketball.turnover',
+        payload: { kind: input.actors[0]?.kind === 'team' ? 'team' : 'player', captureCommandId: null },
+      })
   }
 }
 

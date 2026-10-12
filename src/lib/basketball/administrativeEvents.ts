@@ -2,6 +2,7 @@ import { isPlainObject } from '../gameEvents/envelope'
 import type {
   GameEvent,
   GameEventActor,
+  GameEventLocation,
   GameEventPeriod,
   GameEventTeamSide,
 } from '../gameEvents/types'
@@ -35,6 +36,8 @@ export interface CreateBasketballAdministrativeEventInput<
   elapsedMs?: number | null
   occurredAt: string
   teamSide: GameEventTeamSide
+  /** A foul's full-court spot (BKE-7C); every other administrative event is unlocated. */
+  location?: GameEventLocation | null
   actors?: GameEventActor[]
 }
 
@@ -54,7 +57,7 @@ export function createBasketballAdministrativeEvent<
     elapsedMs: input.elapsedMs ?? null,
     occurredAt: input.occurredAt,
     teamSide: input.teamSide,
-    location: null,
+    location: input.location ?? null,
     actors: input.actors ?? [],
     payload: input.payload,
     revision: 1,
@@ -86,7 +89,9 @@ function definition(
         event.sportId !== 'basketball' ||
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
-        event.location !== null ||
+        // Only a foul may keep a full-court spot (BKE-7C).
+        (event.location !== null &&
+          (eventType !== 'basketball.foul' || event.location.attackingDirection === 'unknown')) ||
         !validRecordedLaterFlag(event.payload.recordedLater) ||
         !validateEvent(event)
       ) {
