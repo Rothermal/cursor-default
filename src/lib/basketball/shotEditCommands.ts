@@ -21,6 +21,7 @@ import {
   normalizedCourtLocationToFeet,
   type BasketballCourtPoint,
 } from './courtGeometry'
+import { basketballShotFeet } from './fullCourtGeometry'
 import { createBasketballUuid } from './id'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
@@ -141,6 +142,10 @@ export function buildBasketballShotEditDraft(
   const prepared = prepareShotEditState(state, eventId)
   if (!prepared.ok) return prepared
   const { shot, active } = prepared.value
+  if (shot.location && shot.location.attackingDirection !== 'unknown') {
+    // This editor works in half-court feet; full-court shots get the full-court editor.
+    return commandFailure('invalid_location', 'Edit this shot on the full court.')
+  }
   const shooter = actorToSelection(actorForRole(shot, 'shooter'))
   const relationships = Object.fromEntries(
     (['assist', 'rebound', 'block'] as const).map(kind => {
@@ -1028,7 +1033,7 @@ function shotValueSource(
 ): BasketballShotValueSource {
   if (original.payload.attempt === 'free_throw') return 'free_throw'
   if (!location) return original.payload.valueSource === 'manual_override' ? 'manual_override' : 'quick_entry'
-  const point = normalizedCourtLocationToFeet(location)
+  const point = basketballShotFeet(location)
   return draft.value === (isThreePointer(point.x, point.y) ? 3 : 2)
     ? 'court'
     : 'manual_override'
@@ -1053,7 +1058,7 @@ function consequenceLines(
       `${draft.made ? 'made' : 'missed'} ${draft.value}-point.`
     )
   }
-  const originalLocation = original.location ? normalizedCourtLocationToFeet(original.location) : null
+  const originalLocation = original.location ? basketballShotFeet(original.location) : null
   if (!sameJson(originalLocation, draft.location)) {
     lines.push(draft.location
       ? `Court location: ${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft.`

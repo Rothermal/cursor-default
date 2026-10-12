@@ -8,6 +8,7 @@ import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createGameEventStream } from '../gameEvents/stream'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { createBasketballAttackingDirectionEvent } from './courtDirectionEvents'
 import {
   addBasketballLateParticipant,
   endBasketballPeriod,
@@ -1163,6 +1164,79 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       .toEqual(['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'])
     expect(basketballProjection(restored.state).participants['tracked-6'])
       .toMatchObject({ position: 'C', captain: true })
+  })
+})
+
+describe('BKE-7 tip-off and recorded-later lineup corrections', () => {
+  function withTipOff(state: GameState, sequence: number, occurredAt: string): GameState {
+    const added = addGameEvent(state, createBasketballAttackingDirectionEvent({
+      id: uuid(901),
+      payload: { captureCommandId: uuid(902), trackedDirection: 'left_to_right', reason: 'tip_off' },
+      recorderUserId,
+      sequence,
+      period: currentPeriod(state),
+      elapsedMs: 0,
+      occurredAt,
+    }), gameEventRegistry, gameEventProjectors)
+    if (!added.ok) throw new Error(added.error.message)
+    return added.state
+  }
+
+  function correctZeroTimeSubstitution(state: GameState) {
+    const draft = basketballLineupCorrectionDraft(state, uuid(903))
+    if (!draft.ok || draft.value.eventType !== 'basketball.substitution') {
+      throw new Error('Missing substitution draft')
+    }
+    expect(draft.value.elapsedMs).toBe(0)
+    return previewBasketballLineupCorrection(state, {
+      ...draft.value,
+      participantIds: ['tracked-1', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+    }, after(3_000))
+  }
+
+  it('keeps a tip-off captured first valid when a zero-time substitution is corrected', () => {
+    const tipped = withTipOff(anchoredState(), 2, after(500))
+    const substituted = requireState(substituteBasketballLineup(tipped, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(1_000),
+      eventId: uuid(903),
+    }))
+    expect(basketballProjection(substituted).court?.trackedAttackingDirection).toBe('left_to_right')
+
+    // The corrected substitution is recorded later, so it replays at elapsed zero ahead
+    // of the tip-off; the tip-off was still captured before it.
+    const preview = correctZeroTimeSubstitution(substituted)
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    const applied = applyBasketballLineupCorrection(substituted, preview.value, after(3_500))
+    expect(applied.ok).toBe(true)
+    if (!applied.ok) return
+    const projection = basketballProjection(applied.state)
+    expect(projection.court?.trackedAttackingDirection).toBe('left_to_right')
+    expect(trackedLineup(applied.state).currentParticipantIds)
+      .toEqual(['tracked-1', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'])
+  })
+
+  it('still rejects a tip-off captured after a substitution', () => {
+    const substituted = requireState(substituteBasketballLineup(anchoredState(), {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(1_000),
+      eventId: uuid(903),
+    }))
+    const added = addGameEvent(substituted, createBasketballAttackingDirectionEvent({
+      id: uuid(901),
+      payload: { captureCommandId: uuid(902), trackedDirection: 'left_to_right', reason: 'tip_off' },
+      recorderUserId,
+      sequence: substituted.eventStream!.events.length + 1,
+      period: currentPeriod(substituted),
+      elapsedMs: 0,
+      occurredAt: after(2_000),
+    }), gameEventRegistry, gameEventProjectors)
+    expect(added.ok).toBe(false)
   })
 })
 

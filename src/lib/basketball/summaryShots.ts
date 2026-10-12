@@ -1,6 +1,7 @@
 import type { GameState, ShotRecord } from '../../types'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
-import { classifyShotZone, normalizedCourtLocationToFeet } from './courtGeometry'
+import { classifyShotZone } from './courtGeometry'
+import { basketballShotFeet } from './fullCourtGeometry'
 import {
   basketballShotDetailFromReview,
   buildBasketballTimelineReview,
@@ -73,7 +74,7 @@ export function basketballSummaryShotReview(state: GameState): BasketballSummary
     if (!detail) return []
     const shooter = event.actors.find(actor => actor.role === 'shooter') ?? event.actors[0]
     const participantId = shooter?.participantId ?? null
-    const point = event.location ? normalizedCourtLocationToFeet(event.location) : null
+    const point = event.location ? basketballShotFeet(event.location) : null
     return [{
       id: event.id,
       event,
