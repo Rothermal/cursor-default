@@ -198,8 +198,10 @@ describe('Basketball release entry guards', () => {
     const legacyReview = source('src/pages/game-summary/GameSummaryShotChartPanel.tsx')
 
     expect(livePanel).toContain("flipped={courtOrientation === 'flipped'}")
-    expect(shotEditor).toContain('flipped={basketballCourtOrientationForState(state)')
-    expect(historicalEditor).toContain('flipped={basketballCourtOrientationForState(state)')
+    for (const editor of [shotEditor, historicalEditor]) {
+      expect(editor).toContain("const flipped = basketballCourtOrientationForState(state) === 'flipped'")
+      expect(editor.match(/flipped=\{flipped\}/g)).toHaveLength(3)
+    }
     expect(eventReview).toContain('flipped={basketballCourtOrientationForState(source.state)')
     expect(legacyReview).toContain('flipped={flipped}')
   })

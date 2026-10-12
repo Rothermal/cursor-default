@@ -1,10 +1,11 @@
 import type { GameState, Player, ShotRecord, ShotZone } from '../../types'
+import { isBasketballTipOffEvent } from './courtDirectionEvents'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
-import { classifyShotZone } from './courtGeometry'
-import { basketballShotFeet } from './fullCourtGeometry'
+import { basketballCourtOrientationForState, classifyShotZone } from './courtGeometry'
+import { basketballShotFeet, basketballShownBasket, isBasketballBeyondHalfCourt } from './fullCourtGeometry'
 import { basketballHistoricalDisplayMs } from './historicalTime'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { resolveBasketballPeriodSegment } from './rules'
@@ -330,8 +331,10 @@ export function basketballShotDetailFromReview(
     teamLabel: teamLabel(state, shot.teamSide),
     resultLabel: shot.payload.made ? 'Made' : 'Missed',
     valueLabel: `${shot.payload.value} point${shot.payload.valueSource === 'manual_override' ? ' (manual)' : ''}`,
-    locationLabel: location && zone
-      ? `${zoneLabel(zone)} (${location.x.toFixed(1)}, ${location.y.toFixed(1)} ft)`
+    locationLabel: location && zone && shot.location
+      ? shot.location.attackingDirection === 'unknown'
+        ? `${zoneLabel(zone)} (${location.x.toFixed(1)}, ${location.y.toFixed(1)} ft)`
+        : `${zoneLabel(zone)} at the ${basketballShownBasket(shot.location.attackingDirection, basketballCourtOrientationForState(state))} basket (${Math.hypot(location.x, location.y).toFixed(1)} ft${isBasketballBeyondHalfCourt(shot.location) ? ', beyond half court' : ''})`
       : 'No court location',
     occurredAt: shot.occurredAt,
     relationships: related.map(item => ({
@@ -574,7 +577,7 @@ function reviewEvent(
     revised: event.revision > 1,
     removed: event.deletedAt !== null,
     recordedLater,
-    boundary: BOUNDARY_TYPES.has(event.eventType),
+    boundary: BOUNDARY_TYPES.has(event.eventType) || isBasketballTipOffEvent(event),
     relationshipLabels: relationshipsForEvent(state, event, eventsById),
     warnings: [...new Set(warnings)],
   }
@@ -713,8 +716,8 @@ function eventTitle(
     case 'basketball.match_reopened': return 'Game reopened'
     case 'basketball.attacking_direction_set': {
       const team = state.gameInfo?.teamName.trim() || 'Tracked team'
-      const basket = event.payload.trackedDirection === 'left_to_right' ? 'right' : 'left'
-      return `${event.payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'}: ${team} shoots at the ${basket} basket`
+      const basket = basketballShownBasket(event.payload.trackedDirection, basketballCourtOrientationForState(state))
+      return `${event.payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'}: ${team} at the ${basket} basket`
     }
     case 'basketball.clock_started': return 'Clock started'
     case 'basketball.clock_paused': return event.payload.source === 'expiration'

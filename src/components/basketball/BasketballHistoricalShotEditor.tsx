@@ -12,8 +12,10 @@ import {
   applyBasketballHistoricalShot,
   basketballShotActorOptions,
   basketballShotActorSelectionKey,
+  basketballShotCourtDraftText,
   buildBasketballHistoricalShotDraft,
   previewBasketballHistoricalShot,
+  reconcileBasketballShotCourtDraft,
   reconcileBasketballHistoricalShotDraftRelationships,
   type BasketballHistoricalShotDraft,
   type BasketballHistoricalShotPreview,
@@ -22,6 +24,10 @@ import {
 } from '../../lib/basketball/shotEditCommands'
 import BasketballCourt from '../shot-chart/BasketballCourt'
 import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
+import {
+  BasketballFullCourtPlacement,
+  BasketballShotAtControl,
+} from './BasketballShotCourtFields'
 import {
   BasketballEditorErrorMessage,
   BasketballEditorFrame,
@@ -96,10 +102,25 @@ export default function BasketballHistoricalShotEditor({
     timestamp: 0,
   }] : []
 
+  const flipped = basketballCourtOrientationForState(state) === 'flipped'
+  const court = draft.court
+  const located = court ? Boolean(court.point) : Boolean(draft.location)
+  const locationText = court
+    ? basketballShotCourtDraftText(court, flipped ? 'flipped' : 'standard')
+    : draft.location
+      ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
+      : 'No court location'
+  const basketMissing = Boolean(court?.point && !court.direction)
+
   const update = (changes: Partial<BasketballHistoricalShotDraft>) => {
-    setDraft(current => current
-      ? reconcileBasketballHistoricalShotDraftRelationships(state, { ...current, ...changes })
-      : current)
+    setDraft(current => {
+      if (!current) return current
+      const next = { ...current, ...changes }
+      return reconcileBasketballHistoricalShotDraftRelationships(state, {
+        ...next,
+        court: reconcileBasketballShotCourtDraft(state, next.court, next.period.id, next.teamSide),
+      })
+    })
     setPreview(null)
     setError(null)
   }
@@ -149,20 +170,28 @@ export default function BasketballHistoricalShotEditor({
       <BasketballEditorFrame title="Place shot" onClose={() => setPlacingLocation(false)} closeRef={closeRef}>
         <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted px-3 py-3">
           <div className="border-y border-line bg-surface">
-            <BasketballCourt
+            {court ? (
+              <BasketballFullCourtPlacement
+                court={court}
+                made={draft.made}
+                value={draft.value}
+                flipped={flipped}
+                onPoint={point => update({ court: { ...court, point } })}
+              />
+            ) : <BasketballCourt
               shots={marker}
               onCourtTap={(x, y) => update({ location: { x, y } })}
-              flipped={basketballCourtOrientationForState(state) === 'flipped'}
+              flipped={flipped}
               className="w-full"
               emptyHint="Tap to place"
-            />
+            />}
           </div>
           <p className="mt-3 text-center text-sm font-medium text-content-muted">
-            {draft.location ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft` : 'Tap to place the shot.'}
+            {located ? locationText : 'Tap to place the shot.'}
           </p>
         </div>
         <footer className="shrink-0 border-t border-line px-4 py-3">
-          <button type="button" onClick={() => setPlacingLocation(false)} disabled={!draft.location} className="btn-primary min-h-11 w-full disabled:bg-control-disabled disabled:text-content-disabled">Done</button>
+          <button type="button" onClick={() => setPlacingLocation(false)} disabled={!located} className="btn-primary min-h-11 w-full disabled:bg-control-disabled disabled:text-content-disabled">Done</button>
         </footer>
       </BasketballEditorFrame>
     )
@@ -242,14 +271,23 @@ export default function BasketballHistoricalShotEditor({
         </BasketballEditorSection>
 
         <BasketballEditorSection title="Court location">
-          <p className="text-sm font-medium text-content">
-            {draft.location ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft` : 'No court location'}
-          </p>
+          <p className="text-sm font-medium text-content">{locationText}</p>
+          {court?.point && (
+            <BasketballShotAtControl
+              direction={court.direction}
+              flipped={flipped}
+              onChange={direction => update({
+                court: { ...court, direction, directionSource: 'recorder' },
+              })}
+            />
+          )}
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setPlacingLocation(true)} className="btn-secondary flex min-h-11 items-center justify-center gap-2">
-              <LocateFixed size={17} aria-hidden /> {draft.location ? 'Move' : 'Locate'}
+              <LocateFixed size={17} aria-hidden /> {located ? 'Move' : 'Locate'}
             </button>
-            <button type="button" onClick={() => update({ location: null })} disabled={!draft.location} className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-danger-content disabled:bg-control-disabled disabled:text-content-disabled">
+            <button type="button" onClick={() => update(court
+              ? { court: { point: null, direction: null, directionSource: null } }
+              : { location: null })} disabled={!located} className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-danger-content disabled:bg-control-disabled disabled:text-content-disabled">
               <MapPinOff size={17} aria-hidden /> Remove
             </button>
           </div>
@@ -276,7 +314,7 @@ export default function BasketballHistoricalShotEditor({
       </div>
       <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
-        <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
+        <button type="button" onClick={requestPreview} disabled={basketMissing} className="btn-primary flex min-h-11 items-center justify-center gap-2 disabled:bg-control-disabled disabled:text-content-disabled">
           <Plus size={17} aria-hidden /> Review
         </button>
       </footer>

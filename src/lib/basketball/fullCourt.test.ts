@@ -424,8 +424,8 @@ describe('BKE-7A attacking direction', () => {
       .filter(item => item.event.eventType === 'basketball.attacking_direction_set')
       .map(item => [item.title, item.families.includes('match_control')])
     expect(titles).toEqual(expect.arrayContaining([
-      ['Tip-off: Tracked shoots at the right basket', true],
-      ['Switched ends: Tracked shoots at the left basket', true],
+      ['Tip-off: Tracked at the right basket', true],
+      ['Switched ends: Tracked at the left basket', true],
     ]))
   })
 })

@@ -40,7 +40,13 @@ import BasketballSetupRulesReview from '../components/basketball/BasketballSetup
 import BasketballOpeningLineupSetup from '../components/basketball/BasketballOpeningLineupSetup'
 import BasketballPositionField from '../components/basketball/BasketballPositionField'
 import { normalizeBasketballPosition } from '../lib/basketball/positions'
-import type { BasketballRulesField } from '../lib/basketball/types'
+import type { BasketballAttackingDirection, BasketballRulesField } from '../lib/basketball/types'
+import BasketballTipOffChoice from '../components/basketball/BasketballTipOffChoice'
+import {
+  BASKETBALL_FULL_COURT_FOR_NEW_GAMES,
+  basketballDefaultTipOffDirection,
+  basketballNewGameTipOffDirection,
+} from '../lib/basketball/fullCourtPolicy'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -75,6 +81,8 @@ export default function PlayerSetup() {
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [starting, setStarting] = useState(false)
+  // Shown as "Right basket" in the court's opening view (BKE-7 §7 Q5); set once a draft loads.
+  const [tipOffDirection, setTipOffDirection] = useState<BasketballAttackingDirection | null>(null)
   const accountScope = basketballSetupAccountScope(user?.id ?? null)
   const [basketballSetupDraft, setBasketballSetupDraft] = useState<BasketballSetupDraft | null>(
     () => loadBasketballSetupDraft(accountScope)
@@ -408,6 +416,9 @@ export default function PlayerSetup() {
     }
     const result = prepareBasketballGameStart(state, {
       recorderUserId: user?.id ?? null,
+      tipOffDirection: basketballNewGameTipOffDirection(
+        tipOffDirection ?? basketballDefaultTipOffDirection(preparedDraft.display.defaultCourtFlipped)
+      ),
       reviewedSetup: {
         rulesSnapshot: preparedDraft.event!.reviewedRules,
         rulesSource: preparedDraft.event!.reviewedRulesSource,
@@ -441,6 +452,22 @@ export default function PlayerSetup() {
     setRosterError(null)
     return true
   }
+
+  const courtOpensFlipped = Boolean(basketballSetupDraft?.display.defaultCourtFlipped)
+  const tipOffChoice = isBasketballEventIntent && BASKETBALL_FULL_COURT_FOR_NEW_GAMES &&
+    !setupReviewMissing && basketballSetupDraft?.event
+    ? (
+        <div className="mb-4">
+          <BasketballTipOffChoice
+            teamName={gameSideDisplayName(state.gameInfo, 'tracked')}
+            flipped={courtOpensFlipped}
+            value={tipOffDirection ?? basketballDefaultTipOffDirection(courtOpensFlipped)}
+            onChange={setTipOffDirection}
+            disabled={starting}
+          />
+        </div>
+      )
+    : null
 
   const continueToOpeningLineup = () => {
     if (!basketballSetupDraft || !anchoredSetup) return
@@ -627,6 +654,8 @@ export default function PlayerSetup() {
         </section>}
 
         {!setupReviewMissing && anchoredSetup && anchoredSetupStep !== 'roster' && basketballSetupDraft?.version === 2 ? (
+          <>
+          {tipOffChoice}
           <BasketballOpeningLineupSetup
             draft={basketballSetupDraft}
             busy={starting}
@@ -634,6 +663,7 @@ export default function PlayerSetup() {
             onBackToRoster={returnToRoster}
             onStart={() => { void handleStart() }}
           />
+          </>
         ) : (
           <>
         {canReadCloudRoster && (
@@ -723,6 +753,7 @@ export default function PlayerSetup() {
         )}
 
         <div className="mt-6 space-y-3">
+          {!anchoredSetup && tipOffChoice}
           {starting && (
             <p role="status" className="text-center text-sm font-semibold text-content-muted">
               Checking the latest Basketball rules...

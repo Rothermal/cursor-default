@@ -13,7 +13,7 @@ import {
   type EventCloudTransportAdapter,
   type SyncEventGameResult,
 } from '../gameEvents/cloudTransport'
-import { addGameEvent, initializeGameEventStream } from '../gameEvents/mutations'
+import { addGameEvents, initializeGameEventStream } from '../gameEvents/mutations'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialCloudSyncState } from '../gameReducer'
@@ -27,7 +27,9 @@ import {
   createBasketballSportGameState,
   normalizeBasketballSportGameState,
 } from './state'
-import type { BasketballSportGameState } from './types'
+import type { BasketballMatchEvent, BasketballSportGameState } from './types'
+import { createBasketballTipOffEvent } from './commands'
+import { basketballNewGameTipOffDirection } from './fullCourtPolicy'
 import { isBasketballEventLocalOnly } from './eventCloudPolicy'
 import {
   authorizeBasketballAnchoredCloudMutation,
@@ -314,18 +316,33 @@ export async function createBasketballIndependentRecorderState(
   }
   const occurredAt = new Date().toISOString()
   const anchored = isBasketballAnchoredCloudAuthority(shell.state)
-  const started = addGameEvent(
-    initialized.state,
-    createBasketballLifecycleEvent({
-      id: createBasketballUuid(),
-      eventType: 'basketball.period_started',
-      payload: { periodId: firstPeriod.id, captureCommandId: null },
+  const period = { id: firstPeriod.id, order: firstPeriod.order }
+  const elapsedMs = anchored ? 0 : null
+  const startEvents: BasketballMatchEvent[] = [createBasketballLifecycleEvent({
+    id: createBasketballUuid(),
+    eventType: 'basketball.period_started',
+    payload: { periodId: firstPeriod.id, captureCommandId: null },
+    recorderUserId: userId,
+    sequence: 1,
+    period,
+    elapsedMs,
+    occurredAt,
+  })]
+  // A new stream is a new full-court game; the recorder fixes the ends with Switch ends.
+  const tipOffDirection = basketballNewGameTipOffDirection()
+  if (tipOffDirection) {
+    startEvents.push(createBasketballTipOffEvent({
+      direction: tipOffDirection,
       recorderUserId: userId,
-      sequence: 1,
-      period: { id: firstPeriod.id, order: firstPeriod.order },
-      elapsedMs: anchored ? 0 : null,
+      sequence: 2,
+      period,
+      elapsedMs,
       occurredAt,
-    }),
+    }))
+  }
+  const started = addGameEvents(
+    initialized.state,
+    startEvents,
     gameEventRegistry,
     gameEventProjectors
   )
