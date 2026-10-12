@@ -84,7 +84,6 @@ export function projectBasketballEvents(
   let projection = createBasketballMatchProjection(sportState.setup)
   const statContext = createBasketballStatProjectionContext()
   const seenSequences = new Set<string>()
-  const projectedEvents: BasketballMatchEvent[] = []
   let failedEvent: BasketballMatchEvent | null = null
   let failureMessage: string | null = null
 
@@ -122,7 +121,7 @@ export function projectBasketballEvents(
 
     const next = structuredClone(projection)
     let error = isBasketballCourtEvent(event)
-      ? applyBasketballCourtEvent(next, event, projectedEvents)
+      ? applyBasketballCourtEvent(next, event, captureOrderedEvents)
       : isBasketballClockEvent(event)
       ? applyBasketballClockEvent(next, sportState, event)
       : isBasketballLineupEvent(event)
@@ -146,7 +145,6 @@ export function projectBasketballEvents(
     clearPendingBasketballStoppageAfterEvent(next, event)
     recordBasketballRunningClockMomentAfterEvent(next, event)
     projection = next
-    projectedEvents.push(event)
     registerProjectedBasketballEvent(statContext, event)
   }
 

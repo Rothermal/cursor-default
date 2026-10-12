@@ -88,7 +88,7 @@ export function isBasketballCourtEvent(
 export function applyBasketballCourtEvent(
   projection: BasketballMatchProjection,
   event: BasketballAttackingDirectionSetEvent,
-  priorEvents: readonly BasketballMatchEvent[]
+  captureOrderedEvents: readonly BasketballMatchEvent[]
 ): string | null {
   // A break belongs to no period, so a switch there would rewrite an ended period's
   // history (§3.4); the recorder switches once the next period starts.
@@ -103,8 +103,14 @@ export function applyBasketballCourtEvent(
   if (event.payload.reason === 'tip_off') {
     if (projection.court) return 'The tip-off direction is already set.'
     if (projection.periods.length !== 1) return 'The tip-off direction is set in the first period.'
-    // One frame for the whole game: nothing but the first period's start comes before it.
-    if (priorEvents.some(prior => prior.eventType !== 'basketball.period_started')) {
+    // One frame for the whole game: nothing but the first period's start was captured
+    // before it. Capture order, not replay order: a recorded-later lineup correction at
+    // elapsed zero replays ahead of the tip-off without having been captured before it.
+    const capturedBefore = captureOrderedEvents.slice(
+      0,
+      Math.max(0, captureOrderedEvents.findIndex(candidate => candidate.id === event.id))
+    )
+    if (capturedBefore.some(prior => prior.eventType !== 'basketball.period_started')) {
       return 'The tip-off direction is set before anything else is recorded.'
     }
     projection.court = {

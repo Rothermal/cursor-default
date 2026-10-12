@@ -274,7 +274,9 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   halftime rule on period start, and the §3.4 queries `basketballPeriodDirection` (a
   direction only when the period used one) and `basketballCurrentDirection`.
 - The tip-off is accepted only directly after the first period's start, before any
-  other event, so a game has one frame throughout. Switch ends is accepted only during a
+  other event in capture order, so a game has one frame throughout. Capture order, not
+  replay order: a recorded-later lineup correction at elapsed zero replays ahead of the
+  tip-off and stays valid. Switch ends is accepted only during a
   period, never in a break, so an ended period's direction history never changes.
 - Shot validation reads every court shot through `basketballShotFeet`; the projection
   rejects a full-court location in a half-court game and a half-court location in a
