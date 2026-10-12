@@ -323,6 +323,10 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   direction preselects it, otherwise Review stays disabled until a basket is chosen. Edit
   keeps the stored basket when the marker moves or the team or period changes; removing the
   location clears it; value checks re-run against the chosen basket.
+- Left and right in text follow the shown court (`basketballShownBasket`): Court ends,
+  Timeline direction rows, shot detail and the editor's location text name the basket as
+  the recorder sees it, matching the court labels, tip-off choice and Shot at control. A
+  flip never reads as switched ends; stored directions are canonical.
 - Tests (`fullCourtLive.test.ts`): start with and without a tip-off, direction stamping and
   value, side selection through Switch ends and halftime, Undo/remove of Switch ends with the
   tip-off read-only, edit basket preservation and re-check, added-shot preselection, location

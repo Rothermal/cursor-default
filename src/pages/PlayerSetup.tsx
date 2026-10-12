@@ -44,6 +44,7 @@ import type { BasketballAttackingDirection, BasketballRulesField } from '../lib/
 import BasketballTipOffChoice from '../components/basketball/BasketballTipOffChoice'
 import {
   BASKETBALL_FULL_COURT_FOR_NEW_GAMES,
+  basketballDefaultTipOffDirection,
   basketballNewGameTipOffDirection,
 } from '../lib/basketball/fullCourtPolicy'
 
@@ -416,7 +417,7 @@ export default function PlayerSetup() {
     const result = prepareBasketballGameStart(state, {
       recorderUserId: user?.id ?? null,
       tipOffDirection: basketballNewGameTipOffDirection(
-        tipOffDirection ?? defaultTipOffDirection(preparedDraft.display.defaultCourtFlipped)
+        tipOffDirection ?? basketballDefaultTipOffDirection(preparedDraft.display.defaultCourtFlipped)
       ),
       reviewedSetup: {
         rulesSnapshot: preparedDraft.event!.reviewedRules,
@@ -460,7 +461,7 @@ export default function PlayerSetup() {
           <BasketballTipOffChoice
             teamName={gameSideDisplayName(state.gameInfo, 'tracked')}
             flipped={courtOpensFlipped}
-            value={tipOffDirection ?? defaultTipOffDirection(courtOpensFlipped)}
+            value={tipOffDirection ?? basketballDefaultTipOffDirection(courtOpensFlipped)}
             onChange={setTipOffDirection}
             disabled={starting}
           />
@@ -781,9 +782,4 @@ export default function PlayerSetup() {
       </div>
     </div>
   )
-}
-
-/** The tracked team shoots at the basket on the right of the court's opening view. */
-function defaultTipOffDirection(flipped: boolean): BasketballAttackingDirection {
-  return flipped ? 'right_to_left' : 'left_to_right'
 }

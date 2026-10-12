@@ -3,7 +3,7 @@ import { ArrowLeftRight } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
 import { switchBasketballEnds } from '../../lib/basketball/commands'
-import { basketballSideDirection } from '../../lib/basketball/fullCourtView'
+import { basketballShownCourtEnds } from '../../lib/basketball/fullCourtView'
 import { gameSideDisplayName } from '../../lib/display'
 
 /**
@@ -14,10 +14,9 @@ export default function BasketballCourtEndsPanel({ disabled }: { disabled: boole
   const { state, dispatch } = useGame()
   const { user } = useAuth()
   const [error, setError] = useState<string | null>(null)
-  const tracked = basketballSideDirection(state, 'tracked')
-  if (!tracked) return null
-  const trackedBasket = tracked === 'left_to_right' ? 'right' : 'left'
-  const opponentBasket = trackedBasket === 'right' ? 'left' : 'right'
+  // Left and right as shown, so a flipped view never reads as switched ends.
+  const ends = basketballShownCourtEnds(state)
+  if (!ends) return null
   const switchEnds = () => {
     const result = switchBasketballEnds(state, { recorderUserId: user?.id ?? null })
     if (!result.ok) {
@@ -33,8 +32,8 @@ export default function BasketballCourtEndsPanel({ disabled }: { disabled: boole
         <div className="min-w-0">
           <h3 id="basketball-court-ends-title" className="text-sm font-bold text-content">Court ends</h3>
           <p className="break-words text-xs text-content-muted">
-            {gameSideDisplayName(state.gameInfo, 'tracked')}: {trackedBasket} basket.{' '}
-            {gameSideDisplayName(state.gameInfo, 'opponent')}: {opponentBasket} basket.
+            {gameSideDisplayName(state.gameInfo, 'tracked')}: {ends.tracked} basket.{' '}
+            {gameSideDisplayName(state.gameInfo, 'opponent')}: {ends.opponent} basket.
           </p>
         </div>
         <button

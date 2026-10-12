@@ -18,12 +18,13 @@ import {
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import {
+  basketballCourtOrientationForState,
   isThreePointer,
   normalizedCourtLocationToFeet,
   type BasketballCourtPoint,
 } from './courtGeometry'
 import { basketballPeriodDirection } from './courtDirectionEvents'
-import { basketballShotFeet } from './fullCourtGeometry'
+import { basketballShotFeet, basketballShownBasket } from './fullCourtGeometry'
 import { createBasketballUuid } from './id'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
@@ -306,7 +307,7 @@ export function previewBasketballHistoricalShot(
       consequenceLines: [
         `Add a ${draft.made ? 'made' : 'missed'} ${draft.value}-point field goal to ${periodLabel}.`,
         events.value[0].location
-          ? `Court location: ${basketballShotLocationText(events.value[0].location)}.`
+          ? `Court location: ${basketballShotLocationText(events.value[0].location, basketballCourtOrientationForState(state))}.`
           : 'The field goal will remain unlocated.',
         ...(relationCount > 0
           ? [`Record ${relationCount} linked related ${relationCount === 1 ? 'stat' : 'stats'}.`]
@@ -1081,19 +1082,28 @@ function shotDraftLocation(
     : normalizeBasketballCourtLocation(draft.location)
 }
 
-/** "Right basket, 23.9 ft" for full-court shots, "x, y ft" for half-court ones. */
-export function basketballShotLocationText(location: GameEventLocation): string {
+/**
+ * "Right basket, 23.9 ft" for full-court shots (the basket as shown in `orientation`),
+ * "x, y ft" for half-court ones.
+ */
+export function basketballShotLocationText(
+  location: GameEventLocation,
+  orientation: 'standard' | 'flipped' = 'standard'
+): string {
   const feet = basketballShotFeet(location)
   if (location.attackingDirection === 'unknown') return `${feet.x.toFixed(1)}, ${feet.y.toFixed(1)} ft`
-  const basket = location.attackingDirection === 'left_to_right' ? 'Right' : 'Left'
+  const basket = basketballShownBasket(location.attackingDirection, orientation) === 'right' ? 'Right' : 'Left'
   return `${basket} basket, ${Math.hypot(feet.x, feet.y).toFixed(1)} ft`
 }
 
 /** A full-court draft's spot as text: basket and distance once the basket is known. */
-export function basketballShotCourtDraftText(court: BasketballShotCourtDraft): string {
+export function basketballShotCourtDraftText(
+  court: BasketballShotCourtDraft,
+  orientation: 'standard' | 'flipped' = 'standard'
+): string {
   if (!court.point) return 'No court location'
   if (!court.direction) return 'Placed. Choose the basket below.'
-  return basketballShotLocationText({ ...court.point, attackingDirection: court.direction })
+  return basketballShotLocationText({ ...court.point, attackingDirection: court.direction }, orientation)
 }
 
 /**
@@ -1168,7 +1178,7 @@ function consequenceLines(
     const location = nextLocation.ok ? nextLocation.value : original.location
     if (!sameJson(original.location, location)) {
       lines.push(location
-        ? `Court location: ${basketballShotLocationText(location)}.`
+        ? `Court location: ${basketballShotLocationText(location, basketballCourtOrientationForState(before))}.`
         : 'Court location will be removed.')
     }
   } else {

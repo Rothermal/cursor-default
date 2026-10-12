@@ -1,9 +1,9 @@
 import type { GameState, ShotRecord } from '../../types'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
 import type { GameEventLocation } from '../gameEvents/types'
-import { COURT_WIDTH } from './courtGeometry'
+import { basketballCourtOrientationForState, COURT_WIDTH } from './courtGeometry'
 import { basketballCurrentDirection } from './courtDirectionEvents'
-import { FULL_COURT_LENGTH } from './fullCourtGeometry'
+import { basketballShownBasket, FULL_COURT_LENGTH } from './fullCourtGeometry'
 import type { BasketballAttackingDirection, BasketballTeamSide } from './types'
 
 /** A game with a tip-off direction is tracked on the full court (BKE-7 §3.2). */
@@ -19,6 +19,19 @@ export function basketballSideDirection(
 ): BasketballAttackingDirection | null {
   if (state.sportGameState?.sportId !== 'basketball') return null
   return basketballCurrentDirection(state.sportGameState.projection, side)
+}
+
+/**
+ * Each side's basket now, left or right as the court is shown (a flipped view swaps them,
+ * matching the court labels), or null for a half-court game.
+ */
+export function basketballShownCourtEnds(
+  state: GameState
+): { tracked: 'left' | 'right'; opponent: 'left' | 'right' } | null {
+  const tracked = basketballSideDirection(state, 'tracked')
+  if (!tracked) return null
+  const shown = basketballShownBasket(tracked, basketballCourtOrientationForState(state))
+  return { tracked: shown, opponent: shown === 'right' ? 'left' : 'right' }
 }
 
 /** The side attacking the basket a full-court direction points at. */

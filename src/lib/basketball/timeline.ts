@@ -4,8 +4,8 @@ import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
-import { classifyShotZone } from './courtGeometry'
-import { basketballShotFeet, isBasketballBeyondHalfCourt } from './fullCourtGeometry'
+import { basketballCourtOrientationForState, classifyShotZone } from './courtGeometry'
+import { basketballShotFeet, basketballShownBasket, isBasketballBeyondHalfCourt } from './fullCourtGeometry'
 import { basketballHistoricalDisplayMs } from './historicalTime'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { resolveBasketballPeriodSegment } from './rules'
@@ -334,7 +334,7 @@ export function basketballShotDetailFromReview(
     locationLabel: location && zone && shot.location
       ? shot.location.attackingDirection === 'unknown'
         ? `${zoneLabel(zone)} (${location.x.toFixed(1)}, ${location.y.toFixed(1)} ft)`
-        : `${zoneLabel(zone)} at the ${shot.location.attackingDirection === 'left_to_right' ? 'right' : 'left'} basket (${Math.hypot(location.x, location.y).toFixed(1)} ft${isBasketballBeyondHalfCourt(shot.location) ? ', beyond half court' : ''})`
+        : `${zoneLabel(zone)} at the ${basketballShownBasket(shot.location.attackingDirection, basketballCourtOrientationForState(state))} basket (${Math.hypot(location.x, location.y).toFixed(1)} ft${isBasketballBeyondHalfCourt(shot.location) ? ', beyond half court' : ''})`
       : 'No court location',
     occurredAt: shot.occurredAt,
     relationships: related.map(item => ({
@@ -716,7 +716,7 @@ function eventTitle(
     case 'basketball.match_reopened': return 'Game reopened'
     case 'basketball.attacking_direction_set': {
       const team = state.gameInfo?.teamName.trim() || 'Tracked team'
-      const basket = event.payload.trackedDirection === 'left_to_right' ? 'right' : 'left'
+      const basket = basketballShownBasket(event.payload.trackedDirection, basketballCourtOrientationForState(state))
       return `${event.payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'}: ${team} at the ${basket} basket`
     }
     case 'basketball.clock_started': return 'Clock started'

@@ -12,10 +12,12 @@ import {
   switchBasketballEnds,
 } from './commands'
 import { basketballLiveCaptureUnits, undoLatestBasketballCourtCapture } from './courtCorrections'
-import { isBasketballBeyondHalfCourt } from './fullCourtGeometry'
+import { basketballShownBasket, isBasketballBeyondHalfCourt } from './fullCourtGeometry'
+import { basketballDefaultTipOffDirection } from './fullCourtPolicy'
 import {
   basketballFullCourtShotLocations,
   basketballFullCourtShotRecords,
+  basketballShownCourtEnds,
   basketballSideAttacking,
   isBasketballFullCourtGame,
 } from './fullCourtView'
@@ -308,5 +310,50 @@ describe('BKE-7B live full court', () => {
       .toBe('Right basket, 63.2 ft')
     expect(basketballShotLocationText({ x: 0.5, y: 0.2, attackingDirection: 'unknown' }))
       .toMatch(/ ft$/)
+  })
+
+  describe('left and right follow the shown court (review on #486)', () => {
+    function shown(state: GameState, flipped: boolean): GameState {
+      const current = sport(state)
+      return {
+        ...state,
+        sportGameState: {
+          ...current,
+          capturePreferences: { ...current.capturePreferences, courtOrientation: flipped ? 'flipped' : 'standard' },
+        },
+      }
+    }
+
+    it.each([
+      ['left_to_right', false, 'right', 'left'],
+      ['left_to_right', true, 'left', 'right'],
+      ['right_to_left', false, 'left', 'right'],
+      ['right_to_left', true, 'right', 'left'],
+    ] as const)('tip-off %s, flipped %s: Court ends shows %s / %s', (direction, flipped, tracked, opponent) => {
+      const state = shown(started(direction), flipped)
+      expect(basketballShownCourtEnds(state)).toEqual({ tracked, opponent })
+      expect(basketballShownBasket(direction, flipped ? 'flipped' : 'standard')).toBe(tracked)
+      // Flipping is display only: the stored direction is unchanged.
+      expect(sport(state).projection.court?.trackedAttackingDirection).toBe(direction)
+      const capitalized = tracked === 'right' ? 'Right' : 'Left'
+      expect(buildBasketballTimelineReview(state).eventById.get(id(2))?.title)
+        .toBe(`Tip-off: Aces at the ${tracked} basket`)
+      expect(basketballShotLocationText(
+        { x: direction === 'left_to_right' ? 0.9 : 0.1, y: 0.5, attackingDirection: direction },
+        flipped ? 'flipped' : 'standard'
+      )).toBe(`${capitalized} basket, 6.8 ft`)
+    })
+
+    it('a flipped opening view defaults the tracked team to the basket shown on the right', () => {
+      const flippedDefault = basketballDefaultTipOffDirection(true)
+      expect(flippedDefault).toBe('right_to_left')
+      expect(basketballShownCourtEnds(shown(started(flippedDefault), true))).toEqual({ tracked: 'right', opponent: 'left' })
+      expect(basketballShownCourtEnds(shown(started(basketballDefaultTipOffDirection(false)), false)))
+        .toEqual({ tracked: 'right', opponent: 'left' })
+    })
+
+    it('half-court games have no Court ends', () => {
+      expect(basketballShownCourtEnds(started())).toBeNull()
+    })
   })
 })

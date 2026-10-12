@@ -106,7 +106,7 @@ export default function BasketballHistoricalShotEditor({
   const court = draft.court
   const located = court ? Boolean(court.point) : Boolean(draft.location)
   const locationText = court
-    ? basketballShotCourtDraftText(court)
+    ? basketballShotCourtDraftText(court, flipped ? 'flipped' : 'standard')
     : draft.location
       ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
       : 'No court location'
