@@ -63,6 +63,11 @@ export default function BasketballEventDetailDialog({
             <DetailCell label="Game clock" value={review.displayClockLabel} />
             <DetailCell label="Canonical elapsed" value={review.canonicalElapsedLabel} />
           </div>
+          {review.spotLabel && (
+            <div className="border-b border-line">
+              <DetailCell label="Court spot" value={review.spotLabel} />
+            </div>
+          )}
           <section className="border-b border-line px-4 py-4">
             <h3 className="text-xs font-semibold uppercase text-content-muted">{detailHeading(review)}</h3>
             <p className="mt-1 break-words text-sm font-semibold text-content">

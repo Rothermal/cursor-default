@@ -335,3 +335,29 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   popup, backcourt prompt, flip on and off, Court ends, after Switch ends, shot detail,
   editor and full-court placement; shared in the project files under
   `basketball-full-court/bke-7b/`.
+
+### BKE-7C (implemented)
+
+- `playLocations.ts`: rebounds, steals, blocks, turnovers and fouls entered from a
+  full-court tap keep the tap, stamped with the acting side's current direction
+  (`basketballPlayCaptureLocation`). Half-court games, grid, Lineup and dialog entries,
+  recorded-later additions and assists stay unlocated. The rebound picked in the missed-shot
+  prompt stays unlocated too: the tap marks the shot, not the rebound.
+- Validation: stat definitions take a `locationRule` (`none`, `shot`, `play`); a play may
+  carry only a known-direction location, and a foul is the one administrative event that
+  may carry one. The frame check (`basketballLocationFrameError`) now runs for every stat
+  and administrative event, so a full-court play in a half-court game is rejected.
+- Capture: the court popup adds Turnover in Event games (team or player turnover by the
+  chosen actor). Foul from the court popup carries the tap into the foul dialog.
+- Review: the Timeline detail shows "Court spot: 2.1 ft from the right basket" (the
+  nearer basket as the court is shown). The related-event and foul editors show a Court
+  spot section with Move (full-court placement) and Remove for located plays. Moving the
+  spot or changing the team keeps the stored direction; Remove clears the location. The
+  review lists the spot change.
+- No migration, no schema bump; the server ignores event locations.
+- Tests (`fullCourtPlays.test.ts`): stamping per side and after Switch ends, unlocated
+  assists, grid entries and half-court games, located fouls, rejection of half-court-frame
+  plays and frame mixing, Undo, edit move/clear with direction kept, recorded-later fouls,
+  flip-aware spot text.
+- Phone screenshots (375 px, Chromium): popup with Turnover, steal detail with its spot,
+  editor and Move placement; in the project files under `basketball-full-court/bke-7c/`.

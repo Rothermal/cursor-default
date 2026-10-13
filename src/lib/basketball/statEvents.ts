@@ -70,12 +70,12 @@ export function createBasketballStatEvent<
 
 export const basketballStatEventDefinitions: GameEventDefinition<GameEvent>[] = [
   statDefinition('basketball.free_throw_trip', validateFreeThrowTrip, [], []),
-  statDefinition('basketball.shot', validateShot, ['shooter'], ['shooter'], true),
+  statDefinition('basketball.shot', validateShot, ['shooter'], ['shooter'], 'shot'),
   statDefinition('basketball.assist', validateRelatedEvent, ['assister'], ['assister']),
-  statDefinition('basketball.rebound', validateRebound, ['rebounder'], ['rebounder']),
-  statDefinition('basketball.steal', validateRelatedEvent, ['stealer', 'turnover_by'], ['stealer']),
-  statDefinition('basketball.block', validateRelatedEvent, ['blocker'], ['blocker']),
-  statDefinition('basketball.turnover', validateTurnover, ['committed_by'], ['committed_by']),
+  statDefinition('basketball.rebound', validateRebound, ['rebounder'], ['rebounder'], 'play'),
+  statDefinition('basketball.steal', validateRelatedEvent, ['stealer', 'turnover_by'], ['stealer'], 'play'),
+  statDefinition('basketball.block', validateRelatedEvent, ['blocker'], ['blocker'], 'play'),
+  statDefinition('basketball.turnover', validateTurnover, ['committed_by'], ['committed_by'], 'play'),
   statDefinition('basketball.score_adjustment', validateScoreAdjustment, ['team'], ['team']),
 ]
 
@@ -84,7 +84,8 @@ function statDefinition(
   validatePayload: (payload: JsonObject) => boolean,
   allowedRoles: string[],
   requiredRoles: string[],
-  allowLocation = false
+  // Shots use either frame; located plays (BKE-7C) only the full court.
+  locationRule: 'none' | 'shot' | 'play' = 'none'
 ): GameEventDefinition<GameEvent> {
   return {
     sportId: 'basketball',
@@ -95,7 +96,8 @@ function statDefinition(
         event.sportId !== 'basketball' ||
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
-        (!allowLocation && event.location !== null) ||
+        (locationRule === 'none' && event.location !== null) ||
+        (locationRule === 'play' && event.location?.attackingDirection === 'unknown') ||
         !actorsHaveRoles(event.actors, allowedRoles, requiredRoles) ||
         !actorsMatchEventFamily(eventType, event) ||
         !validRecordedLaterFlag(event.payload.recordedLater) ||

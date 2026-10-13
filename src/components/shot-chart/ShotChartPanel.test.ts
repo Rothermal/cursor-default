@@ -66,7 +66,7 @@ describe('ShotChartPanel legacy capture wiring', () => {
     const administrative = vi.fn()
     const entry = findElement<Parameters<typeof CourtEventPopup>[0]>(renderPanel({ kind: 'all' }, administrative), CourtEventPopup)!
     entry.props.onAdministrative?.('foul')
-    expect(administrative).toHaveBeenCalledWith('foul', 'tracked')
+    expect(administrative).toHaveBeenCalledWith('foul', 'tracked', null)
     expect(harness.dispatch).not.toHaveBeenCalled()
     expect(findElement(renderPanel(), CourtEventPopup)).toBeUndefined()
   })

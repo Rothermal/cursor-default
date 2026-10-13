@@ -12,7 +12,8 @@ const COURT_STAT_EVENTS = [
   { statId: 'stl', label: 'Steal' }, { statId: 'blk', label: 'Block' },
   { statId: 'ast', label: 'Assist' },
 ] as const
-type CourtStatEventId = (typeof COURT_STAT_EVENTS)[number]['statId']
+const TURNOVER_EVENT = { statId: 'to', label: 'Turnover' } as const
+type CourtStatEventId = (typeof COURT_STAT_EVENTS)[number]['statId'] | typeof TURNOVER_EVENT.statId
 export interface CourtReboundChoice { statId: ReboundStatId; playerId: string }
 export type CourtEvent =
   | { kind: 'shot'; made: boolean; shotType: '2pt' | '3pt'; assistPlayerId?: string; rebound?: CourtReboundChoice }
@@ -32,6 +33,8 @@ interface CourtEventPopupProps {
   errorMessage?: string | null
   shotDisabledMessage?: string | null
   onAdministrative?: (kind: 'foul' | 'free_throw') => void
+  /** Event games log a turnover from the court too (BKE-7C). */
+  turnoverAvailable?: boolean
   /** Full court: both teams, so the recorder can change the team the tapped half chose. */
   sideOptions?: Array<{ side: 'home' | 'opponent'; label: string }>
   onSelectSide?: (side: 'home' | 'opponent') => void
@@ -47,7 +50,7 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
   playerLabels,
   captureSide, onSelectPlayer, reboundPromptAfterMissEnabled = false, shotType,
   onShotTypeChange, errorMessage, shotDisabledMessage, onAdministrative, sideOptions, onSelectSide,
-  backcourtPrompt, onPick, onCancel,
+  backcourtPrompt, turnoverAvailable = false, onPick, onCancel,
 }: CourtEventPopupProps) {
   const [value, setValue] = useState(shotType)
   const [step, setStep] = useState<'event' | 'assist' | 'rebound'>('event')
@@ -139,7 +142,7 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
               } else shot(false)
             })}>Missed</button>
         </div>
-        <div className="grid grid-cols-3 gap-2">{COURT_STAT_EVENTS.map(({ statId, label }) => <button key={statId} type="button"
+        <div className="grid grid-cols-3 gap-2">{[...COURT_STAT_EVENTS, ...(turnoverAvailable ? [TURNOVER_EVENT] : [])].map(({ statId, label }) => <button key={statId} type="button"
           className="min-h-11 rounded-lg border border-line bg-control px-1 text-sm font-semibold text-content"
           onClick={() => guarded(() => onPick({ kind: 'stat', statId }))}>{label}</button>)}</div>
         {onAdministrative && <div className="grid grid-cols-2 gap-2">

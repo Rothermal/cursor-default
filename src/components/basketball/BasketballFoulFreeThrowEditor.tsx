@@ -17,6 +17,8 @@ import {
   type BasketballRelationshipOption,
 } from '../../lib/basketball/foulFreeThrowEditCommands'
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
+import { basketballCourtOrientationForState } from '../../lib/basketball/courtGeometry'
+import BasketballPlaySpotSection from './BasketballPlaySpotSection'
 import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
 import { gameSideDisplayName } from '../../lib/display'
@@ -216,6 +218,14 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
             trackedLabel={trackedLabel}
             opponentLabel={opponentLabel}
             addMode={props.mode === 'add'}
+          />
+        )}
+
+        {draft.eventType === 'basketball.foul' && draft.spot && (
+          <BasketballPlaySpotSection
+            spot={draft.spot}
+            flipped={basketballCourtOrientationForState(state) === 'flipped'}
+            onChange={spot => update({ spot })}
           />
         )}
 

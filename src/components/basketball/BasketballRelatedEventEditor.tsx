@@ -13,6 +13,8 @@ import {
   type BasketballRelatedEventEditPreview,
 } from '../../lib/basketball/relatedEventEditCommands'
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
+import { basketballCourtOrientationForState } from '../../lib/basketball/courtGeometry'
+import BasketballPlaySpotSection from './BasketballPlaySpotSection'
 import {
   BasketballEditorErrorMessage,
   BasketballEditorFrame,
@@ -125,6 +127,7 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
           <BasketballEditorSelectField label="Linked event" value={effectiveDraft.relatedEventId ?? 'none'} options={targetOptions.map(option => ({ value: option.eventId ?? 'none', label: option.label }))} onChange={value => update({ relatedEventId: value === 'none' ? null : value })} />
           <p className="text-xs text-content-subtle">Standalone stats keep their totals.</p>
         </BasketballEditorSection>
+        {draft.spot && <BasketballPlaySpotSection spot={draft.spot} flipped={basketballCourtOrientationForState(state) === 'flipped'} onChange={spot => update({ spot })} />}
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
       <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3"><button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button><button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2"><Pencil size={16} aria-hidden />Review</button></footer>

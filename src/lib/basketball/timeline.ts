@@ -10,6 +10,7 @@ import { basketballHistoricalDisplayMs } from './historicalTime'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { resolveBasketballPeriodSegment } from './rules'
 import { orderBasketballEventsForProjection } from './lineupReplay'
+import { BASKETBALL_LOCATED_PLAY_TYPES, basketballPlaySpotText } from './playLocations'
 import type {
   BasketballMatchEvent,
   BasketballShotEvent,
@@ -83,6 +84,8 @@ export interface BasketballTimelineEventReview {
   recordedLater: boolean
   boundary: boolean
   relationshipLabels: string[]
+  /** Where a located play happened, as the court is shown (BKE-7C); null for other events. */
+  spotLabel: string | null
   warnings: string[]
 }
 
@@ -579,8 +582,15 @@ function reviewEvent(
     recordedLater,
     boundary: BOUNDARY_TYPES.has(event.eventType) || isBasketballTipOffEvent(event),
     relationshipLabels: relationshipsForEvent(state, event, eventsById),
+    spotLabel: playSpotLabel(state, event),
     warnings: [...new Set(warnings)],
   }
+}
+
+function playSpotLabel(state: GameState, event: BasketballMatchEvent): string | null {
+  if (!BASKETBALL_LOCATED_PLAY_TYPES.has(event.eventType)) return null
+  if (!event.location || event.location.attackingDirection === 'unknown') return null
+  return basketballPlaySpotText(event.location, basketballCourtOrientationForState(state))
 }
 
 function groupReviews(
