@@ -1,11 +1,12 @@
 import type { GameState, ShotRecord } from '../../types'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
-import { classifyShotZone } from './courtGeometry'
+import { basketballCourtOrientationForState, classifyShotZone } from './courtGeometry'
 import { basketballShotFeet } from './fullCourtGeometry'
 import { basketballFullCourtFeet } from './fullCourtView'
-import { basketballSummaryCourtPoint, basketballSummaryHalfCourtPoint } from './summaryCourt'
+import { basketballSummaryCourtLocation, basketballSummaryHalfCourtPoint } from './summaryCourt'
 import {
   basketballShotDetailFromReview,
+  basketballShotLocationLabel,
   buildBasketballTimelineReview,
   type BasketballShotDetailModel,
   type BasketballTimelinePeriodOption,
@@ -39,6 +40,7 @@ export interface BasketballSummaryShot {
   fullCourtMarker: ShotRecord | null
   /** Located past the midcourt line from its basket (§3.5); counted, not drawn on the half court. */
   beyondHalfCourt: boolean
+  /** Shot detail whose location text describes the summary court position. */
   detail: BasketballShotDetailModel
   teamSide: BasketballTeamSide
   participantId: string | null
@@ -66,6 +68,7 @@ export const DEFAULT_BASKETBALL_SUMMARY_SHOT_FILTERS: BasketballSummaryShotFilte
 
 export function basketballSummaryShotReview(state: GameState): BasketballSummaryShotReview {
   const timeline = buildBasketballTimelineReview(state, { groupOrder: 'oldest_first' })
+  const orientation = basketballCourtOrientationForState(state)
   const fieldGoals = timeline.activeGroups
     .flatMap(group => group.events)
     .filter(review =>
@@ -77,14 +80,20 @@ export function basketballSummaryShotReview(state: GameState): BasketballSummary
   const shots = fieldGoals.flatMap(review => {
     const event = review.event as BasketballShotEvent
     if (event.payload.value !== 2 && event.payload.value !== 3) return []
-    const detail = basketballShotDetailFromReview(state, timeline, event.id)
-    if (!detail) return []
+    const recorded = basketballShotDetailFromReview(state, timeline, event.id)
+    if (!recorded) return []
     const shooter = event.actors.find(actor => actor.role === 'shooter') ?? event.actors[0]
     const participantId = shooter?.participantId ?? null
     const point = event.location ? basketballSummaryHalfCourtPoint(event.location) : null
     const feet = event.location ? basketballShotFeet(event.location) : null
     const side = event.teamSide === 'opponent' ? 'opponent' : 'tracked'
-    const full = event.location ? basketballFullCourtFeet(basketballSummaryCourtPoint(event.location, side)) : null
+    const summaryLocation = event.location ? basketballSummaryCourtLocation(event.location, side) : null
+    const full = summaryLocation ? basketballFullCourtFeet(summaryLocation) : null
+    // Summary-only text: the location as the summary court shows it, never the stored frame.
+    const detail: BasketballShotDetailModel = {
+      ...recorded,
+      locationLabel: basketballShotLocationLabel(summaryLocation, orientation),
+    }
     const record = (at: { x: number; y: number }): ShotRecord => ({
       id: event.id,
       playerId: participantId ?? `team:${event.teamSide}`,

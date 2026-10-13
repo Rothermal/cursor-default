@@ -379,11 +379,19 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   stay on the Timeline.
 - Every Summary source (this device, cloud primary, another recording, the published
   game) reads the same way: locations travel in the event rows as before.
+- Summary text follows the summary court (review of PR #488): the Plays list, play detail
+  Court spot and shot detail location are worded from the summary point and its summary
+  direction (`basketballSummaryCourtLocation`) with the game's flip, so they name the
+  basket the mark is drawn at. The stored events, Timeline and live text, fingerprints and
+  correction coordinates keep the recorded frame (`basketballShotLocationLabel` in
+  `timeline.ts` serves both).
 - `BASKETBALL_FULL_COURT_FOR_NEW_GAMES` (`fullCourtPolicy.ts`, from BKE-7B) stays the
   rollback switch.
 - Tests (`fullCourtSummary.test.ts`): frame turns for both sides, older half-court shots,
   full-court and half-court markers, a heave beyond half court counted but not drawn on the
   half court, plays with filters, assists and unlocated plays left off, half-court games
-  without plays. `releaseEntryGuards.test.ts` checks both views and the Plays map follow
+  without plays, and the text matrix (both sides, both stored directions, flip off and on:
+  marker, list and detail agree; Timeline text and stored locations unchanged).
+  `releaseEntryGuards.test.ts` checks both views and the Plays map follow
   the flip.
 - Regression record: `docs/REGRESSION_BKE_7_FULL_COURT.md`.

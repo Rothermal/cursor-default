@@ -1,9 +1,9 @@
 import type { GameState } from '../../types'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventLocation } from '../gameEvents/types'
-import { HALFCOURT_Y } from './courtGeometry'
+import { basketballCourtOrientationForState, HALFCOURT_Y } from './courtGeometry'
 import { basketballFullCourtLocation, basketballShotFeet } from './fullCourtGeometry'
-import { BASKETBALL_LOCATED_PLAY_TYPES } from './playLocations'
+import { BASKETBALL_LOCATED_PLAY_TYPES, basketballPlaySpotText } from './playLocations'
 import {
   buildBasketballTimelineReview,
   type BasketballTimelineEventReview,
@@ -39,6 +39,17 @@ export function basketballSummaryCourtPoint(
 }
 
 /**
+ * The same point as a location on the summary court, aimed at the side's summary basket.
+ * Summary text reads this, never the stored location, so words match the marker.
+ */
+export function basketballSummaryCourtLocation(
+  location: Pick<GameEventLocation, 'x' | 'y' | 'attackingDirection'>,
+  side: BasketballTeamSide
+): GameEventLocation {
+  return { ...basketballSummaryCourtPoint(location, side), attackingDirection: BASKETBALL_SUMMARY_DIRECTIONS[side] }
+}
+
+/**
  * Rim-relative half-court feet for the Half court view, or null for a shot beyond half
  * court (§3.5): points are folded onto one basket, never clamped or moved.
  */
@@ -65,6 +76,7 @@ export const BASKETBALL_SUMMARY_PLAY_KINDS: Array<{ kind: BasketballSummaryPlayK
 export interface BasketballSummaryPlay {
   id: string
   kind: BasketballSummaryPlayKind
+  /** The Timeline review with its court spot text describing `point` as shown. */
   review: BasketballTimelineEventReview
   teamSide: BasketballTeamSide
   participantId: string | null
@@ -98,6 +110,7 @@ export interface BasketballSummaryPlayReview {
 /** Active located plays (BKE-7C) in capture order, for the Plays map. */
 export function basketballSummaryPlayReview(state: GameState): BasketballSummaryPlayReview {
   const timeline = buildBasketballTimelineReview(state, { groupOrder: 'oldest_first' })
+  const orientation = basketballCourtOrientationForState(state)
   const plays = timeline.activeGroups
     .flatMap(group => group.events)
     .filter(review => BASKETBALL_LOCATED_PLAY_TYPES.has(review.event.eventType))
@@ -108,16 +121,18 @@ export function basketballSummaryPlayReview(state: GameState): BasketballSummary
       const side = event.teamSide
       if (!location || location.attackingDirection === 'unknown') return []
       if (side !== 'tracked' && side !== 'opponent') return []
+      const summaryLocation = basketballSummaryCourtLocation(location, side)
       return [{
         id: event.id,
         kind: playKind(event),
-        review,
+        // Summary-only text: the stored event and the Timeline review stay as recorded.
+        review: { ...review, spotLabel: basketballPlaySpotText(summaryLocation, orientation) },
         teamSide: side,
         participantId: event.actors[0]?.participantId ?? null,
         participantLabel: review.actorLabel,
         periodId: event.period.id,
         periodLabel: review.periodLabel,
-        point: basketballSummaryCourtPoint(location, side),
+        point: { x: summaryLocation.x, y: summaryLocation.y },
       } satisfies BasketballSummaryPlay]
     })
   const participantIds = new Set(plays.flatMap(play => play.participantId ? [play.participantId] : []))
