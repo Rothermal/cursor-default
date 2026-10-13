@@ -2,6 +2,8 @@ import type { GameState, ShotRecord } from '../../types'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { classifyShotZone } from './courtGeometry'
 import { basketballShotFeet } from './fullCourtGeometry'
+import { basketballFullCourtFeet } from './fullCourtView'
+import { basketballSummaryCourtPoint, basketballSummaryHalfCourtPoint } from './summaryCourt'
 import {
   basketballShotDetailFromReview,
   buildBasketballTimelineReview,
@@ -31,7 +33,12 @@ export interface BasketballSummaryShotParticipant {
 export interface BasketballSummaryShot {
   id: string
   event: BasketballShotEvent
+  /** Half court view: rim-relative feet, or null when unlocated or beyond half court. */
   marker: ShotRecord | null
+  /** Full court view: summary-frame feet (tracked attacks right), or null when unlocated. */
+  fullCourtMarker: ShotRecord | null
+  /** Located past the midcourt line from its basket (§3.5); counted, not drawn on the half court. */
+  beyondHalfCourt: boolean
   detail: BasketballShotDetailModel
   teamSide: BasketballTeamSide
   participantId: string | null
@@ -74,20 +81,26 @@ export function basketballSummaryShotReview(state: GameState): BasketballSummary
     if (!detail) return []
     const shooter = event.actors.find(actor => actor.role === 'shooter') ?? event.actors[0]
     const participantId = shooter?.participantId ?? null
-    const point = event.location ? basketballShotFeet(event.location) : null
+    const point = event.location ? basketballSummaryHalfCourtPoint(event.location) : null
+    const feet = event.location ? basketballShotFeet(event.location) : null
+    const side = event.teamSide === 'opponent' ? 'opponent' : 'tracked'
+    const full = event.location ? basketballFullCourtFeet(basketballSummaryCourtPoint(event.location, side)) : null
+    const record = (at: { x: number; y: number }): ShotRecord => ({
+      id: event.id,
+      playerId: participantId ?? `team:${event.teamSide}`,
+      timestamp: event.sequence,
+      made: event.payload.made,
+      x: at.x,
+      y: at.y,
+      shotType: event.payload.value === 3 ? '3pt' : '2pt',
+      zone: classifyShotZone(feet!.x, feet!.y),
+    })
     return [{
       id: event.id,
       event,
-      marker: point ? {
-        id: event.id,
-        playerId: participantId ?? `team:${event.teamSide}`,
-        timestamp: event.sequence,
-        made: event.payload.made,
-        x: point.x,
-        y: point.y,
-        shotType: event.payload.value === 3 ? '3pt' : '2pt',
-        zone: classifyShotZone(point.x, point.y),
-      } : null,
+      marker: point ? record(point) : null,
+      fullCourtMarker: full ? record(full) : null,
+      beyondHalfCourt: Boolean(event.location && !point),
       detail,
       teamSide: event.teamSide,
       participantId,

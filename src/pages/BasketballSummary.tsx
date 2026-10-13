@@ -8,6 +8,7 @@ import BasketballSummaryHeader from '../components/basketball-summary/Basketball
 import BasketballSummaryClockStatus from '../components/basketball-summary/BasketballSummaryClockStatus'
 import BasketballSummaryTabs from '../components/basketball-summary/BasketballSummaryTabs'
 import BasketballShotReview from '../components/basketball-summary/BasketballShotReview'
+import BasketballPlaysMap from '../components/basketball-summary/BasketballPlaysMap'
 import BasketballTeamStats from '../components/basketball-summary/BasketballTeamStats'
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
 import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
@@ -30,6 +31,7 @@ import {
 } from '../lib/basketball/summarySource'
 import type { BasketballMatchEvent } from '../lib/basketball/types'
 import { basketballSummaryQualityReview } from '../lib/basketball/summaryDetails'
+import { basketballSummaryPlayReview } from '../lib/basketball/summaryCourt'
 
 export default function BasketballSummary() {
   const navigate = useNavigate()
@@ -200,6 +202,7 @@ export default function BasketballSummary() {
   )
   const result = basketballSummaryResult(sportState.projection)
   const quality = healthy ? basketballSummaryQualityReview(source.state) : null
+  const hasLocatedPlays = healthy && basketballSummaryPlayReview(source.state).plays.length > 0
 
   return (
     <div className="min-h-screen bg-surface-muted">
@@ -212,6 +215,7 @@ export default function BasketballSummary() {
       />
       <BasketballSummaryTabs
         activeTab={query.tab}
+        showPlays={hasLocatedPlays}
         onChange={tab => navigate(basketballSummaryPath({
           gameId: query.gameId,
           tab,
@@ -284,6 +288,8 @@ export default function BasketballSummary() {
         />
       ) : healthy && query.tab === 'shots' ? (
         <BasketballShotReview key={sourceKey(source)} source={source} />
+      ) : healthy && query.tab === 'plays' ? (
+        <BasketballPlaysMap key={sourceKey(source)} source={source} />
       ) : healthy && query.tab === 'team' ? (
         <BasketballTeamStats key={sourceKey(source)} source={source} />
       ) : healthy ? (
