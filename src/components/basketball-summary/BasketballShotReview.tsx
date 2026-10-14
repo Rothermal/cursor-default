@@ -15,6 +15,8 @@ import {
   type BasketballShotDetailModel,
 } from '../../lib/basketball/timeline'
 import BasketballCourt from '../shot-chart/BasketballCourt'
+import BasketballFullCourt from '../shot-chart/BasketballFullCourt'
+import { isBasketballFullCourtGame } from '../../lib/basketball/fullCourtView'
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
 import BasketballShotEditor from '../basketball/BasketballShotEditor'
 import BasketballTimelineCorrectionDialog, {
@@ -45,9 +47,17 @@ export default function BasketballShotReview({ source }: Props) {
     () => filterBasketballSummaryShots(review, filters),
     [filters, review]
   )
-  const locatedShots = filteredShots.filter(shot => shot.marker)
-  const markers = locatedShots.map(shot => shot.marker!)
-  const unlocatedShots = filteredShots.filter(shot => !shot.marker)
+  // Full court is the default for full-court games (§7 Q2); older games open as before.
+  const [view, setView] = useState<'full' | 'half'>(() => isBasketballFullCourtGame(source.state) ? 'full' : 'half')
+  const locatedShots = filteredShots.filter(shot => shot.fullCourtMarker)
+  const markers = view === 'full'
+    ? locatedShots.map(shot => shot.fullCourtMarker!)
+    : locatedShots.flatMap(shot => shot.marker ? [shot.marker] : [])
+  const beyondShots = view === 'half' ? locatedShots.filter(shot => shot.beyondHalfCourt) : []
+  const unlocatedShots = filteredShots.filter(shot => !shot.fullCourtMarker)
+  const flipped = basketballCourtOrientationForState(source.state) === 'flipped'
+  const trackedName = source.state.gameInfo?.teamName || 'Tracked'
+  const opponentName = source.state.gameInfo?.opponentName || 'Opponent'
   const shotById = useMemo(
     () => new Map(review.shots.map(shot => [shot.id, shot])),
     [review.shots]
@@ -55,6 +65,14 @@ export default function BasketballShotReview({ source }: Props) {
   const correctionsEnabled = source.kind === 'local' && source.editable &&
     basketballTimelineCorrectionsEnabled(source.state, true)
   const made = filteredShots.filter(shot => shot.made).length
+
+  const markerTone = (marker: ShotRecord) => shotById.get(marker.id)?.teamSide ?? null
+  const markerLabel = (marker: ShotRecord) => {
+    const shot = shotById.get(marker.id)
+    return shot
+      ? `View ${shot.detail.ordinalLabel}, ${shot.participantLabel}, ${shot.made ? 'made' : 'missed'} ${shot.value} point shot`
+      : 'View shot detail'
+  }
 
   const rememberFocus = useCallback((element?: FocusTarget | null) => {
     returnFocusRef.current = element ?? (
@@ -228,19 +246,41 @@ export default function BasketballShotReview({ source }: Props) {
           <span>Circle = made</span>
           <span>X = missed</span>
         </div>
-        <BasketballCourt
-          shots={markers}
-          flipped={basketballCourtOrientationForState(source.state) === 'flipped'}
-          onMarkerActivate={activateMarker}
-          markerTone={marker => shotById.get(marker.id)?.teamSide ?? null}
-          markerLabel={marker => {
-            const shot = shotById.get(marker.id)
-            return shot
-              ? `View ${shot.detail.ordinalLabel}, ${shot.participantLabel}, ${shot.made ? 'made' : 'missed'} ${shot.value} point shot`
-              : 'View shot detail'
-          }}
-          className="w-full"
-        />
+        <div className="mb-3 grid grid-cols-2 rounded-md border border-line-strong bg-control p-0.5" role="group" aria-label="Court view">
+          {([['full', 'Full court'], ['half', 'Half court']] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value)}
+              aria-pressed={view === value}
+              className={`min-h-10 rounded px-2 text-xs font-bold ${
+                view === value ? 'bg-surface text-content shadow-sm' : 'text-content-muted'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {view === 'full' ? (
+          <BasketballFullCourt
+            shots={markers}
+            flipped={flipped}
+            labels={{ left: opponentName, right: trackedName }}
+            onMarkerActivate={activateMarker}
+            markerTone={markerTone}
+            markerLabel={markerLabel}
+            className="w-full"
+          />
+        ) : (
+          <BasketballCourt
+            shots={markers}
+            flipped={flipped}
+            onMarkerActivate={activateMarker}
+            markerTone={markerTone}
+            markerLabel={markerLabel}
+            className="w-full"
+          />
+        )}
         {markers.length === 0 && (
           <div className="py-5 text-center text-sm text-content-subtle">
             <CircleDot className="mx-auto text-content" size={24} aria-hidden />
@@ -249,6 +289,15 @@ export default function BasketballShotReview({ source }: Props) {
         )}
       </section>
 
+      {beyondShots.length > 0 && (
+        <ShotList
+          title="Beyond half court"
+          shots={beyondShots}
+          emptyMessage=""
+          onOpen={openDetail}
+          note="Counted in totals; switch to Full court to see where they were taken."
+        />
+      )}
       <ShotList
         title="Located shots"
         shots={locatedShots}
@@ -349,12 +398,14 @@ function ShotList({
   emptyMessage,
   onOpen,
   unlocated = false,
+  note,
 }: {
   title: string
   shots: BasketballSummaryShot[]
   emptyMessage: string
   onOpen: (shot: BasketballSummaryShot, trigger?: HTMLElement | null) => void
   unlocated?: boolean
+  note?: string
 }) {
   return (
     <section className="border-b border-line bg-surface px-4 py-4">
@@ -367,6 +418,7 @@ function ShotList({
           <MapPinOff size={14} aria-hidden /> These attempts count in totals but have no court marker.
         </p>
       )}
+      {note && <p className="mt-1 text-xs font-medium text-content-muted">{note}</p>}
       {shots.length === 0 ? (
         <p className="py-5 text-center text-sm text-content-subtle">{emptyMessage}</p>
       ) : (

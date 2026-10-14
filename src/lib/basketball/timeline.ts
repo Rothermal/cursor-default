@@ -3,7 +3,7 @@ import { isBasketballTipOffEvent } from './courtDirectionEvents'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
-import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
+import type { GameEventActor, GameEventDiagnostic, GameEventLocation } from '../gameEvents/types'
 import { basketballCourtOrientationForState, classifyShotZone } from './courtGeometry'
 import { basketballShotFeet, basketballShownBasket, isBasketballBeyondHalfCourt } from './fullCourtGeometry'
 import { basketballHistoricalDisplayMs } from './historicalTime'
@@ -293,6 +293,22 @@ export function basketballShotDetailForEvent(
   return basketballShotDetailFromReview(state, review, eventId)
 }
 
+/**
+ * Detail text for a shot location. A full-court location names its basket as shown, so
+ * the flip changes left and right (BKE-7B). Summary passes its own frame (BKE-7D).
+ */
+export function basketballShotLocationLabel(
+  location: GameEventLocation | null | undefined,
+  orientation: 'standard' | 'flipped' = 'standard'
+): string {
+  if (!location) return 'No court location'
+  const feet = basketballShotFeet(location)
+  const zone = classifyShotZone(feet.x, feet.y)
+  return location.attackingDirection === 'unknown'
+    ? `${zoneLabel(zone)} (${feet.x.toFixed(1)}, ${feet.y.toFixed(1)} ft)`
+    : `${zoneLabel(zone)} at the ${basketballShownBasket(location.attackingDirection, orientation)} basket (${Math.hypot(feet.x, feet.y).toFixed(1)} ft${isBasketballBeyondHalfCourt(location) ? ', beyond half court' : ''})`
+}
+
 export function basketballShotDetailFromReview(
   state: GameState,
   review: BasketballTimelineReview,
@@ -320,8 +336,6 @@ export function basketballShotDetailFromReview(
   const related = allReviews.filter(item =>
     isRelatedStat(item.event) && item.event.payload.relatedEventId === shot.id
   )
-  const location = shot.location ? basketballShotFeet(shot.location) : null
-  const zone = location ? classifyShotZone(location.x, location.y) : null
 
   return {
     source: 'event',
@@ -334,11 +348,7 @@ export function basketballShotDetailFromReview(
     teamLabel: teamLabel(state, shot.teamSide),
     resultLabel: shot.payload.made ? 'Made' : 'Missed',
     valueLabel: `${shot.payload.value} point${shot.payload.valueSource === 'manual_override' ? ' (manual)' : ''}`,
-    locationLabel: location && zone && shot.location
-      ? shot.location.attackingDirection === 'unknown'
-        ? `${zoneLabel(zone)} (${location.x.toFixed(1)}, ${location.y.toFixed(1)} ft)`
-        : `${zoneLabel(zone)} at the ${basketballShownBasket(shot.location.attackingDirection, basketballCourtOrientationForState(state))} basket (${Math.hypot(location.x, location.y).toFixed(1)} ft${isBasketballBeyondHalfCourt(shot.location) ? ', beyond half court' : ''})`
-      : 'No court location',
+    locationLabel: basketballShotLocationLabel(shot.location, basketballCourtOrientationForState(state)),
     occurredAt: shot.occurredAt,
     relationships: related.map(item => ({
       id: item.id,

@@ -1,7 +1,7 @@
 import type { GameState } from '../../types'
 import type { BasketballMatchEvent, BasketballMatchProjection } from './types'
 
-export type BasketballSummaryTab = 'overview' | 'players' | 'timeline' | 'shots' | 'team'
+export type BasketballSummaryTab = 'overview' | 'players' | 'timeline' | 'shots' | 'plays' | 'team'
 export type BasketballSummaryFrom = 'tracker' | 'games' | 'game-info' | 'team' | 'sport'
 
 export interface BasketballSummaryQuery {
@@ -68,7 +68,7 @@ export interface BasketballMatchLeader {
   leaders: BasketballLeaderEntry[]
 }
 
-const SHIPPED_TABS = new Set<BasketballSummaryTab>(['overview', 'players', 'timeline', 'shots', 'team'])
+const SHIPPED_TABS = new Set<BasketballSummaryTab>(['overview', 'players', 'timeline', 'shots', 'plays', 'team'])
 const VALID_FROM = new Set<BasketballSummaryFrom>([
   'tracker',
   'games',

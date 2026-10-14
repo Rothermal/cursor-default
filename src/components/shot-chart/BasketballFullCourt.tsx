@@ -31,6 +31,16 @@ export interface BasketballFullCourtLabels {
   right: string | null
 }
 
+/** A located play (BKE-7D Plays map), in full-court feet (canonical). */
+export interface BasketballCourtPlayMarker {
+  id: string
+  x: number
+  y: number
+  letter: string
+  tone: 'tracked' | 'opponent'
+  label: string
+}
+
 interface BasketballFullCourtProps {
   /** Shots in full-court feet (canonical). */
   shots: ShotRecord[]
@@ -50,6 +60,8 @@ interface BasketballFullCourtProps {
   labels?: BasketballFullCourtLabels
   /** Turn the drawing half a turn; stored points never change. */
   flipped?: boolean
+  plays?: BasketballCourtPlayMarker[]
+  onPlayActivate?: (play: BasketballCourtPlayMarker, marker: SVGGElement) => void
 }
 
 export default function BasketballFullCourt({
@@ -63,6 +75,8 @@ export default function BasketballFullCourt({
   markerLabel,
   labels,
   flipped = false,
+  plays = [],
+  onPlayActivate,
 }: BasketballFullCourtProps) {
   const courtTransform = flipped ? `rotate(180 ${CENTER_X} ${CENTER_Y})` : undefined
   const canonicalFeet = (point: { x: number; y: number }) => flipped
@@ -142,6 +156,43 @@ export default function BasketballFullCourt({
             />
           ))}
         </g>
+
+        {/* Drawn upright after the flip so the letters stay readable. */}
+        {plays.map(play => {
+          const shown = flipped ? { x: FULL_COURT_LENGTH - play.x, y: COURT_WIDTH - play.y } : play
+          const color = play.tone === 'tracked' ? 'rgb(var(--court-tracked))' : 'rgb(var(--court-opponent))'
+          return (
+            <g
+              key={play.id}
+              role={onPlayActivate ? 'button' : undefined}
+              tabIndex={onPlayActivate ? 0 : undefined}
+              aria-label={onPlayActivate ? play.label : undefined}
+              onClick={onPlayActivate ? event => onPlayActivate(play, event.currentTarget) : undefined}
+              onKeyDown={onPlayActivate ? event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  onPlayActivate(play, event.currentTarget)
+                }
+              } : undefined}
+              style={onPlayActivate ? { cursor: 'pointer' } : undefined}
+            >
+              <circle cx={shown.x} cy={shown.y} r={1.8} fill="transparent" />
+              <rect x={shown.x - 1.1} y={shown.y - 1.1} width={2.2} height={2.2} rx={0.4} fill={color} pointerEvents="none" />
+              <text
+                x={shown.x}
+                y={shown.y + 0.6}
+                textAnchor="middle"
+                fontSize="1.6"
+                fontWeight="700"
+                fill={COURT_BG}
+                pointerEvents="none"
+                style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}
+              >
+                {play.letter}
+              </text>
+            </g>
+          )
+        })}
 
         {onCourtTap && shots.length === 0 && emptyHint && (
           <g pointerEvents="none" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
