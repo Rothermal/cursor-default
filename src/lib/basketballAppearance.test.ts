@@ -82,7 +82,12 @@ describe('Basketball appearance completion inventory', () => {
     visit(tree)
   })
   it('keeps court geometry independent from theme and gives artwork explicit tokens', () => {
-    const source = readFileSync('src/components/shot-chart/BasketballCourt.tsx', 'utf8')
+    // The half court, the full court and their shared lines and markers.
+    const source = [
+      'src/components/shot-chart/BasketballCourt.tsx',
+      'src/components/shot-chart/BasketballFullCourt.tsx',
+      'src/components/shot-chart/courtDrawing.tsx',
+    ].map(path => readFileSync(path, 'utf8')).join('\n')
     expect(source).not.toMatch(/#[0-9a-f]{3,8}|rgba\(/i)
     for (const token of ['surface', 'line', 'hint', 'made', 'miss', 'tracked', 'opponent']) expect(source).toContain(`var(--court-${token})`)
     expect(source).toContain('r={0.8}')

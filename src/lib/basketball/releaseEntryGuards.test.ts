@@ -196,11 +196,17 @@ describe('Basketball release entry guards', () => {
     const historicalEditor = source('src/components/basketball/BasketballHistoricalShotEditor.tsx')
     const eventReview = source('src/components/basketball-summary/BasketballShotReview.tsx')
     const legacyReview = source('src/pages/game-summary/GameSummaryShotChartPanel.tsx')
+    const playsMap = source('src/components/basketball-summary/BasketballPlaysMap.tsx')
 
     expect(livePanel).toContain("flipped={courtOrientation === 'flipped'}")
-    expect(shotEditor).toContain('flipped={basketballCourtOrientationForState(state)')
-    expect(historicalEditor).toContain('flipped={basketballCourtOrientationForState(state)')
-    expect(eventReview).toContain('flipped={basketballCourtOrientationForState(source.state)')
+    for (const editor of [shotEditor, historicalEditor]) {
+      expect(editor).toContain("const flipped = basketballCourtOrientationForState(state) === 'flipped'")
+      expect(editor.match(/flipped=\{flipped\}/g)).toHaveLength(3)
+    }
+    // Full court and Half court views (BKE-7D) both read the game's orientation.
+    expect(eventReview).toContain("const flipped = basketballCourtOrientationForState(source.state) === 'flipped'")
+    expect(eventReview.match(/flipped=\{flipped\}/g)).toHaveLength(2)
+    expect(playsMap).toContain('flipped={basketballCourtOrientationForState(source.state)')
     expect(legacyReview).toContain('flipped={flipped}')
   })
 

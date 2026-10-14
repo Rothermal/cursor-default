@@ -18,6 +18,13 @@ import {
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { createBasketballUuid } from './id'
+import { basketballCourtOrientationForState } from './courtGeometry'
+import {
+  basketballPlaySpotDraft,
+  basketballPlaySpotLocation,
+  basketballPlaySpotText,
+  type BasketballPlaySpotDraft,
+} from './playLocations'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { basketballRulesAllowOneAndOne } from './rules'
 import {
@@ -65,6 +72,8 @@ export interface BasketballFoulFreeThrowDraft {
   incidentId: string
   drawnBy: BasketballFoulDrawnByDraft
   countingOverride: BasketballFoulCountingOverride | null
+  /** The foul's court spot when it has one (BKE-7C); null when there is none to edit. */
+  spot: BasketballPlaySpotDraft | null
   maximumAttempts: 1 | 2 | 3
   oneAndOne: boolean
   sourceFoulEventId: string | null
@@ -265,6 +274,7 @@ export function buildBasketballFoulFreeThrowEditDraft(
         incidentId: event.payload.incidentId ?? '',
         drawnBy: drawnByToDraft(drawn),
         countingOverride: event.payload.countingOverride,
+        spot: basketballPlaySpotDraft(event),
       },
     }
   }
@@ -526,9 +536,17 @@ function buildFoulPlan(
       lines.push(`Add a linked ${draft.maximumAttempts}-position free-throw award.`)
     }
   } else if (existing) {
-    if (!sameJson({ payload: existing.payload, actors: existing.actors, teamSide: existing.teamSide }, { payload, actors, teamSide: draft.teamSide })) {
-      mutations.push({ type: 'update', eventId: existing.id, changes: { payload, actors, teamSide: draft.teamSide } })
+    // The spot keeps its recorded direction; only moving or removing it changes the location.
+    const location = draft.spot ? basketballPlaySpotLocation(draft.spot) : existing.location
+    const changes = { payload, actors, teamSide: draft.teamSide, location }
+    if (!sameJson({ payload: existing.payload, actors: existing.actors, teamSide: existing.teamSide, location: existing.location }, changes)) {
+      mutations.push({ type: 'update', eventId: existing.id, changes })
       lines.push('Update the foul attribution and structured ruling fields.')
+    }
+    if (!sameJson(existing.location, location)) {
+      lines.push(location
+        ? `Court spot: ${basketballPlaySpotText(location, basketballCourtOrientationForState(prepared.state))}.`
+        : 'The court spot will be removed.')
     }
     const dependents = foulDependencyRepairs(prepared, existing, draft.teamSide, offender.value, payload)
     mutations.push(...dependents.mutations)
@@ -1091,6 +1109,7 @@ function defaultDraft(
     incidentId: '',
     drawnBy: { kind: 'none' },
     countingOverride: null,
+    spot: null,
     maximumAttempts: 2,
     oneAndOne: false,
     sourceFoulEventId: null,

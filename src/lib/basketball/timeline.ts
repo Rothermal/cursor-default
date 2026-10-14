@@ -1,14 +1,16 @@
 import type { GameState, Player, ShotRecord, ShotZone } from '../../types'
+import { isBasketballTipOffEvent } from './courtDirectionEvents'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
-import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
-import { classifyShotZone } from './courtGeometry'
-import { basketballShotFeet } from './fullCourtGeometry'
+import type { GameEventActor, GameEventDiagnostic, GameEventLocation } from '../gameEvents/types'
+import { basketballCourtOrientationForState, classifyShotZone } from './courtGeometry'
+import { basketballShotFeet, basketballShownBasket, isBasketballBeyondHalfCourt } from './fullCourtGeometry'
 import { basketballHistoricalDisplayMs } from './historicalTime'
 import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { resolveBasketballPeriodSegment } from './rules'
 import { orderBasketballEventsForProjection } from './lineupReplay'
+import { BASKETBALL_LOCATED_PLAY_TYPES, basketballPlaySpotText } from './playLocations'
 import type {
   BasketballMatchEvent,
   BasketballShotEvent,
@@ -82,6 +84,8 @@ export interface BasketballTimelineEventReview {
   recordedLater: boolean
   boundary: boolean
   relationshipLabels: string[]
+  /** Where a located play happened, as the court is shown (BKE-7C); null for other events. */
+  spotLabel: string | null
   warnings: string[]
 }
 
@@ -289,6 +293,22 @@ export function basketballShotDetailForEvent(
   return basketballShotDetailFromReview(state, review, eventId)
 }
 
+/**
+ * Detail text for a shot location. A full-court location names its basket as shown, so
+ * the flip changes left and right (BKE-7B). Summary passes its own frame (BKE-7D).
+ */
+export function basketballShotLocationLabel(
+  location: GameEventLocation | null | undefined,
+  orientation: 'standard' | 'flipped' = 'standard'
+): string {
+  if (!location) return 'No court location'
+  const feet = basketballShotFeet(location)
+  const zone = classifyShotZone(feet.x, feet.y)
+  return location.attackingDirection === 'unknown'
+    ? `${zoneLabel(zone)} (${feet.x.toFixed(1)}, ${feet.y.toFixed(1)} ft)`
+    : `${zoneLabel(zone)} at the ${basketballShownBasket(location.attackingDirection, orientation)} basket (${Math.hypot(feet.x, feet.y).toFixed(1)} ft${isBasketballBeyondHalfCourt(location) ? ', beyond half court' : ''})`
+}
+
 export function basketballShotDetailFromReview(
   state: GameState,
   review: BasketballTimelineReview,
@@ -316,8 +336,6 @@ export function basketballShotDetailFromReview(
   const related = allReviews.filter(item =>
     isRelatedStat(item.event) && item.event.payload.relatedEventId === shot.id
   )
-  const location = shot.location ? basketballShotFeet(shot.location) : null
-  const zone = location ? classifyShotZone(location.x, location.y) : null
 
   return {
     source: 'event',
@@ -330,9 +348,7 @@ export function basketballShotDetailFromReview(
     teamLabel: teamLabel(state, shot.teamSide),
     resultLabel: shot.payload.made ? 'Made' : 'Missed',
     valueLabel: `${shot.payload.value} point${shot.payload.valueSource === 'manual_override' ? ' (manual)' : ''}`,
-    locationLabel: location && zone
-      ? `${zoneLabel(zone)} (${location.x.toFixed(1)}, ${location.y.toFixed(1)} ft)`
-      : 'No court location',
+    locationLabel: basketballShotLocationLabel(shot.location, basketballCourtOrientationForState(state)),
     occurredAt: shot.occurredAt,
     relationships: related.map(item => ({
       id: item.id,
@@ -574,10 +590,17 @@ function reviewEvent(
     revised: event.revision > 1,
     removed: event.deletedAt !== null,
     recordedLater,
-    boundary: BOUNDARY_TYPES.has(event.eventType),
+    boundary: BOUNDARY_TYPES.has(event.eventType) || isBasketballTipOffEvent(event),
     relationshipLabels: relationshipsForEvent(state, event, eventsById),
+    spotLabel: playSpotLabel(state, event),
     warnings: [...new Set(warnings)],
   }
+}
+
+function playSpotLabel(state: GameState, event: BasketballMatchEvent): string | null {
+  if (!BASKETBALL_LOCATED_PLAY_TYPES.has(event.eventType)) return null
+  if (!event.location || event.location.attackingDirection === 'unknown') return null
+  return basketballPlaySpotText(event.location, basketballCourtOrientationForState(state))
 }
 
 function groupReviews(
@@ -713,8 +736,8 @@ function eventTitle(
     case 'basketball.match_reopened': return 'Game reopened'
     case 'basketball.attacking_direction_set': {
       const team = state.gameInfo?.teamName.trim() || 'Tracked team'
-      const basket = event.payload.trackedDirection === 'left_to_right' ? 'right' : 'left'
-      return `${event.payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'}: ${team} shoots at the ${basket} basket`
+      const basket = basketballShownBasket(event.payload.trackedDirection, basketballCourtOrientationForState(state))
+      return `${event.payload.reason === 'tip_off' ? 'Tip-off' : 'Switched ends'}: ${team} at the ${basket} basket`
     }
     case 'basketball.clock_started': return 'Clock started'
     case 'basketball.clock_paused': return event.payload.source === 'expiration'

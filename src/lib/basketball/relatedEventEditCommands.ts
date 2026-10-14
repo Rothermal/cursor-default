@@ -5,6 +5,13 @@ import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor, GameEventMutation } from '../gameEvents/types'
+import {
+  basketballPlaySpotDraft,
+  basketballPlaySpotLocation,
+  basketballPlaySpotText,
+  type BasketballPlaySpotDraft,
+} from './playLocations'
+import { basketballCourtOrientationForState } from './courtGeometry'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
   basketballActorForSelection,
@@ -56,6 +63,8 @@ export interface BasketballRelatedEventEditDraft {
   reboundKind: 'offensive' | 'defensive'
   turnoverKind: 'player' | 'team'
   relatedEventId: string | null
+  /** The play's court spot when it has one (BKE-7C); null when there is none to edit. */
+  spot: BasketballPlaySpotDraft | null
 }
 
 export interface BasketballHistoricalRelatedEventDraft {
@@ -176,6 +185,7 @@ export function buildBasketballRelatedEventEditDraft(
       relatedEventId: event.eventType === 'basketball.turnover'
         ? incomingSteal?.id ?? null
         : event.payload.relatedEventId,
+      spot: basketballPlaySpotDraft(event),
     },
   }
 }
@@ -492,11 +502,18 @@ function buildEditPlan(
       ? { ...event.payload, kind: draft.reboundKind, relatedEventId }
       : { ...event.payload, relatedEventId }
   const mutations: GameEventMutation[] = []
-  const changes = { teamSide: draft.teamSide, actors: [actor.value], payload }
-  if (!sameJson({ teamSide: event.teamSide, actors: event.actors, payload: event.payload }, changes)) {
+  // The spot keeps its recorded direction; only moving or removing it changes the location.
+  const location = draft.spot ? basketballPlaySpotLocation(draft.spot) : event.location
+  const changes = { teamSide: draft.teamSide, actors: [actor.value], payload, location }
+  if (!sameJson({ teamSide: event.teamSide, actors: event.actors, payload: event.payload, location: event.location }, changes)) {
     mutations.push({ type: 'update', eventId: event.id, changes })
   }
   const notes = [`Update ${eventLabel(event.eventType)} attribution and relationship.`]
+  if (!sameJson(event.location, location)) {
+    notes.push(location
+      ? `Court spot: ${basketballPlaySpotText(location, basketballCourtOrientationForState(prepared.state))}.`
+      : 'The court spot will be removed.')
+  }
   if (event.eventType === 'basketball.turnover') {
     const activeIncoming = prepared.active.filter((candidate): candidate is BasketballStealEvent =>
       candidate.eventType === 'basketball.steal' && candidate.payload.relatedEventId === event.id

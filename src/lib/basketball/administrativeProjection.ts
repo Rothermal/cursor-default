@@ -1,7 +1,7 @@
 import { getBonusStatus } from '../basketballBonus'
 import type { GameEventActor } from '../gameEvents/types'
 import { sameBasketballActorIdentity } from './actorIdentity'
-import type { BasketballStatProjectionContext } from './statProjection'
+import { basketballLocationFrameError, type BasketballStatProjectionContext } from './statProjection'
 import type {
   BasketballAdministrativeEvent,
   BasketballEjectionEvent,
@@ -29,6 +29,8 @@ export function applyBasketballAdministrativeEvent(
 
   const actorError = validateAdministrativeActors(projection, event)
   if (actorError) return actorError
+  const frameError = basketballLocationFrameError(projection, event)
+  if (frameError) return frameError
 
   switch (event.eventType) {
     case 'basketball.foul':

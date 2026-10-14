@@ -677,13 +677,22 @@ describe('Basketball event cloud transport adapter', () => {
     const independent = await createBasketballIndependentRecorderState('user-2', 'cloud-game-1')
 
     expect(independent.cloudSync.gameId).toBe('cloud-game-1')
-    expect(independent.eventStream?.events).toHaveLength(1)
+    expect(independent.eventStream?.events).toHaveLength(2)
     expect(independent.eventStream?.events[0]).toMatchObject({
       sportId: 'basketball',
       eventType: 'basketball.period_started',
       recorderUserId: 'user-2',
       sequence: 1,
     })
+    // A new stream is a full-court game with the default tip-off (BKE-7B).
+    expect(independent.eventStream?.events[1]).toMatchObject({
+      eventType: 'basketball.attacking_direction_set',
+      recorderUserId: 'user-2',
+      sequence: 2,
+      payload: { trackedDirection: 'left_to_right', reason: 'tip_off' },
+    })
+    expect(assertHealthyBasketballEventGame(independent).projection.court?.trackedAttackingDirection)
+      .toBe('left_to_right')
   })
 
   it('starts an authorized independent anchored recorder paused at elapsed zero', async () => {
@@ -697,10 +706,14 @@ describe('Basketball event cloud transport adapter', () => {
       deps
     )
 
-    expect(independent.eventStream?.events).toHaveLength(1)
+    expect(independent.eventStream?.events).toHaveLength(2)
     expect(independent.eventStream?.events[0]).toMatchObject({
       eventType: 'basketball.period_started',
       recorderUserId: 'user-2',
+      elapsedMs: 0,
+    })
+    expect(independent.eventStream?.events[1]).toMatchObject({
+      eventType: 'basketball.attacking_direction_set',
       elapsedMs: 0,
     })
     expect(assertHealthyBasketballEventGame(independent).projection.clock).toMatchObject({

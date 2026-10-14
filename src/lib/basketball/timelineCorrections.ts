@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { isBasketballTipOffEvent } from './courtDirectionEvents'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
@@ -35,8 +36,12 @@ const READ_ONLY_EVENT_TYPES = new Set<BasketballMatchEvent['eventType']>([
   'basketball.participant_resolved',
   'basketball.match_ended',
   'basketball.match_reopened',
-  'basketball.attacking_direction_set',
 ])
+
+/** Lifecycle and identity rows, and the tip-off that fixes the court frame. */
+function isReadOnlyBasketballEvent(event: BasketballMatchEvent): boolean {
+  return READ_ONLY_EVENT_TYPES.has(event.eventType) || isBasketballTipOffEvent(event)
+}
 
 export type BasketballTimelineRemovalScope = 'event' | 'capture_group'
 
@@ -193,7 +198,7 @@ export function previewBasketballTimelineRestore(
   if (!prepared.ok) return prepared
   const event = prepared.value.deleted.find(candidate => candidate.id === eventId)
   if (!event) return commandFailure('restore_unavailable', 'This Basketball event is no longer removed.')
-  if (READ_ONLY_EVENT_TYPES.has(event.eventType)) {
+  if (isReadOnlyBasketballEvent(event)) {
     return commandFailure('restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
   }
 
@@ -205,7 +210,7 @@ export function previewBasketballTimelineRestore(
     ? prepared.value.deleted.filter(candidate => captureCommandIdForEvent(candidate) === captureCommandId)
     : [event]
   const groupEventIds = new Set(groupEvents.map(candidate => candidate.id))
-  if (groupEvents.some(candidate => READ_ONLY_EVENT_TYPES.has(candidate.eventType))) {
+  if (groupEvents.some(candidate => isReadOnlyBasketballEvent(candidate))) {
     return commandFailure('restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
   }
   const baseMutations: GameEventMutation[] = groupEvents.map(candidate => ({
@@ -290,7 +295,7 @@ export function restoreBasketballTimelineEvent(
   if (!prepared.ok) return failure(state, prepared.code, prepared.message)
   const source = prepared.value.deleted.find(event => event.id === preview.eventId)
   if (!source) return failure(state, 'restore_unavailable', 'This Basketball event is no longer removed.')
-  if (READ_ONLY_EVENT_TYPES.has(source.eventType)) {
+  if (isReadOnlyBasketballEvent(source)) {
     return failure(state, 'restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
   }
   const captureCommandId = captureCommandIdForEvent(source)
@@ -373,7 +378,7 @@ function validateRemovalAvailability(
   event: BasketballMatchEvent,
   removingIds = new Set([event.id])
 ): string | null {
-  if (READ_ONLY_EVENT_TYPES.has(event.eventType)) {
+  if (isReadOnlyBasketballEvent(event)) {
     return 'Basketball lifecycle and identity boundaries are read-only.'
   }
   if (event.eventType !== 'basketball.match_roster_added') return null

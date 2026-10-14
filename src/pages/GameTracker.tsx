@@ -24,6 +24,7 @@ import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import RecentEventsPopup from '../components/RecentEventsPopup'
 import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
 import BasketballLifecycleControls from '../components/basketball/BasketballLifecycleControls'
+import BasketballCourtEndsPanel from '../components/basketball/BasketballCourtEndsPanel'
 import BasketballEventBonusPanel from '../components/basketball/BasketballEventBonusPanel'
 import BasketballReopenDialog from '../components/basketball/BasketballReopenDialog'
 import BasketballLateParticipantDialog from '../components/basketball/BasketballLateParticipantDialog'
@@ -240,6 +241,8 @@ export default function GameTracker() {
     playerId: string | null
     foulClass: BasketballFoulClass
     context: BasketballFoulContext
+    /** The court tap the dialog opened from, kept on the foul (BKE-7C). */
+    fullCourtPoint: { x: number; y: number } | null
   } | null>(null)
   const [foulError, setFoulError] = useState<string | null>(null)
   const [activeFreeThrowTrip, setActiveFreeThrowTrip] = useState<{
@@ -802,6 +805,7 @@ export default function GameTracker() {
     const result = captureBasketballFoul(state, {
       recorderUserId: user?.id ?? null,
       ...input,
+      fullCourtPoint: foulDialog?.fullCourtPoint ?? null,
     })
     if (!result.ok) {
       setFoulError(result.message)
@@ -824,11 +828,12 @@ export default function GameTracker() {
     teamSide: BasketballTeamSide,
     playerId: string | null,
     foulClass: BasketballFoulClass,
-    context: BasketballFoulContext
+    context: BasketballFoulContext,
+    fullCourtPoint: { x: number; y: number } | null = null
   ) => {
     setFoulError(null)
     clearTrackerActionErrors()
-    setFoulDialog({ teamSide, playerId, foulClass, context })
+    setFoulDialog({ teamSide, playerId, foulClass, context, fullCourtPoint })
   }
 
   const handleFreeThrowAttempt = (playerId: string, made: boolean) => {
@@ -1424,8 +1429,8 @@ export default function GameTracker() {
             selection={shotChartSelection}
             onSelectPlayer={handleSelectPlayer}
             capturePlayerId={workspaceTeamPlayer?.id ?? null}
-            onAdministrative={isBasketballEventMode ? (kind, side) => {
-              if (kind === 'foul') openFoulDialog(side, null, 'personal', 'common')
+            onAdministrative={isBasketballEventMode ? (kind, side, fullCourtPoint) => {
+              if (kind === 'foul') openFoulDialog(side, null, 'personal', 'common', fullCourtPoint)
               else openQuickFreeThrow(side)
             } : undefined}
             captureDisabled={isBasketballEventMode && !basketballPeriodActive}
@@ -1663,6 +1668,9 @@ export default function GameTracker() {
               <Link2 size={16} aria-hidden />
               Steal + Turnover
             </button>
+          )}
+          {isBasketballEventMode && basketballWorkspace === 'actions' && (
+            <BasketballCourtEndsPanel disabled={!basketballPeriodActive} />
           )}
           {isBasketballEventMode && basketballWorkspace === 'actions' && timeoutInventory && (
             <section className="border-y border-info-line bg-info px-3 py-3" aria-labelledby="basketball-timeouts-title">

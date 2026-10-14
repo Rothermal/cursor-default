@@ -3,6 +3,7 @@ import { addGameEvent, addGameEvents } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor } from '../gameEvents/types'
+import { basketballPlayCaptureLocation } from './playLocations'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
@@ -52,6 +53,8 @@ export interface BasketballFoulCaptureOptions {
   drawnBy?: BasketballFoulDrawnBy | null
   countingOverride?: BasketballFoulCountingOverride | null
   freeThrows?: BasketballFreeThrowAward | null
+  /** A 0..1 full-court tap (BKE-7C): the foul keeps the spot with the committing side's direction. */
+  fullCourtPoint?: { x: number; y: number } | null
   occurredAt?: string
   eventIds?: string[]
   captureCommandId?: string
@@ -200,6 +203,7 @@ export function captureBasketballFoul(
     elapsedMs: guarded.context.elapsedMs,
     occurredAt: guarded.context.occurredAt,
     teamSide: options.teamSide,
+    location: basketballPlayCaptureLocation(state, options.teamSide, options.fullCourtPoint),
     actors: drawnBy.actor ? [offender.actor, drawnBy.actor] : [offender.actor],
   })
   const awardError = validateFreeThrowAward(state, foul, options.freeThrows ?? null)

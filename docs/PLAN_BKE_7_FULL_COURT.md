@@ -4,8 +4,8 @@ Moves the Basketball Event tracker from a half-court drawing to a horizontal ful
 the way Soccer's pitch and Hockey's rink work: each team attacks one basket, the ends
 switch at halftime, and the basket you tap tells the app which team shot.
 
-Status: approved (merged 2026-10-11, PR #483); built with the §7 recommendations. BKE-7A is
-implemented; see §8.
+Status: approved (merged 2026-10-11, PR #483); built with the §7 recommendations. BKE-7A through
+BKE-7D are implemented; see §8.
 
 ---
 
@@ -291,3 +291,107 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   value, halves with overtime, quarters, the eight-segment youth profile (switch at segment
   5), odd counts, Switch ends forward-only and its removal, frame mixing, a second or late
   tip-off, a tip-off after play, Switch ends in a break, no-op switches, half-court games unchanged, Timeline labels.
+
+### BKE-7B (implemented)
+
+- `fullCourtPolicy.ts`: `BASKETBALL_FULL_COURT_FOR_NEW_GAMES` (true) is the rollback
+  switch, pulled forward from BKE-7D so every new start path reads one place; false
+  starts new Event games on the half court again. Existing games keep their frame.
+- Start paths: `prepareBasketballGameStart` takes `tipOffDirection` and appends the period
+  start and the tip-off in one command (same period and elapsed time). Player Setup shows
+  `BasketballTipOffChoice` ("Tip-off basket for <Team>", Left/Right in the court's opening
+  view, default right) on the anchored opening-lineup step and on the clockless roster
+  step. An independent cloud recorder stream starts with the default right tip-off; the
+  recorder fixes it with Switch ends. Games started before BKE-7B stay half court.
+- Live court: `BasketballFullCourt` (horizontal 94 x 50 drawing, both ends from the shared
+  `courtDrawing.tsx`, team labels with arrows, flip as a half turn, tap-vs-scroll from the
+  shared `courtTap.ts`). `ShotChartPanel` uses it only for full-court games; the legacy
+  tracker and half-court Event games keep `BasketballCourt`.
+- Capture: the tapped half picks the team attacking that basket (the active player stays
+  when on that team, else the team row). The popup's Team control can change it; choosing
+  the team whose basket is far from the tap shows "Backcourt shot. Are the ends right?"
+  with Switch ends or Keep as a backcourt shot. `captureBasketballCourtEvent` takes a
+  0..1 `fullCourtPoint` in full-court games, stamps the shooting side's current direction
+  and measures value from that basket.
+- Switch ends: `switchBasketballEnds` appends one direction event during a period (fails
+  in half-court games and final cloud games) and clears the quick-Undo receipt. The Actions
+  tab has a Court ends section. Switch ends is an ordinary capture unit (Undo, Timeline
+  remove and restore); the tip-off stays a read-only boundary.
+- Shots: detail reads "Paint at the right basket (11.4 ft)". The shot editor and
+  recorded-later shot add place on the full court and show the §3.4 Shot at control
+  (`BasketballShotCourtDraft`: `stored`, `period` or `recorder`); a period that used one
+  direction preselects it, otherwise Review stays disabled until a basket is chosen. Edit
+  keeps the stored basket when the marker moves or the team or period changes; removing the
+  location clears it; value checks re-run against the chosen basket.
+- Left and right in text follow the shown court (`basketballShownBasket`): Court ends,
+  Timeline direction rows, shot detail and the editor's location text name the basket as
+  the recorder sees it, matching the court labels, tip-off choice and Shot at control. A
+  flip never reads as switched ends; stored directions are canonical.
+- Tests (`fullCourtLive.test.ts`): start with and without a tip-off, direction stamping and
+  value, side selection through Switch ends and halftime, Undo/remove of Switch ends with the
+  tip-off read-only, edit basket preservation and re-check, added-shot preselection, location
+  text. Independent cloud stream tests now expect the tip-off.
+- Phone screenshots (375 px, Chromium): setup choice, tracker court with both directions,
+  popup, backcourt prompt, flip on and off, Court ends, after Switch ends, shot detail,
+  editor and full-court placement; shared in the project files under
+  `basketball-full-court/bke-7b/`.
+
+### BKE-7C (implemented)
+
+- `playLocations.ts`: rebounds, steals, blocks, turnovers and fouls entered from a
+  full-court tap keep the tap, stamped with the acting side's current direction
+  (`basketballPlayCaptureLocation`). Half-court games, grid, Lineup and dialog entries,
+  recorded-later additions and assists stay unlocated. The rebound picked in the missed-shot
+  prompt stays unlocated too: the tap marks the shot, not the rebound.
+- Validation: stat definitions take a `locationRule` (`none`, `shot`, `play`); a play may
+  carry only a known-direction location, and a foul is the one administrative event that
+  may carry one. The frame check (`basketballLocationFrameError`) now runs for every stat
+  and administrative event, so a full-court play in a half-court game is rejected.
+- Capture: the court popup adds Turnover in Event games (team or player turnover by the
+  chosen actor). Foul from the court popup carries the tap into the foul dialog.
+- Review: the Timeline detail shows "Court spot: 2.1 ft from the right basket" (the
+  nearer basket as the court is shown). The related-event and foul editors show a Court
+  spot section with Move (full-court placement) and Remove for located plays. Moving the
+  spot or changing the team keeps the stored direction; Remove clears the location. The
+  review lists the spot change.
+- No migration, no schema bump; the server ignores event locations.
+- Tests (`fullCourtPlays.test.ts`): stamping per side and after Switch ends, unlocated
+  assists, grid entries and half-court games, located fouls, rejection of half-court-frame
+  plays and frame mixing, Undo, edit move/clear with direction kept, recorded-later fouls,
+  flip-aware spot text.
+- Phone screenshots (375 px, Chromium): popup with Turnover, steal detail with its spot,
+  editor and Move placement; in the project files under `basketball-full-court/bke-7c/`.
+
+### BKE-7D (implemented)
+
+- `summaryCourt.ts`: the Summary court frame puts the tracked team attacking right and
+  the opponent left (`BASKETBALL_SUMMARY_DIRECTIONS`); a location aimed the other way turns
+  half a turn, and half-court-frame shots from older games sit at their side's summary
+  basket. Nothing stored changes.
+- Shot Chart tab: a **Full court / Half court** control. Full court is the default for
+  full-court games (§7 Q2); games recorded before BKE-7 open on Half court, so their
+  Summary looks as before. Full court draws every shot where it was taken with the team
+  labels; Half court folds shots onto one basket and lists shots beyond half court under
+  **Beyond half court** (§3.5). Totals, filters and the shot lists always include them.
+- Plays tab, shown once the game has a located play: the BKE-7C plays on the summary full
+  court as lettered marks (R, S, B, T, F) with side, player, period and play filters, and a
+  list with the spot text. Marks and rows open the read-only event detail; corrections
+  stay on the Timeline.
+- Every Summary source (this device, cloud primary, another recording, the published
+  game) reads the same way: locations travel in the event rows as before.
+- Summary text follows the summary court (review of PR #488): the Plays list, play detail
+  Court spot and shot detail location are worded from the summary point and its summary
+  direction (`basketballSummaryCourtLocation`) with the game's flip, so they name the
+  basket the mark is drawn at. The stored events, Timeline and live text, fingerprints and
+  correction coordinates keep the recorded frame (`basketballShotLocationLabel` in
+  `timeline.ts` serves both).
+- `BASKETBALL_FULL_COURT_FOR_NEW_GAMES` (`fullCourtPolicy.ts`, from BKE-7B) stays the
+  rollback switch.
+- Tests (`fullCourtSummary.test.ts`): frame turns for both sides, older half-court shots,
+  full-court and half-court markers, a heave beyond half court counted but not drawn on the
+  half court, plays with filters, assists and unlocated plays left off, half-court games
+  without plays, and the text matrix (both sides, both stored directions, flip off and on:
+  marker, list and detail agree; Timeline text and stored locations unchanged).
+  `releaseEntryGuards.test.ts` checks both views and the Plays map follow
+  the flip.
+- Regression record: `docs/REGRESSION_BKE_7_FULL_COURT.md`.
