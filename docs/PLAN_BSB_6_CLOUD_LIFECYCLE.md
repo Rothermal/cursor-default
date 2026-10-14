@@ -82,11 +82,22 @@ adds everything else.
     event it reads the `movements` list:
     - the plate appearance ends on the event when a movement starts from `batter` (the
       engine only allows a batter movement then),
-    - a run is a movement to `home`. It counts when its `runCounts` override says so;
-      when the override is null it counts unless the event makes the third out and that
-      out is the batter before reaching first base, or a force out. A force is judged
-      from the bases at the start of the event, and only when the plate appearance ends
-      on it. These are the same rules as the projector's `runsCountByDefault`,
+    - a run is a movement to `home`. It counts when its `runCounts` override says so.
+      When the override is null, it counts unless the event makes the half's third out
+      and that out is one of these two (the projector's `runsCountByDefault`,
+      `projector.ts` around line 942):
+      - **the batter before reaching first base**: the third out is the batter's own
+        movement, and the batter was not credited with a hit. A batter whose `inPlay.result`
+        is a single, double, triple, home run or ground-rule double reached first before
+        being put out, so runs on that play count. The policy reads the result from the
+        event's `inPlay`, never from the movement alone,
+      - **a force out**: the third out is a runner who started on a forced base, and no
+        batter out comes before it in the event's listed out order. Bases are forced only
+        when the plate appearance ends on the event: first is forced when occupied, second
+        when first and second are, and third when all three are, all judged from the bases
+        at the start of the event. An earlier batter out removes the force,
+      - the third out is the `(3 - outs before the event)`th out movement in listed order,
+        so the order of out movements matters and the policy keeps it,
     - out movements add to the half's outs, and the bases are updated from where each
       runner started and finished. A runner whose run does not count still leaves the
       bases,
@@ -119,7 +130,11 @@ adds everything else.
   the projector's score are compared on the same games: walk-offs, a third-out force with
   a runner crossing the plate, a batter out before first on the third out, a recorder
   override either way, a placed runner in extra innings, a half ended early, score
-  adjustments, removed and revised events, and a forfeit.
+  adjustments, removed and revised events, and a forfeit. It includes the two third-out
+  cases the engine counts as one run each: bases loaded with one out, a runner scores, the
+  batter is retired second and the runner from first third (no force left); and a runner
+  on third with two outs, the batter singles and is put out while the runner scores. Each
+  is also run with its out movements in the other order.
 
 The owner applies the migrations before the BSB-6B client deploys. The handshake keeps the
 client local-only until then.
@@ -166,10 +181,24 @@ client local-only until then.
   its current end. It does not block finalizing. Decisions are events in the recorder's
   stream, so only the primary recorder's device can set them (Q4).
 - **Reopen**: one kind, with a reason (Q5). The server invalidates the publication and
-  unlocks primary selection. The manager's result is handed to the primary recorder's own
-  parked copy, which appends `baseball.game_reopened` with the reason, never earlier than
-  its last event, and applying it twice changes nothing. As in BSB-5D, reopening ends the
-  decisions' epoch, so the recorder sets decisions again after the game ends again.
+  unlocks primary selection. Events are only ever appended by their own recorder, on that
+  recorder's device: a manager never appends to another recorder's stream. There are two
+  paths (Q7):
+  - **same account and device**: when the manager who reopens is also the primary
+    recorder and holds the parked copy, the reopen result is handed to that copy (the Hockey
+    handoff). It appends `baseball.game_reopened` with the reason, never earlier than its
+    last event, and applying it twice changes nothing,
+  - **another account or device**: there is no durable receipt to fetch (only
+    Basketball's 064 has a handoff read). The primary's copy learns the cloud game is no
+    longer final when its binding status is refreshed: on opening the game from Cloud
+    Games or Game Info, and on the tracker's sync. The binding then reads in progress, but
+    the stream stays ended. The tracker shows "Reopened in the cloud" with a Reopen button,
+    which runs the existing local reasoned Reopen under the recorder's own identity. The
+    recorder enters the reason. Until then the stream is unchanged, and the owner may
+    finalize it again as it is,
+  - either way, appending `baseball.game_reopened` ends the decisions' epoch, as in
+    BSB-5D, so the recorder sets decisions again after the game ends again. A status refresh
+    alone changes no event and keeps the old epoch.
 - **Finalized games are read-only**: capture, Undo, Timeline remove, restore and edit, the
   Lineup sheet, endings and the decisions sheet refuse with that reason until Reopen. The
   tracker shows a banner and hides local Reopen.
@@ -232,12 +261,18 @@ client local-only until then.
   Hockey readiness and finalize unchanged,
 - client unit tests: adapter payloads, routing for event, legacy and local-only games, the
   cloud-policy default, the handshake (exact, older, newer), Game Info gating by role,
-  finalized-game refusals, the reopen handoff and decision epochs, and the Summary sources,
+  finalized-game refusals, the reopen handoff and decision epochs, and the Summary sources.
+  The reopen tests cover a manager and a primary recorder on different accounts: the
+  manager's reopen appends nothing to the recorder's stream; the recorder's copy reads in
+  progress after a status refresh and offers Reopen; Reopen appends once even when applied
+  twice; corrections after it upload; decisions from the old epoch stop counting; and
+  re-finalizing publishes the corrected runs,
 - browser at phone size against the dev server: setup with Cloud, play, sync status, Cloud
   Games listing, Game Info finalize and reopen, and the cloud Summary,
 - two-device live check by the owner after deploy: one recorder, a viewer on a second
-  device, finalize, reopen, correct and re-finalize, then the canonical Summary. It stays
-  pending until done,
+  device, finalize, reopen, correct and re-finalize, then the canonical Summary. It includes
+  a reopen from the second device by a manager who is not the recorder, followed by the
+  recorder's Reopen on the first device. It stays pending until done,
 - BSB-1 to BSB-5 tests pass unchanged; Soccer, Basketball and Hockey suites pass,
 - `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
@@ -252,6 +287,10 @@ client local-only until then.
   same exported games, and Finalize shows both scores if they ever differ.
 - **Re-creating shared functions.** Readiness and finalize serve three sports already. The
   migration copies their latest bodies and adds one branch.
+- **Reopen across devices.** After a reopen from another device, the recorder's stream
+  stays ended until the recorder taps Reopen. If the owner finalizes again before that, the
+  same events publish again, which is correct but may surprise. Game Info says which
+  recorder still has to reopen.
 - **Decisions and finalizing.** Decisions can only be set on the recorder's device, and a
   reopen clears them until the game ends again. An owner finalizing from another device may
   publish a game without decisions; the preview says so.
@@ -270,6 +309,7 @@ client local-only until then.
 | Q4 | Pitcher decisions at finalize: block finalizing until they are set, warn, or ignore? | Warn only. Decisions are optional, and only the recorder's device can set them |
 | Q5 | Reopen: one kind with a reason, as Hockey has? | Yes. The local Reopen already lets the recorder correct or resume, and the owner finalizes again explicitly |
 | Q6 | Slices: 6A server migrations, 6B1 sync and cloud policy, 6B2 recorders, finalize and reopen, 6C cloud Summary, each its own PR? | Yes |
+| Q7 | When a manager reopens on a different account or device from the primary recorder, should the recorder's device show "Reopened in the cloud" with a Reopen button the recorder confirms, or should BSB-6A add a durable reopen receipt the recorder's device reads and applies on its own (as Basketball's 064 does)? | The Reopen button. It needs no new server read, and the recorder's own reason and identity go on their stream. A durable receipt can follow later if this becomes a chore |
 
 ---
 
