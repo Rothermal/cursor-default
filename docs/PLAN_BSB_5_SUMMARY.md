@@ -1,6 +1,6 @@
 # Plan: BSB-5 Baseball Game Summary
 
-Status: approved (PR #465 merged 2026-10-03). BSB-5A merged (PR #469); BSB-5B merged (PR #471); BSB-5C merged (PR #473); BSB-5D in review. Owner questions Q1-Q6 are open;
+Status: approved (PR #465 merged 2026-10-03). BSB-5A merged (PR #469); BSB-5B merged (PR #471); BSB-5C merged (PR #473); BSB-5D merged (PR #475); BSB-5 is complete. Owner questions Q1-Q6 are open;
 slices follow the recommended answers until Mark decides otherwise.
 Builds on BSB-1 ([engine](PLAN_BSB_1_EVENT_FOUNDATION.md)), BSB-3
 ([tracker](PLAN_BSB_3_DIAMOND_AND_PITCH_CAPTURE.md)) and BSB-4
