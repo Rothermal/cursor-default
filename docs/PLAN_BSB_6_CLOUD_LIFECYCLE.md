@@ -10,7 +10,8 @@ Execution plan for the sixth Baseball phase defined in
 [HKY-5](PLAN_HKY_5_CLOUD_LIFECYCLE.md), using the sport-neutral recorder, finalization,
 cloud-policy and handshake code that HKY-5 extracted.
 
-Status: proposed. Waiting on the owner's review of this planning PR before any code.
+Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
+until the owner says otherwise. BSB-6A is in review.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -316,3 +317,21 @@ client local-only until then.
 ## 8. Delivery Record
 
 Filled in as each slice lands.
+
+### BSB-6A (in review)
+
+- Migrations `076_baseball_event_platform_publication_constraint.sql` and
+  `077_baseball_event_cloud_lifecycle.sql`, as §2 describes. Not applied yet; the owner
+  applies 076 then 077 before BSB-6B ships.
+- `validate_baseball_finalization_policy` replays the primary stream in `stream_sequence, id`
+  order, keeping only outs and base occupancy per half-inning, and refuses the malformed
+  inputs listed in the regression record. Ties and forfeits publish the recorded runs.
+- The shared `bind_event_game_v2`, `get_event_finalization_readiness` and
+  `finalize_event_game` are 073's bodies plus one Baseball line or branch each; every
+  Baseball wrapper is Hockey's with the sport renamed. `get_baseball_release_capabilities`
+  is contract 1 (migration 77) and also requires 071's team settings save.
+- Tests: `migration077.test.ts`, `bsb6aParityCases.test.ts` (24 games) and the
+  `supabase/tests/bsb6a` harness (parity, 35 malformed inputs, the team role flow, and
+  Hockey's HKY-5A flow on the new schema). See
+  [REGRESSION_BSB_6_CLOUD_LIFECYCLE.md](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md).
+- Nothing on the client changes in this slice.
