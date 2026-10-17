@@ -7,6 +7,12 @@ and unit starters) and FBE-2 (events and projection).
 
 Status: proposed; awaiting owner Q&A.
 
+Shared direction update (2026-10-17): follow the
+[tracker layout and legacy-retirement plan](PLAN_TRACKER_UI_UNIFICATION.md).
+Football still requires FBE-1/FBE-2 and this phase's Q&A; no immediate runtime
+cutover is authorized. At release there is one event UI, not a Legacy/Event picker,
+and all aggregate games, including unfinished/parked ones, open read-only summaries.
+
 ---
 
 ## 1. Goal
@@ -23,8 +29,11 @@ Save (actor prefilled only where the shared decisions allow, see §5).
 Follow the Soccer pattern (`SoccerGameSetup`, `SoccerPlayerSetup`,
 `SoccerGameTracker`): an active football event game routes `/setup`, `/players`,
 `/game` to `FootballGameSetup`, `FootballPlayerSetup`, `FootballGameTracker`.
-Existing aggregate football games keep the generic grid routes. Creation of event
-games is gated by a football release policy in `src/lib/sportAvailability.ts`
+Existing aggregate football games retain readable stats and safe existing-data
+transport, but at the Football cutover open read-only summaries instead of the
+generic grid, even when unfinished. New Football creation becomes event-only at
+release, with no version-choice setting or fallback to legacy capture. Creation
+during development is gated by a football release policy in `src/lib/sportAvailability.ts`
 (`internal` until FBE-6). No cloud writes: football event games are local-only in
 FBE-3 (`cloudSync.eventCloudPolicy` local-only, the BKE-5C3 pattern).
 
@@ -162,11 +171,15 @@ Scoring is proposed, not asked: an end spot in the end zone offers
 
 - Sticky top scorebug: score (tracked vs opponent display names), period, game
   clock with Start/Stop, timeouts, possession arrow, situation (`3rd & 4 · OWN 46`).
-- Horizontal field strip directly under the scorebug (§4).
+- Team nickname selector immediately below the scorebug, then the horizontal field
+  strip (§4). Capture side selection does not change possession or the situation.
 - Main: field (Track tab) / Plays tab (drive-grouped play-by-play, FBE-4 adds
   editing) / Box tab (live team and player totals, read-only).
 - Bottom: primary "Record play" button plus the three most likely play types as
   shortcuts; Undo opens Recent Events (shared `RecentEventsPopup` pattern).
+- Collapsed display filters below the field/quick actions; routine sync status at
+  the very bottom when cloud support arrives. Critical errors stay visible and
+  actionable. Secondary options live in the Game menu or sheets.
 - No global player strip (shared decisions).
 
 ---
