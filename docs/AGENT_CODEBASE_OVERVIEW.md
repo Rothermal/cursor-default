@@ -24,7 +24,7 @@ are not an implemented field experience. Pending live verification remains separ
 | Basketball/legacy tracker | [GameTracker.tsx](../src/pages/GameTracker.tsx) |
 | Soccer tracker | [SoccerGameTracker.tsx](../src/pages/SoccerGameTracker.tsx) |
 | Hockey and Baseball trackers | [HockeyGameTracker.tsx](../src/pages/HockeyGameTracker.tsx), [BaseballGameTracker.tsx](../src/pages/BaseballGameTracker.tsx) |
-| Event summaries | [BasketballSummary.tsx](../src/pages/BasketballSummary.tsx), [SoccerSummary.tsx](../src/pages/SoccerSummary.tsx) |
+| Event summaries | [BasketballSummary.tsx](../src/pages/BasketballSummary.tsx), [SoccerSummary.tsx](../src/pages/SoccerSummary.tsx), [HockeySummary.tsx](../src/pages/HockeySummary.tsx), [BaseballSummary.tsx](../src/pages/BaseballSummary.tsx) |
 | Legacy summary | [GameSummary.tsx](../src/pages/GameSummary.tsx) |
 | Cloud dispatch and safeguards | [cloudSync.ts](../src/lib/cloudSync.ts), [gameSyncFingerprint.ts](../src/lib/gameSyncFingerprint.ts) |
 | Settings and appearance | [SettingsContext.tsx](../src/context/SettingsContext.tsx), [appearance.css](../public/appearance.css) |

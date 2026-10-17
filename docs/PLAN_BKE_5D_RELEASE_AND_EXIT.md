@@ -5,6 +5,17 @@ activation are implemented. Deployment evidence and the focused owner smoke disp
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
 
+Follow-up direction (2026-10-17): [TUI-1](PLAN_TRACKER_UI_UNIFICATION.md) plans the
+event-only cutover and summary-only legacy retirement. At that cutover its policy
+supersedes the Legacy default/fallback, device version choice, two-state policy and
+old rollback expectations below (notably decisions 3-7 and 10-15 where conflicting).
+Creation rollback will block all new production Basketball games, not restore Legacy.
+The owner explicitly approved remaining live checks as post-deployment validation
+for this owner-only cutover, superseding the prerequisite before production history
+depends on events only in that context. The full matrix still gates broader access.
+This is prospective; no runtime policy or historical verification result is changed
+by this note. See TUI sections 1 and 6 for the exact disposition.
+
 ## 1. Goal
 
 Release the new Basketball Event tracker as a deliberate, device-local, default-off production

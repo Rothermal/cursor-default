@@ -5,6 +5,16 @@ BKE-6E2 merge candidate is deployed; BKE-6E3 owner smoke and final sign-off are 
 
 Plan: [PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md)
 
+Prospective cutover disposition (2026-10-17): the owner approved remaining live
+checks as post-deployment validation for the owner-only event-only Basketball
+cutover in [TUI-1](PLAN_TRACKER_UI_UNIFICATION.md). This supersedes the earlier
+precondition before production history depends on events only for that owner-only
+cutover. The broader-rollout gate below (D03, D05-D07, G03-G04) remains blocked.
+Existing result cells are historical evidence, not upgraded by this approval.
+The opt-in/default-off and legacy-capture expectations below describe the prior
+release; TUI-1 must record new policy/rollback and summary-only acceptance coverage.
+Nothing in this docs-only update activates that future runtime policy.
+
 ## Purpose
 
 This is the single operator record for the default-off Basketball Event tracker release. It maps
@@ -409,4 +419,5 @@ receives an issue and explicit disposition rather than silently expanding BKE-6E
 | BKE-6E1 automated release audit | Accepted in PR #350 | 2026-08-31 | Consumer allowlist, matrix, and CI |
 | BKE-6E2 release-surface hardening | Pending PR review | Pending | Runtime contracts implemented; exact browser/PWA/rollback evidence remains pending |
 | BKE-6E3 owner-only exact-candidate smoke | Pending | Pending | Local/cloud smoke and deployed identifier |
+| TUI-1 owner-only cutover validation timing | Approved by owner | 2026-10-17 | Live checks may follow deployment; implementation and exact-candidate results remain pending in the shared tracker plan. No test result or broader gate is waived |
 | Broader rollout | Blocked | Pending | D03, D05-D07, and G03-G04 must pass |

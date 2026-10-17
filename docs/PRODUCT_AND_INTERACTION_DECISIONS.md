@@ -22,6 +22,13 @@ legacy retirement are next; see the [shared tracker plan](PLAN_TRACKER_UI_UNIFIC
   aggregate legacy games. Preserve their event/recovery paths and validation.
 - Old Basketball chart availability is best-effort; underlying stats remain required.
   Do not rewrite saved geometry or fabricate event histories to retain a chart.
+- Owner decision (2026-10-17): unfinished legacy Basketball stays read-only with no
+  Finalize exception. Label its exclusion from season/career aggregates and retain
+  export; do not alter already-finalized contributions.
+- The owner approved post-deployment live validation for the event-only Basketball
+  cutover while access is owner-only. The broader-rollout matrix remains gated and
+  unexecuted checks remain pending. Retirement is per sport: TUI-1 affects Basketball
+  only; shared legacy controls for other sports remain until their own cutovers.
 
 These are approved targets, not shipped routing changes. The
 [execution plan](PLAN_TRACKER_UI_UNIFICATION.md) owns cutover, preservation and tests.

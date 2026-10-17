@@ -21,7 +21,7 @@ architecture, not current schema or deployment instructions.
 
 | Topic | Owner document | Status |
 | --- | --- | --- |
-| Shared tracker UI and legacy retirement | [Four-sport audit and cutover plan](PLAN_TRACKER_UI_UNIFICATION.md) | Owner-approved direction; docs only. Basketball first, then Soccer/Hockey; Football after FBE foundations. Legacy aggregate games become summary-only at each cutover; preserve stats and unsynced data |
+| Shared tracker UI and legacy retirement | [Four-sport audit and cutover plan](PLAN_TRACKER_UI_UNIFICATION.md) | Owner decisions recorded; docs only. Basketball first with owner-only post-deployment validation; broader rollout remains gated. Legacy games become summary-only per sport; unfinished Basketball stays out of aggregates with a notice/export. Soccer/Hockey next; Football after FBE foundations |
 | Basketball UI | [Workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) | Initial workspace implementation merged in #418; owner validation pending |
 | Basketball attribution and roster | [Team defaults and event capture](PLAN_BASKETBALL_ATTRIBUTION_AND_ROSTER.md) | BAR-1 merged; migration 070 applied. BAR-2 dropdowns and quick foul/free throws implemented; review/owner checks pending |
 | Clock and live substitutions | [Timing assessment](PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md) | Confirmed goals; implementation/schema still proposed |
