@@ -9,9 +9,13 @@ game review and optional authenticated cloud sync.
   Timeline, shootouts, Summary and canonical cloud results. Enable it in Settings.
 - **Basketball:** existing aggregate games remain supported; the event tracker is
   a device-level opt-in with clock, lineups, corrections and cloud review.
-  Its court UI modernization is planned, not yet implemented.
-- **Baseball, Football and Hockey:** configuration and generic tracking foundations
-  exist; do not treat these as completed sport-specific field experiences.
+  Court/Lineup/player details, event-local attribution and the full court are implemented.
+- **Hockey:** released event tracker with rink capture, penalties/strength, Timeline,
+  Summary and cloud lifecycle. Every new Hockey game uses events.
+- **Baseball:** opt-in local event tracker with diamond, pitch/play capture, lineups,
+  corrections and Summary; cloud lifecycle is planned, not yet implemented.
+- **Football:** generic aggregate tracking; its planned event/field experience is
+  not implemented.
 
 Availability and defaults are distinct: see
 [sport availability policy](src/lib/sportAvailability.ts) and
@@ -28,10 +32,15 @@ interchangeable authorities.
 Sports -> sport dashboard -> New Game, active/parked games, Teams, Cloud Games or
 Season Stats. Settings separates Account, App, sport preferences, Data and Advanced.
 
-Live Soccer uses Field, Lineup and Timeline workflows. Basketball currently retains
-a player selector and stat grid alongside court capture. The approved next direction
-is surface-first capture, event-local player attribution and player details opened
-from lineup cards, with a separate Manage Lineup action.
+Live Soccer uses Field, Lineup and Timeline workflows. Basketball has Court, Lineup,
+Actions and event Timeline views, with player details opened from lineup cards and
+a separate Manage Lineup action. Hockey uses Track/Timeline with sport-specific sheets.
+
+The [next shared UI plan](docs/PLAN_TRACKER_UI_UNIFICATION.md) aligns clock/score,
+team selector, surface, quick actions, collapsed filters and bottom sync status.
+It also retires legacy aggregate capture in favor of read-only stat summaries,
+preserving recorded stats and unsynced local data. These cutovers are planned,
+not implemented; Basketball goes first and Football awaits its event foundations.
 
 See [shared product decisions](docs/PRODUCT_AND_INTERACTION_DECISIONS.md) for the
 target model and its implementation status. Opening a document is not evidence
@@ -78,6 +87,7 @@ recorded separately; passing unit tests does not certify those checks.
 - [Documentation index and active work](docs/README.md)
 - [Codebase overview for contributors and agents](docs/AGENT_CODEBASE_OVERVIEW.md)
 - [Shared product and interaction decisions](docs/PRODUCT_AND_INTERACTION_DECISIONS.md)
+- [Shared tracker layout and legacy retirement](docs/PLAN_TRACKER_UI_UNIFICATION.md)
 - [Basketball workspace modernization plan](docs/PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md)
 - [Soccer field-test backlog](docs/PLAN_SOC_FIELD_TEST_BACKLOG.md)
 - [Documentation archive audit](docs/DOCUMENTATION_ARCHIVE_AUDIT.md)

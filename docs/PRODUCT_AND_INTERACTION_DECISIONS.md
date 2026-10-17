@@ -1,7 +1,30 @@
 # Shared Product and Interaction Decisions
 
 Status: approved product direction. Adoption is incremental; this document does
-not claim that every sport already implements the target. Basketball UI is next.
+not claim that every sport already implements the target. Basketball layout and
+legacy retirement are next; see the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
+
+## One tracker and shared layout
+
+- One live tracker per sport; no user-facing Legacy/Event version preference or
+  setup choice after that sport's cutover. Keep real rules and sport settings.
+- Live order: compact navigation/menu, score/period/clock and essential sport
+  context, team nickname selector, playing surface, quick actions/lineup/Undo,
+  collapsed display filters, optional detail and routine sync status at the bottom.
+- Keep critical save/conflict/access/authority alerts visible. Compact sport context
+  may remain by the clock; optional panels must not push the field below the viewport.
+- Share layout and presentation, not event construction, clock rules or permissions.
+  Football adopts this after its event foundations exist, not through a grid reskin.
+- Legacy aggregate games, including active/parked/unfinished ones, become read-only
+  stat summaries with no old tracker. Preserve stats, unsynced local data, exports
+  and authorized transport of existing facts; do not auto-finalize or convert them.
+- Older valid event games, including clockless games and old court frames, are not
+  aggregate legacy games. Preserve their event/recovery paths and validation.
+- Old Basketball chart availability is best-effort; underlying stats remain required.
+  Do not rewrite saved geometry or fabricate event histories to retain a chart.
+
+These are approved targets, not shipped routing changes. The
+[execution plan](PLAN_TRACKER_UI_UNIFICATION.md) owns cutover, preservation and tests.
 
 ## Surface-first tracking
 
@@ -88,7 +111,9 @@ semantics; do not build speculative infrastructure for every future sport.
 Field dialogs and player-detail actions use the same sport commands. Corrections
 remain revisioned, dependency-aware and subject to terminal/read-only restrictions.
 Never mutate derived totals directly or merge independent recorder streams in UI.
-Retain separate legacy adapters while legacy games remain supported.
+Retain legacy read/resolution and safe existing-data transport adapters after
+capture retirement. Legacy read-only summaries cannot offer new stat corrections,
+primary-recorder changes or finalization; preserve already-recorded resolution.
 
 ## Clock and substitution goals
 
@@ -108,8 +133,12 @@ rules; a running recorder clock is not proof of what the rules permit.
 | Area | Current versus target |
 | --- | --- |
 | Soccer | Closest existing surface-first example; still audit gaps rather than declaring complete cross-sport parity |
-| Basketball | Current strip/grid remains; next implementation is the linked workspace plan |
-| Other sports | Follow these decisions when building their sport-specific experience; no migration scheduled here |
+| Basketball | Workspace, event-local dropdowns/roster roles and full court are implemented; layout still crowded and new event creation remains opt-in; shared-layout/event-only cutover is next |
+| Hockey | Released event-only new-game setup and compact rink; align side/filter/status placement and retire remaining legacy capture |
+| Football | Generic grid only; shared layout follows FBE event foundations, not an immediate route switch |
+| Baseball/future sports | Follow the shared target when ready; no release/gate change authorized by the four-sport audit |
 | Timing/replay | Separate architectural assessment, not part of the UI-only change |
 
-Current execution proposal: [Basketball workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md).
+Current execution proposal: [Shared tracker UI and legacy retirement](PLAN_TRACKER_UI_UNIFICATION.md).
+The [Basketball workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md)
+records the earlier implementation, not an instruction to rebuild it.

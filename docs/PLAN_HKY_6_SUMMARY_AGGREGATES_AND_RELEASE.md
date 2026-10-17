@@ -5,7 +5,16 @@ Execution plan for the sixth and last core hockey phase defined in
 capture, penalties, shootout, Timeline and corrections) and
 [HKY-5](PLAN_HKY_5_CLOUD_LIFECYCLE.md) (cloud sync, finalize and reopen, settings).
 
-Status: draft for owner review. No runtime behavior changes in this document.
+Status: HKY-6A through HKY-6C implemented; owner/deployment evidence remains in
+[the release record](REGRESSION_HKY_6_RELEASE.md). This document does not itself
+change runtime behavior.
+
+Follow-up direction (2026-10-17): HKY-6 implementation is recorded below. The
+[shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md) owns subsequent layout alignment
+and supersedes continued generic-grid capture at the Hockey cutover. Existing
+aggregate games, including unfinished ones, become read-only summaries, not a
+parallel tracker; preserve their stats and unsynced data. Historical implementation
+and regression evidence below remains unchanged. New Hockey games already use events.
 
 ---
 

@@ -1,6 +1,13 @@
 # Basketball Workspace Modernization
 
-Status: initial workspace implementation complete; PR review and owner validation pending.
+Status: initial workspace implementation merged in PR #418; owner verification
+follow-ups are retained below.
+
+Follow-up direction (2026-10-17): [Shared tracker UI and legacy retirement](PLAN_TRACKER_UI_UNIFICATION.md)
+owns the next layout pass and event-only cutover. It supersedes continued legacy
+capture below: even unfinished legacy games become read-only summaries at cutover,
+with recorded stats and unsynced data preserved. The action inventory and verification
+below describe the earlier implementation; do not rebuild it or rewrite its evidence.
 
 ## Implemented workspace
 

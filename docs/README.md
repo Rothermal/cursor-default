@@ -21,6 +21,7 @@ architecture, not current schema or deployment instructions.
 
 | Topic | Owner document | Status |
 | --- | --- | --- |
+| Shared tracker UI and legacy retirement | [Four-sport audit and cutover plan](PLAN_TRACKER_UI_UNIFICATION.md) | Owner-approved direction; docs only. Basketball first, then Soccer/Hockey; Football after FBE foundations. Legacy aggregate games become summary-only at each cutover; preserve stats and unsynced data |
 | Basketball UI | [Workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) | Initial workspace implementation merged in #418; owner validation pending |
 | Basketball attribution and roster | [Team defaults and event capture](PLAN_BASKETBALL_ATTRIBUTION_AND_ROSTER.md) | BAR-1 merged; migration 070 applied. BAR-2 dropdowns and quick foul/free throws implemented; review/owner checks pending |
 | Clock and live substitutions | [Timing assessment](PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md) | Confirmed goals; implementation/schema still proposed |
@@ -28,7 +29,7 @@ architecture, not current schema or deployment instructions.
 | Soccer issues | [Field-test backlog](PLAN_SOC_FIELD_TEST_BACKLOG.md) | Living issue inventory; distinguish implemented from owner-verified |
 | Soccer live capture | [S7/S1/S4 plan](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md) | Implemented (S7A, S7B, S1, S4); pending deployed verification |
 | Shot metadata/direction | [S15/S16 regression](REGRESSION_SOC_S15_S16_SHOT_DETAILS.md) | Implemented; deployed checks remain separately recorded |
-| Basketball full court | [BKE-7 plan](PLAN_BKE_7_FULL_COURT.md), [BKE-7 regression](REGRESSION_BKE_7_FULL_COURT.md) | Plan approved; BKE-7A frame, 7B live full court and 7C located plays merged; 7D Summary views and Plays map in review; owner game checks pending |
+| Basketball full court | [BKE-7 plan](PLAN_BKE_7_FULL_COURT.md), [BKE-7 regression](REGRESSION_BKE_7_FULL_COURT.md) | BKE-7A through 7D merged; owner game checks remain post-deployment validation. Next layout work is in the shared tracker plan |
 | Basketball release evidence | [BKE-6E regression](REGRESSION_BKE_6E_RELEASE.md) | Preserve pending evidence and reported issues; reconcile with owner results before archiving |
 | Appearance release | [THM-6 regression](REGRESSION_THM_6_APPEARANCE_RELEASE.md) | Released for owner use; retain pending deployed checks |
 | Football program | [FBE-0 product model](PLAN_FBE_0_FOOTBALL_PRODUCT_MODEL.md) with [FBE-1](PLAN_FBE_1_ROSTER_POSITIONS_AND_UNITS.md), [FBE-2](PLAN_FBE_2_PLAY_EVENT_MODEL.md), [FBE-3](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md) | FBE-0 direction approved 2026-09-26; phase Q&A before code; no code yet |
