@@ -7,7 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, BadgeAlert, Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
+import { ArrowLeft, BadgeAlert, CircleDot, Clock3, Hand, Link2, List, Minus, ReceiptText, Target, Trash2, Undo2, Users, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
@@ -18,6 +18,8 @@ import { basketballRulesAllowOneAndOne } from '../lib/basketball/rules'
 import { basketballBonusFoulCountsForPeriod } from '../lib/basketball/administrativeProjection'
 import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
+import GameSyncStatus from '../components/GameSyncStatus'
+import TrackerOptionsMenu from '../components/TrackerOptionsMenu'
 import StatButton from '../components/StatButton'
 import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
 import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
@@ -1132,16 +1134,45 @@ export default function GameTracker() {
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
+  const workspaceTabs = isBasketball && !basketballCorrectionMode ? (
+    <div className={`grid min-h-11 ${isBasketballEventMode ? 'grid-cols-4' : 'grid-cols-3'} border-b border-line-strong bg-control p-1`} role="tablist" aria-label="Basketball game workspace">
+      <button ref={basketballTrackTabRef} type="button" id="basketball-track-tab" role="tab"
+        aria-controls="basketball-track-panel" aria-selected={basketballWorkspace === 'track'}
+        tabIndex={basketballWorkspace === 'track' ? 0 : -1} onClick={() => setBasketballWorkspace('track')}
+        onKeyDown={handleBasketballWorkspaceKeyDown}
+        className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${basketballWorkspace === 'track' ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
+        <Target size={16} aria-hidden /> Court
+      </button>
+      {(['lineup', 'actions'] as const).map(view => (
+        <button key={view} type="button" role="tab" id={`basketball-${view}-tab`}
+          aria-controls={`basketball-${view}-panel`} aria-selected={basketballWorkspace === view}
+          tabIndex={basketballWorkspace === view ? 0 : -1} onKeyDown={handleBasketballWorkspaceKeyDown}
+          onClick={() => { setDetailPlayerId(null); setBasketballWorkspace(view) }}
+          className={`min-w-0 rounded-md px-1 py-2 text-sm font-semibold ${basketballWorkspace === view ? 'bg-surface text-content' : 'text-content-muted'}`}>
+          {view === 'lineup' ? 'Lineup' : 'Actions'}
+        </button>
+      ))}
+      {isBasketballEventMode && <button ref={basketballTimelineTabRef} type="button" id="basketball-timeline-tab" role="tab"
+        aria-controls="basketball-timeline-panel" aria-selected={basketballWorkspace === 'timeline'}
+        tabIndex={basketballWorkspace === 'timeline' ? 0 : -1} onClick={() => setBasketballWorkspace('timeline')}
+        onKeyDown={handleBasketballWorkspaceKeyDown}
+        className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${basketballWorkspace === 'timeline' ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
+        <List size={16} aria-hidden /> Timeline
+      </button>}
+    </div>
+  ) : null
+
   return (
     <div className="min-h-screen flex flex-col bg-surface-muted">
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between gap-2 mb-1">
           <button
             onClick={() => navigate(sportDashboardPath(sport.id))}
             className="text-sm text-content-subtle font-medium active:scale-95 transition-transform"
           >
             Dashboard
           </button>
+          <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(isBasketballEventMode
               ? basketballSummaryPath({ from: 'tracker' })
@@ -1150,19 +1181,35 @@ export default function GameTracker() {
           >
             Summary →
           </button>
+          {basketballSportState && <TrackerOptionsMenu>
+            <button type="button" className="btn-secondary mb-2 w-full" onClick={() => { setDetailPlayerId(null); setBasketballWorkspace('actions') }}>Game actions</button>
+            <button type="button" className="btn-secondary mb-2 w-full" disabled={!basketballPeriodActive}
+              onClick={() => { setScoreCorrectionError(null); setShowScoreCorrection(true) }}>Official score correction</button>
+            <button type="button" className="btn-secondary mb-2 flex w-full items-center justify-center gap-2"
+              disabled={basketballCorrectionMode || (basketballCaptureUnits.length === 0 && !canRestoreBasketball)}
+              onClick={() => setShowRecentEvents(true)}><Undo2 size={16} aria-hidden /> Recent events / Undo</button>
+            <BasketballLifecycleControls
+              sportState={basketballSportState}
+              onEndPeriod={handleEndBasketballPeriod}
+              onStartNextPeriod={handleStartNextBasketballPeriod}
+              onComplete={() => setShowCompleteConfirm(true)}
+              onSuspend={() => { setLifecycleError(null); setPendingLocalEnd('suspend') }}
+              onAbandon={() => { setLifecycleError(null); setPendingLocalEnd('abandon') }}
+              onReopen={() => { setReopenError(null); setShowReopenDialog(true) }}
+            />
+          </TrackerOptionsMenu>}
+          </div>
         </div>
 
+        {isBasketballEventMode && workspaceTabs}
         <Scoreboard
           readOnly={isBasketballEventMode}
-          eventScoreControls={basketballSportState ? {
-            disabled: !basketballPeriodActive,
-            onAdjust: handleQuickScoreAdjustment,
-            onOfficialCorrection: () => {
-              setScoreCorrectionError(null)
-              setShowScoreCorrection(true)
-            },
-          } : undefined}
+          compact={isBasketballEventMode}
+          showSyncStatus={!isBasketballEventMode}
         />
+        {basketballSportState && !basketballSportState.projection.clock && (
+          <p className="px-3 py-1 text-xs font-semibold text-content-muted">{currentBasketballSegment?.label ?? 'Period unavailable'}</p>
+        )}
         {parkingError && (
           <div className="mt-3 rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
             {parkingError}
@@ -1173,7 +1220,6 @@ export default function GameTracker() {
             {cloudRecoveryError}
           </div>
         )}
-        <BasketballEnableCloudPanel state={state} />
         {cloudConflicts.length > 0 ? (
           <div className="mt-3 flex items-center gap-3 border border-warning-line bg-warning px-3 py-3 text-warning-content">
             <BadgeAlert size={20} className="shrink-0" />
@@ -1194,53 +1240,12 @@ export default function GameTracker() {
             <button type="button" onClick={exportBasketballRecovery} className="min-h-9 rounded-md border border-danger-line bg-surface px-3 text-xs font-bold text-danger-content">Export</button>
           </div>
         ) : null}
-        {isBasketballEventMode && state.cloudSync.gameId && (
-          <BasketballRecorderStatus
-            gameId={state.cloudSync.gameId}
-            teamId={state.cloudSync.teamId}
-            refreshSignal={state.cloudSync.lastSyncedAt}
-          />
-        )}
-        {basketballSportState && (
-          <BasketballLifecycleControls
-            sportState={basketballSportState}
-            errorMessage={lifecycleError}
-            onEndPeriod={handleEndBasketballPeriod}
-            onStartNextPeriod={handleStartNextBasketballPeriod}
-            onComplete={() => setShowCompleteConfirm(true)}
-            onSuspend={() => {
-              setLifecycleError(null)
-              setPendingLocalEnd('suspend')
-            }}
-            onAbandon={() => {
-              setLifecycleError(null)
-              setPendingLocalEnd('abandon')
-            }}
-            onReopen={() => {
-              setReopenError(null)
-              setShowReopenDialog(true)
-            }}
-          />
-        )}
-        {basketballSportState && currentBasketballSegment && (
-          <BasketballEventBonusPanel
-            periodLabel={currentBasketballSegment.label}
-            trackedTeamName={trackedTeamLabel}
-            opponentName={opponentTeamLabel}
-            trackedFouls={currentBasketballFouls.tracked}
-            opponentFouls={currentBasketballFouls.opponent}
-            trackedStatus={currentBasketballBonus.tracked}
-            opponentStatus={currentBasketballBonus.opponent}
-            hasOneAndOne={basketballRulesAllowOneAndOne(
-              basketballSportState.setup.rulesSnapshot,
-              currentBasketballSegment.id
-            )}
-          />
-        )}
+        {lifecycleError && <p role="alert" className="mt-2 border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{lifecycleError}</p>}
       </div>
 
       {isBasketballEventMode && !basketballCorrectionMode && (
         <BasketballClockStrip
+          compact
           state={state}
           recorderUserId={user?.id ?? null}
           settings={basketballDeviceSettings}
@@ -1260,60 +1265,24 @@ export default function GameTracker() {
         />
       )}
 
-      {isBasketball && !basketballCorrectionMode && (
+      {basketballSportState && currentBasketballSegment && (
+        <div className="mx-auto w-full max-w-lg px-3">
+          <BasketballEventBonusPanel compact
+            periodLabel={currentBasketballSegment.label}
+            trackedTeamName={trackedTeamLabel}
+            opponentName={opponentTeamLabel}
+            trackedFouls={currentBasketballFouls.tracked}
+            opponentFouls={currentBasketballFouls.opponent}
+            trackedStatus={currentBasketballBonus.tracked}
+            opponentStatus={currentBasketballBonus.opponent}
+            hasOneAndOne={basketballRulesAllowOneAndOne(basketballSportState.setup.rulesSnapshot, currentBasketballSegment.id)}
+          />
+        </div>
+      )}
+
+      {!isBasketballEventMode && isBasketball && !basketballCorrectionMode && (
         <div className="mx-auto w-full max-w-lg px-3 pb-2">
-          <div className={`grid min-h-11 ${isBasketballEventMode ? 'grid-cols-4' : 'grid-cols-3'} border-b border-line-strong bg-control p-1`} role="tablist" aria-label="Basketball game workspace">
-            <button
-              ref={basketballTrackTabRef}
-              type="button"
-              id="basketball-track-tab"
-              role="tab"
-              aria-controls="basketball-track-panel"
-              aria-selected={basketballWorkspace === 'track'}
-              tabIndex={basketballWorkspace === 'track' ? 0 : -1}
-              onClick={() => setBasketballWorkspace('track')}
-              onKeyDown={handleBasketballWorkspaceKeyDown}
-              className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${
-                basketballWorkspace === 'track'
-                  ? 'bg-surface text-content shadow-sm'
-                  : 'text-content-muted'
-              }`}
-            >
-              <Target size={16} aria-hidden />
-              Court
-            </button>
-            {(['lineup', 'actions'] as const).map(view => (
-              <button key={view} type="button" role="tab" id={`basketball-${view}-tab`}
-                aria-controls={`basketball-${view}-panel`} aria-selected={basketballWorkspace === view}
-                tabIndex={basketballWorkspace === view ? 0 : -1}
-                onKeyDown={handleBasketballWorkspaceKeyDown}
-                onClick={() => { setDetailPlayerId(null); setBasketballWorkspace(view) }}
-                className={`min-w-0 rounded-md px-1 py-2 text-sm font-semibold ${basketballWorkspace === view ? 'bg-surface text-content' : 'text-content-muted'}`}>
-                {view === 'lineup' ? 'Lineup' : 'Actions'}
-              </button>
-            ))}
-            {isBasketballEventMode && (
-            <button
-              ref={basketballTimelineTabRef}
-              type="button"
-              id="basketball-timeline-tab"
-              role="tab"
-              aria-controls="basketball-timeline-panel"
-              aria-selected={basketballWorkspace === 'timeline'}
-              tabIndex={basketballWorkspace === 'timeline' ? 0 : -1}
-              onClick={() => setBasketballWorkspace('timeline')}
-              onKeyDown={handleBasketballWorkspaceKeyDown}
-              className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${
-                basketballWorkspace === 'timeline'
-                  ? 'bg-surface text-content shadow-sm'
-                  : 'text-content-muted'
-              }`}
-            >
-              <List size={16} aria-hidden />
-              Timeline
-            </button>
-            )}
-          </div>
+          {workspaceTabs}
         </div>
       )}
 
@@ -1418,14 +1387,34 @@ export default function GameTracker() {
 
       {isBasketball && basketballWorkspace === 'track' && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
-          <label className="mb-2 flex items-center gap-2 text-sm text-content-muted">
-            Shot chart
-            <select value={courtReviewPlayerId} onChange={event => setCourtReviewPlayerId(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-content">
-              <option value="all">All shots</option>
-              {players.map(player => <option key={player.id} value={player.id}>{shotViewLabel({ kind: 'player', playerId: player.id }, players)}</option>)}
-            </select>
-          </label>
           <ShotChartPanel
+            compact={isBasketballEventMode}
+            surfaceActions={isBasketballEventMode ? (
+              <div className="grid grid-cols-4 gap-1 border-b border-line py-2" aria-label="Quick actions">
+                <button type="button" className="btn-secondary flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-xs" disabled={!basketballPeriodActive}
+                  onClick={() => openFoulDialog(workspaceSide, null, 'personal', 'common', null)} title="Record foul"><Hand size={18} aria-hidden /> Foul</button>
+                <button type="button" className="btn-secondary flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-xs" disabled={!basketballPeriodActive}
+                  onClick={() => openQuickFreeThrow(workspaceSide)} title="Record free throw"><CircleDot size={18} aria-hidden /> Free throw</button>
+                <button type="button" className="btn-secondary flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-xs"
+                  disabled={!basketballSportState?.projection.lineup?.sides[workspaceSide] || Boolean(basketballSportState.projection.clock?.running)}
+                  onClick={() => setRequestedLineupSide(workspaceSide)} title="Manage lineup"><Users size={18} aria-hidden /> Lineup</button>
+                <button type="button" className="btn-secondary flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-xs"
+                  disabled={basketballCaptureUnits.length === 0 && !canRestoreBasketball}
+                  onClick={() => setShowRecentEvents(true)} title="Recent events and Undo"><Undo2 size={18} aria-hidden /> Undo</button>
+              </div>
+            ) : undefined}
+            reviewControls={(
+              <details open={isBasketballEventMode ? undefined : true} className="border-b border-line py-2">
+                <summary className={isBasketballEventMode ? 'min-h-9 cursor-pointer text-sm font-semibold text-content-muted' : 'hidden'}>Display filters</summary>
+                <label className="flex items-center gap-2 text-sm text-content-muted">
+                  Shot chart
+                  <select aria-label="Shot chart filter" value={courtReviewPlayerId} onChange={event => setCourtReviewPlayerId(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-content">
+                    <option value="all">All shots</option>
+                    {players.map(player => <option key={player.id} value={player.id}>{shotViewLabel({ kind: 'player', playerId: player.id }, players)}</option>)}
+                  </select>
+                </label>
+              </details>
+            )}
             selection={shotChartSelection}
             onSelectPlayer={handleSelectPlayer}
             capturePlayerId={workspaceTeamPlayer?.id ?? null}
@@ -1467,6 +1456,14 @@ export default function GameTracker() {
 
       <div className="px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
+          {isBasketballEventMode && basketballWorkspace === 'actions' && <Scoreboard
+            readOnly showSyncStatus={false}
+            eventScoreControls={{
+              disabled: !basketballPeriodActive,
+              onAdjust: handleQuickScoreAdjustment,
+              onOfficialCorrection: () => { setScoreCorrectionError(null); setShowScoreCorrection(true) },
+            }}
+          />}
           {displayGridCategories.map(category => {
             const missMap: Record<string, typeof category.actions[0]> = {}
             for (const a of category.actions) {
@@ -1845,7 +1842,16 @@ export default function GameTracker() {
         <BasketballTimeline />
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur border-t border-line px-4 py-3 safe-bottom">
+      {isBasketballEventMode && <footer className="mx-auto w-full max-w-lg space-y-2 border-t border-line px-3 py-3 safe-bottom" aria-label="Game sync and recorders">
+        {eventLastActionLabel && <p className="break-words text-xs text-content-muted">Last: {eventLastActionLabel}</p>}
+        <BasketballEnableCloudPanel state={state} />
+        {state.cloudSync.gameId && <BasketballRecorderStatus
+          gameId={state.cloudSync.gameId} teamId={state.cloudSync.teamId} refreshSignal={state.cloudSync.lastSyncedAt}
+        />}
+        <GameSyncStatus />
+      </footer>}
+
+      {!isBasketballEventMode && <div className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur border-t border-line px-4 py-3 safe-bottom">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="min-w-0 pr-3 text-xs text-content-subtle">
             {(isBasketballEventMode ? eventLastActionLabel : lastActionLabel) && (
@@ -1862,7 +1868,7 @@ export default function GameTracker() {
             ↩ Undo
           </button>
         </div>
-      </div>
+      </div>}
 
       {showRecentEvents && isBasketballEventMode && (
         <BasketballRecentEventsPopup

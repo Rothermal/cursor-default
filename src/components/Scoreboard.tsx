@@ -3,7 +3,7 @@ import { useGame } from '../context/GameContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import type { BasketballTeamSide } from '../lib/basketball/types'
-import { isEventGameLocalOnly } from '../lib/eventCloudPolicy'
+import GameSyncStatus from './GameSyncStatus'
 import { gameSideDisplayName } from '../lib/display'
 
 interface EventScoreControls {
@@ -15,9 +15,11 @@ interface EventScoreControls {
 interface ScoreboardProps {
   readOnly?: boolean
   eventScoreControls?: EventScoreControls
+  compact?: boolean
+  showSyncStatus?: boolean
 }
 
-export default function Scoreboard({ readOnly = false, eventScoreControls }: ScoreboardProps) {
+export default function Scoreboard({ readOnly = false, eventScoreControls, compact = false, showSyncStatus = true }: ScoreboardProps) {
   const { state, dispatch } = useGame()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, cloudSync } =
     state
@@ -29,33 +31,8 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
   const trackedLabel = gameSideDisplayName(gameInfo, 'tracked')
   const opponentLabel = gameSideDisplayName(gameInfo, 'opponent')
 
-  const syncLabel = (() => {
-    if (isEventGameLocalOnly(state) && cloudSync.status !== 'error') {
-      return 'Cloud Sync: local only'
-    }
-    switch (cloudSync.status) {
-      case 'offline':
-        return 'Cloud Sync: offline'
-      case 'syncing':
-        return 'Cloud Sync: syncing...'
-      case 'synced':
-        return cloudSync.lastSyncedAt ? 'Cloud Sync: saved' : 'Cloud Sync: connected'
-      case 'error':
-        if (cloudSync.lastError?.includes("Could not find the table 'public.")) {
-          return 'Cloud Sync: run migrations'
-        }
-        if (cloudSync.lastError?.includes('infinite recursion detected in policy')) {
-          return 'Cloud Sync: apply 005 migration'
-        }
-        return 'Cloud Sync: error'
-      case 'idle':
-      default:
-        return null
-    }
-  })()
-
   return (
-    <div className="rounded-lg border border-line bg-surface p-4 text-content shadow-sm">
+    <div className={compact ? 'border-b border-line bg-surface px-3 py-2 text-content' : 'rounded-lg border border-line bg-surface p-4 text-content shadow-sm'}>
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1 text-center">
           <p className="text-xs font-medium break-words text-content-muted">
@@ -164,9 +141,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
           syncs of this game merged their stats — check those totals in the cloud.
         </p>
       )}
-      {syncLabel && (
-        <p className="text-center text-[11px] text-content-muted mt-1">{syncLabel}</p>
-      )}
+      {showSyncStatus && <GameSyncStatus />}
     </div>
   )
 }

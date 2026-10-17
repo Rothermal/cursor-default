@@ -97,10 +97,10 @@ export default function BasketballFullCourt({
     <div className={className}>
       {labels && (shownLeft || shownRight) && (
         <div className="mb-1 grid grid-cols-2 gap-2 text-xs font-bold text-content-muted">
-          <span className="min-w-0 truncate text-left">
+          <span className="relative min-w-0 truncate text-left" title={shownLeft ? `${shownLeft} attacking the left basket` : undefined}>
             {shownLeft && <><span aria-hidden="true">← </span>{shownLeft}<span className="sr-only"> attacking the left basket</span></>}
           </span>
-          <span className="min-w-0 truncate text-right">
+          <span className="relative min-w-0 truncate text-right" title={shownRight ? `${shownRight} attacking the right basket` : undefined}>
             {shownRight && <>{shownRight}<span className="sr-only"> attacking the right basket</span><span aria-hidden="true"> →</span></>}
           </span>
         </div>
