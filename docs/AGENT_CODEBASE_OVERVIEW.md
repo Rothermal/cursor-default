@@ -9,7 +9,10 @@ assuming a plan or old note is the implemented behavior.
 
 StatKeeper is a React/TypeScript PWA. Soccer has a released event-based experience.
 Basketball supports both historical aggregate games and an opt-in event tracker.
-Other configured sports are not completed sport-specific products.
+Hockey has a released event tracker, Summary and cloud lifecycle; every new Hockey
+game uses events. Baseball has an opt-in local event tracker and Summary, with cloud
+lifecycle planned. Football still uses the generic aggregate grid; its event plans
+are not an implemented field experience. Pending live verification remains separate.
 
 | Area | Starting points |
 | --- | --- |
@@ -20,7 +23,8 @@ Other configured sports are not completed sport-specific products.
 | Basketball rules, commands and projection | [basketball](../src/lib/basketball/) |
 | Basketball/legacy tracker | [GameTracker.tsx](../src/pages/GameTracker.tsx) |
 | Soccer tracker | [SoccerGameTracker.tsx](../src/pages/SoccerGameTracker.tsx) |
-| Event summaries | [BasketballSummary.tsx](../src/pages/BasketballSummary.tsx), [SoccerSummary.tsx](../src/pages/SoccerSummary.tsx) |
+| Hockey and Baseball trackers | [HockeyGameTracker.tsx](../src/pages/HockeyGameTracker.tsx), [BaseballGameTracker.tsx](../src/pages/BaseballGameTracker.tsx) |
+| Event summaries | [BasketballSummary.tsx](../src/pages/BasketballSummary.tsx), [SoccerSummary.tsx](../src/pages/SoccerSummary.tsx), [HockeySummary.tsx](../src/pages/HockeySummary.tsx), [BaseballSummary.tsx](../src/pages/BaseballSummary.tsx) |
 | Legacy summary | [GameSummary.tsx](../src/pages/GameSummary.tsx) |
 | Cloud dispatch and safeguards | [cloudSync.ts](../src/lib/cloudSync.ts), [gameSyncFingerprint.ts](../src/lib/gameSyncFingerprint.ts) |
 | Settings and appearance | [SettingsContext.tsx](../src/context/SettingsContext.tsx), [appearance.css](../public/appearance.css) |
@@ -52,9 +56,13 @@ Share stable presentation primitives and interaction contracts. Sport modules ow
 eligibility, event payloads, validation and projection. Use focused slots/capabilities,
 not a universal component containing branches for every sport.
 
-Basketball is the next adopter. Soccer provides examples, not a perfect template to
-copy wholesale. [The Basketball plan](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md)
-separates workspace changes from the unimplemented clock/replay redesign.
+Basketball's workspace, attribution and full court are implemented. The
+[shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md) now owns the next layout pass
+and legacy retirement: one event UI per sport, with legacy aggregate games reduced
+to read-only stat summaries at cutover. This is an approved target, not shipped
+routing or permission to discard local data. Soccer provides examples, not a
+perfect template. Football needs its event foundations before adoption. The
+[earlier Basketball plan](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) remains history.
 
 ## Timing Is Not Yet Redesigned
 
