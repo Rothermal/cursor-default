@@ -159,7 +159,7 @@ describe('Basketball lineup launcher focus', () => {
     flushFocus()
     expect(props.onState).toHaveBeenCalledOnce()
     expect(props.state.eventStream!.events).toHaveLength(count + 1)
-    expect(props.state.eventStream!.events[count].eventType).toBe('basketball.substitution')
+    expect(props.state.eventStream!.events[count]).toMatchObject({ eventType: 'basketball.substitution' })
     expect(external.focus).toHaveBeenCalledOnce()
     expect(internalLauncher.focus).not.toHaveBeenCalled()
     expect(tools.open).toBe(open)
