@@ -38,6 +38,7 @@ import { HockeyCloudRecoveryError, syncHockeyEventGameToCloud } from '../lib/hoc
 import { enableHockeyEventCloud } from '../lib/hockey/enableCloudSync'
 import { BaseballCloudRecoveryError, syncBaseballEventGameToCloud } from '../lib/baseball/cloudSync'
 import { enableBaseballEventCloud } from '../lib/baseball/enableCloudSync'
+import { isCurrentAuthUser } from '../lib/authIdentity'
 import {
   applyBasketballReopenHandoff,
   loadBasketballReopenHandoff,
@@ -126,6 +127,8 @@ import {
 } from '../lib/gameStorageKeys'
 
 /** A Basketball handoff from the server read, or a Hockey one from the manager's reopen result. */
+const ACCOUNT_CHANGED_REASON = 'The signed-in account changed. Try again.'
+
 export type EventReopenHandoff = BasketballReopenHandoff | HockeyReopenHandoff
 
 export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
@@ -420,6 +423,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const pendingSyncRef = useRef(getPendingSyncFlag())
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
+  /**
+   * True once work started for `ownerId` has outlived that account: the provider moved to
+   * another account, or the auth client already reports one. Such work must stop before any
+   * storage call, because reading parked games as the old owner clears the new owner's games.
+   */
+  const isStaleOwner = useCallback(
+    (ownerId: string | null) => prevUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId),
+    []
+  )
   const hydratedUserRef = useRef<string | null>(null)
   const eventCloudEligible = isEventCloudSyncEligible(state)
 
@@ -502,6 +514,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const prepareActiveGameMutation = useCallback(
     (action: BasketballWorkflowAction) => {
+      if (isStaleOwner(userId)) return false
       const current = stateRef.current
       const hasActiveGame = Boolean(
         current.sport &&
@@ -543,7 +556,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setParkingError(null)
       return true
     },
-    [userId]
+    [isStaleOwner, userId]
   )
 
   const blockUnpreparedRunningClock = useCallback(
@@ -622,6 +635,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const openGameSnapshot = useCallback(
     (nextState: GameState) => {
+      // A page that awaited a cloud read may call this after the account changed.
+      if (isStaleOwner(userId)) return false
       if (blockUnpreparedRunningClock('resume_commit')) return false
       let createdLocalGameId: string | null = null
       let previousActiveLocalGameId: string | null = null
@@ -661,7 +676,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return false
       }
     },
-    [blockUnpreparedRunningClock, userId]
+    [blockUnpreparedRunningClock, isStaleOwner, userId]
   )
 
   const parkCurrentGame = useCallback(() => {
@@ -681,6 +696,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const resumeParkedGame = useCallback(
     (localGameId: string) => {
+      if (isStaleOwner(userId)) return null
       if (
         getActiveLocalGameId(userId) !== localGameId &&
         blockUnpreparedRunningClock('resume_commit')
@@ -700,7 +716,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return null
       }
     },
-    [blockUnpreparedRunningClock, userId]
+    [blockUnpreparedRunningClock, isStaleOwner, userId]
   )
 
   const discardParkedGame = useCallback(
@@ -855,11 +871,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [isConfigured, isOnline, state.cloudSync.status])
 
   const refreshParkingState = useCallback(() => {
+    if (isStaleOwner(userId)) return
     setParkedGames(listParkedGames(userId))
     setActiveLocalGameId(getActiveLocalGameId(userId))
     pendingSyncRef.current = hasDirtyParkedGames(userId)
     setPendingSyncFlag(pendingSyncRef.current)
-  }, [userId])
+  }, [isStaleOwner, userId])
 
   const syncParkedRecord = useCallback(
     async (record: ParkedGameRecord) => {
@@ -930,6 +947,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
               state: snapshot,
               userId: snapshotUserId!,
               localGameId: record.localGameId,
+              assertCurrent: () => {
+                if (isStaleOwner(snapshotUserId)) {
+                  throw new Error('The signed-in account changed before Soccer cloud sync.')
+                }
+              },
             })
           : syncRoute === 'basketball_events'
           ? await syncBasketballEventGameToCloud({
@@ -937,7 +959,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               userId: snapshotUserId!,
               localGameId: record.localGameId,
               assertCurrent: () => {
-                if (prevUserIdRef.current !== snapshotUserId) {
+                if (isStaleOwner(snapshotUserId)) {
                   throw new Error('The signed-in account changed before Basketball cloud sync.')
                 }
               },
@@ -948,7 +970,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               userId: snapshotUserId!,
               localGameId: record.localGameId,
               assertCurrent: () => {
-                if (prevUserIdRef.current !== snapshotUserId) {
+                if (isStaleOwner(snapshotUserId)) {
                   throw new Error('The signed-in account changed before Hockey cloud sync.')
                 }
               },
@@ -959,7 +981,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               userId: snapshotUserId!,
               localGameId: record.localGameId,
               assertCurrent: () => {
-                if (prevUserIdRef.current !== snapshotUserId) {
+                if (isStaleOwner(snapshotUserId)) {
                   throw new Error('The signed-in account changed before Baseball cloud sync.')
                 }
               },
@@ -972,6 +994,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           : (() => {
               throw new Error('This game does not support cloud sync.')
             })()
+        if (isStaleOwner(snapshotUserId)) return
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
         if (!latestRecord) return
 
@@ -1088,6 +1111,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         const networkish = isLikelyNetworkError(error)
         const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
+        if (isStaleOwner(snapshotUserId)) return
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
         if (!latestRecord) return
 
@@ -1132,7 +1156,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         refreshParkingState()
       }
     },
-    [isConfigured, isOnline, refreshParkingState, userId]
+    [isConfigured, isOnline, isStaleOwner, refreshParkingState, userId]
   )
 
   const runCloudSync = useCallback(async () => {
@@ -1153,18 +1177,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       do {
         queueAnotherSyncRef.current = false
+        if (isStaleOwner(userId)) break
         const dirtyRecords = listDirtyParkedGameRecords(userId)
         if (dirtyRecords.length === 0) break
 
         for (const record of dirtyRecords) {
+          if (isStaleOwner(userId)) break
           await syncParkedRecord(record)
         }
-      } while (queueAnotherSyncRef.current)
+      } while (queueAnotherSyncRef.current && !isStaleOwner(userId))
     } finally {
       syncInFlightRef.current = false
       refreshParkingState()
     }
-  }, [isConfigured, isOnline, refreshParkingState, syncParkedRecord, userId])
+  }, [isConfigured, isOnline, isStaleOwner, refreshParkingState, syncParkedRecord, userId])
 
   const flushCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
     if (debounceTimerRef.current !== null) {
@@ -1172,6 +1198,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       debounceTimerRef.current = null
     }
     await runCloudSync()
+    if (isStaleOwner(userId)) return { ok: false, reason: ACCOUNT_CHANGED_REASON }
     const activeId = getActiveLocalGameId(userId)
     const activeRecord = activeId ? getParkedGameRecord(activeId, userId) : null
     const s = activeRecord?.gameState ?? stateRef.current
@@ -1185,7 +1212,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       return { ok: false, reason: 'Latest changes could not be synced. Try again.' }
     }
     return { ok: true }
-  }, [isOnline, runCloudSync, userId])
+  }, [isOnline, isStaleOwner, runCloudSync, userId])
 
   const recoverDeletedEventParticipantSources = useCallback(
     async (): Promise<FlushCloudSyncResult> => {
@@ -1215,6 +1242,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       stateRef.current = recoveryState
       dispatch({ type: 'HYDRATE_STATE', state: recoveryState })
       await runCloudSync()
+      if (isStaleOwner(userId)) return { ok: false, reason: ACCOUNT_CHANGED_REASON }
 
       const result = getParkedGameRecord(localGameId, userId)?.gameState ?? stateRef.current
       if (result.cloudSync.status === 'error') {
@@ -1225,7 +1253,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
       return { ok: true }
     },
-    [runCloudSync, userId]
+    [isStaleOwner, runCloudSync, userId]
   )
 
   const flushCloudGameSync = useCallback(async (
@@ -1236,6 +1264,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       debounceTimerRef.current = null
     }
     await runCloudSync()
+    if (isStaleOwner(userId)) return { ok: false, reason: ACCOUNT_CHANGED_REASON }
     if (!isOnline) {
       return { ok: false, reason: 'Offline - connect to sync before continuing' }
     }
@@ -1269,7 +1298,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     }
     return { ok: true }
-  }, [isOnline, runCloudSync, userId])
+  }, [isOnline, isStaleOwner, runCloudSync, userId])
 
   const enableEventCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
     const sportId = stateRef.current.sport?.id
@@ -1292,6 +1321,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     const assertCurrent = () => {
+      if (isStaleOwner(userId)) throw new Error(ACCOUNT_CHANGED_REASON)
       const currentRecord = getParkedGameRecord(localGameId, userId)
       if (
         getActiveLocalGameId(userId) !== localGameId ||
@@ -1366,7 +1396,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setPendingSyncFlag(pendingSyncRef.current)
     setParkingError(null)
     return { ok: true }
-  }, [isConfigured, isOnline, userId])
+  }, [isConfigured, isOnline, isStaleOwner, userId])
 
   const markEventCloudGameReopened = useCallback(async (
     gameId: string,
@@ -1377,6 +1407,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const handoff = suppliedHandoff === undefined
         ? await loadBasketballReopenHandoff(gameId)
         : suppliedHandoff
+      if (isStaleOwner(userId)) return
       const matches = listParkedGameRecords(userId).filter(
         record => record.gameState.cloudSync.gameId === gameId
       )
@@ -1430,7 +1461,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setParkingError(parkedGameStorageErrorMessage(error))
     }
-  }, [activeLocalGameId, userId])
+  }, [activeLocalGameId, isStaleOwner, userId])
 
   const resolveEventConflict = useCallback(
     (eventId: string, resolution: 'local' | 'remote') => {

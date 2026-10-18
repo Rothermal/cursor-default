@@ -142,6 +142,37 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
 Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test`
 (294 files, 2,762 tests) and `pnpm build` pass.
 
+### Review fix: account changes during sync or a cloud open
+
+The review of `15a892cb` found two account-lifetime gaps that this slice exposed Baseball to:
+
+- The shared transport (`syncEventGameToCloud`) now takes `assertCurrent` and calls it
+  before the bind, the nickname writes, conflict records, every event upsert, conflict
+  resolution and the checkpoint, and before the result settles. Every sport's wrapper passes
+  it (Soccer's now too), so events recorded by one account never upload once another
+  account is signed in.
+- `src/lib/authIdentity.ts` holds the account the auth client last reported, set
+  synchronously in `AuthContext`. `GameContext`'s `isStaleOwner` combines it with the
+  provider's account. Sync success and failure, the queue loop, `refreshParkingState`,
+  the flush callbacks, Enable cloud sync and reopen handling all stop before reading parked
+  games as the old account (`readManifest` clears every parked game on an owner mismatch).
+  So do `openGameSnapshot`, `resumeParkedGame` and `prepareActiveGameMutation`, which a page
+  may call after an await.
+- Cloud Games cancels an open once the page unmounts or the account changes
+  (`openIsStale`), before navigating or touching storage.
+
+Tests: `src/lib/baseball/cloudAccountSwitch.test.ts` (5 cases: uploads while the account
+holds; no writes when it changes during the remote read; stops after the first event write
+without a checkpoint; no settled result when it changes during the checkpoint; no bind when
+it already changed). The middle three fail on the previous transport. `GameContext.test.ts`
+adds 3 cases: callbacks captured for one account refuse to open, resume, prepare or flush
+after another account signs in, and that account's parked game survives; a control showing
+that a read as the old account clears it; and a normal open still works.
+`releaseEntryGuards.test.ts` checks the new Cloud Games guard.
+
+Checks after the fix: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings),
+`pnpm test --maxWorkers=2` (295 files, 2,770 tests) and `pnpm build` pass.
+
 ### After applying 076-077 (owner)
 
 | Step | Expected |
@@ -154,4 +185,5 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
 | A game recorded before this release | Game menu: Enable cloud sync; after confirming, it uploads and appears in Cloud Games |
 | A second scorer opens the team game | Offered their own recorder stream; it opens unstarted |
 | A viewer opens it | Game Info |
+| Start a Cloud Games open, then sign out and into another account before it finishes | Nothing opens; the other account's parked games are untouched |
 

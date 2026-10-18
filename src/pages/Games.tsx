@@ -34,6 +34,7 @@ import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBloc
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
 import { sports } from '../config/sports'
+import { isCurrentAuthUser } from '../lib/authIdentity'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -143,6 +144,15 @@ export default function Games() {
   const userId = user?.id ?? null
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
+  // An open that awaited the cloud must not navigate or touch storage once the page is gone
+  // or the account changed: the old handler still holds the previous account's callbacks.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  const openIsStale = (ownerId: string) =>
+    !mountedRef.current || currentUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId)
   const supabaseClient = supabase
   const requestedSportId = searchParams.get('sport')
   const scopedSport = useMemo(
@@ -417,10 +427,12 @@ export default function Games() {
     try {
       authority = await sport.loadAuthority(game.id)
     } catch (err) {
+      if (openIsStale(userId)) return true
       setError(err instanceof Error ? err.message : `${label} authority could not load`)
       setLoadingGameId(null)
       return true
     }
+    if (openIsStale(userId)) return true
     if (authority === 'legacy') {
       setLoadingGameId(null)
       return false
@@ -450,7 +462,7 @@ export default function Games() {
       setLoadingGameId(null)
       return true
     }
-    if (currentUserIdRef.current !== userId) {
+    if (openIsStale(userId)) {
       setError(`The signed-in account changed. Open the ${label} game again.`)
       setLoadingGameId(null)
       return true
@@ -476,7 +488,7 @@ export default function Games() {
         setError(err instanceof Error ? err.message : 'Could not start recorder stream')
         return null
       })
-      if (currentUserIdRef.current !== userId) {
+      if (openIsStale(userId)) {
         setError(`The signed-in account changed. Open the ${label} game again.`)
         eventGame = null
       }
@@ -645,7 +657,7 @@ export default function Games() {
           setLoadingGameId(null)
           return
         }
-        if (currentUserIdRef.current !== userId) {
+        if (openIsStale(userId)) {
           setError('The signed-in account changed. Open the Basketball game again.')
           setLoadingGameId(null)
           return
@@ -687,7 +699,7 @@ export default function Games() {
             setError(err instanceof Error ? err.message : 'Could not start recorder stream')
             return null
           })
-          if (currentUserIdRef.current !== userId) {
+          if (openIsStale(userId)) {
             setError('The signed-in account changed. Open the Basketball game again.')
             basketballGame = null
           }
@@ -730,11 +742,13 @@ export default function Games() {
       return null
     })
 
+    if (openIsStale(userId)) return
     if (!cloudGame) {
       setLoadingGameId(null)
       return
     }
     await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
+    if (openIsStale(userId)) return
 
     const sport = sports.find(item => item.id === cloudGame.sportId)
     if (!sport) {

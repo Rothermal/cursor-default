@@ -293,8 +293,9 @@ describe('Basketball release entry guards', () => {
     expect(gameInfo.indexOf('currentUserIdRef.current !== user.id')).toBeLessThan(
       gameInfo.indexOf('openGameSnapshot(basketballGame)')
     )
-    expect(games).toContain('currentUserIdRef.current !== userId')
-    expect(games.indexOf('currentUserIdRef.current !== userId')).toBeLessThan(
+    // Games also cancels once the page unmounts or the auth client reports another account.
+    expect(games).toContain('!mountedRef.current || currentUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId)')
+    expect(games.indexOf('if (openIsStale(userId)) {')).toBeLessThan(
       games.indexOf('openGameSnapshot(basketballGame)')
     )
   })

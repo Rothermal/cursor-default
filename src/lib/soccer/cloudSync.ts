@@ -64,6 +64,7 @@ export interface SyncSoccerEventGameInput {
   state: GameState
   userId: string
   localGameId: string
+  assertCurrent?: () => void
 }
 
 export interface SyncSoccerEventGameResult {
@@ -158,11 +159,13 @@ export async function syncSoccerEventGameToCloud({
   state,
   userId,
   localGameId,
+  assertCurrent,
 }: SyncSoccerEventGameInput): Promise<SyncSoccerEventGameResult> {
   return syncEventGameToCloud({
     state,
     userId,
     localGameId,
+    assertCurrent,
     adapter: soccerEventCloudTransportAdapter,
   })
 }
