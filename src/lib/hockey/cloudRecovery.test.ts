@@ -119,7 +119,8 @@ describe('HKY-5B1 deleted source player recovery before the first bind', () => {
 
   it('looks the role up by that team in the alert and the recovery callback', () => {
     const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
-    expect(read('src/components/hockey/HockeyCloudSync.tsx')).toContain('useTeamRole(deletedSourceRecoveryTeamId(state))')
+    expect(read('src/components/game-events/EventCloudSync.tsx')).toContain('useTeamRole(deletedSourceRecoveryTeamId(state))')
+    expect(read('src/components/hockey/HockeyCloudSync.tsx')).toContain('<EventCloudSyncAlerts state={state} sportId="hockey" />')
     expect(read('src/context/GameContext.tsx')).toContain('!deletedSourceRecoveryTeamId(current)')
   })
 })

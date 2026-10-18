@@ -11,7 +11,7 @@ Execution plan for the sixth Baseball phase defined in
 cloud-policy and handshake code that HKY-5 extracted.
 
 Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
-until the owner says otherwise. BSB-6A is in review.
+until the owner says otherwise. BSB-6A is merged (PR #489); BSB-6B1 is in review.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -318,7 +318,7 @@ client local-only until then.
 
 Filled in as each slice lands.
 
-### BSB-6A (in review)
+### BSB-6A (merged, PR #489)
 
 - Migrations `076_baseball_event_platform_publication_constraint.sql` and
   `077_baseball_event_cloud_lifecycle.sql`, as §2 describes. Not applied yet; the owner
@@ -335,3 +335,27 @@ Filled in as each slice lands.
   Hockey's HKY-5A flow on the new schema). See
   [REGRESSION_BSB_6_CLOUD_LIFECYCLE.md](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md).
 - Nothing on the client changes in this slice.
+
+### BSB-6B1 (in review)
+
+- `src/lib/baseball/cloudSync.ts` adds the Baseball adapter to the shared transport
+  (`bind_baseball_event_game_v5`, policy `advance`). Participants are the setup participants,
+  with `source_player_id` only for roster players of a team game; opponent slots and pitchers
+  stay in the setup snapshot. The cloud shell rebuilds a game from the stored setup and
+  checks it against the game row and participant rows.
+- `cloudSyncRouteForState` returns `'baseball_events'` for an event Baseball game whose
+  policy is `automatic`. A missing policy is local-only for Baseball, so games made before
+  BSB-6B stay on the device until Enable cloud sync in the Game menu (active access, a
+  tracking team role, the contract 1 handshake, every event recorded by this account).
+- Setup offers Cloud or This device only when signed in. Cloud needs
+  `get_baseball_release_capabilities` contract 1; a failed check offers Retry or This device
+  only. New games are not started at setup, as before.
+- The tracker shows sync problems (conflict review, Retry, Export, Preserve history) and the
+  Game menu shows where the game is saved. Hockey's component moved to the shared
+  `EventCloudSync` with a thin adapter for each sport.
+- Cloud Games opens a Baseball event game as it does a Hockey one: the recorder's parked
+  copy, then their cloud stream, or an independent stream (not started, like a new game).
+  Final games and viewers go to Game Info. The Hockey and Baseball paths share one function.
+- Until 076-077 are applied, the handshake reports a backend update and Cloud stays
+  unavailable at setup.
+

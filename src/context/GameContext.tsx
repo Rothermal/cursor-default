@@ -36,6 +36,8 @@ import {
 import { enableBasketballEventCloud } from '../lib/basketball/enableCloudSync'
 import { HockeyCloudRecoveryError, syncHockeyEventGameToCloud } from '../lib/hockey/cloudSync'
 import { enableHockeyEventCloud } from '../lib/hockey/enableCloudSync'
+import { BaseballCloudRecoveryError, syncBaseballEventGameToCloud } from '../lib/baseball/cloudSync'
+import { enableBaseballEventCloud } from '../lib/baseball/enableCloudSync'
 import {
   applyBasketballReopenHandoff,
   loadBasketballReopenHandoff,
@@ -376,7 +378,7 @@ interface GameContextType {
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
   recoverDeletedEventParticipantSources: () => Promise<FlushCloudSyncResult>
-  /** Enable cloud sync for the active local-only Basketball or Hockey event game. */
+  /** Enable cloud sync for the active local-only Basketball, Hockey or Baseball event game. */
   enableEventCloudSync: () => Promise<FlushCloudSyncResult>
   markEventCloudGameReopened: (
     gameId: string,
@@ -951,6 +953,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 }
               },
             })
+          : syncRoute === 'baseball_events'
+          ? await syncBaseballEventGameToCloud({
+              state: snapshot,
+              userId: snapshotUserId!,
+              localGameId: record.localGameId,
+              assertCurrent: () => {
+                if (prevUserIdRef.current !== snapshotUserId) {
+                  throw new Error('The signed-in account changed before Baseball cloud sync.')
+                }
+              },
+            })
           : syncRoute === 'aggregate'
           ? await syncGameSnapshotToCloud({
               state: snapshot,
@@ -1082,7 +1095,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const canApplyRecovery =
           (error instanceof SoccerCloudRecoveryError ||
             error instanceof BasketballCloudRecoveryError ||
-            error instanceof HockeyCloudRecoveryError) &&
+            error instanceof HockeyCloudRecoveryError ||
+            error instanceof BaseballCloudRecoveryError) &&
           buildGameSyncFingerprint(latestState) === snapshotFingerprint &&
           eventConflictRecoveryFingerprint(latestState) === snapshotRecoveryFingerprint
         const recoveredState = canApplyRecovery ? error.recoveredState : latestState
@@ -1259,7 +1273,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const enableEventCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
     const sportId = stateRef.current.sport?.id
-    const label = sportId === 'hockey' ? 'Hockey' : 'Basketball'
+    const label = sportId === 'hockey' ? 'Hockey' : sportId === 'baseball' ? 'Baseball' : 'Basketball'
     if (!isConfigured || !supabase) {
       return { ok: false, reason: `${label} cloud sync requires Supabase configuration.` }
     }
@@ -1303,7 +1317,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
     let enabled: { state: GameState; cloudGameId: string }
     let summaries: ParkedGameSummary[]
     try {
-      const enable = sportId === 'hockey' ? enableHockeyEventCloud : enableBasketballEventCloud
+      const enable = sportId === 'hockey'
+        ? enableHockeyEventCloud
+        : sportId === 'baseball'
+        ? enableBaseballEventCloud
+        : enableBasketballEventCloud
       enabled = await enable({
         state: snapshot,
         userId,

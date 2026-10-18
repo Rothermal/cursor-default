@@ -66,6 +66,11 @@ const FIELDING_KEYS: Record<keyof BaseballFieldingLine, string> = {
   cs: 'bsb_f_cs',
 }
 
+/** The local player id a setup participant's stats are keyed by. */
+export function baseballLocalPlayerKey(participant: { id: string; playerId: string | null }): string {
+  return participant.playerId ?? participant.id
+}
+
 /** Per-player projected totals keyed by local player id, for legacy/aggregate surfaces. */
 export function baseballPlayerStatsById(
   setup: BaseballMatchSetup,

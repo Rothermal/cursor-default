@@ -115,3 +115,43 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
 | Apply 076, then 077 | Both apply without errors |
 | `select public.get_baseball_release_capabilities();` signed in | `contractVersion` 1, migration 77 |
 | `select public.get_hockey_release_capabilities();` signed in | Unchanged: contract 2 |
+
+## BSB-6B1 Client sync and cloud policy
+
+### Automated
+
+- `src/lib/baseball/cloudSync.test.ts` (19 cases): route only for the automatic policy
+  (started or not); device games by default; a game with no policy stays on the device and
+  is not rewritten; a malformed policy fails closed with "Baseball cloud policy is invalid";
+  a local-only game loses its binding metadata; legacy grid games stay off the event route;
+  participants link `source_player_id` only for a team game, opponent slots stay in the
+  setup snapshot; the adapter binds through `bind_baseball_event_game_v5` with policy
+  `advance`; device games and another recorder's events are refused; Enable cloud sync
+  offers, explains, uploads with the automatic policy, and stops before uploading on
+  inactive access, a viewer role or a missing backend; the handshake accepts only contract
+  1 / migration 77, reads contract 0 or a missing RPC as a backend update, caches per
+  account; the setup gate never falls back silently.
+- `src/lib/baseball/cloudShell.test.ts` (4 cases): the cloud shell rebuilds players, the
+  automatic policy and the player map; a mismatched team, a renamed participant or setup
+  version 2 is refused; an independent recorder starts with an empty, pregame stream; a
+  final game cannot add one.
+- Updated source checks: `sportIsolation.test.ts` (event Baseball is event-eligible, local
+  only without a policy, `baseball_events` when automatic), `releaseEntryGuards.test.ts`
+  (the enable dispatch) and `cloudRecovery.test.ts` (the shared alerts component).
+
+Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test`
+(294 files, 2,762 tests) and `pnpm build` pass.
+
+### After applying 076-077 (owner)
+
+| Step | Expected |
+|---|---|
+| Signed out, New Baseball game | "Saved on this device" note, no Sync choice |
+| Signed in, New Baseball game | Sync: Cloud (default) and This device only |
+| Before applying 077, choose Cloud | "Baseball cloud games require the latest backend update" with Retry and This device only; Continue disabled |
+| After applying, start a team game with Cloud and record a few pitches | Game appears in Cloud Games; Game menu says "Synced to the cloud" |
+| Open it from Cloud Games on the same device | Resumes the parked copy |
+| A game recorded before this release | Game menu: Enable cloud sync; after confirming, it uploads and appears in Cloud Games |
+| A second scorer opens the team game | Offered their own recorder stream; it opens unstarted |
+| A viewer opens it | Game Info |
+

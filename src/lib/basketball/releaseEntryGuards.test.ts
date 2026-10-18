@@ -320,7 +320,9 @@ describe('Basketball release entry guards', () => {
     expect(transportIndex).toBeGreaterThanOrEqual(0)
     expect(persistIndex).toBeGreaterThan(transportIndex)
     expect(hydrateIndex).toBeGreaterThan(persistIndex)
-    expect(handler).toContain("sportId === 'hockey' ? enableHockeyEventCloud : enableBasketballEventCloud")
+    expect(handler).toMatch(
+      /sportId === 'hockey'\s+\? enableHockeyEventCloud\s+: sportId === 'baseball'\s+\? enableBaseballEventCloud\s+: enableBasketballEventCloud/
+    )
     expect(handler).toContain('Another local game already owns this cloud ${label} game.')
   })
 

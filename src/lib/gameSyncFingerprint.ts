@@ -72,11 +72,22 @@ export function isHockeyEventCloudSyncEligible(state: GameState): boolean {
   )
 }
 
+/** Baseball event games (BSB-6B); legacy Baseball grid games keep aggregate sync. */
+export function isBaseballEventCloudSyncEligible(state: GameState): boolean {
+  return Boolean(
+    state.sport?.id === 'baseball' &&
+      state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+      state.eventStream !== null &&
+      state.sportGameState?.sportId === 'baseball'
+  )
+}
+
 export function isEventCloudSyncEligible(state: GameState): boolean {
   return (
     isSoccerEventCloudSyncEligible(state) ||
     isBasketballEventCloudSyncEligible(state) ||
-    isHockeyEventCloudSyncEligible(state)
+    isHockeyEventCloudSyncEligible(state) ||
+    isBaseballEventCloudSyncEligible(state)
   )
 }
 
@@ -85,6 +96,7 @@ export type CloudSyncRoute =
   | 'soccer_events'
   | 'basketball_events'
   | 'hockey_events'
+  | 'baseball_events'
   | 'unsupported'
 
 /** Exhaustive transport selection keeps event games out of legacy aggregate tables. */
@@ -95,6 +107,9 @@ export function cloudSyncRouteForState(state: GameState): CloudSyncRoute {
   }
   if (isHockeyEventCloudSyncEligible(state)) {
     return isEventGameLocalOnly(state) ? 'unsupported' : 'hockey_events'
+  }
+  if (isBaseballEventCloudSyncEligible(state)) {
+    return isEventGameLocalOnly(state) ? 'unsupported' : 'baseball_events'
   }
   if (isAggregateCloudSyncEligible(state)) return 'aggregate'
   return 'unsupported'
