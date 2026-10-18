@@ -4,6 +4,9 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { MODEL, EFFORT, validateReport } from './engine.mjs'
+import { StopRequested } from './control.mjs'
+import { atomicJSON, readJSON } from './storage.mjs'
+export { atomicJSON, readJSON } from './storage.mjs'
 
 export const TOOLING = path.dirname(fileURLToPath(import.meta.url))
 export function classicProtection(result) {
@@ -28,14 +31,6 @@ export function validationEnvironment(source = process.env) {
   const permitted = /^(?:PATH|PATHEXT|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|SYSTEMROOT|WINDIR|COMSPEC|TEMP|TMP|CI|PNPM_HOME|COREPACK_HOME|NUMBER_OF_PROCESSORS|PROCESSOR_ARCHITECTURE)$/i
   return { ...Object.fromEntries(Object.entries(source).filter(([key]) => permitted.test(key))), CI: 'true', FORCE_COLOR: '0' }
 }
-export const readJSON = file => JSON.parse(fs.readFileSync(file, 'utf8'))
-export function atomicJSON(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  const temp = `${file}.${process.pid}.tmp`
-  fs.writeFileSync(temp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 })
-  fs.renameSync(temp, file)
-}
-
 // No shell receives task text, model output, PR bodies, branch names or paths.
 // PowerShell is used only for Windows' pnpm shim with individually quoted args.
 export function invocation(command, args) {
@@ -46,26 +41,55 @@ export function invocation(command, args) {
   return [command === 'node' ? process.execPath : command, args]
 }
 
-export async function execute(command, args, { cwd, input, timeout = 60000, env = process.env, log, maxBytes = 2_000_000, usage } = {}) {
+async function terminateTree(child) {
+  if (!child.pid || child.exitCode !== null) return false
+  if (process.platform !== 'win32') {
+    try { process.kill(-child.pid, 'SIGKILL'); return true } catch (e) { return e.code === 'ESRCH' }
+  }
+  const confirmed = await new Promise(resolve => {
+    const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+    const timer = setTimeout(() => { killer.kill('SIGKILL'); resolve(false) }, 2000)
+    killer.on('error', () => { clearTimeout(timer); resolve(false) })
+    killer.on('close', code => { clearTimeout(timer); resolve(code === 0) })
+  })
+  if (!confirmed && child.exitCode === null) { try { child.kill('SIGKILL') } catch { /* report incomplete cleanup */ } }
+  return confirmed
+}
+
+export async function execute(command, args, { cwd, input, timeout = 60000, env = process.env, log, maxBytes = 2_000_000, usage, signal } = {}) {
+  if (signal?.aborted) throw signal.reason
   const [exe, argv] = invocation(command, args)
   return new Promise((resolve, reject) => {
-    const child = spawn(exe, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] })
-    let output = '', stdout = '', stderr = '', bytes = 0, timedOut = false, pending = '', killed = false
+    // Establish fallible log storage before starting a process that needs cleanup.
     let fd = log ? fs.openSync(log, 'w', 0o600) : null
+    let child
+    try { child = spawn(exe, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] }) }
+    catch (e) { if (fd !== null) fs.closeSync(fd); reject(e); return }
+    let output = '', stdout = '', stderr = '', bytes = 0, timedOut = false, pending = '', stopping = null, settled = false, fallback
     function closeLog() { if (fd !== null) { fs.closeSync(fd); fd = null } }
     function stop() {
-      if (killed || !child.pid) return
-      killed = true
-      if (process.platform === 'win32') {
-        const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
-        killer.on('error', () => { child.kill('SIGKILL') })
-        // Restricted Windows tokens can deny taskkill; still terminate our root.
-        setTimeout(() => { if (child.exitCode === null) child.kill('SIGKILL') }, 1000).unref()
-      }
-      else { try { process.kill(-child.pid, 'SIGKILL') } catch { /* already exited */ } }
+      if (stopping) return
+      stopping = terminateTree(child)
+      // A denied OS termination must not leave cancellation awaiting forever.
+      fallback = setTimeout(() => { child.stdout.destroy(); child.stderr.destroy(); child.stdin.destroy(); child.unref(); finish(null, true) }, 4000)
     }
     const timer = setTimeout(() => { timedOut = true; stop() }, Math.max(1, timeout))
+    const abort = () => stop()
+    signal?.addEventListener('abort', abort, { once: true })
+    async function finish(code, forced = false, error = null) {
+      if (settled) return
+      settled = true; clearTimeout(timer); clearTimeout(fallback); signal?.removeEventListener('abort', abort); closeLog()
+      const cleanupIncomplete = stopping ? forced || !await stopping : false
+      if (cleanupIncomplete) { child.stdout.destroy(); child.stderr.destroy(); child.stdin.destroy(); child.unref() }
+      if (signal?.aborted) {
+        const reason = signal.reason instanceof Error ? signal.reason : new StopRequested('Execution stopped')
+        reason.cleanupIncomplete = Boolean(reason.cleanupIncomplete || cleanupIncomplete)
+        reject(reason)
+      } else if (error) { error.cleanupIncomplete = cleanupIncomplete; reject(error) }
+      else resolve({ exitCode: timedOut || bytes > maxBytes || cleanupIncomplete ? -1 : code, output, stdout, stderr, timedOut, truncated: bytes > maxBytes, cleanupIncomplete })
+    }
     function collect(chunk, stream) {
+      if (settled) return
       const text = chunk.toString()
       bytes += chunk.length
       if (bytes > maxBytes) { stop(); return }
@@ -78,29 +102,30 @@ export async function execute(command, args, { cwd, input, timeout = 60000, env 
         output += text
         if (stream === 'stdout') stdout += text
         else stderr += text
-        if (fd !== null) fs.writeSync(fd, text)
+        if (fd !== null) { try { fs.writeSync(fd, text) } catch (e) { stop(); finish(null, false, e) } }
       }
     }
     child.stdout.on('data', c => collect(c, 'stdout'))
     child.stderr.on('data', c => collect(c, 'stderr'))
     child.stdin.on('error', () => {})
-    child.on('error', error => { clearTimeout(timer); closeLog(); reject(error) })
-    child.on('close', code => {
-      clearTimeout(timer)
-      closeLog()
-      resolve({ exitCode: timedOut || bytes > maxBytes ? -1 : code, output, stdout, stderr, timedOut, truncated: bytes > maxBytes })
-    })
-    child.stdin.end(input || '')
+    child.on('error', error => finish(null, false, error))
+    child.on('close', code => finish(code))
+    try { child.stdin.end(input || '') } catch (e) { stop(); finish(null, false, e) }
+    if (signal?.aborted) stop()
   })
 }
 
 export class LocalAdapter {
-  constructor(policy, directory, state, save) {
-    Object.assign(this, { policy, directory, state, save })
+  constructor(policy, directory, state, save, control = null) {
+    Object.assign(this, { policy, directory, state, save, control })
   }
   async command(command, args, options = {}) {
+    this.control?.check()
     const remaining = this.state.limits.minutes * 60000 - (Date.now() - Date.parse(this.state.startedAt))
-    return execute(command, args, { cwd: this.state.worktree, timeout: Math.min(remaining, this.state.limits.commandMinutes * 60000), ...options })
+    const result = await execute(command, args, { cwd: this.state.worktree, timeout: Math.min(remaining, this.state.limits.commandMinutes * 60000), ...options, signal: this.control?.signal })
+    if (result.cleanupIncomplete) throw new StopRequested('Process-tree cleanup could not be confirmed', { cleanupIncomplete: true })
+    this.control?.check()
+    return result
   }
   async git(...args) {
     const r = await this.command('git', args)
@@ -227,7 +252,9 @@ export class LocalAdapter {
   async wait() {
     const remaining = this.state.limits.minutes * 60000 - (Date.now() - Date.parse(this.state.startedAt))
     console.log(`CI pending for ${this.state.headSha}; checkpoint saved, checking again within 30 seconds`)
-    await new Promise(resolve => setTimeout(resolve, Math.max(1, Math.min(30000, remaining))))
+    const ms = Math.max(1, Math.min(30000, remaining))
+    if (this.control) await this.control.wait(ms)
+    else await new Promise(resolve => setTimeout(resolve, ms))
   }
 }
 

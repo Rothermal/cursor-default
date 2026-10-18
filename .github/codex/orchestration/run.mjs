@@ -4,10 +4,13 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { assertPolicy, MODEL, EFFORT, PHASES, TERMINAL, riskFor, rolesFor, policyChanged, validateReport, reviewPasses, checksPass, budgetReason, repair, ciVerdict } from './engine.mjs'
 import { TOOLING, LocalAdapter, atomicJSON, readJSON, execute } from './adapters.mjs'
+import { acquireLock } from './storage.mjs'
+import { readSwitch, setSwitch, readStop, stopRun, disableRepository, RunControl, StopRequested, markStopped, resumeState } from './control.mjs'
+export { acquireLock } from './storage.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 export function toolingDigest(policy) {
-  const files = ['run.mjs', 'engine.mjs', 'adapters.mjs', 'report.schema.json', ...fs.readdirSync(path.join(TOOLING, 'prompts')).sort().map(f => `prompts/${f}`)]
+  const files = ['run.mjs', 'engine.mjs', 'adapters.mjs', 'control.mjs', 'storage.mjs', 'report.schema.json', ...fs.readdirSync(path.join(TOOLING, 'prompts')).sort().map(f => `prompts/${f}`)]
   return hash(JSON.stringify(policy) + files.map(f => fs.readFileSync(path.join(TOOLING, f), 'utf8')).join('\n'))
 }
 export function newState(id, task, policy, baseSha, worktree, now = new Date().toISOString()) {
@@ -17,7 +20,7 @@ export function newState(id, task, policy, baseSha, worktree, now = new Date().t
     phase: 'INTAKE', classification: riskFor(task), reason: 'New run',
     startedAt: now, updatedAt: now, limits: { ...policy.limits }, calls: 0, tokens: 0,
     usageObserved: false, repairs: 0, reports: [], findings: [], acceptance: [],
-    remoteAuthorized: false, history: [], toolingDigest: toolingDigest(policy), inFlight: null }
+    remoteAuthorized: false, history: [], toolingDigest: toolingDigest(policy), inFlight: null, controlEpoch: null, acceptedStopRequest: null }
 }
 
 function coverage(r, criteria) {
@@ -175,78 +178,119 @@ export async function drive(s, p, io, save = () => {}, { maxSteps = 1000 } = {})
   return s
 }
 
-export function acquireLock(file) {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  const fd = fs.openSync(file, 'wx', 0o600)
-  fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }))
-  fs.closeSync(fd)
-  return () => fs.unlinkSync(file)
-}
-
-async function gitAt(cwd, args) {
-  const r = await execute('git', args, { cwd })
+async function gitAt(cwd, args, control) {
+  control?.check()
+  const r = await execute('git', args, { cwd, signal: control?.signal })
   if (r.exitCode !== 0) throw Error(`git ${args[0]} failed: ${r.output}`)
+  control?.check()
   return r.stdout.trim()
 }
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...rest] = argv, opts = {}
-  const allowed = new Set(['--id', '--task', '--base', '--publish'])
+  const allowed = new Set(['--id', '--task', '--base', '--publish', '--confirm-cleanup'])
   for (let i = 0; i < rest.length; i++) {
     if (!allowed.has(rest[i]) || rest[i] in opts) throw Error('Unknown/duplicate option')
-    const key = rest[i]; opts[key] = key === '--publish' ? true : rest[++i]
-    if (!opts[key] || (key !== '--publish' && opts[key].startsWith('--'))) throw Error(`Missing value: ${key}`)
+    const key = rest[i]; opts[key] = ['--publish', '--confirm-cleanup'].includes(key) ? true : rest[++i]
+    if (!opts[key] || (typeof opts[key] === 'string' && opts[key].startsWith('--'))) throw Error(`Missing value: ${key}`)
   }
-  const policy = assertPolicy(readJSON(path.join(TOOLING, 'policy.json')))
+  if (opts['--publish'] && command !== 'run') throw Error('--publish is only permitted with run')
+  if (opts['--confirm-cleanup'] && command !== 'resume') throw Error('--confirm-cleanup is only permitted with resume')
   if (command === 'dry-run') {
+    const policy = assertPolicy(readJSON(path.join(TOOLING, 'policy.json')))
     if (!opts['--task']) throw Error('dry-run requires --task <file>')
     const task = fs.readFileSync(opts['--task'], 'utf8')
     console.log(JSON.stringify({ model: MODEL, effort: EFFORT, classification: riskFor(task), roles: rolesFor(riskFor(task)), limits: policy.limits, checks: policy.checks, remoteWrites: false, note: 'No model, git mutation or network call. Model intake may raise risk.' }, null, 2))
     return
   }
   if (command === 'help' || !command) {
-    console.log('node .github/codex/orchestration/run.mjs dry-run --task task.md\nstart --id <slug> --task task.md [--base <ref>]\nrun --id <slug> [--publish]\nstatus --id <slug>\nRun data/worktrees live in the Git common directory. No automatic merge.')
+    console.log('node .github/codex/orchestration/run.mjs <command>\nenable | disable | control-status\ndry-run --task task.md\nstart --id <slug> --task task.md [--base <ref>]\nrun --id <slug> [--publish]\nstop --id <slug>\nresume --id <slug> [--confirm-cleanup]\nstatus --id <slug>\nDisabled by default. Enable never restarts runs. Resume only rearms; run explicitly to continue. No automatic merge.')
     return
   }
-  if (!['start', 'run', 'status'].includes(command)) throw Error('Unknown command; use help')
-  const id = opts['--id']
-  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id || '')) throw Error('id must be a lowercase slug (1-48 characters)')
+  if (!['enable', 'disable', 'control-status', 'start', 'run', 'status', 'stop', 'resume'].includes(command)) throw Error('Unknown command; use help')
   const root = await gitAt(process.cwd(), ['rev-parse', '--show-toplevel'])
   const common = await gitAt(root, ['rev-parse', '--git-common-dir'])
-  const directory = path.join(path.resolve(root, common), 'codex-orchestration', id)
+  const controlRoot = path.join(path.resolve(root, common), 'codex-orchestration')
+  if (['enable', 'disable', 'control-status'].includes(command)) {
+    if (Object.keys(opts).length) throw Error(`${command} does not accept run options`)
+    const result = command === 'disable' ? await disableRepository(controlRoot)
+      : command === 'enable' ? setSwitch(controlRoot, true) : readSwitch(controlRoot)
+    console.log(JSON.stringify(result, null, 2))
+    if (result.runs?.some(r => !r.confirmed)) process.exitCode = 1
+    return
+  }
+  const id = opts['--id']
+  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id || '')) throw Error('id must be a lowercase slug (1-48 characters)')
+  const directory = path.join(controlRoot, id)
   const file = path.join(directory, 'task.json')
-  if (command === 'status') { console.log(JSON.stringify(readJSON(file), null, 2)); return }
+  if (command === 'stop') {
+    const result = await stopRun(controlRoot, id)
+    console.log(JSON.stringify(result, null, 2)); if (!result.confirmed) process.exitCode = 1
+    return
+  }
+  const control = readSwitch(controlRoot)
+  if (command === 'status') {
+    const s = readJSON(file), request = readStop(directory)
+    console.log(JSON.stringify({ ...s, enabled: control.enabled, requiresResume: s.phase === 'STOPPED' || s.controlEpoch !== control.epoch || (request?.requestId ?? null) !== (s.acceptedStopRequest ?? null) }, null, 2)); return
+  }
+  if (!control.enabled) throw Error('Orchestration is disabled. Use enable explicitly; stopped runs still require resume.')
+  const policy = assertPolicy(readJSON(path.join(TOOLING, 'policy.json')))
   const unlock = acquireLock(path.join(directory, 'run.lock'))
+  let runtime
   try {
+    if (command === 'resume') {
+      const s = readJSON(file)
+      resumeState(s, control, readStop(directory), { confirmCleanup: opts['--confirm-cleanup'] === true })
+      atomicJSON(file, s)
+      console.log(`Run ${id} rearmed. No execution started. Use run --id ${id} to continue; --publish must be granted again.`)
+      return
+    }
     if (command === 'start') {
       if (!opts['--task']) throw Error('start requires --task <file>')
-      if (opts['--publish']) throw Error('Authorize publishing with run --publish after inspecting the local result')
       if (fs.existsSync(file)) throw Error('Run already exists; resume with run')
+      if (readStop(directory)) throw Error('Run initialization was stopped; inspect it and use a new run ID')
+      runtime = new RunControl(controlRoot, directory, { controlEpoch: control.epoch })
+      runtime.check()
       const base = opts['--base'] || policy.baseBranch
       if (base.startsWith('-')) throw Error('Invalid base ref')
-      const baseSha = await gitAt(root, ['rev-parse', '--verify', `${base}^{commit}`])
+      const baseSha = await gitAt(root, ['rev-parse', '--verify', `${base}^{commit}`], runtime)
       const worktree = path.join(directory, 'worktree')
       const s = newState(id, fs.readFileSync(opts['--task'], 'utf8'), policy, baseSha, worktree)
+      s.controlEpoch = control.epoch
       // Persist intent first; interrupted worktree creation can be inspected safely.
       s.phase = 'BLOCKED'; s.reason = 'Worktree creation not yet confirmed'; atomicJSON(file, s)
-      await gitAt(root, ['worktree', 'add', '-b', s.branch, worktree, baseSha])
+      await gitAt(root, ['worktree', 'add', '-b', s.branch, worktree, baseSha], runtime)
       s.phase = 'INTAKE'; s.reason = 'Worktree initialized; install frozen dependencies there before run'
       atomicJSON(file, s)
       console.log(`Created ${file}\nWorktree: ${worktree}`)
       return
     }
     const s = readJSON(file)
+    const request = readStop(directory)
+    if (s.phase === 'STOPPED' || s.controlEpoch !== control.epoch || (request?.requestId ?? null) !== (s.acceptedStopRequest ?? null)) {
+      if (s.phase !== 'STOPPED') { markStopped(s, { reason: request?.reason || 'Stopped since last execution; explicit resume required', epoch: control.epoch, requestId: request?.requestId }); atomicJSON(file, s) }
+      throw new StopRequested('Run is stopped; explicit resume required', { alreadyStopped: true })
+    }
+    runtime = new RunControl(controlRoot, directory, s)
+    runtime.check()
     if (s.phase === 'READY_FOR_HUMAN_REVIEW') s.phase = 'CI_WAIT'
     if (opts['--publish']) s.remoteAuthorized = true
     const save = () => atomicJSON(file, s)
     save()
-    const io = new LocalAdapter(policy, directory, s, save)
+    const io = new LocalAdapter(policy, directory, s, save, runtime)
     await drive(s, policy, io, save)
     console.log(`${s.phase}: ${s.reason}\nState: ${file}${s.pr ? `\nPR: ${s.pr.url}` : ''}`)
     if (['FAILED', 'BLOCKED', 'BUDGET_EXHAUSTED', 'NEEDS_HUMAN_DECISION'].includes(s.phase)) process.exitCode = 1
   } catch (error) {
+    if (error.cleanupIncomplete && !(error instanceof StopRequested)) error = new StopRequested(`Child cleanup not confirmed: ${error.message}`, { cleanupIncomplete: true })
     if (fs.existsSync(file)) {
       const s = readJSON(file)
+      if (error instanceof StopRequested) {
+        if (!error.alreadyStopped) { markStopped(s, { reason: error.message, ...error }); atomicJSON(file, s) }
+        console.log(`STOPPED: ${error.message}${error.cleanupIncomplete ? '; child cleanup not confirmed. Inspect processes before resume --confirm-cleanup.' : ''}`)
+        process.exitCode = 130
+        return
+      }
       // Retain phase for bounded retry. In-flight call was already charged.
       s.lastError = String(error.message).slice(0, 1000); s.updatedAt = new Date().toISOString()
       s.errors = (s.errors || 0) + 1
@@ -254,7 +298,7 @@ export async function main(argv = process.argv.slice(2)) {
       atomicJSON(file, s)
     }
     throw error
-  } finally { unlock() }
+  } finally { runtime?.dispose(); unlock() }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

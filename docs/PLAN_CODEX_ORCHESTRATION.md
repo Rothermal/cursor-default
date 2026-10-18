@@ -143,3 +143,38 @@ from running the new pipeline end to end; that live model/repair pilot remains p
 Current-base verification: 40/40 orchestration tests, 22/22 existing review-control
 tests, typecheck, lint (3 warnings in unchanged Context files), production/PWA
 build and the full two-worker app suite (292 files, 2,739 tests) passed.
+
+
+## Owner-requested shutdown controls
+
+The owner requested a persistent kill switch and per-run stop. The controller now
+starts disabled, with device-local control.json in the Git common directory.
+Enable/disable apply across linked worktrees; disable advances a generation and
+writes durable stop requests for existing runs. A rapid re-enable cannot hide that
+stop from an active controller. RunControl checks before/after child commands and
+polls during work, cancelling through AbortSignal. SIGINT/SIGTERM use that path.
+
+Stop preserves source/worktree/evidence, in-flight commit intent and spent budgets,
+records STOPPED, and clears remote publication authority. Explicit resume only
+rearms; a separate run invocation is required. Enable never resumes. Per-run stop
+requests are acknowledged by generation rather than deleted, avoiding a lost-stop
+race. Control commands remain available without valid model/policy configuration.
+
+Child termination targets only currently owned processes, never PIDs from saved
+locks. Stop acknowledgement waits for the lock owner to finish. Windows tree
+termination and Unix process groups are used; denied or unconfirmed cleanup is
+reported and blocks resume until the operator inspects it and explicitly confirms
+cleanup. No file switch can undo an already accepted remote request or guarantee
+OS cleanup after a forced crash. No Actions workflow or hosted trigger is added.
+
+New control/storage modules participate in the tooling digest. Existing run state
+from older tooling still requires inspection rather than silently adopting a new
+control implementation. Tests cover default-off startup, linked-worktree disable,
+explicit resume, budgets/partial work, fast toggle races, signal requests, stale
+locks, abortable CI wait, and actual child/grandchild heartbeat termination.
+
+Shutdown verification: 52/52 controller tests and 22/22 existing review-control
+tests passed under a normal Windows token. Independent Sol/Ultra rereview found
+no outstanding local issue. The log-open orphan reproduction is covered and fixed
+by opening fallible log storage before spawning children. App source, dependencies,
+existing workflows and rollout policies are unchanged by this shutdown slice.

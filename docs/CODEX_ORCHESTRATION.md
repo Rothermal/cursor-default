@@ -32,6 +32,7 @@ must contain the controller tests and repository instructions. From this repo:
 
 ```sh
 node .github/codex/orchestration/run.mjs dry-run --task .github/codex/orchestration/examples/task.md
+node .github/codex/orchestration/run.mjs enable
 node .github/codex/orchestration/run.mjs start --id vite-docs --task .github/codex/orchestration/examples/task.md
 ```
 
@@ -65,6 +66,59 @@ agent instructions, package/dependency manifest or build configuration. This is 
 intentional boundary for tasks that change the pipeline itself. Migrations may be
 authored for review, but never applied. Supabase/device/PWA/release evidence stays
 separate; missing required evidence blocks a clean review.
+
+## Stop, disable and resume
+
+The master switch defaults to **off**. Ask Codex to disable orchestration for this
+repo, or run:
+
+```sh
+node .github/codex/orchestration/run.mjs disable
+```
+
+This persists the off state, blocks new starts/runs, and requests cancellation of
+all existing runs in this Git common directory. Linked worktrees share the switch;
+other clones and ordinary Codex chats have their own scope. No background scheduler
+turns it back on. A generation change prevents a quick disable/enable sequence from
+being missed by an active run.
+
+For one run, or to inspect the switch:
+
+```sh
+node .github/codex/orchestration/run.mjs stop --id vite-docs
+node .github/codex/orchestration/run.mjs control-status
+node .github/codex/orchestration/run.mjs status --id vite-docs
+```
+
+The runner checks durable controls before/after commands and polls during active
+work at 100 ms. Stop requests abort model, validation, Git/GitHub child commands
+and CI waits. SIGINT/Ctrl+C and SIGTERM use the same cancellation path. The stop
+command waits for the run owner to finish child-process cleanup and release its
+lock; it never kills a PID copied from an old lock file. Already accepted remote
+requests cannot be reversed, but subsequent publication steps are blocked.
+
+Stopped runs preserve their phase, in-flight commit intent, worktree, evidence and
+budgets. They enter STOPPED and lose their publication grant. Turning the master
+switch on starts no work and clears no stop requests. Explicitly rearm each run,
+then launch it separately:
+
+```sh
+node .github/codex/orchestration/run.mjs enable
+node .github/codex/orchestration/run.mjs resume --id vite-docs
+node .github/codex/orchestration/run.mjs run --id vite-docs
+```
+
+Grant --publish again on run only after reviewing the resumed work. Resume does
+not reset time/call/token/repair limits; stopped time still counts toward the
+original wall-clock limit. Dry-run, status, stop and disable stay available while
+disabled. Stop/disable do not require a valid model/provider or pipeline policy.
+
+If the OS denies tree termination or the runner cannot acknowledge shutdown,
+stop/disable report failure while preserving the durable stop barrier. Inspect
+remaining processes and any stale lock before proceeding. An unconfirmed child
+cleanup blocks resume until the operator verifies cleanup and explicitly supplies
+resume --id vite-docs --confirm-cleanup. A hard crash or forced OS kill can still
+require manual process cleanup; the command does not claim success in that case.
 
 ## Publish and monitor CI
 
@@ -129,7 +183,8 @@ REVIEW → FINAL_CHALLENGE? → PR_UPDATE → CI_WAIT → READY_FOR_HUMAN_REVIEW
                                       CI_REPAIR → validation → fresh review
 ```
 
-Run `run --id ...` again after an interruption. Role calls are charged before
+Inspect status after an interruption. A STOPPED run requires explicit resume and
+then run as described above; enable alone never resumes it. Role calls are charged before
 launch; partial Developer changes remain in its worktree for inspection/continuation.
 A committed change interrupted before checkpointing is recovered only when its
 parent, branch, clean tree and exact controller commit message match the saved
@@ -141,9 +196,10 @@ run, including authorization/network/rate-limit failures. No infinite retry.
 An exclusive `run.lock` prevents concurrent writers for the task/branch. After a
 hard crash, inspect its PID and stop any surviving child processes before removing
 that exact lock. Do not delete a lock for an active run or edit an active worktree.
-Windows uses process-tree termination with a root-process fallback under restricted
-tokens; OS/job-level containment is required to guarantee descendant termination
-if Windows denies tree termination. The fallback is covered by local tests.
+Windows uses taskkill /T /F and Unix uses the child process group. A denied
+termination falls back to the owned root handle and is reported as unconfirmed
+cleanup, requiring operator inspection before resume. Real child/grandchild
+heartbeat cancellation is covered by local tests.
 
 Terminal failure states preserve evidence and work for inspection. After resolving
 an external requirement, use a new run ID with the reviewed corrected base rather

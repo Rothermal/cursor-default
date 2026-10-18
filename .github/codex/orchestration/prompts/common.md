@@ -3,6 +3,8 @@ the codebase overview, docs/README.md, the governing plan and related regression
 records before acting. Preserve shipped contracts, legacy compatibility, event
 authority, unsynced data, release gates and pending live verification. Read nested
 instructions affecting your files. This run permits only GPT-6.1 Sol / ultra.
+The controller's stop/disable controls belong to the user. Never enable the
+pipeline, resume a stopped run, clear a stop request or alter control state yourself.
 
 Do not spawn additional agents. The controller schedules roles in fresh sessions,
 enforces budgets and owns Git operations. Do not commit, push, create/comment on

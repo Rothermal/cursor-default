@@ -6,6 +6,8 @@ import path from 'node:path'
 import { assertPolicy, riskFor, rolesFor, policyChanged, validateReport, reviewPasses, checksPass, budgetReason, repair, ciVerdict } from './engine.mjs'
 import { TOOLING, LocalAdapter, codexArgs, execute, validationEnvironment, atomicJSON, readJSON, classicProtection } from './adapters.mjs'
 import { drive, newState, acquireLock } from './run.mjs'
+import { StopRequested, readSwitch, setSwitch, readStop, requestStop, markStopped, resumeState, stopRun, disableRepository, RunControl } from './control.mjs'
+import { setTimeout as delay } from 'node:timers/promises'
 
 const policy = readJSON(path.join(TOOLING, 'policy.json'))
 const clone = v => structuredClone(v)
@@ -345,6 +347,11 @@ test('real CLI start creates isolated Git worktree and durable state without cha
   await git('-c', 'user.name=Orchestration Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture base')
   const task = path.join(dir, 'task.md')
   fs.writeFileSync(task, 'Update README wording')
+  const disabled = await execute('node', ['--preserve-symlinks', '--preserve-symlinks-main', path.join(TOOLING, 'run.mjs'), 'start', '--id', 'smoke', '--task', task], { cwd: dir })
+  assert.notEqual(disabled.exitCode, 0)
+  assert.match(disabled.output, /disabled/)
+  const enabled = await execute('node', ['--preserve-symlinks', '--preserve-symlinks-main', path.join(TOOLING, 'run.mjs'), 'enable'], { cwd: dir })
+  assert.equal(enabled.exitCode, 0, enabled.output)
   const r = await execute('node', ['--preserve-symlinks', '--preserve-symlinks-main', path.join(TOOLING, 'run.mjs'), 'start', '--id', 'smoke', '--task', task], { cwd: dir })
   assert.equal(r.exitCode, 0, r.output)
   const s = readJSON(path.join(dir, '.git/codex-orchestration/smoke/task.json'))
@@ -352,6 +359,31 @@ test('real CLI start creates isolated Git worktree and durable state without cha
   assert.equal(s.remoteAuthorized, false)
   assert.equal(await git('branch', '--show-current'), 'stattracker')
   assert.ok(fs.existsSync(path.join(s.worktree, 'README.md')))
+  // The shared Git common directory makes the switch apply in linked worktrees.
+  const off = await execute('node', ['--preserve-symlinks', '--preserve-symlinks-main', path.join(TOOLING, 'run.mjs'), 'disable'], { cwd: s.worktree })
+  assert.equal(off.exitCode, 0, off.output)
+  assert.equal(readSwitch(path.join(dir, '.git/codex-orchestration')).enabled, false)
+  const stoppedState = readJSON(path.join(dir, '.git/codex-orchestration/smoke/task.json'))
+  assert.equal(stoppedState.phase, 'STOPPED')
+  const cli = async (...args) => execute('node', ['--preserve-symlinks', '--preserve-symlinks-main', path.join(TOOLING, 'run.mjs'), ...args], { cwd: dir })
+  assert.equal((await cli('enable')).exitCode, 0)
+  const blocked = await cli('run', '--id', 'smoke')
+  assert.equal(blocked.exitCode, 130)
+  assert.match(blocked.output, /explicit resume/)
+  const rearmed = await cli('resume', '--id', 'smoke')
+  assert.equal(rearmed.exitCode, 0, rearmed.output)
+  const resumedState = readJSON(path.join(dir, '.git/codex-orchestration/smoke/task.json'))
+  assert.equal(resumedState.phase, 'INTAKE')
+  assert.equal(resumedState.calls, 0, 'resume did not start any model work')
+  assert.equal((await cli('stop', '--id', 'smoke')).exitCode, 0)
+  // Emergency controls still work when ordinary pipeline configuration is broken.
+  const brokenTooling = path.join(dir, 'broken-tooling')
+  fs.mkdirSync(brokenTooling)
+  for (const name of ['run.mjs','engine.mjs','adapters.mjs','control.mjs','storage.mjs']) fs.copyFileSync(path.join(TOOLING, name), path.join(brokenTooling, name))
+  fs.writeFileSync(path.join(brokenTooling, 'policy.json'), '{broken')
+  const emergency = await execute('node', ['--preserve-symlinks', '--preserve-symlinks-main', path.join(brokenTooling, 'run.mjs'), 'disable'], { cwd: dir })
+  assert.equal(emergency.exitCode, 0, emergency.output)
+  assert.equal(readSwitch(path.join(dir, '.git/codex-orchestration')).enabled, false)
   await git('worktree', 'remove', s.worktree)
 })
 
@@ -408,4 +440,156 @@ test('CI adapter accepts the actual ruleset-only StatTracker protection shape', 
       : { exitCode: 1, stdout: JSON.stringify({ message: 'Branch not protected', status: '404' }) }
   const snapshot = await io.ci()
   assert.equal(ciVerdict(snapshot, s, policy).kind, 'ready')
+})
+
+function controlFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'orchestration-control-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const config = setSwitch(root, true), s = state()
+  s.controlEpoch = config.epoch
+  const directory = path.join(root, s.id), file = path.join(directory, 'task.json')
+  atomicJSON(file, s)
+  return { root, directory, file, config, s }
+}
+test('master switch is off by default, persists, and fails closed on malformed settings', t => {
+  const { root } = controlFixture(t)
+  fs.unlinkSync(path.join(root, 'control.json'))
+  assert.equal(readSwitch(root).enabled, false)
+  setSwitch(root, false)
+  assert.equal(readSwitch(root).enabled, false)
+  fs.writeFileSync(path.join(root, 'control.json'), '{broken')
+  assert.throws(() => readSwitch(root))
+  setSwitch(root, false)
+  assert.equal(readSwitch(root).enabled, false)
+})
+test('idle stop checkpoints the phase and partial work without losing budgets or authorizing publication', async t => {
+  const { root, directory, file, config, s } = controlFixture(t)
+  s.phase = 'IMPLEMENT'; s.calls = 4; s.tokens = 123; s.remoteAuthorized = true
+  s.inFlight = { phase: 'COMMIT', headSha: 'base', nextPhase: 'LOCAL_VALIDATE' }
+  fs.writeFileSync(path.join(directory, 'partial.txt'), 'Preserve this work')
+  atomicJSON(file, s)
+  assert.equal((await stopRun(root, s.id)).confirmed, true)
+  const saved = readJSON(file)
+  assert.equal(saved.phase, 'STOPPED'); assert.equal(saved.stop.resumePhase, 'IMPLEMENT')
+  assert.equal(saved.calls, 4); assert.equal(saved.tokens, 123)
+  assert.equal(saved.inFlight.phase, 'COMMIT'); assert.equal(saved.remoteAuthorized, false)
+  assert.equal(fs.readFileSync(path.join(directory, 'partial.txt'), 'utf8'), 'Preserve this work')
+  resumeState(saved, config, readStop(directory))
+  assert.equal(saved.phase, 'IMPLEMENT'); assert.equal(saved.remoteAuthorized, false)
+  assert.equal(saved.startedAt, s.startedAt)
+})
+test('enable never resumes stopped runs; stop tokens remain durable until explicit resume', async t => {
+  const { root, directory, file, s } = controlFixture(t)
+  await disableRepository(root)
+  const config = setSwitch(root, true), saved = readJSON(file)
+  assert.equal(saved.phase, 'STOPPED')
+  const runtime = new RunControl(root, directory, saved)
+  t.after(() => runtime.dispose())
+  assert.throws(() => runtime.check(), StopRequested)
+  resumeState(saved, config, readStop(directory))
+  const resumed = new RunControl(root, directory, saved)
+  t.after(() => resumed.dispose())
+  assert.doesNotThrow(() => resumed.check())
+  assert.equal(saved.calls, s.calls)
+})
+test('disable then enable between polls still stops the old runtime', t => {
+  const { root, directory, s } = controlFixture(t)
+  const runtime = new RunControl(root, directory, s)
+  t.after(() => runtime.dispose())
+  setSwitch(root, false); setSwitch(root, true)
+  assert.throws(() => runtime.check(), StopRequested)
+})
+test('a newer stop request cannot be erased by resuming an older request', t => {
+  const { root, directory, config, s } = controlFixture(t)
+  const first = requestStop(directory, 'first')
+  markStopped(s, { reason: first.reason, requestId: first.requestId })
+  const newer = requestStop(directory, 'newer')
+  resumeState(s, config, first)
+  const runtime = new RunControl(root, directory, s)
+  t.after(() => runtime.dispose())
+  assert.throws(() => runtime.check(), e => e.requestId === newer.requestId)
+})
+test('stop does not acquire or delete an active/stale run lock and never kills a stored PID', async t => {
+  const { root, directory, file, s } = controlFixture(t)
+  const lock = path.join(directory, 'run.lock')
+  atomicJSON(lock, { pid: process.pid, nonce: 'another-owner' })
+  const result = await stopRun(root, s.id, 'stop', { waitMs: 20 })
+  assert.equal(result.confirmed, false)
+  assert.equal(readJSON(lock).nonce, 'another-owner')
+  assert.equal(readJSON(file).phase, 'INTAKE')
+  assert.ok(readStop(directory))
+})
+test('unconfirmed child cleanup requires explicit operator confirmation before resume', t => {
+  const { config, s } = controlFixture(t)
+  markStopped(s, { reason: 'OS denied child cleanup', cleanupIncomplete: true })
+  assert.throws(() => resumeState(s, config, null), /confirm-cleanup/)
+  resumeState(s, config, null, { confirmCleanup: true })
+  assert.equal(s.stop.cleanupIncomplete, false)
+  assert.ok(s.stop.cleanupConfirmedAt)
+})
+test('stop cancels CI waiting promptly instead of waiting for the 30-second poll', async t => {
+  const { root, directory, s } = controlFixture(t)
+  const runtime = new RunControl(root, directory, s)
+  t.after(() => runtime.dispose())
+  const waited = assert.rejects(runtime.wait(30000), StopRequested)
+  requestStop(directory, 'Stop while waiting')
+  await waited
+})
+test('a stopped or disabled runtime cannot start a new command', async t => {
+  const { root, directory, s } = controlFixture(t)
+  const runtime = new RunControl(root, directory, s)
+  t.after(() => runtime.dispose())
+  const io = new LocalAdapter(policy, directory, s, () => {}, runtime)
+  setSwitch(root, false)
+  await assert.rejects(io.command('definitely-missing-executable', []), StopRequested)
+})
+test('SIGINT and SIGTERM request a persistent stop instead of abandoning the child cleanup path', t => {
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    const { root, directory, s } = controlFixture(t)
+    const runtime = new RunControl(root, directory, s)
+    runtime.handlers[signal]()
+    assert.equal(runtime.signal.aborted, true)
+    assert.match(readStop(directory).reason, new RegExp(signal))
+    runtime.dispose()
+  }
+})
+test('real child and grandchild processes stop before acknowledgement; work and resume barrier persist', async t => {
+  const { root, directory, file, s } = controlFixture(t)
+  s.phase = 'IMPLEMENT'; s.worktree = directory; atomicJSON(file, s)
+  const runtime = new RunControl(root, directory, s), release = acquireLock(path.join(directory, 'run.lock'))
+  t.after(() => runtime.dispose())
+  const heartbeat = path.join(directory, 'heartbeat'), ready = path.join(directory, 'ready')
+  const grandchild = `const fs=require('fs');setInterval(()=>fs.appendFileSync(${JSON.stringify(heartbeat)},'x'),20);setTimeout(()=>process.exit(),3000)`
+  const code = `const {spawn}=require('child_process');const fs=require('fs');spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio:'ignore'});fs.writeFileSync(${JSON.stringify(ready)},'ready');setTimeout(()=>process.exit(),5000)`
+  const io = new LocalAdapter(policy, directory, s, () => atomicJSON(file, s), runtime)
+  let cancelled
+  const running = io.command('node', ['-e', code]).catch(e => {
+    cancelled = e; markStopped(s, { reason: e.message, ...e }); atomicJSON(file, s); throw e
+  }).finally(release)
+  const rejected = assert.rejects(running, StopRequested)
+  const deadline = Date.now() + 5000
+  while ((!fs.existsSync(ready) || !fs.existsSync(heartbeat)) && Date.now() < deadline) await delay(20)
+  assert.ok(fs.existsSync(heartbeat), 'grandchild started')
+  const result = await stopRun(root, s.id)
+  await rejected
+  assert.equal(result.confirmed, true, 'entire process tree cleanup confirmed')
+  assert.equal(cancelled.cleanupIncomplete, false)
+  const before = fs.readFileSync(heartbeat, 'utf8')
+  await delay(150)
+  assert.equal(fs.readFileSync(heartbeat, 'utf8'), before, 'grandchild stopped writing')
+  const saved = readJSON(file)
+  assert.equal(saved.phase, 'STOPPED'); assert.equal(saved.stop.resumePhase, 'IMPLEMENT')
+  assert.equal(saved.remoteAuthorized, false)
+  assert.ok(saved.stop.requestId)
+})
+test('failure opening a log cannot launch an orphan child outside the abort path', async t => {
+  const { directory } = controlFixture(t)
+  const marker = path.join(directory, 'should-not-exist')
+  const controller = new AbortController()
+  await assert.rejects(execute('node', ['-e', `setTimeout(()=>require('fs').writeFileSync(${JSON.stringify(marker)},'orphan'),300)`], {
+    signal: controller.signal, log: path.join(directory, 'missing-parent', 'log')
+  }), /ENOENT/)
+  controller.abort(new StopRequested('Stop after setup failed'))
+  await delay(500)
+  assert.equal(fs.existsSync(marker), false)
 })

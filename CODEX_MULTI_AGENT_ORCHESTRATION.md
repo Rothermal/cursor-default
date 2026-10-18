@@ -19,6 +19,9 @@ distinguishes implemented local behavior, offline evidence and pending live chec
   high-risk work requires design and final adversarial review.
 - Only Developer authors implementation. Fresh CLI sessions enforce separate
   developer/reviewer sandbox policies. Native project roles are also supplied.
+- A persistent, default-off master switch applies across linked worktrees. Stop
+  cancels active child commands, checkpoints STOPPED and requires explicit resume;
+  enable never restarts work. Cancellation clears publication authorization.
 - A task owns an isolated Git worktree/branch and atomic durable checkpoints
   outside tracked source, with locks and wall-time/call/repair/observed-token bounds.
 - Acceptance, local gates and independent review bind to the exact head/base.

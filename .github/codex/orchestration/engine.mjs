@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 export const MODEL = 'gpt-6.1-sol'
 export const EFFORT = 'ultra'
-export const TERMINAL = new Set(['READY_FOR_HUMAN_REVIEW', 'BLOCKED', 'NEEDS_HUMAN_DECISION', 'BUDGET_EXHAUSTED', 'FAILED'])
+export const TERMINAL = new Set(['READY_FOR_HUMAN_REVIEW', 'BLOCKED', 'NEEDS_HUMAN_DECISION', 'BUDGET_EXHAUSTED', 'FAILED', 'STOPPED'])
 export const PHASES = new Set(['INTAKE', 'TRIAGE', 'PLAN', 'CHALLENGE', 'IMPLEMENT', 'LOCAL_VALIDATE', 'REVIEW', 'REPAIR', 'FINAL_CHALLENGE', 'PR_UPDATE', 'CI_WAIT', 'CI_REPAIR', ...TERMINAL])
 
 export function assertPolicy(p) {
