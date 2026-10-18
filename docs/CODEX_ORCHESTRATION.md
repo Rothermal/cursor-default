@@ -16,6 +16,9 @@ Native subagents inherit the parent sandbox, so role prose alone is not isolatio
 
 ## Quick start
 
+Start orchestration through an explicit Codex interaction. Ask Codex to run the
+commands below for the task; there is no orchestration Actions or scheduled trigger.
+
 Use Node 20+, Git, pnpm 9 and an authenticated Codex CLI supporting the flags
 verified in the audit. `codex exec --help` must list `--ignore-user-config`,
 `--strict-config`, `--output-schema`, `--ephemeral` and `--json`. The selected
@@ -148,7 +151,7 @@ than editing saved states to bypass gates. Policy/tooling digests prevent silent
 resuming an old run under changed gate code. Worktree initialization interrupted
 before confirmation is marked BLOCKED for manual inspection.
 
-## Validation, hosting and reuse
+## Validation and reuse
 
 ```sh
 node --test .github/codex/orchestration/orchestration.test.mjs
@@ -161,19 +164,17 @@ does **not** claim that a live model detected the bug. Fault fixtures cover stal
 review, incomplete acceptance, interrupted work, locks, missing permission evidence,
 CI failure/resume, budgets, repeated failures and task text kept out of shell code.
 
-`Codex Orchestration Controls` is a read-only, secret-free workflow triggered
-manually or for PRs changing this infrastructure. It runs offline tests only.
-Existing CI/review/deploy workflows are unchanged. Hosted autonomous model/writer
-execution, issue/comment triggers, shared cross-machine scheduling, uploaded run
-recovery and deployment remain deferred. A hosted writer needs separately reviewed
-credential isolation, authorization and permissions; no workflow silently adds it.
+Run these tests through Codex as part of local validation. This implementation
+adds no GitHub Actions workflow or hosted orchestration. Runs start only through
+explicit Codex interactions. Existing CI/review/deploy workflows remain in place;
+the controller can inspect their results after authorized PR publication.
 
 For another project, copy the controller and native roles through review, adapt
 `policy.json` repository/base/checks/context, and replace StatTracker-specific role
 context. Keep the model/effort lock, gate semantics and fault tests. Do not install
-this as a global default. To roll back, stop active processes, disable the new
-controls workflow if enabled, and remove only these additive files in a reviewed
-change. Retain run worktrees/evidence until their changes are recovered; do not
+this as a global default. To roll back, stop active processes and remove only
+these additive files in a reviewed change. Retain run worktrees/evidence until
+their changes are recovered; do not
 delete existing local games, other agents, settings or credentials.
 
 ## Verification record

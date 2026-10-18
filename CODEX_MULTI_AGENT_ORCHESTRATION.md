@@ -40,10 +40,10 @@ in [.codex/agents](.codex/agents/).
 
 Local implementation and offline controller/Git tests are verified. A full live
 CLI model-driven repair, remote publication and protected-CI pilot remain pending.
-The new manual/PR Actions workflow tests offline contracts only; a hosted autonomous
-writer, issue/comment triggers and cross-machine scheduling are deferred until
-separately authorized credential/isolation infrastructure exists. Token usage is
-an observed stop threshold, not an enforceable provider spend cap.
+Orchestration runs only through explicit Codex interactions. No GitHub Actions
+workflow, hosted writer, issue/comment trigger or cross-machine scheduler is added.
+Run the offline contract tests locally through Codex. Token usage is an observed
+stop threshold, not an enforceable provider spend cap.
 
 For another project, review/adapt the repository policy, context and role prompts;
 retain model locks, trust boundaries and fault coverage. See the operating guide

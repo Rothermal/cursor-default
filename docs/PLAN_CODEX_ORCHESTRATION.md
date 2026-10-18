@@ -37,7 +37,7 @@ authorization for remote writes.
 | Structured role evidence | Native output schema | Validate reports and bind review/validation to exact head and base |
 | Token/cost cap | Not a strict native spend cap | Bound calls, wall time, repairs and observed tokens; stop after reported usage crosses cap; provider spend controls remain external |
 | GitHub PR/CI | `gh` wrapper, explicit publish opt-in | Draft PR, idempotent branch lookup, latest-head checks, protection inspection; never merge |
-| Secrets/fork execution | No safe general-purpose hosted writer yet | No issue/comment triggers or secret-bearing hosted implementation job |
+| Invocation | Codex interactions only | No added Actions workflow, hosted writer or issue/comment trigger |
 
 Official interface references: [subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents?surface=cli)
 and [CLI reference](https://learn.chatgpt.com/docs/cli/reference). Local CLI help is
@@ -67,11 +67,9 @@ docs/CODEX_ORCHESTRATION.md            operation, limitations, rollback
 
 Run data goes under the Git common directory, never committed. No dependency,
 database, rollout-policy or app changes are needed. Existing workflow permissions
-stay unchanged. The additive **offline contract-test** workflow runs manually and
-on PRs changing this infrastructure with contents:read only. Hosted autonomous
-writes remain deferred pending a separate
-credential/isolation design and owner authorization. Local publication requires
-explicit `--publish`; it authorizes only that run's branch and draft PR. Agents
+stay unchanged. Orchestration and its offline contract tests run through Codex
+interactions only. No GitHub Actions workflow or hosted orchestration is added.
+Local publication requires explicit `--publish`; it authorizes only that run's branch and draft PR. Agents
 are prohibited from pushing, posting, merging, deploying or applying migrations.
 
 Changes to agent policy, CI, dependencies, security/access or migrations escalate
@@ -92,7 +90,7 @@ before publication rather than letting a run rewrite its own gates.
 
 Reuse through a reviewed repository policy adapter, not by copying StatTracker's
 product assumptions into other projects. This initial implementation deliberately
-does not auto-enable a hosted writer or replace the existing automated reviewer.
+runs only through Codex interactions and retains the existing automated reviewer.
 
 ## Implementation evidence
 
@@ -119,7 +117,8 @@ does not auto-enable a hosted writer or replace the existing automated reviewer.
   repaired and covered with focused probes/tests before final review.
 - GitHub protection inspection remains unavailable (connected integration 403).
   Remote branch/PR writes and live model/GitHub execution were not performed.
-  Hosted writer execution remains explicitly deferred, not implementation-complete.
+  Hosted orchestration is outside the requested scope; runs start through Codex
+  interactions.
 
 ## PR preparation on the current integration base
 
