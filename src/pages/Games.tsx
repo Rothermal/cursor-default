@@ -34,6 +34,7 @@ import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBloc
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
 import { sports } from '../config/sports'
+import { isCurrentAuthUser } from '../lib/authIdentity'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -146,6 +147,15 @@ export default function Games() {
   // Unmount and newer requests invalidate continuations before owner-scoped storage access.
   const openRequestRef = useRef(0)
   useEffect(() => () => { openRequestRef.current += 1 }, [userId])
+  // An open that awaited the cloud must not navigate or touch storage once the page is gone
+  // or the account changed: the old handler still holds the previous account's callbacks.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  const openIsStale = (ownerId: string) =>
+    !mountedRef.current || currentUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId)
   const supabaseClient = supabase
   const requestedSportId = searchParams.get('sport')
   const scopedSport = useMemo(
@@ -494,7 +504,8 @@ export default function Games() {
   const handleOpenGame = async (game: GameRow) => {
     if (!userId) return
     const request = ++openRequestRef.current
-    const isCurrent = () => openRequestRef.current === request && currentUserIdRef.current === userId
+    const isCurrent = () => openRequestRef.current === request && !openIsStale(userId)
+    if (!isCurrent()) return
     const gameSportId =
       game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
     const teamRole = game.team_id ? teamRolesById[game.team_id] ?? null : null

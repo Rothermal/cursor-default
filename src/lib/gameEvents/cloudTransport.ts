@@ -70,6 +70,11 @@ export interface SyncEventGameInput {
   localGameId: string
   adapter: EventCloudTransportAdapter
   validateBinding?: (gameId: string) => void | Promise<void>
+  /**
+   * Throws when the sync is stale, for example because the signed-in account changed. Called
+   * before every write and before the result settles, so an account switch during an await
+   * stops the upload: the server records `auth.uid()`, which would be the new account.
+   */
   assertCurrent?: () => void
 }
 
@@ -153,6 +158,7 @@ export async function syncEventGameToCloud({
     )
   }
 
+  assertCurrent?.()
   const { data: bindingData, error: bindingError } = await supabase.rpc(
     adapter.bindingRpc,
     {
@@ -179,6 +185,7 @@ export async function syncEventGameToCloud({
   if (!binding?.game_id || !binding.game_status || !binding.participant_id_map) {
     throw new Error(`${adapter.sportLabel} game binding returned an invalid response`)
   }
+  assertCurrent?.()
   await Promise.all([
     freezeGameSideNickname(
       binding.game_id,

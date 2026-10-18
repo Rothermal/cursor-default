@@ -4,6 +4,7 @@ import Games from './Games'
 import { createInitialState } from '../lib/gameReducer'
 import { saveActiveGameState } from '../lib/gameParking'
 import { sports } from '../config/sports'
+import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
 
 const harness = vi.hoisted(() => ({
   slots: [] as unknown[], cursor: 0, effects: [] as Array<() => void>, cleanups: [] as Array<() => void>,
@@ -103,13 +104,16 @@ async function open() {
   render(); await drain()
   const button = render().find(element => element.type === 'button' && ['View Details', 'Review Game'].includes(element.props.children as string))
   if (!button) throw new Error('Missing cloud open action')
-  ;(button.props.onClick as () => void)()
+  const click = button.props.onClick as () => void
+  click()
+  return click
 }
 function candidate() {
   return { ...createInitialState(), sport: sports.find(sport => sport.id === harness.sportId)!,
     gameInfo: { teamName: 'Home', opponentName: 'Away', date: '2026-10-18', tournamentName: '', tournamentId: null } }
 }
 beforeEach(() => {
+  setCurrentAuthUserId('account-a')
   harness.slots = []; harness.cursor = 0; harness.effects = []; harness.cleanups = []
   harness.userId = 'account-a'; harness.sportId = 'baseball'
   for (const mock of [harness.authority, harness.load, harness.independent, harness.legacy, harness.touch, harness.open, harness.navigate]) mock.mockReset()
@@ -118,9 +122,51 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', new MemoryStorage())
   vi.stubGlobal('window', { confirm: () => true })
 })
-afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); vi.unstubAllGlobals() })
+afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
 
 describe('Cloud Games open lifetime', () => {
+  it.each(['baseball', 'hockey', 'basketball', 'soccer'])('cancels %s adoption when auth changes before React rerenders', async sport => {
+    harness.sportId = sport
+    let settle!: (value: ReturnType<typeof candidate>) => void
+    harness.load.mockReturnValue(new Promise(resolve => { settle = resolve }))
+    await open()
+    await vi.waitFor(() => expect(harness.load).toHaveBeenCalledOnce())
+    setCurrentAuthUserId('account-b')
+    saveActiveGameState(candidate(), 'account-b')
+    const before = new Map((localStorage as unknown as MemoryStorage).store)
+    settle(candidate()); await drain()
+    expect(harness.open).not.toHaveBeenCalled()
+    expect(harness.navigate).not.toHaveBeenCalled()
+    expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+  })
+  it('does not revive an old request when the rendered account changes A to B to A', async () => {
+    let settle!: (value: ReturnType<typeof candidate>) => void
+    harness.load.mockReturnValue(new Promise(resolve => { settle = resolve }))
+    await open()
+    await vi.waitFor(() => expect(harness.load).toHaveBeenCalledOnce())
+    harness.userId = 'account-b'; setCurrentAuthUserId('account-b'); render()
+    harness.userId = 'account-a'; setCurrentAuthUserId('account-a'); render()
+    saveActiveGameState(candidate(), 'account-a')
+    const before = new Map((localStorage as unknown as MemoryStorage).store)
+    settle(candidate()); await drain()
+    expect(harness.open).not.toHaveBeenCalled()
+    expect(harness.navigate).not.toHaveBeenCalled()
+    expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+  })
+  it('lets a newer request supersede an earlier open for the same account', async () => {
+    let settle!: (value: ReturnType<typeof candidate>) => void
+    harness.load.mockReturnValueOnce(new Promise(resolve => { settle = resolve }))
+    harness.load.mockResolvedValue(candidate())
+    const reopen = await open()
+    await vi.waitFor(() => expect(harness.load).toHaveBeenCalledOnce())
+    reopen(); await drain()
+    expect(harness.open).toHaveBeenCalledOnce()
+    const before = new Map((localStorage as unknown as MemoryStorage).store)
+    settle(candidate()); await drain()
+    expect(harness.open).toHaveBeenCalledOnce()
+    expect(harness.navigate).toHaveBeenCalledOnce()
+    expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+  })
   it.each(['baseball', 'hockey', 'basketball', 'soccer'])('does not open stale %s data after unmount and account switch', async sport => {
     harness.sportId = sport
     let settle!: (value: ReturnType<typeof candidate>) => void

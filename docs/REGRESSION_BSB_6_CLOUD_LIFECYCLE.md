@@ -218,6 +218,59 @@ has no retry timestamp, so it otherwise needs another edit or manual retry.
   and `Games.test.ts`, using `--maxWorkers=2`. Full gates and independent re-review of
   this follow-up remain pending; no new live Supabase or device signoff is claimed.
 
+### Author 148e27d5 Account Guards (Pre-Merge Evidence)
+
+The review of `15a892cb` found two account-lifetime gaps that this slice exposed Baseball to:
+
+- The shared transport (`syncEventGameToCloud`) now takes `assertCurrent` and calls it
+  before the bind, the nickname writes, conflict records, every event upsert, conflict
+  resolution and the checkpoint, and before the result settles. Every sport's wrapper passes
+  it (Soccer's now too), so events recorded by one account never upload once another
+  account is signed in.
+- `src/lib/authIdentity.ts` holds the account the auth client last reported, set
+  synchronously in `AuthContext`. `GameContext`'s `isStaleOwner` combines it with the
+  provider's account. Sync success and failure, the queue loop, `refreshParkingState`,
+  the flush callbacks, Enable cloud sync and reopen handling all stop before reading parked
+  games as the old account (`readManifest` clears every parked game on an owner mismatch).
+  So do `openGameSnapshot`, `resumeParkedGame` and `prepareActiveGameMutation`, which a page
+  may call after an await.
+- Cloud Games cancels an open once the page unmounts or the account changes
+  (`openIsStale`), before navigating or touching storage.
+
+Tests: `src/lib/baseball/cloudAccountSwitch.test.ts` (5 cases: uploads while the account
+holds; no writes when it changes during the remote read; stops after the first event write
+without a checkpoint; no settled result when it changes during the checkpoint; no bind when
+it already changed). The middle three fail on the previous transport. `GameContext.test.ts`
+adds 3 cases: callbacks captured for one account refuse to open, resume, prepare or flush
+after another account signs in, and that account's parked game survives; a control showing
+that a read as the old account clears it; and a normal open still works.
+`releaseEntryGuards.test.ts` checks the new Cloud Games guard.
+
+Author-reported checks before integration: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings),
+`pnpm test --maxWorkers=2` (295 files, 2,770 tests) and `pnpm build` pass.
+
+### Merge Integration: de4f52d9 With 148e27d5
+
+- Retained the author's synchronous auth identity updates before React state, plus the
+  provider open/resume/prepare-mutation and reopen guards. `isCurrentAccount` now combines
+  that auth identity with the captured provider lifetime; `isStaleOwner` delegates to it
+  while checking the captured owner. Unmount and a rendered A-to-B-to-A transition do not
+  revive old work. The queued-B wake-up still runs only after the stale worker releases
+  its lock, without old-owner storage access.
+- Cloud Games combines the author's mounted/auth checks with per-request cancellation.
+  Shared transport checks remain before and after awaits, including nickname writes.
+  All author tests are retained; their capability mocks now return contract 2 / migration
+  78 for the actual-sync preflight. Migration 078 and first-bind recovery are unchanged.
+- Added deferred integration cases for auth switching before React rerenders, provider
+  unmount, A-to-B-to-A replacement, and superseded cloud-open requests. The focused merge
+  run passed **13 files / 167 tests** with `--maxWorkers=2`, including both authors' tests,
+  the queue handoff, migration/recovery checks and all four sport transports.
+  `pnpm typecheck` also passed after resolution.
+- The coordinator reports the pre-merge `de4f52d9` full suite passed **298 files / 2,798
+  tests**. That and the author's baseline above are separate historical results, not a
+  post-merge full gate. Full-suite/build/lint and independent re-review remain coordinator
+  owned; the bounded SQL/browser evidence above is not new live Supabase signoff.
+
 ### After applying 076-078 (owner)
 
 | Step | Expected |
@@ -230,3 +283,4 @@ has no retry timestamp, so it otherwise needs another edit or manual retry.
 | A game recorded before this release | Game menu: Enable cloud sync; after confirming, it uploads and appears in Cloud Games |
 | A second scorer opens the team game | Offered their own recorder stream; it opens unstarted |
 | A viewer opens it | Game Info |
+| Start a Cloud Games open, then sign out and into another account before it finishes | Nothing opens; the other account's parked games are untouched |

@@ -296,13 +296,14 @@ describe('Basketball release entry guards', () => {
     const handler = between(games, 'const handleOpenGame = async', '\n  const startEditOpponentName')
     const basketball = between(handler, "if (gameSportId === 'basketball') {", '\n    const recorderEventSport')
     const requestIndex = handler.indexOf('const request = ++openRequestRef.current')
-    const guardIndex = handler.indexOf('const isCurrent = () => openRequestRef.current === request && currentUserIdRef.current === userId')
+    const guardIndex = handler.indexOf('const isCurrent = () => openRequestRef.current === request && !openIsStale(userId)')
     expect(requestIndex).toBeGreaterThanOrEqual(0)
     expect(guardIndex).toBeGreaterThan(requestIndex)
     expect(guardIndex).toBeLessThan(handler.indexOf('await loadBasketballCloudDataAuthority'))
     expect(games).toContain('useEffect(() => () => { openRequestRef.current += 1 }, [userId])')
     expect(basketball).toMatch(/}\s+if \(!isCurrent\(\)\) return\s+const hasActiveGame/)
     expect(basketball).toContain('if (!isCurrent() || !openGameSnapshot(basketballGame))')
+    expect(games).toContain('!mountedRef.current || currentUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId)')
   })
 
   it('commits later cloud enablement only after the guarded transport succeeds', () => {

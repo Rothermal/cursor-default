@@ -6,6 +6,7 @@ import { createBaseballEventGameState } from '../lib/baseball/setupBuilder'
 import { baseballSetup } from '../lib/baseball/testFixtures'
 import { saveActiveGameState, parkActiveGame, getActiveLocalGameId, getParkedGameRecord } from '../lib/gameParking'
 import type { GameState } from '../types'
+import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
 
 const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, userId: 'account-a', state: null as unknown,
   dispatch: vi.fn(), sync: vi.fn(), automatic: false, renderRequested: false,
@@ -35,11 +36,11 @@ vi.mock('react', async original => ({
     return (harness.slots[index] as { callback: unknown }).callback
   },
   useEffect: (effect: () => (() => void) | undefined, deps: unknown[]) => {
-    if (!harness.automatic) return
-    // Drive the queue/retry and 150ms debounce effects, not unrelated auth/persistence effects.
+    // Drive account lifetime and optional automatic-sync effects, not unrelated persistence.
+    const lifetimeEffect = deps.length === 1 && typeof deps[0] === 'object' && deps[0] !== null && 'active' in deps[0]
     const queueEffect = deps.length === 6 && typeof deps[3] === 'function' && typeof deps[4] === 'number'
     const debounceEffect = deps.length === 4 && typeof deps[0] === 'function' && typeof deps[1] === 'boolean'
-    if (!queueEffect && !debounceEffect) return
+    if (!lifetimeEffect && (!harness.automatic || (!queueEffect && !debounceEffect))) return
     const index = harness.cursor++
     const previous = harness.slots[index] as { deps: unknown[]; cleanup?: () => void } | undefined
     if (previous && deps.every((value, i) => Object.is(value, previous.deps[i]))) return
@@ -92,6 +93,7 @@ function fixture(kind: string): GameState {
   }
 }
 beforeEach(() => {
+  setCurrentAuthUserId('account-a')
   harness.slots = []; harness.cursor = 0; harness.userId = 'account-a'
   harness.automatic = false; harness.renderRequested = false; harness.effects = []; harness.cleanups = []
   harness.dispatch.mockClear(); harness.sync.mockReset()
@@ -99,9 +101,44 @@ beforeEach(() => {
   vi.stubGlobal('navigator', { onLine: true })
   vi.stubGlobal('window', { clearTimeout: vi.fn() })
 })
-afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); vi.unstubAllGlobals() })
+afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
 
 describe('sync settlement account isolation', () => {
+  it.each([
+    ['auth-before-render', 'success'], ['auth-before-render', 'rejection'],
+    ['unmount', 'success'], ['unmount', 'rejection'],
+    ['A-to-B-to-A', 'success'], ['A-to-B-to-A', 'rejection'],
+  ])('rejects stale %s work on %s without touching current storage', async (transition, settlement) => {
+    const first = fixture('baseball')
+    harness.state = first
+    saveActiveGameState(first, 'account-a')
+    let resolve!: (value: unknown) => void
+    let reject!: (reason: unknown) => void
+    harness.sync.mockReturnValue(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const pending = render().flushCloudSync()
+    await vi.waitFor(() => expect(harness.sync).toHaveBeenCalledOnce())
+    if (transition === 'unmount') harness.cleanups.forEach(cleanup => cleanup())
+    else {
+      setCurrentAuthUserId('account-b')
+      if (transition === 'A-to-B-to-A') {
+        harness.userId = 'account-b'; render()
+        harness.userId = 'account-a'; setCurrentAuthUserId('account-a'); render()
+      }
+    }
+    const owner = transition === 'auth-before-render' ? 'account-b' : 'account-a'
+    saveActiveGameState({ ...first, gameInfo: { ...first.gameInfo!, opponentName: 'Current game' } }, owner)
+    const storage = localStorage as unknown as MemoryStorage
+    const before = new Map(storage.store)
+    const writes = storage.writes.length
+    harness.dispatch.mockClear()
+    if (settlement === 'rejection') reject(new Error('Account changed'))
+    else resolve({ gameId: 'stale-cloud-a' })
+    expect(await pending).toMatchObject({ ok: false })
+    expect(storage.store).toEqual(before)
+    expect(storage.writes).toHaveLength(writes)
+    expect(harness.dispatch).not.toHaveBeenCalled()
+    expect(harness.sync).toHaveBeenCalledOnce()
+  })
   it.each(['success', 'rejection'])('automatically drains B after its queued worker waits for stale A %s', async settlement => {
     harness.automatic = true
     let timerId = 0
@@ -123,7 +160,7 @@ describe('sync settlement account isolation', () => {
     await drainAutomaticRenders()
     expect(harness.sync).toHaveBeenCalledOnce()
 
-    harness.userId = 'account-b'
+    harness.userId = 'account-b'; setCurrentAuthUserId('account-b')
     const second = fixture('baseball')
     harness.state = second
     saveActiveGameState(second, 'account-b')
@@ -180,7 +217,7 @@ describe('sync settlement account isolation', () => {
     harness.sync.mockReturnValue(new Promise((yes, no) => { resolve = yes; reject = no }))
     const pending = render().flushCloudSync()
     await vi.waitFor(() => expect(harness.sync).toHaveBeenCalledOnce())
-    harness.userId = 'account-b'
+    harness.userId = 'account-b'; setCurrentAuthUserId('account-b')
     const second = fixture('aggregate')
     harness.state = second
     saveActiveGameState(second, 'account-b')

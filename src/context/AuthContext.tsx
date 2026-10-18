@@ -11,6 +11,7 @@ import { clearSoccerReleaseCapabilityCache } from '../lib/soccer/releaseCapabili
 import { clearBasketballReleaseCapabilityCache } from '../lib/basketball/releaseCapabilities'
 import { clearHockeyReleaseCapabilityCache } from '../lib/hockey/releaseCapabilities'
 import { clearBaseballReleaseCapabilityCache } from '../lib/baseball/releaseCapabilities'
+import { setCurrentAuthUserId } from '../lib/authIdentity'
 import { clearBasketballClockLineupCapabilityCache } from '../lib/basketball/clockLineupCapabilities'
 import type { User, Session } from '@supabase/supabase-js'
 
@@ -61,12 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setCurrentAuthUserId(s?.user?.id ?? null)
       setSession(s)
       setUser(s?.user ?? null)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setCurrentAuthUserId(s?.user?.id ?? null)
       setSession(s)
       setUser(s?.user ?? null)
     })
