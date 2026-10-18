@@ -70,6 +70,7 @@ export interface SyncEventGameInput {
   localGameId: string
   adapter: EventCloudTransportAdapter
   validateBinding?: (gameId: string) => void | Promise<void>
+  assertCurrent?: () => void
 }
 
 export interface SyncEventGameResult {
@@ -140,7 +141,9 @@ export async function syncEventGameToCloud({
   localGameId,
   adapter,
   validateBinding,
+  assertCurrent,
 }: SyncEventGameInput): Promise<SyncEventGameResult> {
+  assertCurrent?.()
   if (!supabase) throw new Error('Supabase client not configured')
   const prepared = adapter.prepare(state)
   if ((state.cloudSync.eventConflicts?.length ?? 0) > 0) {
@@ -167,6 +170,7 @@ export async function syncEventGameToCloud({
         state.cloudSync.allowDeletedSourcePlayerRecovery === true,
     }
   )
+  assertCurrent?.()
   if (bindingError) {
     throw new Error(`${adapter.sportLabel} game binding failed: ${bindingError.message}`)
   }
@@ -179,15 +183,19 @@ export async function syncEventGameToCloud({
     freezeGameSideNickname(
       binding.game_id,
       'tracked_team_nickname',
-      state.gameInfo!.teamNickname
+      state.gameInfo!.teamNickname,
+      assertCurrent
     ),
     freezeGameSideNickname(
       binding.game_id,
       'opponent_nickname',
-      state.gameInfo!.opponentNickname
+      state.gameInfo!.opponentNickname,
+      assertCurrent
     ),
   ])
+  assertCurrent?.()
   await validateBinding?.(binding.game_id)
+  assertCurrent?.()
 
   const cloudToLocalParticipantId = Object.fromEntries(
     Object.entries(binding.participant_id_map).map(([localId, cloudId]) => [cloudId, localId])
@@ -198,6 +206,7 @@ export async function syncEventGameToCloud({
     cloudToLocalParticipantId,
     adapter.registry
   )
+  assertCurrent?.()
   if (!remote.ok || !remote.inspection.complete) {
     throw new Error(
       remote.error ?? remote.inspection.diagnostics[0]?.message ?? 'Cloud event history could not be loaded'
@@ -237,6 +246,7 @@ export async function syncEventGameToCloud({
   if (merge.conflicts.length > 0) {
     const conflicts: GameEventSyncConflict[] = []
     for (const conflict of merge.conflicts) {
+      assertCurrent?.()
       const { data: conflictId, error: conflictError } = await supabase.rpc(
         'record_game_event_conflict',
         {
@@ -246,6 +256,7 @@ export async function syncEventGameToCloud({
           p_remote_event: conflict.remoteEvent,
         }
       )
+      assertCurrent?.()
       if (conflictError || typeof conflictId !== 'string') {
         throw new Error(`Event conflict could not be preserved: ${conflictError?.message ?? 'invalid response'}`)
       }
@@ -275,6 +286,7 @@ export async function syncEventGameToCloud({
 
   const mergedState = rebuilt.state
   for (const rawEvent of mergedState.eventStream!.events) {
+    assertCurrent?.()
     if (!isGameEventEnvelope(rawEvent) || rawEvent.sportId !== adapter.sportId) {
       throw new Error(`${adapter.sportLabel} event history contains an invalid event`)
     }
@@ -284,6 +296,7 @@ export async function syncEventGameToCloud({
       rawEvent,
       binding.participant_id_map
     )
+    assertCurrent?.()
     if (!result.ok) {
       throw new Error(`Event ${rawEvent.id} could not sync: ${result.error}`)
     }
@@ -294,10 +307,12 @@ export async function syncEventGameToCloud({
   )
   let conflictStatusById = new Map<string, string>()
   if (pendingResolutions.length > 0) {
+    assertCurrent?.()
     const { data: conflictRows, error: conflictStatusError } = await supabase
       .from('game_event_conflicts')
       .select('id,status')
       .in('id', pendingResolutions.map(pending => pending.conflictId))
+    assertCurrent?.()
     if (conflictStatusError) {
       throw new Error(`Event conflict status could not load: ${conflictStatusError.message}`)
     }
@@ -307,6 +322,7 @@ export async function syncEventGameToCloud({
   }
 
   for (const pending of pendingResolutions) {
+    assertCurrent?.()
     const conflictStatus = conflictStatusById.get(pending.conflictId)
     if (conflictStatus === 'resolved') continue
     if (conflictStatus !== 'open') {
@@ -323,6 +339,7 @@ export async function syncEventGameToCloud({
       p_resolution: pending.resolution,
       p_resolved_event: resolvedEvent,
     })
+    assertCurrent?.()
     if (resolutionError) {
       throw new Error(`Event conflict resolution could not sync: ${resolutionError.message}`)
     }
@@ -331,6 +348,7 @@ export async function syncEventGameToCloud({
   const revisions = eventRevisionCheckpoint(mergedState)
   const maxSequence = mergedState.eventStream!.events.reduce<number>((max, rawEvent) =>
     isGameEventEnvelope(rawEvent) ? Math.max(max, rawEvent.sequence) : max, -1)
+  assertCurrent?.()
   const { data: checkpointData, error: checkpointError } = await supabase.rpc(
     'confirm_game_event_stream_checkpoint',
     {
@@ -342,6 +360,7 @@ export async function syncEventGameToCloud({
       p_stream_fingerprint: eventStreamFingerprint(mergedState),
     }
   )
+  assertCurrent?.()
   if (checkpointError) {
     throw new Error(`${adapter.sportLabel} event checkpoint failed: ${checkpointError.message}`)
   }
@@ -372,8 +391,10 @@ export async function syncEventGameToCloud({
 async function freezeGameSideNickname(
   gameId: string,
   column: 'tracked_team_nickname' | 'opponent_nickname',
-  nickname: string | null | undefined
+  nickname: string | null | undefined,
+  assertCurrent?: () => void
 ): Promise<void> {
+  assertCurrent?.()
   const value = nickname?.trim()
   if (!value || !supabase) return
   const { error } = await supabase
@@ -381,6 +402,7 @@ async function freezeGameSideNickname(
     .update({ [column]: value })
     .eq('id', gameId)
     .is(column, null)
+  assertCurrent?.()
   if (error) {
     console.warn(`[StatKeeper] Game side nickname ${column} could not be saved`, error.message)
   }

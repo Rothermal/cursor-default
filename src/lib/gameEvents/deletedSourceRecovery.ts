@@ -24,11 +24,13 @@ export function deletedSourcePlayerRecoverySettlementPatch(): Pick<
 
 /**
  * The team whose owner or admin may approve recovery: the cloud binding's team, or before
- * the first bind succeeds, a Hockey game's immutable source team (HKY-5B1 review).
+ * the first bind succeeds, a Hockey or Baseball game's immutable source team.
  */
 export function deletedSourceRecoveryTeamId(state: GameState): string | null {
   if (state.cloudSync.teamId) return state.cloudSync.teamId
   const sportState = state.sportGameState
-  if (sportState?.sportId === 'hockey' && !state.cloudSync.gameId) return sportState.setup.sourceTeamId
+  if ((sportState?.sportId === 'hockey' || sportState?.sportId === 'baseball') && !state.cloudSync.gameId) {
+    return sportState.setup.sourceTeamId
+  }
   return null
 }

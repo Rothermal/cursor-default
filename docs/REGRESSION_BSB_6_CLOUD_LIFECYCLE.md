@@ -7,9 +7,10 @@ lands.
 
 Migrations `076_baseball_event_platform_publication_constraint.sql` (stages the publication
 sport check `NOT VALID`) and `077_baseball_event_cloud_lifecycle.sql` (validates and swaps
-it, then everything else). Not yet applied to the Supabase project; the owner applies both,
-in order, before the BSB-6B client ships. Until then the handshake keeps Baseball on the
-device.
+it, then everything else). Not yet applied to the Supabase project; the owner applies both
+in order. The BSB-6B1 review repair additionally requires 078 before its client ships;
+076-077 alone do not satisfy the new handshake. Until then cloud binding/upload is blocked
+and local-only games remain available.
 
 ### Local database
 
@@ -108,7 +109,9 @@ scores in the table above; the database harness reuses it.
 Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test` and
 `pnpm build` pass.
 
-### After applying (owner)
+### After applying 076-077 (BSB-6A, owner)
+
+This is the original BSB-6A contract. The BSB-6B1 client below requires 078 and contract 2.
 
 | Step | Expected |
 |---|---|
@@ -129,7 +132,7 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
   `advance`; device games and another recorder's events are refused; Enable cloud sync
   offers, explains, uploads with the automatic policy, and stops before uploading on
   inactive access, a viewer role or a missing backend; the handshake accepts only contract
-  1 / migration 77, reads contract 0 or a missing RPC as a backend update, caches per
+  2 / migration 78, reads contract 0/1 or a missing RPC as a backend update, caches per
   account; the setup gate never falls back silently.
 - `src/lib/baseball/cloudShell.test.ts` (4 cases): the cloud shell rebuilds players, the
   automatic policy and the player map; a mismatched team, a renamed participant or setup
@@ -139,19 +142,64 @@ Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm te
   only without a policy, `baseball_events` when automatic), `releaseEntryGuards.test.ts`
   (the enable dispatch) and `cloudRecovery.test.ts` (the shared alerts component).
 
-Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test`
+Pre-repair baseline checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test`
 (294 files, 2,762 tests) and `pnpm build` pass.
 
-### After applying 076-077 (owner)
+### PR #492 Review Repairs (2026-10-18)
+
+- Added optional account-lifetime checks throughout the shared event transport, including
+  binding, nickname writes, remote reads, event/conflict writes and checkpoint settlement.
+  Soccer forwards the same optional guard; existing sport wrappers, event policies and
+  conflict semantics remain intact.
+- Cloud Games invalidates pending opens on unmount, account change or a newer request,
+  including the Hockey/Baseball shared path, Soccer/Basketball and legacy fallthrough.
+  Sync settlement checks the original account before any owner-scoped storage read;
+  stale success/catch/finally, queued records and flush callbacks preserve the new account's
+  manifest. The deferred tests reproduced manifest clearing before the repair.
+- Deleted-player recovery can use Baseball's immutable source team before first binding,
+  without widening owner/admin approval or leaving durable approval enabled.
+- Migration `078_baseball_initial_event_revisions.sql` reissues the 055 writer with only
+  its absent-row gate changed: actual positive revisions greater than one are accepted
+  for a Baseball game with a matching Baseball setup version 1. Edited events, Undo
+  tombstones and restored events upload unchanged; no prior snapshots or revision 1 are
+  invented. All other authorization, identity, monotonic/idempotent, final-audit and sibling
+  rules remain unchanged. Source tests compare the full writer and capability bodies.
+- Baseball capability contract 2 / migration 78 gates actual sync before binding as well
+  as setup and Enable cloud sync; the account is checked again after the handshake await.
+  Migrations 076, 077 and 078 must be applied in order before this client ships.
+- Focused repair and sibling compatibility run: **11 files / 120 tests passed** with
+  `--maxWorkers=2`. This covers deferred account changes at transport stages, stale cloud
+  opens and sync success/rejection, same-account controls, real checked offline revisions,
+  old-backend refusal, first-bind recovery, migration scope and existing sport transports.
+  Post-repair full-suite/build/typecheck/lint gates remain coordinator-owned and are not
+  claimed here.
+
+The coordinator separately reports **28 passing SQL checks** against the complete 078
+migration in PostgreSQL 18.6 via PGlite 0.5.10. The fixture has a minimal schema and stubs
+for existing permission helpers. Actual revision-2, deleted revision-2 and restored
+revision-3 first inserts retain their values; revision advance, idempotence, stale/conflict,
+cross-game/recorder identity, anonymous/viewer/final-primary refusal, allowed late audit
+and timestamp limits, sibling first-revision refusal, setup mismatch, capability 0/2,
+inactive access and authenticated-only grants pass. The writer outside the initial gate
+also matches 055 after line-ending normalization. The pre-repair 055 probe reproduced
+the initial-revision conflict. This is bounded local SQL execution, not live Supabase,
+full RLS integration or concurrent-client verification. PGlite is only in ignored QA
+files; no application dependency was added.
+
+The coordinator also reports 16 real-provider Baseball/Hockey renders at 390px/1280px,
+Light/Dark and error/local-only states, with recovery export kind and menu status checked,
+no overflow and zero page errors. Those used a fake configured loopback backend with
+nonfixture HTTP blocked, not live Supabase; a final-patch repeat remains pending.
+
+### After applying 076-078 (owner)
 
 | Step | Expected |
 |---|---|
 | Signed out, New Baseball game | "Saved on this device" note, no Sync choice |
 | Signed in, New Baseball game | Sync: Cloud (default) and This device only |
-| Before applying 077, choose Cloud | "Baseball cloud games require the latest backend update" with Retry and This device only; Continue disabled |
-| After applying, start a team game with Cloud and record a few pitches | Game appears in Cloud Games; Game menu says "Synced to the cloud" |
+| Before applying 078, choose Cloud or retry automatic sync | "Baseball cloud games require the latest backend update"; setup offers Retry and This device only, and actual sync makes no bind/upload calls |
+| After applying 076-078, start a team game with Cloud and record a few pitches | Contract 2 / migration 78; game appears in Cloud Games; Game menu says "Synced to the cloud" |
 | Open it from Cloud Games on the same device | Resumes the parked copy |
 | A game recorded before this release | Game menu: Enable cloud sync; after confirming, it uploads and appears in Cloud Games |
 | A second scorer opens the team game | Offered their own recorder stream; it opens unstarted |
 | A viewer opens it | Game Info |
-

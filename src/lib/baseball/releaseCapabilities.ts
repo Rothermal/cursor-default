@@ -4,10 +4,10 @@ import {
   type ReleaseCapabilityResult,
 } from '../eventReleaseCapabilities'
 
-/** `get_baseball_release_capabilities`: contract 1 in migration 077 (needs 071's team settings save). */
+/** `get_baseball_release_capabilities`: contract 2 in migration 078 (actual first-upload revisions). */
 export interface BaseballReleaseCapabilities {
-  contractVersion: 1
-  migration: 77
+  contractVersion: 2
+  migration: 78
   eventTransportVersion: 4
   recoveryVersion: 1
   recorderResolutionVersion: 1
@@ -21,8 +21,8 @@ const checker = createReleaseCapabilityChecker<BaseballReleaseCapabilities>({
   rpcName: 'get_baseball_release_capabilities',
   subject: 'Baseball cloud games',
   expected: {
-    contractVersion: 1,
-    migration: 77,
+    contractVersion: 2,
+    migration: 78,
     eventTransportVersion: 4,
     recoveryVersion: 1,
     recorderResolutionVersion: 1,

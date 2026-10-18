@@ -27,8 +27,8 @@ import { baseballSetup } from './testFixtures'
 
 const baseball = sports.find(sport => sport.id === 'baseball')!
 const READY: BaseballReleaseCapabilities = {
-  contractVersion: 1,
-  migration: 77,
+  contractVersion: 2,
+  migration: 78,
   eventTransportVersion: 4,
   recoveryVersion: 1,
   recorderResolutionVersion: 1,
@@ -243,17 +243,18 @@ describe('BSB-6B Enable cloud sync', () => {
 })
 
 describe('BSB-6B release handshake', () => {
-  it('accepts only the exact migration 077 contract', async () => {
+  it('accepts only the exact migration 078 contract', async () => {
     await expect(loadBaseballReleaseCapabilities(clientWith(READY))).resolves.toEqual({ status: 'ready', capabilities: READY })
     await expect(loadBaseballReleaseCapabilities(clientWith({ ...READY, extra: 1 }))).resolves.toMatchObject({ status: 'invalid_response' })
     await expect(loadBaseballReleaseCapabilities(clientWith({ ...READY, migration: 76 }))).resolves.toMatchObject({ status: 'invalid_response' })
+    await expect(loadBaseballReleaseCapabilities(clientWith({ ...READY, contractVersion: 1, migration: 77 }))).resolves.toMatchObject({ status: 'backend_update_required' })
   })
 
   it('reads contract 0 or a missing RPC as migrations not applied and a newer contract as a stale client', async () => {
     await expect(loadBaseballReleaseCapabilities(clientWith({ contractVersion: 0 }))).resolves.toMatchObject({ status: 'backend_update_required' })
     await expect(loadBaseballReleaseCapabilities(clientWith(null, { code: 'PGRST202', message: 'Could not find the function' })))
       .resolves.toMatchObject({ status: 'backend_update_required' })
-    await expect(loadBaseballReleaseCapabilities(clientWith({ contractVersion: 2 }))).resolves.toMatchObject({ status: 'client_update_required' })
+    await expect(loadBaseballReleaseCapabilities(clientWith({ contractVersion: 3 }))).resolves.toMatchObject({ status: 'client_update_required' })
   })
 
   it('caches a ready result per account and re-checks when forced or the account changes', async () => {

@@ -20,6 +20,7 @@ import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { supabase } from '../supabase'
 import { createBaseballSportGameState, normalizeBaseballMatchSetup } from './state'
 import { baseballLocalPlayerKey } from './stats'
+import { ensureBaseballReleaseCapabilities } from './releaseCapabilities'
 import type { BaseballMatchSetup, BaseballSportGameState } from './types'
 
 export interface BaseballCloudShell {
@@ -118,6 +119,9 @@ export async function syncBaseballEventGameToCloud(
     throw new Error('Baseball cloud sync cannot blend another recorder stream.')
   }
   input.assertCurrent?.()
+  const capability = await ensureBaseballReleaseCapabilities(input.userId, { force: true })
+  input.assertCurrent?.()
+  if (capability.status !== 'ready') throw new Error(capability.error)
   return syncEventGameToCloud({ ...input, adapter: baseballEventCloudTransportAdapter })
 }
 
