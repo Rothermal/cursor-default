@@ -1,0 +1,16 @@
+{
+  "type":"object","additionalProperties":false,
+  "required":["headSha","baseSha","classification","complete","verdict","summary","plan","acceptance","findings"],
+  "properties":{
+    "headSha":{"type":"string"},"baseSha":{"type":"string"},
+    "classification":{"type":"string","enum":["small","medium","high"]},
+    "complete":{"type":"boolean"},"verdict":{"type":"string","enum":["pass","changes","incomplete"]},
+    "summary":{"type":"string"},"plan":{"type":"string"},
+    "acceptance":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["criterion","evidence","status"],"properties":{
+      "criterion":{"type":"string"},"evidence":{"type":"string"},"status":{"type":"string","enum":["passed","failed","manual"]}
+    }}},
+    "findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","priority","blocking","file","line","evidence","status","disposition"],"properties":{
+      "id":{"type":"string"},"priority":{"type":"string","enum":["P0","P1","P2"]},"blocking":{"type":"boolean"},"file":{"type":"string"},"line":{"type":"integer"},"evidence":{"type":"string"},"status":{"type":"string","enum":["open","resolved","superseded"]},"disposition":{"type":"string"}
+    }}}
+  }
+}
