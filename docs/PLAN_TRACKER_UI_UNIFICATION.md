@@ -289,7 +289,9 @@ Source assessment identified two separate review surfaces within TUI-1:
   clock/lineup tools, quick court actions, collapsed chart filters/tools and bottom
   routine sync/recorder status. Existing commands, setup, release policy, legacy
   capture and cloud authority stay unchanged. The action inventory and verification
-  are in the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md).
+  are in the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md). Lineup Save/Cancel
+  preserve the actual launcher and clock-disclosure state, including the late-player
+  handoff; no navigation-only gameplay events are added.
 - **Authority cutover (next PR):** event-only new-game creation and summary-only
   legacy routing, including local source review/export/safe sync, capability
   recovery, stale drafts and per-sport Summary/Game Info guards. This reaches setup,

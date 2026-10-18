@@ -224,7 +224,8 @@ export default function GameTracker() {
   const [eventCorrectionError, setEventCorrectionError] = useState<string | null>(null)
   const [lateParticipantError, setLateParticipantError] = useState<string | null>(null)
   const [lateParticipantReturnSide, setLateParticipantReturnSide] = useState<BasketballTeamSide | null>(null)
-  const [requestedLineupSide, setRequestedLineupSide] = useState<BasketballTeamSide | null>(null)
+  const [lateParticipantReturnLauncher, setLateParticipantReturnLauncher] = useState<HTMLButtonElement | null>(null)
+  const [requestedLineup, setRequestedLineup] = useState<{ side: BasketballTeamSide; launcher: HTMLButtonElement | null } | null>(null)
   const [boundaryReviewRequest, setBoundaryReviewRequest] = useState(0)
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [directCaptureError, setDirectCaptureError] = useState<string | null>(null)
@@ -1058,8 +1059,9 @@ export default function GameTracker() {
     setLateParticipantError(null)
     setLifecycleError(null)
     setShowAddPlayer(false)
-    if (lateParticipantReturnSide) setRequestedLineupSide(input.teamSide)
+    if (lateParticipantReturnSide) setRequestedLineup({ side: input.teamSide, launcher: lateParticipantReturnLauncher })
     setLateParticipantReturnSide(null)
+    setLateParticipantReturnLauncher(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -1250,11 +1252,13 @@ export default function GameTracker() {
           recorderUserId={user?.id ?? null}
           settings={basketballDeviceSettings}
           canOverrideEqualPlay={canAuthorizeBasketballEqualPlayOverride(state, equalPlayAccess)}
-          requestedLineupSide={requestedLineupSide}
-          onRequestedLineupOpened={() => setRequestedLineupSide(null)}
+          requestedLineupSide={requestedLineup?.side ?? null}
+          requestedLineupLauncher={requestedLineup?.launcher ?? null}
+          onRequestedLineupOpened={() => setRequestedLineup(null)}
           boundaryReviewRequest={boundaryReviewRequest}
-          onAddParticipant={teamSide => {
+          onAddParticipant={(teamSide, launcher) => {
             setLateParticipantReturnSide(teamSide)
+            setLateParticipantReturnLauncher(launcher)
             setLateParticipantError(null)
             setShowAddPlayer(true)
           }}
@@ -1334,8 +1338,8 @@ export default function GameTracker() {
             onOpen={playerId => {
               setDetailPlayerId(playerId)
               window.requestAnimationFrame(() => document.getElementById('basketball-player-detail-title')?.focus())
-            }} onManage={() => setRequestedLineupSide(workspaceSide)}
-            onAdd={() => { setLateParticipantReturnSide(workspaceSide); setShowAddPlayer(true) }}
+            }} onManage={launcher => setRequestedLineup({ side: workspaceSide, launcher })}
+            onAdd={launcher => { setLateParticipantReturnSide(workspaceSide); setLateParticipantReturnLauncher(launcher); setShowAddPlayer(true) }}
           />}
           {basketballWorkspace === 'lineup' && detailPlayerId && (
             <div className="py-3">
@@ -1397,7 +1401,7 @@ export default function GameTracker() {
                   onClick={() => openQuickFreeThrow(workspaceSide)} title="Record free throw"><CircleDot size={18} aria-hidden /> Free throw</button>
                 <button type="button" className="btn-secondary flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-xs"
                   disabled={!basketballSportState?.projection.lineup?.sides[workspaceSide] || Boolean(basketballSportState.projection.clock?.running)}
-                  onClick={() => setRequestedLineupSide(workspaceSide)} title="Manage lineup"><Users size={18} aria-hidden /> Lineup</button>
+                  onClick={event => setRequestedLineup({ side: workspaceSide, launcher: event.currentTarget })} title="Manage lineup"><Users size={18} aria-hidden /> Lineup</button>
                 <button type="button" className="btn-secondary flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-xs"
                   disabled={basketballCaptureUnits.length === 0 && !canRestoreBasketball}
                   onClick={() => setShowRecentEvents(true)} title="Recent events and Undo"><Undo2 size={18} aria-hidden /> Undo</button>
@@ -1908,9 +1912,12 @@ export default function GameTracker() {
           errorMessage={lateParticipantError}
           onAdd={handleAddBasketballParticipant}
           onClose={() => {
+            const launcher = lateParticipantReturnLauncher
             setLateParticipantReturnSide(null)
+            setLateParticipantReturnLauncher(null)
             setLateParticipantError(null)
             setShowAddPlayer(false)
+            window.requestAnimationFrame(() => launcher?.focus())
           }}
         />
       )}

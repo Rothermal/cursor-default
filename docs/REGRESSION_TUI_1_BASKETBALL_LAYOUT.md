@@ -92,6 +92,30 @@ physical-phone or full-match signoff. Component-tree tests mock effects; the bro
 checks supply the real focus/clock/navigation coverage. Owner deployed checks remain
 post-deployment validation under the governing plan; broader rollout stays gated.
 
+### PR #491 Repair Checks
+
+Observed on 2026-10-18, starting from `08a463f1`:
+
+- Lineup Save and Cancel now return focus to the actual court, roster or clock-tools
+  launcher without changing the clock disclosure's open state. Add Participant
+  keeps that launcher through Save back to the sheet or Cancel back to the launcher;
+  opening or dismissing these workflows does not record gameplay events.
+- Before the repair, the focused callback tests reproduced external Save/Cancel
+  focus failures. Afterward, **3 files / 29 tests passed** using
+  `pnpm test -- src/components/basketball/BasketballClockStrip.test.ts src/pages/GameTrackerLayout.test.ts src/components/basketball/BasketballWorkspaceRoster.test.ts --maxWorkers=2`.
+- Coverage includes internal/external close paths, rejected Save, actual tracker
+  launcher wiring, Add Participant handoff, and quick Foul/Free throw disabled after
+  checked Abandon and End Period commands. The lifecycle guards themselves were
+  already correct and are unchanged.
+- The coordinator separately reports real Chromium checks at 390px: external Cancel
+  kept the tools closed at 36px high and focused `#external-launcher`; external Save
+  made one checked one-out/one-in substitution event (two total events), kept tools
+  closed and returned external focus; internal Lineup Cancel preserved expanded
+  tools and internal focus. All three checks had zero page errors.
+- The unit checks use mocked focus targets; the coordinator's browser checks are
+  desktop Chromium, not physical-device or live-service signoff. Post-repair full-gate
+  reruns are not recorded here yet; prior full-suite counts above remain historical.
+
 ## Remaining Work
 
 The next TUI-1 PR owns event-only setup/commit, stale legacy drafts, read-only

@@ -8,8 +8,8 @@ export default function BasketballWorkspaceRoster({ state, side, canAdd, onAdd, 
   state: GameState
   side: BasketballTeamSide
   canAdd: boolean
-  onAdd: () => void
-  onManage: () => void
+  onAdd: (launcher: HTMLButtonElement) => void
+  onManage: (launcher: HTMLButtonElement) => void
   onOpen: (playerId: string) => void
 }) {
   const projection = state.sportGameState?.sportId === 'basketball' ? state.sportGameState.projection : null
@@ -20,11 +20,11 @@ export default function BasketballWorkspaceRoster({ state, side, canAdd, onAdd, 
     : (player.teamSide === 'opponent' ? 'opponent' : 'tracked') === side))
   return <section className="py-3 pb-20">
     <div className="mb-3 flex flex-wrap gap-2">
-      {lineup && <button type="button" className="btn-secondary flex min-h-11 items-center gap-2 px-3" onClick={onManage}
+      {lineup && <button type="button" className="btn-secondary flex min-h-11 items-center gap-2 px-3" onClick={event => onManage(event.currentTarget)}
         disabled={manageDisabled} title={manageDisabled ? 'Pause and review the clock before changing the lineup.' : undefined}>
         <Users size={16} aria-hidden /> Manage Lineup
       </button>}
-      <button type="button" className="btn-secondary flex min-h-11 items-center gap-2 px-3" disabled={!canAdd} onClick={onAdd}>
+      <button type="button" className="btn-secondary flex min-h-11 items-center gap-2 px-3" disabled={!canAdd} onClick={event => onAdd(event.currentTarget)}>
         <Plus size={16} aria-hidden /> Add Player
       </button>
     </div>
