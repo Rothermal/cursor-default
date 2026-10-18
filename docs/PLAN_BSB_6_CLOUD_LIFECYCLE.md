@@ -176,6 +176,8 @@ client local-only until then.
   async reads/writes, including nickname freezes and checkpoint settlement. Cloud opens
   cancel on page unmount, account change or a newer request before storage/navigation;
   stale sync success, failure, queue and flush callbacks cannot read old-owner storage.
+  When a stale worker releases the shared lock, an already-queued active account is
+  nudged through its own retry effect, never through the old owner's storage callback.
   Deleted-source recovery also uses Baseball's immutable team before its first binding.
 
 ### BSB-6B2 Client: recorders, finalize and reopen

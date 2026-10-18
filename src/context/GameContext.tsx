@@ -1172,6 +1172,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       } while (queueAnotherSyncRef.current)
     } finally {
       syncInFlightRef.current = false
+      if (queueAnotherSyncRef.current && !isCurrentAccount() && accountRef.current.active) {
+        // The current account's effect must claim the released worker, not this stale owner.
+        setSyncRetryTick(tick => tick + 1)
+      }
       refreshParkingState()
     }
   }, [isConfigured, isCurrentAccount, isOnline, refreshParkingState, syncParkedRecord, userId])

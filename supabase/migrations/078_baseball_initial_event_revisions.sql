@@ -230,4 +230,3 @@ comment on function public.get_baseball_release_capabilities() is
   'Baseball event cloud contract 2: migration 078 preserves actual first-upload revisions.';
 
 notify pgrst, 'reload schema';
-

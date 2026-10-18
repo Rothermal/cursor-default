@@ -189,7 +189,34 @@ files; no application dependency was added.
 The coordinator also reports 16 real-provider Baseball/Hockey renders at 390px/1280px,
 Light/Dark and error/local-only states, with recovery export kind and menu status checked,
 no overflow and zero page errors. Those used a fake configured loopback backend with
-nonfixture HTTP blocked, not live Supabase; a final-patch repeat remains pending.
+nonfixture HTTP blocked, not live Supabase. The coordinator reports the 16-case final
+repeat also passed on `bb94bd33`; the queue-handoff follow-up below was not part of that
+browser candidate.
+
+### Direct Account Handoff Follow-Up
+
+The `bb94bd33` review confirmed a separate automatic-sync stall when account A changes
+directly to B without remounting `GameProvider`: B's immediate/debounced attempts queue
+behind A, but the stale A worker releases its lock without waking B. B's new dirty record
+has no retry timestamp, so it otherwise needs another edit or manual retry.
+
+- After clearing the lock, a stale worker now increments the existing retry tick only
+  when another run is queued and the current account is still active. B's current effect
+  claims the worker; A's guarded refresh and all old-owner storage guards remain unchanged.
+- Two deferred callback tests drive the real automatic queue and 150ms debounce effects
+  for a same-provider A-to-B replacement. Both A success and rejection left B stalled
+  before the repair. Afterward B syncs without a capture or manual flush, preserves its
+  local game id, and becomes clean. Storage remains unchanged when A settles, before B's
+  own worker runs. Unrelated auth/persistence effects remain excluded from this harness.
+- The existing Basketball source-contract test now checks the combined account/request
+  lifetime and guarded adoption instead of its obsolete inequality literal. Behavioral
+  cloud-open coverage already includes Basketball, Hockey, Baseball and Soccer.
+- Migration 078 loses only its extra EOF blank line; SQL behavior is unchanged from the
+  coordinator's 28-check probe above.
+- Focused follow-up run on 2026-10-18: **4 files / 45 tests passed** across
+  `GameContextSyncLifetime.test.ts`, `GameContext.test.ts`, `releaseEntryGuards.test.ts`
+  and `Games.test.ts`, using `--maxWorkers=2`. Full gates and independent re-review of
+  this follow-up remain pending; no new live Supabase or device signoff is claimed.
 
 ### After applying 076-078 (owner)
 
