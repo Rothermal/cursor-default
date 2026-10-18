@@ -19,6 +19,10 @@ Each brief should identify the task, scope, files or interfaces, acceptance crit
 permissions and expected evidence. Separate agents need that context explicitly;
 do not assume they know the coordinating chat's decisions.
 
+For independent review, follow the [Orchestrator's context rules](codex/roles/orchestrator.md):
+give the Reviewer fresh context for its initial assessment of requirements, source
+and diff, then pass validation evidence and targeted rebuttals for verification.
+
 ## Choose roles to match the work
 
 | Work | Roles |

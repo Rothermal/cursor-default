@@ -32,6 +32,9 @@ The final diff must contain only Markdown files. Internal links must resolve, ro
 briefs must support a manual conversation, and instructions must preserve the
 repository's source-trace, current-head review and observed-evidence rules.
 No guide may refer users to removed commands or claim runtime enforcement.
+The Reviewer must form its initial assessment in fresh context without Developer
+narrative or self-assessment, then verify validation evidence and targeted rebuttals.
+Disclose any inability to provide fresh context.
 
 Check the final file list, internal links and whitespace. App tests/builds are
 unnecessary for this documentation-only reduction; earlier runtime test counts

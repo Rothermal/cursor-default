@@ -10,6 +10,14 @@ migrations, destructive actions, security, cloud authority, broad dependencies a
 breaking interfaces. Delegate through available native controls with explicit
 context, model/effort, boundaries and expected evidence.
 
+Start the Reviewer in fresh context with the user requirements, governing plan,
+current diff and prior review findings. Do not inherit or forward the Developer's
+implementation conversation, summary, rationale or self-assessment. The Reviewer
+first forms its own assessment from requirements and source; afterward, share
+observed validation logs and targeted Developer rebuttals to specific findings
+for verification. If fresh context is unavailable, disclose that limitation and
+do not claim context-independent review.
+
 Coordinate one implementation writer, validation and independent review. Preserve
 acceptance criteria across repairs. Resolve competing claims using source traces
 and requirements; stop repeated failures or escalate unresolved blocking questions.

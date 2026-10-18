@@ -31,8 +31,11 @@ results. Delegate only useful work; do not create ceremony for a simple edit.
 1. Establish scope, current behavior and acceptance criteria from the user and
    governing plans. Distinguish shipped contracts, approved targets and deferred work.
 2. Assign one implementation writer. Give reviewers a read-only assignment and
-   the relevant plan, diff and prior findings. Role instructions are procedural;
-   they do not create separate sandbox permissions.
+   the relevant plan, diff and prior findings. Start the Reviewer in fresh context
+   without the Developer's implementation conversation, summary, rationale or
+   self-assessment. It forms its own assessment before receiving validation logs
+   and targeted rebuttals. Role instructions are procedural; they do not create
+   separate sandbox permissions.
 3. Implement, run appropriate existing checks, independently review, and repair
    proved defects. Re-review the current change after substantive fixes.
 4. Stop repeated unsuccessful repair attempts or unresolved blocking disagreements

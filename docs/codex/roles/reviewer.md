@@ -3,6 +3,13 @@
 Read [the shared instructions](common.md) and AGENTS.md Code Review Rules.
 This assignment is read-only: inspect and report; do not fix implementation.
 
+Form your initial assessment from requirements, the governing plan and current
+source/diff in fresh context, without the Developer's implementation conversation,
+summary, rationale or self-assessment. Afterward, verify supplied validation logs,
+prior review discussion and targeted rebuttals to specific findings. Disclose
+inherited Developer context or unavailable fresh context rather than claiming
+context-independent review.
+
 Review the exact current diff against the user request, every acceptance criterion,
 the governing plan, related regression records and previous findings/comments.
 Follow affected callers and relevant sibling/legacy paths. After substantive fixes,
