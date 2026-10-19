@@ -11,7 +11,7 @@ Execution plan for the sixth Baseball phase defined in
 cloud-policy and handshake code that HKY-5 extracted.
 
 Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
-until the owner says otherwise. BSB-6A is in review.
+until the owner says otherwise. BSB-6A is merged (PR #489); BSB-6B1 is in review.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -165,6 +165,20 @@ client local-only until then.
 - **Cloud Games and resume**: Baseball event games appear in Cloud Games. Opening one
   resumes the recorder's matching parked binding first, then the recorder's cloud stream,
   or starts an independent stream. Final games and viewers go to Game Info.
+- **Review repairs:** migration 078 preserves a Baseball event's actual positive initial
+  revision, including edited/removed/restored events first uploaded after offline use.
+  Only a matching Baseball setup version 1 receives that first-insert exception; the
+  migration-055 writer's other checks and sibling revision policy stay unchanged.
+  `get_baseball_release_capabilities` contract 2 / migration 78 is required by setup,
+  Enable cloud sync and actual automatic sync before binding. Apply 076, 077, then 078
+  before shipping this client. No revision-1 history is fabricated or reset.
+- **Account lifetime:** shared event transport checks its caller's account guard around
+  async reads/writes, including nickname freezes and checkpoint settlement. Cloud opens
+  cancel on page unmount, account change or a newer request before storage/navigation;
+  stale sync success, failure, queue and flush callbacks cannot read old-owner storage.
+  When a stale worker releases the shared lock, an already-queued active account is
+  nudged through its own retry effect, never through the old owner's storage callback.
+  Deleted-source recovery also uses Baseball's immutable team before its first binding.
 
 ### BSB-6B2 Client: recorders, finalize and reopen
 
@@ -318,7 +332,7 @@ client local-only until then.
 
 Filled in as each slice lands.
 
-### BSB-6A (in review)
+### BSB-6A (merged, PR #489)
 
 - Migrations `076_baseball_event_platform_publication_constraint.sql` and
   `077_baseball_event_cloud_lifecycle.sql`, as §2 describes. Not applied yet; the owner
@@ -335,3 +349,28 @@ Filled in as each slice lands.
   Hockey's HKY-5A flow on the new schema). See
   [REGRESSION_BSB_6_CLOUD_LIFECYCLE.md](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md).
 - Nothing on the client changes in this slice.
+
+### BSB-6B1 (in review)
+
+- `src/lib/baseball/cloudSync.ts` adds the Baseball adapter to the shared transport
+  (`bind_baseball_event_game_v5`, policy `advance`). Participants are the setup participants,
+  with `source_player_id` only for roster players of a team game; opponent slots and pitchers
+  stay in the setup snapshot. The cloud shell rebuilds a game from the stored setup and
+  checks it against the game row and participant rows.
+- `cloudSyncRouteForState` returns `'baseball_events'` for an event Baseball game whose
+  policy is `automatic`. A missing policy is local-only for Baseball, so games made before
+  BSB-6B stay on the device until Enable cloud sync in the Game menu (active access, a
+  tracking team role, the contract 2 handshake, every event recorded by this account).
+- Setup offers Cloud or This device only when signed in. Cloud needs
+  `get_baseball_release_capabilities` contract 2 / migration 78; a failed check offers Retry or This device
+  only. New games are not started at setup, as before.
+- The tracker shows sync problems (conflict review, Retry, Export, Preserve history) and the
+  Game menu shows where the game is saved. Hockey's component moved to the shared
+  `EventCloudSync` with a thin adapter for each sport.
+- Cloud Games opens a Baseball event game as it does a Hockey one: the recorder's parked
+  copy, then their cloud stream, or an independent stream (not started, like a new game).
+  Final games and viewers go to Game Info. The Hockey and Baseball paths share one function.
+- Actual sync rechecks contract 2 before binding, then checks its account lifetime after
+  the await. Until 076-078 are applied in order, Cloud stays unavailable; local-only games
+  and historical reads stay available. See the PR #492 repair evidence in the regression
+  record; BSB-6B2, BSB-6C, live verification and the production release stage are unchanged.

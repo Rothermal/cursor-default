@@ -293,10 +293,17 @@ describe('Basketball release entry guards', () => {
     expect(gameInfo.indexOf('currentUserIdRef.current !== user.id')).toBeLessThan(
       gameInfo.indexOf('openGameSnapshot(basketballGame)')
     )
-    expect(games).toContain('currentUserIdRef.current !== userId')
-    expect(games.indexOf('currentUserIdRef.current !== userId')).toBeLessThan(
-      games.indexOf('openGameSnapshot(basketballGame)')
-    )
+    const handler = between(games, 'const handleOpenGame = async', '\n  const startEditOpponentName')
+    const basketball = between(handler, "if (gameSportId === 'basketball') {", '\n    const recorderEventSport')
+    const requestIndex = handler.indexOf('const request = ++openRequestRef.current')
+    const guardIndex = handler.indexOf('const isCurrent = () => openRequestRef.current === request && !openIsStale(userId)')
+    expect(requestIndex).toBeGreaterThanOrEqual(0)
+    expect(guardIndex).toBeGreaterThan(requestIndex)
+    expect(guardIndex).toBeLessThan(handler.indexOf('await loadBasketballCloudDataAuthority'))
+    expect(games).toContain('useEffect(() => () => { openRequestRef.current += 1 }, [userId])')
+    expect(basketball).toMatch(/}\s+if \(!isCurrent\(\)\) return\s+const hasActiveGame/)
+    expect(basketball).toContain('if (!isCurrent() || !openGameSnapshot(basketballGame))')
+    expect(games).toContain('!mountedRef.current || currentUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId)')
   })
 
   it('commits later cloud enablement only after the guarded transport succeeds', () => {
@@ -320,7 +327,9 @@ describe('Basketball release entry guards', () => {
     expect(transportIndex).toBeGreaterThanOrEqual(0)
     expect(persistIndex).toBeGreaterThan(transportIndex)
     expect(hydrateIndex).toBeGreaterThan(persistIndex)
-    expect(handler).toContain("sportId === 'hockey' ? enableHockeyEventCloud : enableBasketballEventCloud")
+    expect(handler).toMatch(
+      /sportId === 'hockey'\s+\? enableHockeyEventCloud\s+: sportId === 'baseball'\s+\? enableBaseballEventCloud\s+: enableBasketballEventCloud/
+    )
     expect(handler).toContain('Another local game already owns this cloud ${label} game.')
   })
 

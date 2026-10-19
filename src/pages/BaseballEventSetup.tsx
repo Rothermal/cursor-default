@@ -34,6 +34,12 @@ import {
   type BaseballSetupRosterPlayer,
 } from '../lib/baseball/setupBuilder'
 import { baseballTeamSettingsAdapter } from '../lib/baseball/teamSettingsSync'
+import { ensureBaseballReleaseCapabilities } from '../lib/baseball/releaseCapabilities'
+import {
+  baseballSetupCloudGate,
+  type BaseballSetupCapabilityState,
+  type BaseballSetupStorage,
+} from '../lib/baseball/setupCloud'
 import { getBaseballEventCreationPolicy } from '../lib/sportAvailability'
 import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
@@ -86,6 +92,21 @@ function BaseballSetupForm() {
   const [commitError, setCommitError] = useState<string | null>(null)
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: null as string | null })
   const teamSettings = useSportTeamSettings(baseballTeamSettingsAdapter, teamId || null, Boolean(teamId))
+  const [storage, setStorage] = useState<BaseballSetupStorage>('cloud')
+  const [capability, setCapability] = useState<BaseballSetupCapabilityState>({ status: 'idle' })
+  const [capabilityAttempt, setCapabilityAttempt] = useState(0)
+  const cloudGate = baseballSetupCloudGate({ cloudAvailable, storage, capability })
+
+  // The handshake keeps Cloud unavailable until the BSB-6A migrations are applied.
+  useEffect(() => {
+    if (!cloudAvailable || storage !== 'cloud' || !user) return
+    let cancelled = false
+    setCapability({ status: 'checking' })
+    void ensureBaseballReleaseCapabilities(user.id, { force: capabilityAttempt > 0 }).then(result => {
+      if (!cancelled) setCapability({ status: 'done', result })
+    })
+    return () => { cancelled = true }
+  }, [cloudAvailable, storage, user, capabilityAttempt])
 
   useEffect(() => {
     if (!cloudAvailable) return
@@ -237,7 +258,17 @@ function BaseballSetupForm() {
   const commit = () => {
     const baseball = sports.find(entry => entry.id === 'baseball')
     if (!baseball || !build.ok) return
-    const created = createBaseballEventGameState({ sport: baseball, setup: build.setup, teamName, date })
+    if (!cloudGate.canStart) {
+      setCommitError(cloudGate.message ?? 'Checking Baseball cloud support...')
+      return
+    }
+    const created = createBaseballEventGameState({
+      sport: baseball,
+      setup: build.setup,
+      teamName,
+      date,
+      cloudPolicy: cloudGate.cloudPolicy,
+    })
     if (!created.ok) {
       setCommitError(created.message)
       return
@@ -252,9 +283,48 @@ function BaseballSetupForm() {
   return (
     <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
       <h1 className="text-lg font-bold">New Baseball game</h1>
-      <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Development preview. The game saves on this device only.
-      </p>
+      {!cloudAvailable && (
+        <p className="text-sm text-content-muted">Saved on this device. Sign in to sync Baseball games to the cloud.</p>
+      )}
+
+      {cloudAvailable && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold uppercase text-content-muted">Sync</h2>
+          <div role="radiogroup" aria-label="Save to" className="grid grid-cols-2 gap-1 rounded-md border border-line p-1">
+            {([['cloud', 'Cloud'], ['device', 'This device only']] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={storage === value}
+                className={`min-h-10 rounded px-2 text-sm font-semibold ${
+                  storage === value ? 'bg-accent text-accent-content' : 'text-content-muted hover:bg-surface-muted'
+                }`}
+                onClick={() => { setStorage(value); setCommitError(null) }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-content-muted">
+            {storage === 'cloud'
+              ? 'Events sync as you record them, and the game appears in Cloud Games.'
+              : 'The game stays on this device. You can enable cloud sync later from the Game menu.'}
+          </p>
+          {storage === 'cloud' && !cloudGate.canStart && cloudGate.checking && (
+            <p className="text-sm text-content-muted" role="status">Checking Baseball cloud support...</p>
+          )}
+          {storage === 'cloud' && !cloudGate.canStart && !cloudGate.checking && (
+            <div role="alert" className="space-y-2 rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
+              <p>{cloudGate.message}</p>
+              <div className="flex gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setCapabilityAttempt(attempt => attempt + 1)}>Retry</button>
+                <button type="button" className="btn-secondary" onClick={() => setStorage('device')}>This device only</button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-sm font-bold uppercase text-content-muted">Game</h2>
@@ -492,7 +562,7 @@ function BaseballSetupForm() {
               {commitError}
             </p>
           )}
-          <button type="button" className="btn-primary w-full" disabled={!build.ok} onClick={commit}>
+          <button type="button" className="btn-primary w-full" disabled={!build.ok || !cloudGate.canStart} onClick={commit}>
             Continue to game
           </button>
         </>

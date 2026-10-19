@@ -1,6 +1,7 @@
 import { ChevronLeft, Menu, X } from 'lucide-react'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { BaseballCloudMenuSection, BaseballCloudSyncAlerts } from '../components/baseball/BaseballCloudSync'
 import BaseballCorrectionPreviewSheet from '../components/baseball/BaseballCorrectionPreviewSheet'
 import BaseballDiamond from '../components/baseball/BaseballDiamond'
 import BaseballEditPlay from '../components/baseball/BaseballEditPlay'
@@ -576,15 +577,12 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
         )}
       />
 
-      <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
-        Preview. This game stays on this device.
-      </p>
-
       {error && (
         <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
           {error}
         </p>
       )}
+      <BaseballCloudSyncAlerts state={state} />
 
       {projection.status === 'pregame' && (
         <section className="space-y-3">
@@ -1113,6 +1111,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           {projection.status !== 'pregame' && (
             <MenuAction label={inProgress ? 'Summary (in progress)' : 'Summary'} onClick={() => navigate(baseballSummaryPath())} />
           )}
+          <BaseballCloudMenuSection state={state} onDone={() => setMenuOpen(false)} />
         </GameMenu>
       )}
     </main>

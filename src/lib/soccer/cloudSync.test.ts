@@ -204,6 +204,15 @@ describe('soccer event cloud sync helpers', () => {
     })
   })
 
+  it('forwards account cancellation before starting the shared transport', async () => {
+    await expect(syncSoccerEventGameToCloud({
+      state: startedState(), userId: 'user-1', localGameId: 'local-1',
+      assertCurrent: () => { throw new Error('Account changed') },
+    })).rejects.toThrow('Account changed')
+    expect(cloudMock.rpc).not.toHaveBeenCalled()
+    expect(cloudMock.upsert).not.toHaveBeenCalled()
+  })
+
   it('creates personal snapshots without claiming permanent cloud players', () => {
     expect(soccerCloudParticipants(createSoccerSportGameState(setup()))).toEqual([
       expect.objectContaining({

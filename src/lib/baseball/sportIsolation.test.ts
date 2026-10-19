@@ -131,13 +131,16 @@ describe('Baseball event engine isolation', () => {
     expect(cloudSyncRouteForState(legacy)).toBe('aggregate')
   })
 
-  it('rejects event Baseball from every cloud route', () => {
+  it('keeps event Baseball off the aggregate route, and off every route while local-only', () => {
     const state = eventBaseballGame()
     expect(state.gameDataAuthority).toBe('sport_events')
     expect(isAggregateCloudSyncEligible(state)).toBe(false)
-    expect(isEventCloudSyncEligible(state)).toBe(false)
+    // BSB-6B: event Baseball has its own route; a game with no policy stays on the device.
+    expect(isEventCloudSyncEligible(state)).toBe(true)
     expect(cloudSyncRouteForState(state)).toBe('unsupported')
     expect(isCloudSyncEligible(state)).toBe(false)
+    const automatic = { ...state, cloudSync: { ...state.cloudSync, eventCloudPolicy: 'automatic' as const } }
+    expect(cloudSyncRouteForState(automatic)).toBe('baseball_events')
   })
 
   it('fails closed when Baseball sport state is corrupt or missing', () => {

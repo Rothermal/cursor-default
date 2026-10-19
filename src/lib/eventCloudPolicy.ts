@@ -6,11 +6,13 @@ export type EventCloudPolicy = 'automatic' | 'local_only'
 /**
  * Event sports with a per-game cloud policy, and the policy a game without one gets.
  * Basketball Event games made before BKE-5C synced automatically; Hockey games made before
- * HKY-5B were local-only, so they stay on the device until the recorder enables sync.
+ * HKY-5B were local-only, so they stay on the device until the recorder enables sync, and so
+ * are Baseball games made before BSB-6B.
  */
 const MISSING_POLICY: Record<string, { label: string; policy: EventCloudPolicy }> = {
   basketball: { label: 'Basketball', policy: 'automatic' },
   hockey: { label: 'Hockey', policy: 'local_only' },
+  baseball: { label: 'Baseball', policy: 'local_only' },
 }
 
 export function invalidEventCloudPolicyError(sportLabel: string): string {

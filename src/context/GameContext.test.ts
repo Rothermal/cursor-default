@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GameProvider } from './GameContext'
 import { createInitialState } from '../lib/gameReducer'
 import { sports } from '../config/sports'
 import { saveActiveGameState, parkActiveGame, getParkedGameRecord, hasDirtyParkedGames } from '../lib/gameParking'
 import { getPendingSyncFlag, setPendingSyncFlag } from '../lib/gameStorageKeys'
+import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
 import { basketballSetupDraftKey, createBasketballSetupDraft, loadBasketballSetupDraft, saveBasketballSetupDraft } from '../lib/basketball/setupDraft'
 
 // Drive the provider's real callbacks and storage. Background effects/network stay off.
@@ -107,5 +108,46 @@ describe('GameProvider parked deletion cleanup', () => {
     expect(render().discardParkedGame(id, { allowUnsyncedLocalDelete: true })).toBe(true)
     expect(getParkedGameRecord(id, 'user-1')).toBeNull()
     expect(render().parkingError).toContain('Local game deleted, but')
+  })
+})
+
+describe('GameProvider callbacks after the account changes', () => {
+  afterEach(() => resetCurrentAuthUserIdForTests())
+
+  /** Callbacks captured while user-1 was signed in, then user-2 signs in and parks a game. */
+  function staleUserOneCallbacks() {
+    setCurrentAuthUserId('user-1')
+    const stale = render()
+    setCurrentAuthUserId('user-2')
+    const state = { ...createInitialState(), sport: sports.find(sport => sport.id === 'baseball')!,
+      gameInfo: { teamName: 'B team', opponentName: 'Away', tournamentName: '', tournamentId: null, date: '2026-10-18' } }
+    const id = saveActiveGameState(state, 'user-2').find(summary => summary.teamName === 'B team')!.localGameId
+    parkActiveGame('user-2')
+    return { stale, state, id }
+  }
+
+  it("never reads or writes storage as the old account, so the new account's games survive", async () => {
+    const { stale, state, id } = staleUserOneCallbacks()
+    expect(stale.openGameSnapshot(state)).toBe(false)
+    expect(stale.resumeParkedGame(id)).toBeNull()
+    expect(stale.prepareActiveGameMutation('resume_commit')).toBe(false)
+    await expect(stale.flushCloudSync()).resolves.toEqual({ ok: false, reason: 'The signed-in account changed. Try again.' })
+    await expect(stale.flushCloudGameSync('cloud-x')).resolves.toMatchObject({ ok: false })
+    expect(getParkedGameRecord(id, 'user-2')).not.toBeNull()
+  })
+
+  it('without the guard, reading as the old account would clear the new account games', () => {
+    const { id } = staleUserOneCallbacks()
+    // What the stale handler used to do: any parked-game read as user-1.
+    expect(getParkedGameRecord(id, 'user-1')).toBeNull()
+    hasDirtyParkedGames('user-1')
+    expect(getParkedGameRecord(id, 'user-2')).toBeNull()
+  })
+
+  it('still opens a game for the signed-in account', () => {
+    setCurrentAuthUserId('user-1')
+    const state = { ...createInitialState(), sport: sports.find(sport => sport.id === 'baseball')!,
+      gameInfo: { teamName: 'A team', opponentName: 'Away', tournamentName: '', tournamentId: null, date: '2026-10-18' } }
+    expect(render().openGameSnapshot(state)).toBe(true)
   })
 })

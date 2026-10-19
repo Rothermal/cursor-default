@@ -6,6 +6,8 @@ import { normalizeBaseballPosition } from './positions'
 import { createBaseballMatchRules, DEFAULT_BASEBALL_PROFILE_ID } from './profiles'
 import { resolveBaseballTeamRules, type BaseballLineupDefaults, type BaseballTeamSettingsV1 } from './settings'
 import { normalizeBaseballMatchSetup, validateBaseballMatchSetup } from './state'
+import { baseballLocalPlayerKey } from './stats'
+import type { EventCloudPolicy } from '../eventCloudPolicy'
 import type { BaseballBatHand, BaseballHomeAway, BaseballMatchRules, BaseballMatchSetup, BaseballPitchHand } from './types'
 
 /** A roster player available to this game (cloud roster row or a locally entered player). */
@@ -286,9 +288,13 @@ export function createBaseballEventGameState(input: {
   setup: BaseballMatchSetup
   teamName: string
   date: string
+  /** BSB-6B: cloud games sync automatically; device games stay local until enabled. */
+  cloudPolicy?: EventCloudPolicy
 }): BaseballCommandResult {
+  const initial = createInitialState()
   const base: GameState = {
-    ...createInitialState(),
+    ...initial,
+    cloudSync: { ...initial.cloudSync, eventCloudPolicy: input.cloudPolicy ?? 'local_only' },
     sport: input.sport,
     gameInfo: {
       teamName: input.teamName.trim().slice(0, 80) || 'Home',
@@ -298,7 +304,7 @@ export function createBaseballEventGameState(input: {
       date: input.date,
     },
     players: input.setup.participants.map(participant => ({
-      id: participant.playerId ?? participant.id,
+      id: baseballLocalPlayerKey(participant),
       name: participant.displayName,
       number: participant.number ?? '',
       stats: {},

@@ -17,6 +17,11 @@ import {
   loadHockeyCloudGameById,
 } from '../lib/hockey/cloudSync'
 import {
+  createBaseballIndependentRecorderState,
+  loadBaseballCloudDataAuthority,
+  loadBaseballCloudGameById,
+} from '../lib/baseball/cloudSync'
+import {
   resolveEventRecorderOpenSource,
   type EventRecorderOpenSource,
 } from '../lib/gameEvents/cloudOpen'
@@ -29,6 +34,7 @@ import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBloc
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
 import { sports } from '../config/sports'
+import { isCurrentAuthUser } from '../lib/authIdentity'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -67,6 +73,32 @@ interface TeamRow {
   nickname: string | null
   season_id: string
   seasons: { sport: string }
+}
+
+/** Event sports whose cloud games open one recorder's own stream (Hockey HKY-5B, Baseball BSB-6B). */
+interface RecorderEventSport {
+  sportId: string
+  label: string
+  loadAuthority: (gameId: string) => Promise<'sport_events' | 'legacy'>
+  loadGame: (userId: string, gameId: string) => Promise<GameState | null>
+  createIndependent: (userId: string, gameId: string) => Promise<GameState>
+}
+
+const RECORDER_EVENT_SPORTS: Record<string, RecorderEventSport> = {
+  hockey: {
+    sportId: 'hockey',
+    label: 'Hockey',
+    loadAuthority: loadHockeyCloudDataAuthority,
+    loadGame: loadHockeyCloudGameById,
+    createIndependent: createHockeyIndependentRecorderState,
+  },
+  baseball: {
+    sportId: 'baseball',
+    label: 'Baseball',
+    loadAuthority: loadBaseballCloudDataAuthority,
+    loadGame: loadBaseballCloudGameById,
+    createIndependent: (_userId, gameId) => createBaseballIndependentRecorderState(gameId),
+  },
 }
 
 function statusLabel(status: string): string {
@@ -112,6 +144,18 @@ export default function Games() {
   const userId = user?.id ?? null
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
+  // Unmount and newer requests invalidate continuations before owner-scoped storage access.
+  const openRequestRef = useRef(0)
+  useEffect(() => () => { openRequestRef.current += 1 }, [userId])
+  // An open that awaited the cloud must not navigate or touch storage once the page is gone
+  // or the account changed: the old handler still holds the previous account's callbacks.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  const openIsStale = (ownerId: string) =>
+    !mountedRef.current || currentUserIdRef.current !== ownerId || !isCurrentAuthUser(ownerId)
   const supabaseClient = supabase
   const requestedSportId = searchParams.get('sport')
   const scopedSport = useMemo(
@@ -372,22 +416,26 @@ export default function Games() {
   }
 
   /**
-   * HKY-5B: a Hockey event game resumes this recorder's matching local copy first, then their
-   * cloud stream, or starts an independent stream. Final games and viewers go to Game Info.
-   * Returns false for a legacy Hockey game, which opens through the aggregate path.
+   * HKY-5B and BSB-6B: a Hockey or Baseball event game resumes this recorder's matching local
+   * copy first, then their cloud stream, or starts an independent stream. Final games and
+   * viewers go to Game Info. Returns false for a legacy game, which opens through the
+   * aggregate path.
    */
-  const openHockeyEventGame = async (game: GameRow): Promise<boolean> => {
+  const openRecorderEventGame = async (game: GameRow, sport: RecorderEventSport, isCurrent: () => boolean): Promise<boolean> => {
+    const { sportId, label } = sport
     if (!userId) return true
     setError(null)
     setLoadingGameId(game.id)
     let authority: 'sport_events' | 'legacy'
     try {
-      authority = await loadHockeyCloudDataAuthority(game.id)
+      authority = await sport.loadAuthority(game.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Hockey authority could not load')
+      if (!isCurrent()) return true
+      setError(err instanceof Error ? err.message : `${label} authority could not load`)
       setLoadingGameId(null)
       return true
     }
+    if (!isCurrent()) return true
     if (authority === 'legacy') {
       setLoadingGameId(null)
       return false
@@ -398,7 +446,7 @@ export default function Games() {
       navigate(gameInfoPath(game.id, game.team_id))
       return true
     }
-    if (state.sport?.id === 'hockey' && state.gameDataAuthority === 'sport_events' && state.cloudSync.gameId === game.id) {
+    if (state.sport?.id === sportId && state.gameDataAuthority === 'sport_events' && state.cloudSync.gameId === game.id) {
       setLoadingGameId(null)
       navigate('/game')
       return true
@@ -406,22 +454,19 @@ export default function Games() {
     let source: EventRecorderOpenSource<GameState>
     try {
       source = await resolveEventRecorderOpenSource(
-        'hockey',
+        sportId,
         game.id,
         activeLocalGameId,
         parkedGames,
-        () => loadHockeyCloudGameById(userId, game.id)
+        () => sport.loadGame(userId, game.id)
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load Hockey game')
+      if (!isCurrent()) return true
+      setError(err instanceof Error ? err.message : `Could not load ${label} game`)
       setLoadingGameId(null)
       return true
     }
-    if (currentUserIdRef.current !== userId) {
-      setError('The signed-in account changed. Open the Hockey game again.')
-      setLoadingGameId(null)
-      return true
-    }
+    if (!isCurrent()) return true
     const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
     if (source.kind === 'local') {
       if (hasActiveGame && activeLocalGameId !== source.localGameId && !prepareActiveGameMutation('resume_commit')) {
@@ -433,22 +478,21 @@ export default function Games() {
       if (resumed) navigate('/game')
       return true
     }
-    let hockeyGame = source.kind === 'cloud' ? source.state : null
+    let eventGame = source.kind === 'cloud' ? source.state : null
     if (source.kind === 'empty') {
       if (!window.confirm('Start your own recorder stream for this game? Select Cancel to stay in Cloud Games.')) {
         setLoadingGameId(null)
         return true
       }
-      hockeyGame = await createHockeyIndependentRecorderState(userId, game.id).catch(err => {
+      eventGame = await sport.createIndependent(userId, game.id).catch(err => {
+        if (!isCurrent()) return null
         setError(err instanceof Error ? err.message : 'Could not start recorder stream')
         return null
       })
-      if (currentUserIdRef.current !== userId) {
-        setError('The signed-in account changed. Open the Hockey game again.')
-        hockeyGame = null
-      }
+      if (!isCurrent()) return true
     }
-    if (!hockeyGame || (hasActiveGame && !prepareActiveGameMutation('resume_commit')) || !openGameSnapshot(hockeyGame)) {
+    if (!isCurrent()) return true
+    if (!eventGame || (hasActiveGame && !prepareActiveGameMutation('resume_commit')) || !openGameSnapshot(eventGame)) {
       setLoadingGameId(null)
       return true
     }
@@ -459,6 +503,9 @@ export default function Games() {
 
   const handleOpenGame = async (game: GameRow) => {
     if (!userId) return
+    const request = ++openRequestRef.current
+    const isCurrent = () => openRequestRef.current === request && !openIsStale(userId)
+    if (!isCurrent()) return
     const gameSportId =
       game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
     const teamRole = game.team_id ? teamRolesById[game.team_id] ?? null : null
@@ -498,10 +545,12 @@ export default function Games() {
           () => loadSoccerCloudGameById(userId, game.id)
         )
       } catch (err) {
+        if (!isCurrent()) return
         setError(err instanceof Error ? err.message : 'Could not load soccer game')
         setLoadingGameId(null)
         return
       }
+      if (!isCurrent()) return
       const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
       if (source.kind === 'local') {
         if (
@@ -536,9 +585,11 @@ export default function Games() {
           return
         }
         soccerGame = await createSoccerIndependentRecorderState(userId, game.id).catch(err => {
+          if (!isCurrent()) return null
           setError(err instanceof Error ? err.message : 'Could not start recorder stream')
           return null
         })
+        if (!isCurrent()) return
       }
       if (!soccerGame) {
         setLoadingGameId(null)
@@ -548,7 +599,7 @@ export default function Games() {
         setLoadingGameId(null)
         return
       }
-      if (!openGameSnapshot(soccerGame)) {
+      if (!isCurrent() || !openGameSnapshot(soccerGame)) {
         setLoadingGameId(null)
         return
       }
@@ -563,10 +614,12 @@ export default function Games() {
       try {
         basketballAuthority = await loadBasketballCloudDataAuthority(game.id)
       } catch (err) {
+        if (!isCurrent()) return
         setError(err instanceof Error ? err.message : 'Basketball authority could not load')
         setLoadingGameId(null)
         return
       }
+      if (!isCurrent()) return
       if (basketballAuthority === 'sport_events') {
         if (game.status === 'final') {
           setLoadingGameId(null)
@@ -608,15 +661,12 @@ export default function Games() {
             () => loadBasketballCloudGameById(userId, game.id)
           )
         } catch (err) {
+          if (!isCurrent()) return
           setError(err instanceof Error ? err.message : 'Could not load Basketball game')
           setLoadingGameId(null)
           return
         }
-        if (currentUserIdRef.current !== userId) {
-          setError('The signed-in account changed. Open the Basketball game again.')
-          setLoadingGameId(null)
-          return
-        }
+        if (!isCurrent()) return
         const hasActiveGame = Boolean(
           state.sport && (state.gameInfo || state.players.length > 0)
         )
@@ -651,13 +701,11 @@ export default function Games() {
             userId,
             game.id
           ).catch(err => {
+            if (!isCurrent()) return null
             setError(err instanceof Error ? err.message : 'Could not start recorder stream')
             return null
           })
-          if (currentUserIdRef.current !== userId) {
-            setError('The signed-in account changed. Open the Basketball game again.')
-            basketballGame = null
-          }
+          if (!isCurrent()) return
         }
         if (!basketballGame) {
           setLoadingGameId(null)
@@ -667,7 +715,7 @@ export default function Games() {
           setLoadingGameId(null)
           return
         }
-        if (!openGameSnapshot(basketballGame)) {
+        if (!isCurrent() || !openGameSnapshot(basketballGame)) {
           setLoadingGameId(null)
           return
         }
@@ -677,8 +725,10 @@ export default function Games() {
       }
       setLoadingGameId(null)
     }
-    if (gameSportId === 'hockey') {
-      const handled = await openHockeyEventGame(game)
+    const recorderEventSport = gameSportId ? RECORDER_EVENT_SPORTS[gameSportId] : undefined
+    if (recorderEventSport) {
+      const handled = await openRecorderEventGame(game, recorderEventSport, isCurrent)
+      if (!isCurrent()) return
       if (handled) return
     }
     const canTrackCurrentGame = game.team_id
@@ -691,16 +741,19 @@ export default function Games() {
     setError(null)
     setLoadingGameId(game.id)
     const cloudGame = await loadCloudGameById(userId, game.id).catch(err => {
+      if (!isCurrent()) return null
       setError(err instanceof Error ? err.message : 'Could not load game')
       setLoadingGameId(null)
       return null
     })
 
+    if (!isCurrent()) return
     if (!cloudGame) {
       setLoadingGameId(null)
       return
     }
     await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
+    if (!isCurrent()) return
 
     const sport = sports.find(item => item.id === cloudGame.sportId)
     if (!sport) {
@@ -742,7 +795,7 @@ export default function Games() {
       setLoadingGameId(null)
       return
     }
-    if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
+    if (!isCurrent() || !openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
       setLoadingGameId(null)
       return
     }
