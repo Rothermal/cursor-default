@@ -42,10 +42,15 @@ export function applyBaseballReopenHandoff(
     return { ok: false, state, reason: 'The local Baseball event stream is unavailable.' }
   }
 
-  const cloudStateChanged = state.cloudSync.gameStatus !== 'in_progress' ||
-    state.cloudSync.status !== 'idle' || state.cloudSync.lastError !== null
+  // Existing command identity makes a redelivered publication inert even after a later end.
+  if (state.eventStream.events.some(event => isGameEventEnvelope(event) &&
+    event.eventType === 'baseball.game_reopened' && event.payload.captureCommandId === handoff.publicationId)) {
+    return { ok: true, state, changed: false }
+  }
+
+  const cloudStateChanged = state.cloudSync.gameStatus !== 'in_progress'
   const reopenedBinding: GameState = cloudStateChanged
-    ? { ...state, cloudSync: { ...state.cloudSync, gameStatus: 'in_progress', status: 'idle', lastError: null } }
+    ? { ...state, cloudSync: { ...state.cloudSync, gameStatus: 'in_progress' } }
     : state
 
   const status = state.sportGameState.projection.status
@@ -59,6 +64,7 @@ export function applyBaseballReopenHandoff(
 
   const result = reopenBaseballGame(reopenedBinding, handoff.reason, {
     recorderUserId: userId,
+    captureCommandId: handoff.publicationId,
     occurredAt: laterTime(handoff.reopenedAt, lastOccurredAt(state)),
   })
   if (!result.ok) return { ok: false, state, reason: result.message }

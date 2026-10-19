@@ -1,5 +1,5 @@
 import type { GameState } from '../../types'
-import { isPlainObject } from '../gameEvents/envelope'
+import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
 import {
   applyGameEventAppendsAndMutations,
   hasLegacyAggregateActivity,
@@ -231,6 +231,11 @@ export function reopenBaseballGame(
   reason: string,
   context: BaseballCommandContext
 ): BaseballCommandResult {
+  if (state.cloudSync.gameId && !isFinalBaseballCloudGame(state) &&
+    (!context.recorderUserId || state.eventStream?.events.some(event =>
+      !isGameEventEnvelope(event) || event.recorderUserId !== context.recorderUserId))) {
+    return failure(state, 'rejected', 'Only this recording\'s recorder can reopen its local history.')
+  }
   return append(state, context, 'baseball.game_reopened', 'neutral', {
     captureCommandId: captureId(context),
     reason,

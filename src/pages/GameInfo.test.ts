@@ -7,9 +7,10 @@ import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/aut
 const h = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, effects: [] as Array<() => void>,
   cleanups: [] as Array<() => void>, userId: 'account-a', role: 'owner', team: true,
   gameId: 'cloud-a', authority: vi.fn(), load: vi.fn(), independent: vi.fn(), rpc: vi.fn(),
-  dispatch: vi.fn(), open: vi.fn(), navigate: vi.fn(), reopen: vi.fn(), state: {} as unknown,
+  dispatch: vi.fn(), open: vi.fn(), navigate: vi.fn(), reopen: vi.fn(), finalized: vi.fn(), refresh: vi.fn(), state: {} as unknown,
 }))
 vi.mock('react', async original => ({ ...await original<typeof import('react')>(),
+  useCallback: (callback: unknown) => callback,
   useState: (initial: unknown) => {
     const i = h.cursor++
     if (!(i in h.slots)) h.slots[i] = typeof initial === 'function' ? initial() : initial
@@ -30,7 +31,8 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => h.navigate,
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: h.userId }, isConfigured: true }) }))
 vi.mock('../context/GameContext', () => ({ useGame: () => ({ state: h.state, dispatch: h.dispatch,
   activeLocalGameId: null, parkedGames: [], openGameSnapshot: h.open, prepareActiveGameMutation: () => true,
-  resumeParkedGame: vi.fn(), flushCloudGameSync: vi.fn(), markEventCloudGameReopened: h.reopen, parkingError: null }) }))
+  resumeParkedGame: vi.fn(), flushCloudGameSync: vi.fn(), markEventCloudGameReopened: h.reopen,
+  markBaseballCloudGameFinalized: h.finalized, refreshBaseballCloudGameStatus: h.refresh, parkingError: null }) }))
 vi.mock('../lib/baseball/cloudSync', () => ({ loadBaseballCloudDataAuthority: (...args: unknown[]) => h.authority(...args),
   loadBaseballCloudGameById: (...args: unknown[]) => h.load(...args),
   createBaseballIndependentRecorderState: (...args: unknown[]) => h.independent(...args) }))
@@ -66,7 +68,7 @@ function panel(tree: ReturnType<typeof render>, type = 'baseball-finalization') 
 beforeEach(() => {
   h.slots = []; h.cursor = 0; h.effects = []; h.cleanups = []; h.userId = 'account-a'; h.gameId = 'cloud-a'; h.role = 'owner'; h.team = true
   h.state = createInitialState(); setCurrentAuthUserId(h.userId)
-  for (const mock of [h.authority, h.load, h.independent, h.rpc, h.dispatch, h.open, h.navigate, h.reopen]) mock.mockReset()
+  for (const mock of [h.authority, h.load, h.independent, h.rpc, h.dispatch, h.open, h.navigate, h.reopen, h.finalized, h.refresh]) mock.mockReset()
   h.authority.mockResolvedValue('sport_events'); h.rpc.mockResolvedValue({ data: [], error: null }); h.open.mockReturnValue(true)
   vi.stubGlobal('window', { confirm: () => true })
 })
@@ -120,5 +122,14 @@ describe('BSB-6B2 Game Info', () => {
       { publicationId: 'pub-1', reason: 'Correct runner', reopenedAt: '2026-10-18T12:00:00Z' }, { primaryRecorderId: 'recorder-b' })
     expect(h.reopen).toHaveBeenCalledWith('cloud-a', { sportId: 'baseball', publicationId: 'pub-1', primaryRecorderId: 'recorder-b',
       reason: 'Correct runner', reopenedAt: '2026-10-18T12:00:00Z' })
+  })
+  it('marks matching parked bindings final even while another game is active', async () => {
+    const props = panel(await loaded())
+    h.state = { ...createInitialState(), cloudSync: { ...createInitialState().cloudSync, gameId: 'cloud-b' } }
+    render()
+    ;(props.onFinalized as (result: unknown) => void)({ serverScoreConfirmed: true,
+      score: { tracked: 3, opponent: 2 }, previewScore: { tracked: 3, opponent: 2 } })
+    expect(h.finalized).toHaveBeenCalledWith('cloud-a')
+    expect(h.dispatch).not.toHaveBeenCalled()
   })
 })

@@ -314,11 +314,53 @@ The owner confirmed 076-078 execution, not the live checks below.
   rerun with explicit computed-palette assertions counts as themed evidence.
 - These are simulated responses, not live auth/RLS, PostgREST, multi-device,
   physical-mobile, installed-PWA or full-game signoff.
-- Final local gates: **306 files / 2,881 tests passed** with
+- Original implementation's local gates (before the repair below): **306 files / 2,881 tests passed** with
   `pnpm test --maxWorkers=2`; production build/typecheck passed (14 PWA precache
   entries). ESLint had 0 errors and the same 3 existing Fast Refresh warnings,
   excluding ignored `qa.local` and `.claude` fixtures. Review-control tests:
   **22 passed**. Whitespace checks were clean. CI is reported in the PR separately.
+
+### PR #495 Repair Evidence
+
+The three blockers reported on head `49ee32c97ef88efcc01d25fb49cf7e1008fd863c`
+are repaired in the working tree: remote-reopen status refresh, parked-binding
+finalization, and same-device reopen of a clean final retained only in memory.
+No migration, event/setup schema, release gate or remote Summary scope changed.
+
+- Before implementation, `pnpm test src/context/GameContext.test.ts
+  src/pages/GameInfo.test.ts --maxWorkers=2` produced **3 failures / 20 passes**.
+  The clean-final/current-state reproduction remained final with no stored record;
+  the parked-finalization callback was not invoked, and the new provider transition
+  was absent. The coordinator separately reproduced the clean-final failure with
+  real React effects and localStorage in disposable Chromium.
+- Provider regressions exercise active and parked status-only refresh, unchanged
+  history/fingerprints/recovery/errors, exact retry retention through final ->
+  read/save/reload -> reopen, queue exclusion while final, and A-final/B-active
+  isolation. Auth-before-render, provider/page cancellation, superseded reads,
+  replaced/deleted bindings and newer lifecycle generations reject late results.
+  Both stale sync success and failure leave newer Baseball finalization intact.
+- Same-primary handoff tests cover clean-final persistence actually deleting the
+  active slot, rollback-safe replacement, cap/storage failure without eviction,
+  one owned non-backdated append, advancing sync revision, repeated delivery and
+  redelivery after a later end/finalization. Other-manager/status-only paths leave
+  history unchanged; explicit cloud-bound local Reopen rejects a foreign recorder.
+- Cloud Games tests cover both active and parked refresh before navigation and
+  caller lifetime guards. Tracker tests execute mount/focus/online refresh and
+  cleanup. The status-only SDK helper rejects missing, foreign-sport, wrong-id,
+  unsupported-status and inaccessible rows without loading any recorder history.
+- Final focused command passed **40 files / 569 tests**:
+
+  ```text
+  pnpm test src/lib/baseball src/context/GameContext.test.ts src/context/GameContextSyncLifetime.test.ts src/lib/gameParking.test.ts src/lib/cloudSyncState.test.ts src/pages/Games.test.ts src/pages/GameInfo.test.ts src/pages/BaseballCloudLifecycle.test.ts src/lib/hockey/finalization.test.ts src/lib/hockey/cloudSync.test.ts src/lib/basketball/cloudSync.test.ts src/lib/soccer/cloudSync.test.ts --maxWorkers=2 --silent
+  ```
+
+  `pnpm typecheck` passed, and `git diff --check` was clean. Full-suite/build/lint,
+  exact-final-tree browser rerun and independent rereview remain coordinator-owned.
+- The coordinator reported provisional working-tree Chromium evidence: **9 real
+  provider/storage cases**, plus **12 responsive/theme renders / 4 simulated
+  finalize-and-reopen flows**, passed. These use synthetic auth and simulated cloud
+  responses with non-localhost HTTP blocked. They are not live Supabase/RLS,
+  two-device, physical-mobile, installed-PWA or release-matrix signoff.
 
 ### Owner Post-Deployment Checks (Pending)
 

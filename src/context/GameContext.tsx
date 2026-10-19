@@ -46,6 +46,7 @@ import {
 } from '../lib/basketball/reopenHandoff'
 import { applyHockeyReopenHandoff, type HockeyReopenHandoff } from '../lib/hockey/reopenHandoff'
 import { applyBaseballReopenHandoff, type BaseballReopenHandoff } from '../lib/baseball/reopenHandoff'
+import { loadBaseballCloudGameStatus, type BaseballCloudGameStatus } from '../lib/baseball/cloudLifecycle'
 import {
   pauseRunningBasketballClockForWorkflow,
   shouldInterceptRunningBasketballClock,
@@ -115,6 +116,7 @@ import {
   parkActiveGame,
   parkedGameStorageErrorMessage,
   saveActiveGameState,
+  saveActiveGameStateAtomically,
   saveParkedGameRecordState,
   saveParkedGameRecordStateAtomically,
   type ParkedGameRecord,
@@ -388,6 +390,8 @@ interface GameContextType {
     gameId: string,
     handoff?: EventReopenHandoff | null
   ) => Promise<void>
+  markBaseballCloudGameFinalized: (gameId: string) => void
+  refreshBaseballCloudGameStatus: (gameId: string, isCurrent?: () => boolean) => Promise<BaseballCloudGameStatus | null>
   resolveEventConflict: (
     eventId: string,
     resolution: 'local' | 'remote'
@@ -426,6 +430,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const prevUserIdRef = useRef<string | null>(userId)
   // Async work keeps its original lifetime, even if this account signs back in later.
   const accountRef = useRef({ userId, active: true })
+  const baseballStatusGenerationRef = useRef(new Map<string, number>())
+  const baseballStatusRequestRef = useRef(new Map<string, number>())
   if (accountRef.current.userId !== userId) {
     accountRef.current.active = false
     accountRef.current = { userId, active: true }
@@ -897,6 +903,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
       const snapshotRecoveryFingerprint = eventConflictRecoveryFingerprint(snapshot)
       const snapshotUserId = userId
+      const baseballGameId = snapshot.sportGameState?.sportId === 'baseball' ? snapshot.cloudSync.gameId : null
+      const baseballGeneration = baseballGameId ? baseballStatusGenerationRef.current.get(baseballGameId) ?? 0 : 0
+      const lifecycleIsCurrent = () => !baseballGameId ||
+        (baseballStatusGenerationRef.current.get(baseballGameId) ?? 0) === baseballGeneration
       if (!getParkedGameRecord(record.localGameId, snapshotUserId)) return
 
       const isActiveRecord = getActiveLocalGameId(snapshotUserId) === record.localGameId
@@ -956,6 +966,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       try {
         const assertCurrent = () => {
           if (!isCurrentAccount()) throw new Error(ACCOUNT_CHANGED_REASON)
+          if (!lifecycleIsCurrent()) throw new Error('The Baseball cloud lifecycle changed. Sync again.')
         }
         const syncRoute = cloudSyncRouteForState(snapshot)
         const synced = syncRoute === 'soccer_events'
@@ -994,7 +1005,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           : (() => {
               throw new Error('This game does not support cloud sync.')
             })()
-        if (!isCurrentAccount()) return
+        if (!isCurrentAccount() || !lifecycleIsCurrent()) return
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
         if (!latestRecord) return
 
@@ -1109,7 +1120,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           ))
         }
       } catch (error) {
-        if (!isCurrentAccount()) return
+        if (!isCurrentAccount() || !lifecycleIsCurrent()) return
         const networkish = isLikelyNetworkError(error)
         const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
@@ -1404,11 +1415,122 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }, [isConfigured, isCurrentAccount, isOnline, userId])
 
+  const applyBaseballCloudLifecycle = useCallback((
+    gameId: string,
+    status: BaseballCloudGameStatus,
+    handoff: BaseballReopenHandoff | null = null
+  ): boolean => {
+    if (!userId || isStaleOwner(userId)) return false
+    const matches = (candidate: GameState) => candidate.gameDataAuthority === 'sport_events' &&
+      candidate.sportGameState?.sportId === 'baseball' && candidate.cloudSync.gameId === gameId
+    const active = stateRef.current
+    const activeMatches = matches(active)
+    const activeId = getActiveLocalGameId(userId)
+    const records = listParkedGameRecords(userId).filter(record => record.ownerId === userId && matches(record.gameState))
+    const transition = (current: GameState): GameState => {
+      if (handoff) {
+        const applied = applyBaseballReopenHandoff(current, userId, gameId, handoff)
+        if (!applied.ok) throw new Error(applied.reason)
+        return applied.state
+      }
+      return current.cloudSync.gameStatus === status ? current : {
+        ...current, cloudSync: { ...current.cloudSync, gameStatus: status },
+      }
+    }
+    let nextActive = active
+    let changed = false
+    for (const record of records) {
+      const isActive = activeMatches && record.localGameId === activeId
+      const source = isActive ? active : record.gameState
+      const next = transition(source)
+      if (next !== source) {
+        changed = true
+        const appended = next.eventStream !== source.eventStream
+        saveParkedGameRecordStateAtomically(record.localGameId, next, userId, appended ? {
+          dirty: true,
+          attempts: record.sync.attempts,
+          lastError: record.sync.lastError,
+          lastSuccessfulSyncRevision: record.sync.lastSuccessfulSyncRevision,
+          nextAttemptAt: null,
+        } : {
+          ...record.sync,
+          dirty: record.sync.dirty || shouldBlockDiscardUnsyncedGame(next, false),
+        })
+      }
+      if (isActive) nextActive = next
+    }
+    if (activeMatches && !records.some(record => record.localGameId === activeId)) {
+      // Clean final persistence removes the slot, not the still-mounted React state.
+      if (activeId) throw new Error('The active local game changed. Open this recording again.')
+      nextActive = transition(active)
+      if (nextActive !== active && status !== 'final') saveActiveGameStateAtomically(nextActive, userId)
+      changed ||= nextActive !== active
+    }
+    if (changed) baseballStatusGenerationRef.current.set(gameId, (baseballStatusGenerationRef.current.get(gameId) ?? 0) + 1)
+    // Never expose an editable in-memory stream until its durable write succeeded.
+    if (nextActive !== active) {
+      stateRef.current = nextActive
+      dispatch({ type: 'HYDRATE_STATE', state: nextActive })
+    }
+    setParkedGames(listParkedGames(userId))
+    setActiveLocalGameId(getActiveLocalGameId(userId))
+    if (changed) setParkingError(null)
+    return true
+  }, [isStaleOwner, userId])
+
+  const markBaseballCloudGameFinalized = useCallback((gameId: string) => {
+    if (isStaleOwner(userId)) return
+    baseballStatusGenerationRef.current.set(gameId, (baseballStatusGenerationRef.current.get(gameId) ?? 0) + 1)
+    try {
+      applyBaseballCloudLifecycle(gameId, 'final')
+    } catch (error) {
+      setParkingError(parkedGameStorageErrorMessage(error))
+    }
+  }, [applyBaseballCloudLifecycle, isStaleOwner, userId])
+
+  const refreshBaseballCloudGameStatus = useCallback(async (gameId: string, callerIsCurrent: () => boolean = () => true) => {
+    if (!userId || isStaleOwner(userId) || !callerIsCurrent()) return null
+    const generation = baseballStatusGenerationRef.current.get(gameId) ?? 0
+    const request = (baseballStatusRequestRef.current.get(gameId) ?? 0) + 1
+    baseballStatusRequestRef.current.set(gameId, request)
+    const isCurrent = () => !isStaleOwner(userId) && callerIsCurrent() &&
+      (baseballStatusGenerationRef.current.get(gameId) ?? 0) === generation &&
+      baseballStatusRequestRef.current.get(gameId) === request
+    try {
+      const observedActive = stateRef.current
+      const observedActiveId = getActiveLocalGameId(userId)
+      const bindings = () => JSON.stringify(listParkedGameRecords(userId).filter(record => record.gameState.cloudSync.gameId === gameId))
+      const observedBindings = bindings()
+      const status = await loadBaseballCloudGameStatus(gameId)
+      if (!isCurrent()) return null
+      if (stateRef.current !== observedActive || getActiveLocalGameId(userId) !== observedActiveId ||
+        bindings() !== observedBindings) return null
+      return applyBaseballCloudLifecycle(gameId, status) ? status : null
+    } catch (error) {
+      if (isCurrent()) setParkingError(error instanceof Error ? error.message : parkedGameStorageErrorMessage(error))
+      return null
+    }
+  }, [applyBaseballCloudLifecycle, isStaleOwner, userId])
+
   const markEventCloudGameReopened = useCallback(async (
     gameId: string,
     suppliedHandoff?: EventReopenHandoff | null
   ) => {
     try {
+      if (isStaleOwner(userId)) return
+      if (suppliedHandoff && 'sportId' in suppliedHandoff && suppliedHandoff.sportId === 'baseball') {
+        baseballStatusGenerationRef.current.set(gameId, (baseballStatusGenerationRef.current.get(gameId) ?? 0) + 1)
+        applyBaseballCloudLifecycle(gameId, 'in_progress', suppliedHandoff)
+        return
+      }
+      if (suppliedHandoff === null && (
+        stateRef.current.sportGameState?.sportId === 'baseball' && stateRef.current.cloudSync.gameId === gameId ||
+        listParkedGameRecords(userId).some(record => record.gameState.sportGameState?.sportId === 'baseball' && record.gameState.cloudSync.gameId === gameId)
+      )) {
+        baseballStatusGenerationRef.current.set(gameId, (baseballStatusGenerationRef.current.get(gameId) ?? 0) + 1)
+        applyBaseballCloudLifecycle(gameId, 'in_progress')
+        return
+      }
       // Only Basketball has a server handoff read; Hockey/Baseball pass a reopen result or null.
       const handoff = suppliedHandoff === undefined
         ? await loadBasketballReopenHandoff(gameId)
@@ -1441,9 +1563,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           : record.gameState
         const applied = handoff && userId
           ? 'sportId' in handoff
-            ? handoff.sportId === 'baseball'
-              ? applyBaseballReopenHandoff(record.gameState, userId, gameId, handoff)
-              : applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+            ? applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
             : applyBasketballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
           : { ok: true as const, state: cloudReopenedState, changed: cloudStateChanged }
         if (!applied.ok) {
@@ -1469,7 +1589,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setParkingError(parkedGameStorageErrorMessage(error))
     }
-  }, [activeLocalGameId, isStaleOwner, userId])
+  }, [activeLocalGameId, applyBaseballCloudLifecycle, isStaleOwner, userId])
 
   const resolveEventConflict = useCallback(
     (eventId: string, resolution: 'local' | 'remote') => {
@@ -1582,6 +1702,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         recoverDeletedEventParticipantSources,
         enableEventCloudSync,
         markEventCloudGameReopened,
+        markBaseballCloudGameFinalized,
+        refreshBaseballCloudGameStatus,
         resolveEventConflict,
       }}
     >

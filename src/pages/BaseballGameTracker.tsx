@@ -115,7 +115,7 @@ import {
   type BaseballSubstitutionKind,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
-import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from '../lib/baseball/cloudPolicy'
+import { assertBaseballCloudAccount, BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from '../lib/baseball/cloudPolicy'
 
 const BASE_LABELS: Record<BaseballBase, string> = { first: 'first', second: 'second', third: 'third' }
 
@@ -197,8 +197,8 @@ export default function BaseballGameTracker() {
 }
 
 function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
-  const { state, dispatch } = useGame()
-  const { user } = useAuth()
+  const { state, dispatch, refreshBaseballCloudGameStatus } = useGame()
+  const { user, isConfigured } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pitchLocation, setPitchLocation] = useState<BaseballPitchLocation | null>(null)
@@ -223,6 +223,21 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   const diamond = baseballDiamondView(sport)
   const cloudFinal = isFinalBaseballCloudGame(state)
   const inProgress = projection.status === 'in_progress' && !cloudFinal
+  const cloudGameId = state.cloudSync.gameId
+  const userId = user?.id ?? null
+  useEffect(() => {
+    if (!isConfigured || !userId || !cloudGameId) return
+    let current = true
+    const refresh = () => { void refreshBaseballCloudGameStatus(cloudGameId, () => current) }
+    refresh()
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    return () => {
+      current = false
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+    }
+  }, [cloudGameId, isConfigured, refreshBaseballCloudGameStatus, userId])
   useEffect(() => {
     if (!cloudFinal) return
     setFlow({ step: 'idle' })
@@ -463,6 +478,12 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
 
   const confirmReopen = () => {
     if (flow.step !== 'reopen' || !flow.reason.trim()) return
+    if (cloudGameId) {
+      try { assertBaseballCloudAccount(userId) } catch (error) {
+        setFlow({ ...flow, error: error instanceof Error ? error.message : 'Sign in again to reopen this recording.' })
+        return
+      }
+    }
     commitFlow(reopenBaseballGame(state, flow.reason.trim(), context()))
   }
 

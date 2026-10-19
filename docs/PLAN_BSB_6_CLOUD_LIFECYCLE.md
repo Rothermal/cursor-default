@@ -195,6 +195,11 @@ client local-only until then.
   It previews the runs the server's policy will publish, confirms the exact checkpoint,
   then reads the stored score back. If the server counted differently, its score is shown
   with a note.
+  The result marks every matching account-owned local binding final, including parked A
+  while B remains active. This is a status change, not an acknowledgement of unsynced
+  history: Baseball final debt, retry metadata and fingerprints survive reads and saves,
+  but final bindings stay out of the upload queue. Clean synced finals still use the
+  existing parking cleanup policy.
 - **Pitcher decisions**: the preview notes when the primary stream has no decisions for
   its current end. It does not block finalizing. Decisions are events in the recorder's
   stream, so only the primary recorder's device can set them (Q4).
@@ -203,13 +208,19 @@ client local-only until then.
   recorder's device: a manager never appends to another recorder's stream. There are two
   paths (Q7):
   - **same account and device**: when the manager who reopens is also the primary
-    recorder and holds the parked copy, the reopen result is handed to that copy (the Hockey
-    handoff). It appends `baseball.game_reopened` with the reason, never earlier than its
-    last event, and applying it twice changes nothing,
+    recorder and holds the parked or current in-memory copy, the reopen result is handed
+    to that copy. This includes a clean final whose persisted slot was already removed.
+    Recreating that slot is rollback-safe and respects the parking cap without eviction.
+    It appends `baseball.game_reopened` with the reason, never earlier than its last event.
+    The existing capture-command identity makes repeated delivery of that publication
+    inert, including after a later end/finalization; no receipt schema is added,
   - **another account or device**: there is no durable receipt to fetch (only
     Basketball's 064 has a handoff read). The primary's copy learns the cloud game is no
     longer final when its binding status is refreshed: on opening the game from Cloud
-    Games or Game Info, and on the tracker's sync. The binding then reads in progress, but
+    Games or Game Info, on Tracker mount/focus/reconnect, and on the tracker's sync.
+    Status reads are account/provider/page/request safe and reject changes to the observed
+    binding or local state. A newer finalization/reopen also invalidates older status and
+    sync results even when the gameplay fingerprint is unchanged. The binding then reads in progress, but
     the stream stays ended. The tracker shows "Reopened in the cloud" with a Reopen button,
     which runs the existing local reasoned Reopen under the recorder's own identity. The
     recorder enters the reason. Until then the stream is unchanged, and the owner may

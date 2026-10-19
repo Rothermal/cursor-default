@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import ResultBadge from '../components/team-info/ResultBadge'
 import BasketballFinalizationPanel from '../components/basketball/BasketballFinalizationPanel'
@@ -200,8 +200,8 @@ export default function GameInfo() {
     setOpeningGame(false)
     return () => { mountedRef.current = false; openRequestRef.current += 1 }
   }, [gameId, userId])
-  const inspectionIsCurrent = () => mountedRef.current && currentGameIdRef.current === gameId &&
-    currentUserIdRef.current === userId && isCurrentAuthUser(userId)
+  const inspectionIsCurrent = useCallback(() => mountedRef.current && currentGameIdRef.current === gameId &&
+    currentUserIdRef.current === userId && isCurrentAuthUser(userId), [gameId, userId])
   const {
     state,
     dispatch,
@@ -212,6 +212,8 @@ export default function GameInfo() {
     resumeParkedGame,
     flushCloudGameSync,
     markEventCloudGameReopened,
+    markBaseballCloudGameFinalized,
+    refreshBaseballCloudGameStatus,
     parkingError,
   } = useGame()
   const supabaseClient = supabase
@@ -282,10 +284,13 @@ export default function GameInfo() {
   }, [game?.id, game?.sport_id, game?.status, hockeyDataAuthority, markEventCloudGameReopened, userId])
 
   useEffect(() => {
-    if (game?.status !== 'in_progress' || game.sport_id !== 'baseball' ||
+    const inspectedGameId = game?.id
+    if (!inspectedGameId || game?.sport_id !== 'baseball' ||
       baseballDataAuthority !== 'sport_events' || !userId) return
-    void markEventCloudGameReopened(game.id, null)
-  }, [game?.id, game?.sport_id, game?.status, baseballDataAuthority, markEventCloudGameReopened, userId])
+    let cancelled = false
+    void refreshBaseballCloudGameStatus(inspectedGameId, () => !cancelled && inspectionIsCurrent())
+    return () => { cancelled = true }
+  }, [game?.id, game?.sport_id, baseballDataAuthority, inspectionIsCurrent, refreshBaseballCloudGameStatus, userId])
 
   useEffect(() => {
     if (!gameId || !isConfigured || !supabaseClient) {
@@ -1094,12 +1099,7 @@ export default function GameInfo() {
                       opponent_score: result.serverScoreConfirmed ? result.score.opponent : null,
                       home_score_adjustment: 0,
                     } : current)
-                    if (activeStateRef.current.cloudSync.gameId === game.id) {
-                      dispatch({
-                        type: 'SET_CLOUD_SYNC_STATE',
-                        cloudSync: { gameStatus: 'final' },
-                      })
-                    }
+                    markBaseballCloudGameFinalized(game.id)
                   }}
                   onReopened={async (result, publication) => {
                     if (!inspectionIsCurrent()) return

@@ -175,10 +175,20 @@ describe('BSB-6B2 finalized cloud games and reopen handoff', () => {
     expect(applyBaseballReopenHandoff(state, USER, 'wrong-game', handoff).ok).toBe(false)
     expect(applyBaseballReopenHandoff(state, USER, GAME, { ...handoff, reopenedAt: 'invalid' }).ok).toBe(false)
   })
+  it('does not replay an old publication handoff after the recording ends and is finalized again', () => {
+    const first = applyBaseballReopenHandoff(bound(ended(), 'final'), USER, GAME, handoff)
+    if (!first.ok) throw new Error(first.reason)
+    const finalizedAgain = bound(expectOk(endBaseballGame(first.state, 'time_limit', rc(80))), 'final')
+    const again = applyBaseballReopenHandoff(finalizedAgain, USER, GAME, handoff)
+    expect(again).toEqual({ ok: true, state: finalizedAgain, changed: false })
+  })
   it('never appends this account to a foreign recorder stream', () => {
     const state = bound(ended(), 'final')
     const result = applyBaseballReopenHandoff(state, 'foreign-account', GAME, { ...handoff, primaryRecorderId: 'foreign-account' })
     expect(result).toMatchObject({ ok: false })
     expect(result.state).toBe(state)
+    const refreshed = { ...state, cloudSync: { ...state.cloudSync, gameStatus: 'in_progress' } }
+    expect(reopenBaseballGame(refreshed, 'Recorder confirms correction', { ...rc(70), recorderUserId: 'foreign-account' }))
+      .toMatchObject({ ok: false, state: refreshed, message: 'Only this recording\'s recorder can reopen its local history.' })
   })
 })

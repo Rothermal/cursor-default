@@ -267,6 +267,16 @@ function hasSyncablePayload(state: GameState): boolean {
   )
 }
 
+function isHeldBaseballFinal(state: GameState): boolean {
+  return state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+    state.sportGameState?.sportId === 'baseball' && Boolean(state.cloudSync.gameId) &&
+    state.cloudSync.gameStatus === 'final'
+}
+
+function hasTrackedSyncPayload(state: GameState): boolean {
+  return hasSyncablePayload(state) || isHeldBaseballFinal(state)
+}
+
 function normalizeSyncState(
   value: Partial<ParkedGameSyncState> | null | undefined,
   existing: ParkedGameRecord | null,
@@ -276,7 +286,7 @@ function normalizeSyncState(
     typeof value?.revision === 'number'
       ? Math.max(0, Math.floor(value.revision))
       : existing?.sync.revision ?? 0
-  if (!hasSyncablePayload(state)) {
+  if (!hasTrackedSyncPayload(state)) {
     return {
       dirty: false,
       revision,
@@ -287,11 +297,10 @@ function normalizeSyncState(
       nextAttemptAt: null,
     }
   }
-  const fingerprint = hasSyncablePayload(state) ? buildGameSyncFingerprint(state) : null
+  const fingerprint = buildGameSyncFingerprint(state)
   const dirty = Boolean(
-    hasSyncablePayload(state) &&
-      fingerprint &&
-      state.cloudSync.lastSyncedGameFingerprint !== fingerprint
+    fingerprint && (state.cloudSync.lastSyncedGameFingerprint !== fingerprint ||
+      (isHeldBaseballFinal(state) && (value?.dirty || existing?.sync.dirty)))
   )
 
   return {
@@ -325,14 +334,15 @@ function buildSyncState(
   state: GameState,
   patch: Partial<ParkedGameSyncState> = {}
 ): ParkedGameSyncState {
-  const fingerprint = hasSyncablePayload(state) ? buildGameSyncFingerprint(state) : null
+  const fingerprint = hasTrackedSyncPayload(state) ? buildGameSyncFingerprint(state) : null
   const previousFingerprint = existing ? buildGameSyncFingerprint(existing.gameState) : null
   const payloadChanged = fingerprint !== previousFingerprint
   const revision = (existing?.sync.revision ?? 0) + (payloadChanged ? 1 : 0)
   const dirty = Boolean(
-    hasSyncablePayload(state) &&
+    hasTrackedSyncPayload(state) &&
       fingerprint &&
-      state.cloudSync.lastSyncedGameFingerprint !== fingerprint
+      (state.cloudSync.lastSyncedGameFingerprint !== fingerprint ||
+        (isHeldBaseballFinal(state) && existing?.sync.dirty))
   )
   const base: ParkedGameSyncState = {
     dirty,
@@ -708,6 +718,8 @@ export function listDirtyParkedGameRecords(
   return listParkedGameRecords(ownerId)
     .filter(record => {
       if (!record.sync.dirty) return false
+      // A final Baseball binding retains unsynced debt, but cannot upload until reopened.
+      if (isHeldBaseballFinal(record.gameState)) return false
       if (eventCloudPolicyForState(record.gameState) === 'local_only') return false
       if ((record.gameState.cloudSync.eventConflicts?.length ?? 0) > 0) return false
       if (!record.sync.nextAttemptAt) return true
@@ -777,6 +789,22 @@ export function saveParkedGameRecordStateAtomically(
   const snapshot = snapshotParkingStorage(migrateLegacyGameStorage(ownerId))
   try {
     return saveParkedGameRecordState(localGameId, state, ownerId, syncPatch)
+  } catch (error) {
+    restoreParkingStorage(snapshot)
+    throw error
+  }
+}
+
+/** Recreate a cleaned-up active binding without leaving a partial slot on quota/cap failure. */
+export function saveActiveGameStateAtomically(state: GameState, ownerId: string | null): ParkedGameSummary[] {
+  const manifest = migrateLegacyGameStorage(ownerId)
+  const snapshot = snapshotParkingStorage(manifest)
+  try {
+    // Register the new id first so rollback also knows about a pre-manifest record write.
+    if (!manifest.activeLocalGameId && state.cloudSync.gameStatus !== 'final' && hasPersistableGameState(state)) {
+      beginNewActiveParkedGame(ownerId)
+    }
+    return saveActiveGameState(state, ownerId)
   } catch (error) {
     restoreParkingStorage(snapshot)
     throw error
