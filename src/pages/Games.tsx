@@ -11,6 +11,7 @@ import {
   loadBasketballCloudGameById,
 } from '../lib/basketball/cloudSync'
 import { basketballSummaryPath } from '../lib/basketball/summary'
+import { baseballSummaryPath } from '../lib/baseball/summary'
 import {
   createHockeyIndependentRecorderState,
   loadHockeyCloudDataAuthority,
@@ -982,6 +983,9 @@ export default function Games() {
           )}
         </p>
         <div className="flex gap-2 mt-3">
+          {sport?.id === 'baseball' && (
+            <Link to={baseballSummaryPath({ gameId: game.id, from: 'games', teamId: game.team_id })} className="btn-secondary flex-1 py-2 text-center">Summary</Link>
+          )}
           {sport?.id === 'soccer' ? (
             <button
               onClick={() => { void handleOpenGame(game) }}

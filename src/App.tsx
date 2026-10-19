@@ -44,6 +44,7 @@ import { isSoccerSummaryRoute } from './lib/soccer/summary'
 import BasketballSummary from './pages/BasketballSummary'
 import { isBasketballSummaryRoute } from './lib/basketball/summary'
 import BaseballSummary from './pages/BaseballSummary'
+import BaseballCloudSummaryRoute from './pages/BaseballCloudSummaryRoute'
 import HockeySummary from './pages/HockeySummary'
 import { isBaseballSummaryRoute } from './lib/baseball/summary'
 import { isHockeySummaryRoute } from './lib/hockey/summary'
@@ -133,6 +134,16 @@ function GameCheckoutRoute() {
 }
 
 function GameSummaryRoute() {
+  const [searchParams] = useSearchParams()
+  const gameId = searchParams.get('gameId')
+  const requestedSport = searchParams.get('sport')
+  if (gameId && (!requestedSport || requestedSport === 'baseball')) {
+    return <BaseballCloudSummaryRoute gameId={gameId} requestedSport={requestedSport}><SportGameSummaryRoute /></BaseballCloudSummaryRoute>
+  }
+  return <SportGameSummaryRoute />
+}
+
+function SportGameSummaryRoute() {
   const { state } = useGame()
   const [searchParams] = useSearchParams()
   if (isBasketballSummaryRoute(state, searchParams)) return <BasketballSummary />
