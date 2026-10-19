@@ -13,8 +13,10 @@ cloud-policy and handshake code that HKY-5 extracted.
 Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
 until the owner says otherwise. BSB-6A (#489) and BSB-6B1 (#492) are merged and
 deployed; the owner reports migrations 076-078 applied successfully. BSB-6B2 merged
-in #495. BSB-6C is implemented for review; BSB-7 is the next implementation phase,
-but the BSB-6 live two-device exit regression remains pending. Baseball stays `opt_in`.
+in #495. BSB-6C cloud Summary merged in #496. The
+[BSB-7 execution plan](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) has approved
+product scope and is under review, not shipped. The BSB-6 live two-device exit
+regression remains pending. Baseball stays `opt_in` until BSB-7D implementation.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -414,9 +416,9 @@ Filled in as each slice lands.
   `in_progress` binding alone does not prove a previous cloud finalization.
 - Async open and manager-write continuations retain account/lifetime checks. No new
   migration, event schema, setup, aggregate source, release stage or remote Summary
-  route is introduced. BSB-6C and the live owner matrix remain pending.
+  route is introduced. BSB-6C later merged in #496; the live owner matrix remains pending.
 
-### BSB-6C (implemented for review)
+### BSB-6C (merged, PR #496)
 
 - The synchronous `baseballSummarySource` in `summary.ts` remains the local replay
   model. `summarySource.ts` selects one local, nonfinal cloud-primary, or active
