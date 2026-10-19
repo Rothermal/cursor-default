@@ -40,6 +40,7 @@ import {
   type BaseballSummaryView,
   type BaseballTeamNames,
 } from '../lib/baseball'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from '../lib/baseball/cloudPolicy'
 import { createBaseballUuid } from '../lib/baseball/id'
 
 /**
@@ -84,7 +85,9 @@ export default function BaseballSummary() {
   const started = sport.projection.status !== 'pregame'
   const decisions = source.healthy && started ? baseballDecisionsView(sport, events) : null
   // A reopened game closes the sheet: its decisions belonged to the earlier ending.
-  const draft = decisions?.canSet ? decisionDraft : null
+  // A game final in the cloud is read-only here too; its Timeline links and Set stay hidden.
+  const cloudFinal = isFinalBaseballCloudGame(state)
+  const draft = decisions?.canSet && !cloudFinal ? decisionDraft : null
 
   const openDecisions = () => {
     if (!decisions) return
@@ -149,7 +152,7 @@ export default function BaseballSummary() {
             ))}
           </div>
 
-          {view && tab === 'overview' && <Overview view={view} sport={sport} decisions={decisions} names={names} onSetDecisions={openDecisions} />}
+          {view && tab === 'overview' && <Overview view={view} sport={sport} decisions={decisions} names={names} onSetDecisions={cloudFinal ? null : openDecisions} />}
           {tab === 'box' && started && (
             <BaseballBoxScore
               box={baseballBoxScore(sport, events)}
@@ -225,7 +228,9 @@ export default function BaseballSummary() {
           <BaseballPlayDetailSheet
             detail={play}
             onClose={() => setPlayId(null)}
-            note={<>To change this play, <Link to="/game?tab=timeline" className="font-semibold underline">correct it on the Timeline</Link>.</>}
+            note={cloudFinal
+              ? BASEBALL_FINAL_CLOUD_GAME_MESSAGE
+              : <>To change this play, <Link to="/game?tab=timeline" className="font-semibold underline">correct it on the Timeline</Link>.</>}
           />
         </SheetDialog>
       )}
@@ -238,7 +243,7 @@ function Overview({ view, sport, decisions, names, onSetDecisions }: {
   sport: BaseballSportGameState
   decisions: BaseballDecisionsView | null
   names: BaseballTeamNames
-  onSetDecisions: () => void
+  onSetDecisions: (() => void) | null
 }) {
   return (
     <div className="space-y-3">
@@ -322,7 +327,8 @@ function Decisions({ sport, decisions, names, onSet }: {
   sport: BaseballSportGameState
   decisions: BaseballDecisionsView
   names: BaseballTeamNames
-  onSet: () => void
+  /** Null while the game is final in the cloud: decisions change only after a reopen (BSB-6B2). */
+  onSet: (() => void) | null
 }) {
   const labels = decisions.current ? baseballDecisionLabels(sport, decisions.current.decisions) : null
   const sides = labels ? (['tracked', 'opponent'] as const).filter(side => labels[side].length > 0) : []
@@ -352,9 +358,13 @@ function Decisions({ sport, decisions, names, onSet }: {
           </div>
         </div>
       )}
-      <button type="button" className="btn-secondary w-full" onClick={onSet}>
-        {decisions.current ? 'Change decisions' : 'Set decisions'}
-      </button>
+      {onSet ? (
+        <button type="button" className="btn-secondary w-full" onClick={onSet}>
+          {decisions.current ? 'Change decisions' : 'Set decisions'}
+        </button>
+      ) : (
+        <p className="text-sm text-content-muted">{BASEBALL_FINAL_CLOUD_GAME_MESSAGE}</p>
+      )}
     </section>
   )
 }

@@ -10,6 +10,7 @@ import {
   BASEBALL_REASON_LABELS,
 } from './capture'
 import { baseballSportState, withBaseballUndoReceipt, type BaseballCommandResult } from './commands'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from './cloudPolicy'
 import { baseballSubstitutionChanges } from './events'
 import { parseBaseballPeriod } from './periods'
 import { baseballFieldingPositionCode } from './positions'
@@ -93,7 +94,7 @@ export function baseballRecentPlays(
 
 /** True when the newest active unit is a play Undo may remove. */
 export function canUndoBaseballPlay(state: GameState): boolean {
-  if (!baseballSportState(state) || !state.eventStream) return false
+  if (!baseballSportState(state) || !state.eventStream || isFinalBaseballCloudGame(state)) return false
   const units = groupUnits(activeEvents(state))
   const newest = units[units.length - 1]
   return Boolean(newest && isBaseballCaptureEvent(newest[0]))
@@ -118,7 +119,7 @@ export function undoBaseballPlay(state: GameState, now: string): BaseballCommand
 
 /** True when the receipt still matches the stream, so Restore would succeed structurally. */
 export function canRestoreBaseballPlay(state: GameState): boolean {
-  return restoreMutations(state) !== null
+  return !isFinalBaseballCloudGame(state) && restoreMutations(state) !== null
 }
 
 /** Restores the play Undo just removed, if nothing has been recorded since. */
@@ -422,6 +423,7 @@ function applyChecked(
   now: string,
   events: GameEvent[]
 ): BaseballCommandResult {
+  if (isFinalBaseballCloudGame(state)) return failure(state, BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const removing = new Set(mutations.filter(mutation => mutation.type === 'delete').map(mutation => mutation.eventId))
   const restoring = mutations.filter(mutation => mutation.type === 'restore').map(mutation => findEvent(state, mutation.eventId)!)
   const candidate = [

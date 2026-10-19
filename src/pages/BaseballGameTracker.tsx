@@ -114,6 +114,8 @@ import {
   type BaseballSubstitutionDraft,
   type BaseballSubstitutionKind,
 } from '../lib/baseball'
+import { isFinalBaseballCloudGame } from '../lib/baseball/cloudPolicy'
+import { loadBaseballCloudGameStatus } from '../lib/baseball/finalization'
 import { createBaseballUuid } from '../lib/baseball/id'
 
 const BASE_LABELS: Record<BaseballBase, string> = { first: 'first', second: 'second', third: 'third' }
@@ -196,7 +198,7 @@ export default function BaseballGameTracker() {
 }
 
 function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
-  const { state, dispatch } = useGame()
+  const { state, dispatch, markEventCloudGameReopened } = useGame()
   const { user } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -221,6 +223,23 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   const sideName = (side: 'tracked' | 'opponent') => names[side]
   const diamond = baseballDiamondView(sport)
   const inProgress = projection.status === 'in_progress'
+  // Final in the cloud: read-only until a manager reopens it (BSB-6B2).
+  const cloudFinal = isFinalBaseballCloudGame(state)
+  // Reopened from another account or device while this copy stayed ended (plan Q7).
+  const cloudReopened = !cloudFinal && capturePreferences.cloudReopenNotice !== null && baseballCanReopen(projection)
+  const cloudGameId = state.cloudSync.gameId
+
+  // A finalized copy has no sync to run, so it checks whether the cloud game was reopened.
+  useEffect(() => {
+    if (!cloudFinal || !cloudGameId) return
+    let cancelled = false
+    void loadBaseballCloudGameStatus(cloudGameId).then(status => {
+      if (!cancelled && status === 'in_progress') void markEventCloudGameReopened(cloudGameId, null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [cloudFinal, cloudGameId, markEventCloudGameReopened])
 
   const start = () => {
     const result = startBaseballGame(state, { recorderUserId: user?.id ?? null, occurredAt: new Date().toISOString() })
@@ -583,6 +602,23 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
         </p>
       )}
       <BaseballCloudSyncAlerts state={state} />
+      {cloudFinal && (
+        <p role="status" className="rounded-md border border-line bg-surface-muted px-3 py-2 text-sm text-content-muted">
+          This game is finalized and read-only. An owner or admin can reopen it from Game Info.
+        </p>
+      )}
+      {cloudReopened && flow.step === 'idle' && (
+        <section role="status" className="space-y-2 rounded-md border border-warning-line bg-warning p-3 text-sm text-warning-content">
+          <p className="font-semibold">Reopened in the cloud</p>
+          <p>
+            An owner or admin reopened this game. Reopen it here to correct or continue it, then end it again.
+            Until you do, this recording stays as it is.
+          </p>
+          <button type="button" className="btn-secondary w-full" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })}>
+            Reopen game
+          </button>
+        </section>
+      )}
 
       {projection.status === 'pregame' && (
         <section className="space-y-3">
@@ -854,7 +890,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               </p>
               {result.note && <p className="text-sm text-content-muted">{result.note}</p>}
               <Link to={baseballSummaryPath()} className="btn-primary block w-full text-center">Summary</Link>
-              {flow.step === 'idle' && baseballCanReopen(projection) && (
+              {flow.step === 'idle' && !cloudFinal && !cloudReopened && baseballCanReopen(projection) && (
                 <button type="button" className="btn-secondary w-full" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })}>
                   Reopen game
                 </button>
@@ -1105,7 +1141,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               />
             </>
           )}
-          {baseballCanReopen(projection) && (
+          {!cloudFinal && baseballCanReopen(projection) && (
             <MenuAction label="Reopen game" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })} />
           )}
           {projection.status !== 'pregame' && (

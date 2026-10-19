@@ -5,6 +5,8 @@ import BasketballFinalizationPanel from '../components/basketball/BasketballFina
 import BasketballRecorderManager from '../components/basketball/BasketballRecorderManager'
 import HockeyFinalizationPanel from '../components/hockey/HockeyFinalizationPanel'
 import HockeyRecorderManager from '../components/hockey/HockeyRecorderManager'
+import BaseballFinalizationPanel from '../components/baseball/BaseballFinalizationPanel'
+import BaseballRecorderManager from '../components/baseball/BaseballRecorderManager'
 import { computePlayerScore, sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -22,6 +24,11 @@ import {
   loadHockeyCloudDataAuthority,
   loadHockeyCloudGameById,
 } from '../lib/hockey/cloudSync'
+import {
+  createBaseballIndependentRecorderState,
+  loadBaseballCloudDataAuthority,
+  loadBaseballCloudGameById,
+} from '../lib/baseball/cloudSync'
 import {
   resolveEventRecorderOpenSource,
   type EventRecorderOpenSource,
@@ -51,6 +58,28 @@ import {
   type TeamRole,
 } from '../lib/teamPermissions'
 import type { GameState, SportConfig, StatAction } from '../types'
+
+/** A sport whose event games open the recorder's own stream from Game Info. */
+interface RecorderStreamSport {
+  sportId: 'hockey' | 'baseball'
+  label: string
+  loadGame: (userId: string, gameId: string) => Promise<GameState | null>
+  createIndependent: (userId: string, gameId: string) => Promise<GameState>
+}
+
+const HOCKEY_RECORDER_STREAM: RecorderStreamSport = {
+  sportId: 'hockey',
+  label: 'Hockey',
+  loadGame: loadHockeyCloudGameById,
+  createIndependent: createHockeyIndependentRecorderState,
+}
+
+const BASEBALL_RECORDER_STREAM: RecorderStreamSport = {
+  sportId: 'baseball',
+  label: 'Baseball',
+  loadGame: loadBaseballCloudGameById,
+  createIndependent: (_userId, gameId) => createBaseballIndependentRecorderState(gameId),
+}
 
 interface GameInfoGameRow extends TeamInfoGame {
   id: string
@@ -207,6 +236,8 @@ export default function GameInfo() {
     useState<'sport_events' | 'legacy' | null>(null)
   const [hockeyDataAuthority, setHockeyDataAuthority] =
     useState<'sport_events' | 'legacy' | null>(null)
+  const [baseballDataAuthority, setBaseballDataAuthority] =
+    useState<'sport_events' | 'legacy' | null>(null)
   const [openingGame, setOpeningGame] = useState(false)
   const [finalizationNotice, setFinalizationNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -258,6 +289,18 @@ export default function GameInfo() {
     void markEventCloudGameReopened(game.id, null)
   }, [game?.id, game?.sport_id, game?.status, hockeyDataAuthority, markEventCloudGameReopened, userId])
 
+  // Baseball likewise (BSB-6B2): the parked copy reads in progress and keeps its ended stream, and
+  // the tracker offers the recorder their own Reopen.
+  useEffect(() => {
+    if (
+      game?.status !== 'in_progress' ||
+      game.sport_id !== 'baseball' ||
+      baseballDataAuthority !== 'sport_events' ||
+      !userId
+    ) return
+    void markEventCloudGameReopened(game.id, null)
+  }, [baseballDataAuthority, game?.id, game?.sport_id, game?.status, markEventCloudGameReopened, userId])
+
   useEffect(() => {
     if (!gameId || !isConfigured || !supabaseClient) {
       setLoading(false)
@@ -276,6 +319,7 @@ export default function GameInfo() {
       setStatTotals({})
       setBasketballDataAuthority(null)
       setHockeyDataAuthority(null)
+      setBaseballDataAuthority(null)
 
       const { data: gameData, error: gameError } = await supabaseClient
         .from('games')
@@ -314,6 +358,18 @@ export default function GameInfo() {
         } catch (caught) {
           if (cancelled) return
           setError(caught instanceof Error ? caught.message : 'Hockey authority could not load')
+          setLoading(false)
+          return
+        }
+      }
+      if (loadedGame.sport_id === 'baseball') {
+        try {
+          const authority = await loadBaseballCloudDataAuthority(loadedGame.id)
+          if (cancelled) return
+          setBaseballDataAuthority(authority)
+        } catch (caught) {
+          if (cancelled) return
+          setError(caught instanceof Error ? caught.message : 'Baseball authority could not load')
           setLoading(false)
           return
         }
@@ -416,30 +472,35 @@ export default function GameInfo() {
   }, [gameId, isConfigured, supabaseClient, userId])
 
   /**
-   * A Hockey event game opens the recorder's own stream: the matching parked binding first, then
-   * their cloud stream, or a new independent stream. A finalized game opens read-only (the tracker
-   * refuses edits until a manager reopens it) and never starts a new stream.
+   * A Hockey or Baseball event game opens the recorder's own stream: the matching parked binding
+   * first, then their cloud stream, or a new independent stream. A finalized game opens read-only
+   * (the tracker refuses edits until a manager reopens it) and never starts a new stream.
    */
-  const openHockeyEventGame = async (current: GameInfoGameRow, currentUserId: string) => {
+  const openRecorderStreamGame = async (
+    current: GameInfoGameRow,
+    currentUserId: string,
+    recorderSport: RecorderStreamSport
+  ) => {
+    const { sportId, label } = recorderSport
     const final = current.status === 'final'
     setOpeningGame(true)
     setError(null)
     let source: EventRecorderOpenSource<GameState>
     try {
       source = await resolveEventRecorderOpenSource(
-        'hockey',
+        sportId,
         current.id,
         activeLocalGameId,
         parkedGames,
-        () => loadHockeyCloudGameById(currentUserId, current.id)
+        () => recorderSport.loadGame(currentUserId, current.id)
       )
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not load Hockey game')
+      setError(caught instanceof Error ? caught.message : `Could not load ${label} game`)
       setOpeningGame(false)
       return
     }
     if (currentUserIdRef.current !== currentUserId) {
-      setError('The signed-in account changed. Open the Hockey game again.')
+      setError(`The signed-in account changed. Open the ${label} game again.`)
       setOpeningGame(false)
       return
     }
@@ -465,7 +526,7 @@ export default function GameInfo() {
       return
     }
 
-    let hockeyGame = source.kind === 'cloud' ? source.state : null
+    let eventGame = source.kind === 'cloud' ? source.state : null
     if (source.kind === 'empty') {
       if (final) {
         setError('You have no recorded stream for this finalized game. The published score is shown above.')
@@ -478,16 +539,16 @@ export default function GameInfo() {
         setOpeningGame(false)
         return
       }
-      hockeyGame = await createHockeyIndependentRecorderState(currentUserId, current.id).catch(caught => {
+      eventGame = await recorderSport.createIndependent(currentUserId, current.id).catch(caught => {
         setError(caught instanceof Error ? caught.message : 'Could not start recorder stream')
         return null
       })
       if (currentUserIdRef.current !== currentUserId) {
-        setError('The signed-in account changed. Open the Hockey game again.')
-        hockeyGame = null
+        setError(`The signed-in account changed. Open the ${label} game again.`)
+        eventGame = null
       }
     }
-    if (!hockeyGame || (hasActiveGame && !prepareActiveGameMutation('resume_commit')) || !openGameSnapshot(hockeyGame)) {
+    if (!eventGame || (hasActiveGame && !prepareActiveGameMutation('resume_commit')) || !openGameSnapshot(eventGame)) {
       setOpeningGame(false)
       return
     }
@@ -586,7 +647,11 @@ export default function GameInfo() {
       return
     }
     if (game.sport_id === 'hockey' && hockeyDataAuthority === 'sport_events') {
-      await openHockeyEventGame(game, user.id)
+      await openRecorderStreamGame(game, user.id, HOCKEY_RECORDER_STREAM)
+      return
+    }
+    if (game.sport_id === 'baseball' && baseballDataAuthority === 'sport_events') {
+      await openRecorderStreamGame(game, user.id, BASEBALL_RECORDER_STREAM)
       return
     }
     if (game.sport_id === 'basketball' && basketballDataAuthority === 'sport_events') {
@@ -997,6 +1062,86 @@ export default function GameInfo() {
               </>
             )}
 
+            {sport?.id === 'baseball' && baseballDataAuthority === 'sport_events' && (
+              <>
+                {finalizationNotice && (
+                  <p role="status" className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
+                    {finalizationNotice}
+                  </p>
+                )}
+                <BaseballRecorderManager
+                  gameId={game.id}
+                  currentUserId={userId}
+                  canManage={canManageRecorderAuthority}
+                />
+                <BaseballFinalizationPanel
+                  gameId={game.id}
+                  gameStatus={game.status}
+                  sideLabels={inspectedSideLabels}
+                  currentUserId={userId}
+                  canManage={canManageRecorderAuthority}
+                  trackedScore={game.home_team_score ?? null}
+                  opponentScore={game.opponent_score ?? null}
+                  ownedLocalTerminal={Boolean(
+                    state.cloudSync.gameId === game.id &&
+                    state.sportGameState?.sportId === 'baseball' &&
+                    (
+                      state.sportGameState.projection.status === 'final' ||
+                      state.sportGameState.projection.status === 'abandoned'
+                    )
+                  )}
+                  flushCloudSync={() => flushCloudGameSync(game.id)}
+                  onFinalized={result => {
+                    // The server's runs: 077 counts them again from the primary stream.
+                    setFinalizationNotice(
+                      result.serverScoreConfirmed &&
+                        (result.score.tracked !== result.previewScore.tracked ||
+                          result.score.opponent !== result.previewScore.opponent)
+                        ? `The server published ${result.score.tracked}-${result.score.opponent}, not the ${result.previewScore.tracked}-${result.previewScore.opponent} shown in the review. The server's score is the official one.`
+                        : null
+                    )
+                    setGame(current => current ? {
+                      ...current,
+                      status: 'final',
+                      home_team_score: result.score.tracked,
+                      opponent_score: result.score.opponent,
+                      home_score_adjustment: 0,
+                    } : current)
+                    if (state.cloudSync.gameId === game.id) {
+                      dispatch({
+                        type: 'SET_CLOUD_SYNC_STATE',
+                        cloudSync: { gameStatus: 'final' },
+                      })
+                    }
+                  }}
+                  onReopened={async (result, publication) => {
+                    setFinalizationNotice(null)
+                    setGame(current => current ? {
+                      ...current,
+                      status: 'in_progress',
+                      home_team_score: null,
+                      opponent_score: 0,
+                      home_score_adjustment: 0,
+                    } : current)
+                    // The same account's parked copy gets the reopen with its reason; a copy on
+                    // another account or device learns of it when it next refreshes.
+                    await markEventCloudGameReopened(
+                      game.id,
+                      publication
+                        ? {
+                            sportId: 'baseball',
+                            publicationId: result.publicationId,
+                            primaryRecorderId: publication.primaryRecorderId,
+                            reason: result.reason,
+                            reopenedAt: result.reopenedAt,
+                          }
+                        : null
+                    )
+                  }}
+                />
+              </>
+            )}
+
             <section className="card space-y-3">
               <div>
                 <h2 className="font-semibold text-content">Stat Leaders</h2>
@@ -1053,7 +1198,8 @@ export default function GameInfo() {
               >
                 {openingGame
                   ? 'Opening...'
-                  : hockeyDataAuthority === 'sport_events' && game.status === 'final'
+                  : (hockeyDataAuthority === 'sport_events' || baseballDataAuthority === 'sport_events') &&
+                      game.status === 'final'
                     ? 'Open recorded game (read-only)'
                     : game.status === 'final' ||
                         (sport?.id === 'soccer' && !canTrackGames(teamRole)) ||

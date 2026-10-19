@@ -5,6 +5,8 @@ import { sports } from '../config/sports'
 import { saveActiveGameState, parkActiveGame, getParkedGameRecord, hasDirtyParkedGames } from '../lib/gameParking'
 import { getPendingSyncFlag, setPendingSyncFlag } from '../lib/gameStorageKeys'
 import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
+import { endBaseballGame } from '../lib/baseball/commands'
+import { ballInPlay, expectOk, startedGame, threeUpThreeDown } from '../lib/baseball/testFixtures'
 import { basketballSetupDraftKey, createBasketballSetupDraft, loadBasketballSetupDraft, saveBasketballSetupDraft } from '../lib/basketball/setupDraft'
 
 // Drive the provider's real callbacks and storage. Background effects/network stay off.
@@ -149,5 +151,60 @@ describe('GameProvider callbacks after the account changes', () => {
     const state = { ...createInitialState(), sport: sports.find(sport => sport.id === 'baseball')!,
       gameInfo: { teamName: 'A team', opponentName: 'Away', tournamentName: '', tournamentId: null, date: '2026-10-18' } }
     expect(render().openGameSnapshot(state)).toBe(true)
+  })
+})
+
+describe('GameProvider Baseball cloud reopen (BSB-6B2)', () => {
+  afterEach(() => resetCurrentAuthUserIdForTests())
+
+  /** A Baseball event game user-1 recorded, ended and saw finalized, parked on this device. */
+  function parkedFinalBaseballGame() {
+    setCurrentAuthUserId('user-1')
+    const played = ballInPlay(threeUpThreeDown(startedGame()), 'home_run', { battedBallType: 'fly' })
+    // Recorded by user-1, as their own cloud stream is.
+    const recorded = ({ ...played, eventStream: { ...played.eventStream!, events: played.eventStream!.events.map(event => ({ ...(event as Record<string, unknown>), recorderUserId: 'user-1' })) } }) as typeof played
+    const ended = expectOk(endBaseballGame(recorded, 'time_limit', { recorderUserId: 'user-1', occurredAt: '2026-10-18T20:00:00.000Z' }))
+    const state = {
+      ...ended,
+      gameInfo: { teamName: 'Aces', opponentName: 'Visitors', tournamentName: '', tournamentId: null, date: '2026-10-18' },
+      cloudSync: { ...ended.cloudSync, gameId: 'cloud-b', gameStatus: 'final' as const, eventCloudPolicy: 'automatic' as const },
+    }
+    const id = saveActiveGameState(state, 'user-1').find(summary => summary.cloudGameId === 'cloud-b')!.localGameId
+    parkActiveGame('user-1')
+    return { id, eventCount: state.eventStream!.events.length }
+  }
+
+  const baseballOf = (id: string) => {
+    const sport = getParkedGameRecord(id, 'user-1')!.gameState.sportGameState
+    if (sport?.sportId !== 'baseball') throw Error('Not Baseball')
+    return sport
+  }
+
+  it('reopened elsewhere: the copy reads in progress, keeps its ended stream and shows the notice', async () => {
+    const { id, eventCount } = parkedFinalBaseballGame()
+    await render().markEventCloudGameReopened('cloud-b', null)
+    const record = getParkedGameRecord(id, 'user-1')!
+    expect(record.gameState.cloudSync.gameStatus).toBe('in_progress')
+    expect(record.gameState.eventStream!.events).toHaveLength(eventCount)
+    expect(record.sync.dirty).toBe(false)
+    expect(baseballOf(id).capturePreferences.cloudReopenNotice).not.toBeNull()
+  })
+
+  it('reopened by the same account: the reopen with its reason is appended once and queued to upload', async () => {
+    const { id, eventCount } = parkedFinalBaseballGame()
+    const handoff = {
+      sportId: 'baseball' as const,
+      publicationId: 'pub-1',
+      primaryRecorderId: 'user-1',
+      reason: 'Wrong runner scored',
+      reopenedAt: '2026-10-18T21:00:00.000Z',
+    }
+    await render().markEventCloudGameReopened('cloud-b', handoff)
+    await render().markEventCloudGameReopened('cloud-b', handoff)
+    const record = getParkedGameRecord(id, 'user-1')!
+    expect(record.gameState.eventStream!.events).toHaveLength(eventCount + 1)
+    expect(record.sync.dirty).toBe(true)
+    expect(baseballOf(id).projection.status).toBe('in_progress')
+    expect(baseballOf(id).capturePreferences.cloudReopenNotice).toBeNull()
   })
 })

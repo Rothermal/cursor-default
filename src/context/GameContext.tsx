@@ -45,6 +45,8 @@ import {
   type BasketballReopenHandoff,
 } from '../lib/basketball/reopenHandoff'
 import { applyHockeyReopenHandoff, type HockeyReopenHandoff } from '../lib/hockey/reopenHandoff'
+import { applyBaseballReopenHandoff, type BaseballReopenHandoff } from '../lib/baseball/reopenHandoff'
+import { withBaseballCloudReopenNotice } from '../lib/baseball/commands'
 import {
   pauseRunningBasketballClockForWorkflow,
   shouldInterceptRunningBasketballClock,
@@ -129,7 +131,7 @@ import {
 const ACCOUNT_CHANGED_REASON = 'The signed-in account changed. Try again.'
 
 /** A Basketball handoff from the server read, or a Hockey one from the manager's reopen result. */
-export type EventReopenHandoff = BasketballReopenHandoff | HockeyReopenHandoff
+export type EventReopenHandoff = BasketballReopenHandoff | HockeyReopenHandoff | BaseballReopenHandoff
 
 export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
 
@@ -1408,7 +1410,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     suppliedHandoff?: EventReopenHandoff | null
   ) => {
     try {
-      // Only Basketball has a server handoff read; Hockey passes its own reopen result or null.
+      // Only Basketball has a server handoff read; Hockey and Baseball pass their own reopen
+      // result or null.
       const handoff = suppliedHandoff === undefined
         ? await loadBasketballReopenHandoff(gameId)
         : suppliedHandoff
@@ -1417,11 +1420,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
         record => record.gameState.cloudSync.gameId === gameId
       )
       for (const record of matches) {
-        // A Hockey copy learns of a reopen elsewhere only while it still holds the final status,
-        // so a Game Info visit never clears an unrelated sync error.
+        // A Hockey or Baseball copy learns of a reopen elsewhere only while it still holds the
+        // final status, so a Game Info visit never clears an unrelated sync error.
+        const recordSportId = record.gameState.sportGameState?.sportId
         if (
           !handoff &&
-          record.gameState.sportGameState?.sportId === 'hockey' &&
+          (recordSportId === 'hockey' || recordSportId === 'baseball') &&
           record.gameState.cloudSync.gameStatus !== 'final'
         ) continue
         const cloudStateChanged = record.gameState.cloudSync.gameStatus !== 'in_progress' ||
@@ -1440,9 +1444,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
           : record.gameState
         const applied = handoff && userId
           ? 'sportId' in handoff
-            ? applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+            ? handoff.sportId === 'baseball'
+              ? applyBaseballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+              : applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
             : applyBasketballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
-          : { ok: true as const, state: cloudReopenedState, changed: cloudStateChanged }
+          : recordSportId === 'baseball'
+            // Reopened from another account or device: the stream stays ended and the tracker
+            // offers the recorder their own Reopen (BSB-6B2, plan Q7).
+            ? {
+                ok: true as const,
+                state: withBaseballCloudReopenNotice(cloudReopenedState, { noticedAt: new Date().toISOString() }),
+                changed: true,
+              }
+            : { ok: true as const, state: cloudReopenedState, changed: cloudStateChanged }
         if (!applied.ok) {
           setParkingError(applied.reason)
           return

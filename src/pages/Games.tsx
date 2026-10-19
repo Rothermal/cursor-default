@@ -82,6 +82,11 @@ interface RecorderEventSport {
   loadAuthority: (gameId: string) => Promise<'sport_events' | 'legacy'>
   loadGame: (userId: string, gameId: string) => Promise<GameState | null>
   createIndependent: (userId: string, gameId: string) => Promise<GameState>
+  /**
+   * A parked copy still marked final learns here that the cloud game was reopened elsewhere
+   * (Baseball BSB-6B2, plan Q7), before it is resumed.
+   */
+  learnsCloudReopen?: boolean
 }
 
 const RECORDER_EVENT_SPORTS: Record<string, RecorderEventSport> = {
@@ -98,6 +103,7 @@ const RECORDER_EVENT_SPORTS: Record<string, RecorderEventSport> = {
     loadAuthority: loadBaseballCloudDataAuthority,
     loadGame: loadBaseballCloudGameById,
     createIndependent: (_userId, gameId) => createBaseballIndependentRecorderState(gameId),
+    learnsCloudReopen: true,
   },
 }
 
@@ -140,6 +146,7 @@ export default function Games() {
     prepareActiveGameMutation,
     resumeParkedGame,
     parkingError,
+    markEventCloudGameReopened,
   } = useGame()
   const userId = user?.id ?? null
   const currentUserIdRef = useRef(userId)
@@ -472,6 +479,10 @@ export default function Games() {
       if (hasActiveGame && activeLocalGameId !== source.localGameId && !prepareActiveGameMutation('resume_commit')) {
         setLoadingGameId(null)
         return true
+      }
+      if (sport.learnsCloudReopen) {
+        await markEventCloudGameReopened(game.id, null)
+        if (!isCurrent()) return true
       }
       const resumed = resumeParkedGame(source.localGameId)
       setLoadingGameId(null)

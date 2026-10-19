@@ -17,6 +17,7 @@ import type {
   BaseballBase,
   BaseballBaserunningPlay,
   BaseballEventType,
+  BaseballCapturePreferences,
   BaseballGameEndOutcome,
   BaseballHalfInningEndReason,
   BaseballInPlay,
@@ -35,6 +36,7 @@ import type {
   BaseballUndoReceipt,
   BaseballPitcherDecisions,
 } from './types'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from './cloudPolicy'
 
 export type BaseballCommandErrorCode =
   | 'not_baseball'
@@ -43,6 +45,7 @@ export type BaseballCommandErrorCode =
   | 'already_initialized'
   | 'stream_not_initialized'
   | 'rejected'
+  | 'cloud_final'
 
 export type BaseballCommandResult =
   | { ok: true; state: GameState; events: GameEvent[] }
@@ -229,10 +232,27 @@ export function reopenBaseballGame(
   reason: string,
   context: BaseballCommandContext
 ): BaseballCommandResult {
-  return append(state, context, 'baseball.game_reopened', 'neutral', {
+  const result = append(state, context, 'baseball.game_reopened', 'neutral', {
     captureCommandId: captureId(context),
     reason,
   })
+  return result.ok ? { ...result, state: withBaseballCloudReopenNotice(result.state, null) } : result
+}
+
+/**
+ * Records, or clears, that the cloud game was reopened elsewhere while this copy stays ended
+ * (BSB-6B2). It lives in capture preferences, outside fingerprints and events.
+ */
+export function withBaseballCloudReopenNotice(
+  state: GameState,
+  notice: BaseballCapturePreferences['cloudReopenNotice']
+): GameState {
+  const sport = baseballSportState(state)
+  if (!sport || sport.capturePreferences.cloudReopenNotice === notice) return state
+  return {
+    ...state,
+    sportGameState: { ...sport, capturePreferences: { ...sport.capturePreferences, cloudReopenNotice: notice } },
+  }
 }
 
 /**
@@ -432,6 +452,7 @@ function append<TType extends BaseballEventType>(
   const sport = baseballSportState(state)
   if (!sport || state.sport?.id !== 'baseball') return notBaseball(state)
   if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Start a Baseball event game first.')
+  if (isFinalBaseballCloudGame(state)) return failure(state, 'cloud_final', BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const projection = sport.projection
   const period = baseballPeriod(projection.inning, projection.half)
   const event = createBaseballEvent({

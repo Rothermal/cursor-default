@@ -11,7 +11,7 @@ Execution plan for the sixth Baseball phase defined in
 cloud-policy and handshake code that HKY-5 extracted.
 
 Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
-until the owner says otherwise. BSB-6A is merged (PR #489); BSB-6B1 is in review.
+until the owner says otherwise. BSB-6A is merged (PR #489); BSB-6B1 is merged (PR #492); BSB-6B2 is in review.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -350,7 +350,7 @@ Filled in as each slice lands.
   [REGRESSION_BSB_6_CLOUD_LIFECYCLE.md](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md).
 - Nothing on the client changes in this slice.
 
-### BSB-6B1 (in review)
+### BSB-6B1 (merged, PR #492)
 
 - `src/lib/baseball/cloudSync.ts` adds the Baseball adapter to the shared transport
   (`bind_baseball_event_game_v5`, policy `advance`). Participants are the setup participants,
@@ -374,3 +374,35 @@ Filled in as each slice lands.
   the await. Until 076-078 are applied in order, Cloud stays unavailable; local-only games
   and historical reads stay available. See the PR #492 repair evidence in the regression
   record; BSB-6B2, BSB-6C, live verification and the production release stage are unchanged.
+
+### BSB-6B2 (in review)
+
+- Game Info shows Baseball event games through the shared `EventRecorderManager` and
+  `EventFinalizationPanel` with the 077 wrappers (`src/lib/baseball/recorders.ts`,
+  `src/lib/baseball/finalization.ts`, thin `BaseballRecorderManager` and
+  `BaseballFinalizationPanel`). Owners and admins get recorders, primary selection,
+  readiness, conflicts, Finalize, publication history and Reopen with a reason; scorers and
+  viewers see the score, status and compact recorder presence. Game Info opens a Baseball
+  event game the way it opens a Hockey one (one shared function); a final game opens
+  read-only and never starts a new stream.
+- Finalize accepts completed, run rule, time limit, forfeit and abandoned primary streams
+  and refuses a suspended one. It previews the recorded runs (a forfeit publishes them as
+  recorded), confirms the exact checkpoint, rechecks readiness, finalizes with a setup-only
+  canonical snapshot (payload schema 1) and reads the stored score back; when the server
+  counted otherwise, Game Info shows its score with a note. The preview notes when a game
+  with a winner has no pitcher decisions for its current end; it does not block.
+- A game final in the cloud is read-only: capture, Undo and Restore, Timeline remove,
+  restore and edit, the Lineup sheet, endings, local Reopen and pitcher decisions refuse with
+  "Reopen the finalized game before editing it." (`src/lib/baseball/cloudPolicy.ts`, checked
+  in `commands.ts`, `recentPlays.ts` and `corrections.ts`). The tracker shows a banner and
+  hides local Reopen; the Summary hides Set decisions and the correction link.
+- Reopen, same account and device: the reopening manager's result is handed to their own
+  parked copy (`src/lib/baseball/reopenHandoff.ts`), which appends `baseball.game_reopened`
+  with the reason, never earlier than its last event, once.
+- Reopen, another account or device: the copy learns of it when Game Info or Cloud Games opens
+  the game, or when the tracker of a finalized copy checks the cloud status. Its binding then
+  reads in progress and the stream stays ended, with a `cloudReopenNotice` in capture
+  preferences (outside events and fingerprints). The tracker shows "Reopened in the cloud"
+  with Reopen, which runs the recorder's own reasoned Reopen and clears the notice.
+- Either way the appended reopen ends the decisions' epoch, so decisions are set again after
+  the game ends again. No migration; BSB-6C (cloud Summary) is next.

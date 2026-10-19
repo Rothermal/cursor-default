@@ -284,3 +284,39 @@ Author-reported checks before integration: `pnpm typecheck`, `pnpm lint` (no err
 | A second scorer opens the team game | Offered their own recorder stream; it opens unstarted |
 | A viewer opens it | Game Info |
 | Start a Cloud Games open, then sign out and into another account before it finishes | Nothing opens; the other account's parked games are untouched |
+
+## BSB-6B2 Recorders, finalize and reopen
+
+### Automated
+
+- `src/lib/baseball/finalization.test.ts` (14 cases): every finalizable ending (time limit,
+  forfeit, abandoned) publishes the recorded runs, suspended and running games do not;
+  missing decisions are noted only for a game with a winner and no decisions; the canonical
+  snapshot is setup only in the version 2 envelope with payload schema 1, parses back, and
+  rejects another recorder, a cached projection or another schema; finalize confirms the
+  checkpoint, rechecks readiness, calls `finalize_baseball_event_game` and prefers the
+  server's score; a suspended primary is refused before any confirmation; reopen trims the
+  reason and calls `reopen_baseball_event_game`; the cloud status read; a finalized cloud
+  game refuses capture, Undo, Restore, removal previews, Reopen and decisions, and accepts
+  capture again once the binding reads in progress; the same-account handoff appends the
+  reopen once, never moves time back, flips only the binding for another account, and
+  ends the decisions' epoch; the cross-device notice survives a reload, drops a malformed
+  value, stays out of events and is cleared by the recorder's Reopen.
+- `src/context/GameContext.test.ts` (2 new cases): a parked final copy reopened elsewhere
+  reads in progress with its stream unchanged, not dirty, and with the notice; the same
+  account's handoff appends one reopen even when applied twice and queues it to upload.
+
+Checks: `pnpm typecheck`, `pnpm lint` (no errors, 3 existing warnings), `pnpm test`
+(303 files, 2,866 tests) and `pnpm build` pass.
+
+### Owner checklist (after deploy, with 076-078 applied)
+
+| Step | Expected | Result |
+|---|---|---|
+| Owner opens Game Info for an ended cloud Baseball game | Recorders, readiness and Finalize show; a scorer sees the score, status and compact presence only | Pending |
+| Finalize a game without pitcher decisions | The review notes the missing decisions; Finalize still works and shows the server's score | Pending |
+| Open the finalized game on the recorder's device | Read-only banner; pitches, Undo, Timeline corrections, Lineup changes and Reopen are refused or hidden | Pending |
+| Reopen from Game Info on the recorder's own account and device | The tracker reads in progress with a "Reopened" row carrying the reason; corrections upload | Pending |
+| Reopen from a second device or another manager account | The recorder's device shows "Reopened in the cloud" after opening the game; nothing changes until the recorder taps Reopen and gives a reason | Pending |
+| Re-finalize after the correction | Publication 2 with the corrected runs; history shows publication 1 invalidated with its reason | Pending |
+

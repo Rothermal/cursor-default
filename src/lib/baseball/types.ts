@@ -578,6 +578,16 @@ export interface BaseballCapturePreferences {
   lastUndo: BaseballUndoReceipt | null
   /** BSB-4C: Timeline corrections, newest first, at most `BASEBALL_MAX_CORRECTION_RECEIPTS`. */
   corrections: BaseballCorrectionReceipt[]
+  /**
+   * BSB-6B2: a manager reopened this finalized game from another account or device. The stream
+   * stays ended until the recorder chooses Reopen; cleared by that Reopen.
+   */
+  cloudReopenNotice: BaseballCloudReopenNotice | null
+}
+
+export interface BaseballCloudReopenNotice extends JsonObject {
+  /** When this device learned that the cloud game is no longer final. */
+  noticedAt: string
 }
 
 export const BASEBALL_MAX_CORRECTION_RECEIPTS = 20

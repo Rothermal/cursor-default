@@ -4,6 +4,7 @@ import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, stableJson } from '../gameEvents/stream'
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from './cloudPolicy'
 import { baseballSportState, type BaseballCommandResult } from './commands'
 import { createBaseballUuid } from './id'
 import { formatBaseballHalf } from './periods'
@@ -103,6 +104,7 @@ export interface BaseballCorrectionOptions {
 export function previewBaseballRemoval(state: GameState, unitId: string, names: BaseballSideNames): BaseballCorrectionPreviewResult {
   const sport = baseballSportState(state)
   if (!sport || !state.eventStream) return refuse('This is not a Baseball event game.')
+  if (isFinalBaseballCloudGame(state)) return refuse(BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const unit = groupBaseballUnits(baseballActiveEvents(state)).find(candidate => candidate[0].id === unitId)
   if (!unit) return refuse('That play is no longer in the game.')
   if (!isBaseballCaptureEvent(unit[0])) {
@@ -118,6 +120,7 @@ export function previewBaseballRemoval(state: GameState, unitId: string, names: 
 export function previewBaseballEdit(state: GameState, edit: BaseballEventEdit, names: BaseballSideNames): BaseballCorrectionPreviewResult {
   const sport = baseballSportState(state)
   if (!sport || !state.eventStream) return refuse('This is not a Baseball event game.')
+  if (isFinalBaseballCloudGame(state)) return refuse(BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const current = baseballActiveEvents(state).find(event => event.id === edit.eventId)
   if (!current) return refuse('That play is no longer in the game.')
   if (!isBaseballCaptureEvent(current)) return refuse('Game-flow rows cannot be edited.')
@@ -147,6 +150,7 @@ export function previewBaseballRestore(
 ): BaseballCorrectionPreviewResult {
   const sport = baseballSportState(state)
   if (!sport || !state.eventStream) return refuse('This is not a Baseball event game.')
+  if (isFinalBaseballCloudGame(state)) return refuse(BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const removed = baseballRemovedEvents(state)
   if (target.kind === 'restore_unit') {
     const unit = groupBaseballUnits(removed).find(candidate => candidate[0].id === target.unitId)
@@ -476,6 +480,7 @@ function saveCorrection(
   options: BaseballCorrectionOptions,
   edit: BaseballEventEdit | null = null
 ): BaseballCommandResult {
+  if (isFinalBaseballCloudGame(state)) return failure(state, BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   if (!fresh.ok) return failure(state, fresh.message)
   if (fresh.preview.key !== preview.key) {
     return failure(state, 'The game changed since this preview. Review the changes again.')

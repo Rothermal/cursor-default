@@ -34,7 +34,7 @@ export function createBaseballSportGameState(setup: BaseballMatchSetup): Basebal
 }
 
 export function defaultBaseballCapturePreferences(): BaseballCapturePreferences {
-  return { trackPitchLocation: true, trackBattedBallLocation: true, lastUndo: null, corrections: [] }
+  return { trackPitchLocation: true, trackBattedBallLocation: true, lastUndo: null, corrections: [], cloudReopenNotice: null }
 }
 
 export function createBaseballMatchProjection(setup: BaseballMatchSetup): BaseballMatchProjection {
@@ -206,7 +206,14 @@ function normalizeCapturePreferences(value: unknown): BaseballCapturePreferences
         : defaults.trackBattedBallLocation,
     lastUndo: normalizeUndoReceipt(value.lastUndo),
     corrections: normalizeCorrectionReceipts(value.corrections),
+    cloudReopenNotice: normalizeCloudReopenNotice(value.cloudReopenNotice),
   }
+}
+
+/** Games saved before BSB-6B2 read with no notice; a malformed one is dropped. */
+function normalizeCloudReopenNotice(value: unknown): BaseballCapturePreferences['cloudReopenNotice'] {
+  if (!isPlainObject(value) || typeof value.noticedAt !== 'string' || Number.isNaN(Date.parse(value.noticedAt))) return null
+  return { noticedAt: value.noticedAt }
 }
 
 /** Games saved before BSB-4C read with no receipts; a malformed receipt is dropped on its own. */
