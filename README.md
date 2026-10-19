@@ -14,8 +14,10 @@ game review and optional authenticated cloud sync.
   Summary and cloud lifecycle. Every new Hockey game uses events.
 - **Baseball:** opt-in event tracker with diamond, pitch/play capture, lineups,
   corrections, Summary and cloud sync. Recorder management/finalize/reopen merged
-  in #495; cloud primary/canonical Summary is implemented for review. BSB-7 is next;
-  the BSB-6 live exit checks remain pending and Baseball stays opt-in.
+  in #495; cloud primary/canonical Summary merged in #496. The
+  [BSB-7 execution plan](docs/PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) has
+  approved product scope and is under review, not shipped. Baseball remains opt-in
+  until its final implementation slice; BSB-6 live exit checks remain pending.
 - **Football:** generic aggregate tracking; its planned event/field experience is
   not implemented.
 

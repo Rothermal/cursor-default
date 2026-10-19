@@ -7,11 +7,16 @@ location, and an authoritative event model. BSB-0 sets the stable direction; eac
 implementation phase below receives its own detailed execution plan and Q&A review
 before code work begins, as SOC-0 and BKE-0 did.
 
-Status: approved direction (owner answers recorded in section 16, 2026-09-26). BSB-1
-implementation is in progress; build-and-test-as-we-go was approved in place of a
-diamond prototype. No runtime behavior changes in this document.
+Status: approved direction (owner answers recorded in section 16, 2026-09-26).
+Implementation has reached BSB-6C, merged in #496; BSB-6 live exit checks remain
+pending. Build-and-test-as-we-go was approved in place of a diamond prototype.
+No runtime behavior changes in this document.
 
 Companion document: [BSB-1 execution plan](PLAN_BSB_1_EVENT_FOUNDATION.md).
+Current phase: [BSB-7 execution plan](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md),
+with Q1-Q23 product decisions approved and execution design under review, not shipped.
+Baseball is already `opt_in`; earlier gate/parallel-Legacy statements below are
+historical direction, superseded by BSB-7's final-slice cutover target, not yet runtime.
 
 ---
 
