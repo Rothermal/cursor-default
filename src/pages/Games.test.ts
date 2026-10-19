@@ -2,14 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import Games from './Games'
 import { createInitialState } from '../lib/gameReducer'
-import { saveActiveGameState } from '../lib/gameParking'
+import { saveActiveGameState, type ParkedGameSummary } from '../lib/gameParking'
+import type { GameState } from '../types'
 import { sports } from '../config/sports'
 import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
 
 const harness = vi.hoisted(() => ({
   slots: [] as unknown[], cursor: 0, effects: [] as Array<() => void>, cleanups: [] as Array<() => void>,
   userId: 'account-a', sportId: 'baseball', authority: vi.fn(), load: vi.fn(), independent: vi.fn(), legacy: vi.fn(), touch: vi.fn(),
-  open: vi.fn(), navigate: vi.fn(),
+  open: vi.fn(), navigate: vi.fn(), refresh: vi.fn(), resume: vi.fn(), state: null as GameState | null,
+  activeId: null as string | null, parked: [] as ParkedGameSummary[],
 }))
 vi.mock('react', async original => ({
   ...await original<typeof import('react')>(),
@@ -44,8 +46,8 @@ vi.mock('../context/GameContext', async () => {
   const { createInitialState } = await import('../lib/gameReducer')
   return { useGame: () => {
     const owner = harness.userId
-    return { state: createInitialState(), dispatch: vi.fn(), activeLocalGameId: null, parkedGames: [], parkingError: null,
-      prepareActiveGameMutation: () => true, resumeParkedGame: vi.fn(),
+    return { state: harness.state ?? createInitialState(), dispatch: vi.fn(), activeLocalGameId: harness.activeId, parkedGames: harness.parked, parkingError: null,
+      prepareActiveGameMutation: () => true, resumeParkedGame: harness.resume, refreshBaseballCloudGameStatus: harness.refresh,
       openGameSnapshot: (state: Parameters<typeof saveActiveGameState>[0]) => { harness.open(state); saveActiveGameState(state, owner); return true },
     }
   } }
@@ -116,7 +118,9 @@ beforeEach(() => {
   setCurrentAuthUserId('account-a')
   harness.slots = []; harness.cursor = 0; harness.effects = []; harness.cleanups = []
   harness.userId = 'account-a'; harness.sportId = 'baseball'
-  for (const mock of [harness.authority, harness.load, harness.independent, harness.legacy, harness.touch, harness.open, harness.navigate]) mock.mockReset()
+  harness.state = null; harness.activeId = null; harness.parked = []
+  for (const mock of [harness.authority, harness.load, harness.independent, harness.legacy, harness.touch, harness.open, harness.navigate, harness.refresh, harness.resume]) mock.mockReset()
+  harness.refresh.mockResolvedValue('in_progress'); harness.resume.mockReturnValue(candidate())
   harness.authority.mockResolvedValue('sport_events'); harness.touch.mockResolvedValue(undefined)
   harness.legacy.mockResolvedValue(null)
   vi.stubGlobal('localStorage', new MemoryStorage())
@@ -125,6 +129,38 @@ beforeEach(() => {
 afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
 
 describe('Cloud Games open lifetime', () => {
+  it.each(['active', 'parked'])('refreshes a reopened %s Baseball binding before opening its local history', async kind => {
+    const local = { ...candidate(), gameDataAuthority: 'sport_events' as const,
+      cloudSync: { ...createInitialState().cloudSync, gameId: 'cloud-a', gameStatus: 'final' } }
+    if (kind === 'active') harness.state = local
+    else {
+      harness.parked = saveActiveGameState(local, 'account-a')
+      harness.activeId = 'another-active-slot'
+    }
+    let settle!: (value: string) => void
+    harness.refresh.mockReturnValue(new Promise(resolve => { settle = resolve }))
+    await open(); await drain()
+    expect(harness.refresh).toHaveBeenCalledWith('cloud-a', expect.any(Function))
+    expect(harness.navigate).not.toHaveBeenCalled(); expect(harness.resume).not.toHaveBeenCalled()
+    settle('in_progress'); await drain()
+    expect(harness.navigate).toHaveBeenCalledWith('/game')
+    if (kind === 'parked') expect(harness.resume).toHaveBeenCalledWith(harness.parked[0].localGameId)
+    expect(harness.load).not.toHaveBeenCalled()
+  })
+  it('passes an unmount/auth/request guard into Baseball status refresh', async () => {
+    let settle!: (value: string) => void
+    harness.refresh.mockReturnValue(new Promise(resolve => { settle = resolve }))
+    const click = await open(); await drain()
+    const isCurrent = harness.refresh.mock.calls[0][1] as () => boolean
+    expect(isCurrent()).toBe(true)
+    click(); await drain()
+    expect(isCurrent()).toBe(false)
+    const latest = harness.refresh.mock.calls[1][1] as () => boolean
+    setCurrentAuthUserId('account-b'); expect(latest()).toBe(false)
+    harness.cleanups.forEach(cleanup => cleanup())
+    settle('in_progress'); await drain()
+    expect(harness.navigate).not.toHaveBeenCalled()
+  })
   it.each(['baseball', 'hockey', 'basketball', 'soccer'])('cancels %s adoption when auth changes before React rerenders', async sport => {
     harness.sportId = sport
     let settle!: (value: ReturnType<typeof candidate>) => void

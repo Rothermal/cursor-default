@@ -139,8 +139,11 @@ export default function Games() {
     openGameSnapshot,
     prepareActiveGameMutation,
     resumeParkedGame,
+    refreshBaseballCloudGameStatus,
     parkingError,
   } = useGame()
+  const localOpenStateRef = useRef({ state, activeLocalGameId, parkedGames })
+  localOpenStateRef.current = { state, activeLocalGameId, parkedGames }
   const userId = user?.id ?? null
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
@@ -440,13 +443,23 @@ export default function Games() {
       setLoadingGameId(null)
       return false
     }
+    if (sportId === 'baseball') {
+      const status = await refreshBaseballCloudGameStatus(game.id, isCurrent)
+      if (!isCurrent()) return true
+      if (!status) {
+        setLoadingGameId(null)
+        return true
+      }
+      game = { ...game, status }
+    }
+    const local = sportId === 'baseball' ? localOpenStateRef.current : { state, activeLocalGameId, parkedGames }
     const canTrack = game.team_id ? canTrackGames(teamRolesById[game.team_id] ?? null) : game.created_by === userId
     if (game.status === 'final' || !canTrack) {
       setLoadingGameId(null)
       navigate(gameInfoPath(game.id, game.team_id))
       return true
     }
-    if (state.sport?.id === sportId && state.gameDataAuthority === 'sport_events' && state.cloudSync.gameId === game.id) {
+    if (local.state.sport?.id === sportId && local.state.gameDataAuthority === 'sport_events' && local.state.cloudSync.gameId === game.id) {
       setLoadingGameId(null)
       navigate('/game')
       return true
@@ -456,8 +469,8 @@ export default function Games() {
       source = await resolveEventRecorderOpenSource(
         sportId,
         game.id,
-        activeLocalGameId,
-        parkedGames,
+        local.activeLocalGameId,
+        local.parkedGames,
         () => sport.loadGame(userId, game.id)
       )
     } catch (err) {
@@ -467,9 +480,9 @@ export default function Games() {
       return true
     }
     if (!isCurrent()) return true
-    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+    const hasActiveGame = Boolean(local.state.sport && (local.state.gameInfo || local.state.players.length > 0))
     if (source.kind === 'local') {
-      if (hasActiveGame && activeLocalGameId !== source.localGameId && !prepareActiveGameMutation('resume_commit')) {
+      if (hasActiveGame && local.activeLocalGameId !== source.localGameId && !prepareActiveGameMutation('resume_commit')) {
         setLoadingGameId(null)
         return true
       }

@@ -5,6 +5,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, stableJson } from '../gameEvents/stream'
 import type { GameEvent, GameEventMutation } from '../gameEvents/types'
 import { baseballSportState, type BaseballCommandResult } from './commands'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from './cloudPolicy'
 import { createBaseballUuid } from './id'
 import { formatBaseballHalf } from './periods'
 import { baseballFieldingPositionCode } from './positions'
@@ -223,6 +224,7 @@ function buildPreview(
   restoring: GameEvent[],
   replacing: GameEvent[]
 ): BaseballCorrectionPreviewResult {
+  if (isFinalBaseballCloudGame(state)) return refuse(BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const before = baseballActiveEvents(state)
   const removingIds = new Set(removing.map(event => event.id))
   const restoringIds = new Set(restoring.map(event => event.id))

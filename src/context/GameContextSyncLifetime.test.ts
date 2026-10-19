@@ -104,6 +104,27 @@ beforeEach(() => {
 afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
 
 describe('sync settlement account isolation', () => {
+  it.each(['success', 'rejection'])('does not overwrite newer Baseball finalization on stale sync %s', async settlement => {
+    const initial = fixture('baseball')
+    const state = { ...initial, cloudSync: { ...initial.cloudSync, gameId: 'cloud-a', gameStatus: 'in_progress' } }
+    harness.state = state
+    saveActiveGameState(state, 'account-a')
+    let resolve!: (value: unknown) => void, reject!: (value: unknown) => void
+    harness.sync.mockReturnValue(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const api = render(), pending = api.flushCloudSync()
+    await vi.waitFor(() => expect(harness.sync).toHaveBeenCalledOnce())
+    api.markBaseballCloudGameFinalized('cloud-a')
+    const id = getActiveLocalGameId('account-a')!, before = getParkedGameRecord(id, 'account-a')!
+    harness.dispatch.mockClear()
+    if (settlement === 'success') resolve({ gameId: 'cloud-a', gameStatus: 'in_progress', syncedState: state,
+      seasonId: null, teamId: null, playerIdMap: {}, syncedAt: '2026-10-19' })
+    else reject(new Error('Old sync failed'))
+    await pending
+    expect(getParkedGameRecord(id, 'account-a')).toEqual(before)
+    expect(before.gameState.cloudSync.gameStatus).toBe('final')
+    expect(before.sync.dirty).toBe(true)
+    expect(harness.dispatch).not.toHaveBeenCalled()
+  })
   it.each([
     ['auth-before-render', 'success'], ['auth-before-render', 'rejection'],
     ['unmount', 'success'], ['unmount', 'rejection'],

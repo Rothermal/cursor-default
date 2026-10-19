@@ -21,6 +21,7 @@ export interface EventFinalizationPreviewView {
   snapshot: unknown
   score: { tracked: number; opponent: number } | null
   endReason: string | null
+  endReasonLabel?: string | null
   blockers?: Array<{ code: string; message: string }>
 }
 
@@ -471,7 +472,7 @@ export default function EventFinalizationPanel<
             )}
             {adapter.previewNote?.(preview)}
             <p className="mt-3 text-xs font-semibold capitalize text-content-muted">
-              {preview.endReason ?? 'Not ready'} | {preview.readiness.primaryCheckpointCurrent
+              {preview.endReasonLabel ?? preview.endReason ?? 'Not ready'} | {preview.readiness.primaryCheckpointCurrent
                 ? 'checkpoint current'
                 : 'checkpoint pending'} | {preview.projection.eventStream.events.length} events
             </p>

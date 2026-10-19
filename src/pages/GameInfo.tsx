@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import ResultBadge from '../components/team-info/ResultBadge'
 import BasketballFinalizationPanel from '../components/basketball/BasketballFinalizationPanel'
 import BasketballRecorderManager from '../components/basketball/BasketballRecorderManager'
 import HockeyFinalizationPanel from '../components/hockey/HockeyFinalizationPanel'
 import HockeyRecorderManager from '../components/hockey/HockeyRecorderManager'
+import BaseballFinalizationPanel from '../components/baseball/BaseballFinalizationPanel'
+import BaseballRecorderManager from '../components/baseball/BaseballRecorderManager'
 import { computePlayerScore, sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -22,6 +24,12 @@ import {
   loadHockeyCloudDataAuthority,
   loadHockeyCloudGameById,
 } from '../lib/hockey/cloudSync'
+import {
+  createBaseballIndependentRecorderState,
+  loadBaseballCloudDataAuthority,
+  loadBaseballCloudGameById,
+} from '../lib/baseball/cloudSync'
+import { isCurrentAuthUser } from '../lib/authIdentity'
 import {
   resolveEventRecorderOpenSource,
   type EventRecorderOpenSource,
@@ -183,6 +191,17 @@ export default function GameInfo() {
   const userId = user?.id ?? null
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
+  const currentGameIdRef = useRef(gameId)
+  currentGameIdRef.current = gameId
+  const mountedRef = useRef(true)
+  const openRequestRef = useRef(0)
+  useEffect(() => {
+    mountedRef.current = true
+    setOpeningGame(false)
+    return () => { mountedRef.current = false; openRequestRef.current += 1 }
+  }, [gameId, userId])
+  const inspectionIsCurrent = useCallback(() => mountedRef.current && currentGameIdRef.current === gameId &&
+    currentUserIdRef.current === userId && isCurrentAuthUser(userId), [gameId, userId])
   const {
     state,
     dispatch,
@@ -193,9 +212,13 @@ export default function GameInfo() {
     resumeParkedGame,
     flushCloudGameSync,
     markEventCloudGameReopened,
+    markBaseballCloudGameFinalized,
+    refreshBaseballCloudGameStatus,
     parkingError,
   } = useGame()
   const supabaseClient = supabase
+  const activeStateRef = useRef(state)
+  activeStateRef.current = state
 
   const [game, setGame] = useState<GameInfoGameRow | null>(null)
   const [team, setTeam] = useState<GameInfoTeamRow | null>(null)
@@ -206,6 +229,8 @@ export default function GameInfo() {
   const [basketballDataAuthority, setBasketballDataAuthority] =
     useState<'sport_events' | 'legacy' | null>(null)
   const [hockeyDataAuthority, setHockeyDataAuthority] =
+    useState<'sport_events' | 'legacy' | null>(null)
+  const [baseballDataAuthority, setBaseballDataAuthority] =
     useState<'sport_events' | 'legacy' | null>(null)
   const [openingGame, setOpeningGame] = useState(false)
   const [finalizationNotice, setFinalizationNotice] = useState<string | null>(null)
@@ -259,6 +284,15 @@ export default function GameInfo() {
   }, [game?.id, game?.sport_id, game?.status, hockeyDataAuthority, markEventCloudGameReopened, userId])
 
   useEffect(() => {
+    const inspectedGameId = game?.id
+    if (!inspectedGameId || game?.sport_id !== 'baseball' ||
+      baseballDataAuthority !== 'sport_events' || !userId) return
+    let cancelled = false
+    void refreshBaseballCloudGameStatus(inspectedGameId, () => !cancelled && inspectionIsCurrent())
+    return () => { cancelled = true }
+  }, [game?.id, game?.sport_id, baseballDataAuthority, inspectionIsCurrent, refreshBaseballCloudGameStatus, userId])
+
+  useEffect(() => {
     if (!gameId || !isConfigured || !supabaseClient) {
       setLoading(false)
       return
@@ -276,6 +310,8 @@ export default function GameInfo() {
       setStatTotals({})
       setBasketballDataAuthority(null)
       setHockeyDataAuthority(null)
+      setBaseballDataAuthority(null)
+      setFinalizationNotice(null)
 
       const { data: gameData, error: gameError } = await supabaseClient
         .from('games')
@@ -294,6 +330,20 @@ export default function GameInfo() {
       }
 
       const loadedGame = gameData as GameInfoGameRow
+      let baseballEventGame = false
+      if (loadedGame.sport_id === 'baseball') {
+        try {
+          const authority = await loadBaseballCloudDataAuthority(loadedGame.id)
+          if (cancelled) return
+          setBaseballDataAuthority(authority)
+          baseballEventGame = authority === 'sport_events'
+        } catch (caught) {
+          if (cancelled) return
+          setError(caught instanceof Error ? caught.message : 'Baseball authority could not load')
+          setLoading(false)
+          return
+        }
+      }
       if (loadedGame.sport_id === 'basketball') {
         try {
           const authority = await loadBasketballCloudDataAuthority(loadedGame.id)
@@ -319,7 +369,7 @@ export default function GameInfo() {
         }
       }
       if (!loadedGame.team_id) {
-        const statsRes = await supabaseClient.rpc('get_game_stats_resolved', {
+        const statsRes = baseballEventGame ? { data: [], error: null } : await supabaseClient.rpc('get_game_stats_resolved', {
           p_game_id: loadedGame.id,
         })
         if (cancelled) return
@@ -351,7 +401,7 @@ export default function GameInfo() {
           .select('players!inner(id,first_name,last_name,nickname)')
           .eq('team_id', loadedTeamId)
           .eq('is_active', true),
-        supabaseClient.rpc('get_game_stats_resolved', {
+        baseballEventGame ? Promise.resolve({ data: [], error: null }) : supabaseClient.rpc('get_game_stats_resolved', {
           p_game_id: loadedGame.id,
         }),
         userId
@@ -495,6 +545,85 @@ export default function GameInfo() {
     navigate('/game')
   }
 
+  /**
+   * A Baseball event game opens the recorder's own stream: the matching parked binding first, then
+   * their cloud stream, or a new independent stream. A finalized game opens read-only (the tracker
+   * refuses edits until a manager reopens it) and never starts a new stream.
+   */
+  const openBaseballEventGame = async (current: GameInfoGameRow, currentUserId: string) => {
+    const request = ++openRequestRef.current
+    const isCurrent = () => request === openRequestRef.current && inspectionIsCurrent()
+    if (!isCurrent()) return
+    const final = current.status === 'final'
+    setOpeningGame(true)
+    setError(null)
+    let source: EventRecorderOpenSource<GameState>
+    try {
+      source = await resolveEventRecorderOpenSource(
+        'baseball',
+        current.id,
+        activeLocalGameId,
+        parkedGames,
+        () => loadBaseballCloudGameById(currentUserId, current.id)
+      )
+    } catch (caught) {
+      if (!isCurrent()) return
+      setError(caught instanceof Error ? caught.message : 'Could not load Baseball game')
+      setOpeningGame(false)
+      return
+    }
+    if (!isCurrent()) return
+
+    const active = activeStateRef.current
+    const hasActiveGame = Boolean(active.sport && (active.gameInfo || active.players.length > 0))
+    if (source.kind === 'local') {
+      if (
+        hasActiveGame &&
+        activeLocalGameId !== source.localGameId &&
+        !prepareActiveGameMutation('resume_commit')
+      ) {
+        setOpeningGame(false)
+        return
+      }
+      if (!resumeParkedGame(source.localGameId)) {
+        setOpeningGame(false)
+        return
+      }
+      // A game finalized from another device: the parked copy learns it here.
+      dispatch({ type: 'SET_CLOUD_SYNC_STATE', cloudSync: { gameStatus: final ? 'final' : 'in_progress' } })
+      setOpeningGame(false)
+      navigate('/game')
+      return
+    }
+
+    let baseballGame = source.kind === 'cloud' ? source.state : null
+    if (source.kind === 'empty') {
+      if (final) {
+        setError('You have no recorded stream for this finalized game. The published score is shown above.')
+        setOpeningGame(false)
+        return
+      }
+      if (!window.confirm(
+        'Start your own independent recorder stream for this game? Select Cancel to stay on Game Info.'
+      )) {
+        setOpeningGame(false)
+        return
+      }
+      baseballGame = await createBaseballIndependentRecorderState(current.id).catch(caught => {
+        if (!isCurrent()) return null
+        setError(caught instanceof Error ? caught.message : 'Could not start recorder stream')
+        return null
+      })
+      if (!isCurrent()) return
+    }
+    if (!baseballGame || (hasActiveGame && !prepareActiveGameMutation('resume_commit')) || !openGameSnapshot(baseballGame)) {
+      setOpeningGame(false)
+      return
+    }
+    setOpeningGame(false)
+    navigate('/game')
+  }
+
   const openFullGame = async () => {
     if (!game || !user) return
     const canTrackCurrentGame = game.team_id
@@ -587,6 +716,10 @@ export default function GameInfo() {
     }
     if (game.sport_id === 'hockey' && hockeyDataAuthority === 'sport_events') {
       await openHockeyEventGame(game, user.id)
+      return
+    }
+    if (game.sport_id === 'baseball' && baseballDataAuthority === 'sport_events') {
+      await openBaseballEventGame(game, user.id)
       return
     }
     if (game.sport_id === 'basketball' && basketballDataAuthority === 'sport_events') {
@@ -919,6 +1052,82 @@ export default function GameInfo() {
               </>
             )}
 
+            {sport?.id === 'baseball' && baseballDataAuthority === 'sport_events' && (
+              <>
+                {finalizationNotice && (
+                  <p role="status" className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
+                    {finalizationNotice}
+                  </p>
+                )}
+                <BaseballRecorderManager
+                  gameId={game.id}
+                  currentUserId={userId}
+                  canManage={canManageRecorderAuthority}
+                />
+                <BaseballFinalizationPanel
+                  gameId={game.id}
+                  gameStatus={game.status}
+                  sideLabels={inspectedSideLabels}
+                  currentUserId={userId}
+                  canManage={canManageRecorderAuthority}
+                  trackedScore={game.home_team_score ?? null}
+                  opponentScore={game.opponent_score ?? null}
+                  ownedLocalTerminal={Boolean(
+                    state.cloudSync.gameId === game.id &&
+                    state.sportGameState?.sportId === 'baseball' &&
+                    (
+                      state.sportGameState.projection.status === 'final' ||
+                      state.sportGameState.projection.status === 'abandoned'
+                    )
+                  )}
+                  flushCloudSync={() => flushCloudGameSync(game.id)}
+                  onFinalized={result => {
+                    if (!inspectionIsCurrent()) return
+                    // The server's score: 077 counts it again from the primary stream.
+                    setFinalizationNotice(
+                      !result.serverScoreConfirmed
+                        ? 'The game was finalized, but its published score could not be read back. Reload Game Info to confirm the official score.'
+                        : (result.score.tracked !== result.previewScore.tracked ||
+                          result.score.opponent !== result.previewScore.opponent)
+                        ? `The server published ${result.score.tracked}-${result.score.opponent}, not the ${result.previewScore.tracked}-${result.previewScore.opponent} shown in the review. The server's score is the official one.`
+                        : null
+                    )
+                    setGame(current => current ? {
+                      ...current,
+                      status: 'final',
+                      home_team_score: result.serverScoreConfirmed ? result.score.tracked : null,
+                      opponent_score: result.serverScoreConfirmed ? result.score.opponent : null,
+                      home_score_adjustment: 0,
+                    } : current)
+                    markBaseballCloudGameFinalized(game.id)
+                  }}
+                  onReopened={async (result, publication) => {
+                    if (!inspectionIsCurrent()) return
+                    setFinalizationNotice(null)
+                    setGame(current => current ? {
+                      ...current,
+                      status: 'in_progress',
+                      home_team_score: null,
+                      opponent_score: 0,
+                      home_score_adjustment: 0,
+                    } : current)
+                    await markEventCloudGameReopened(
+                      game.id,
+                      publication
+                        ? {
+                            sportId: 'baseball',
+                            publicationId: result.publicationId,
+                            primaryRecorderId: publication.primaryRecorderId,
+                            reason: result.reason,
+                            reopenedAt: result.reopenedAt,
+                          }
+                        : null
+                    )
+                  }}
+                />
+              </>
+            )}
+
             {sport?.id === 'hockey' && hockeyDataAuthority === 'sport_events' && (
               <>
                 {finalizationNotice && (
@@ -997,34 +1206,36 @@ export default function GameInfo() {
               </>
             )}
 
-            <section className="card space-y-3">
-              <div>
-                <h2 className="font-semibold text-content">Stat Leaders</h2>
-                <p className="text-xs text-content-muted">Resolved game stats</p>
-              </div>
-              {statsError ? (
-                <p className="text-sm text-content-muted">{statsError}</p>
-              ) : leaders.length === 0 ? (
-                <p className="text-sm text-content-muted">No stat leaders yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {leaders.map(leader => (
-                    <div
-                      key={leader.key}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium text-content truncate">
-                          {leader.playerName}
-                        </p>
-                        <p className="text-xs text-content-muted">{leader.label}</p>
-                      </div>
-                      <p className="text-lg font-bold text-content">{leader.value}</p>
-                    </div>
-                  ))}
+            {baseballDataAuthority !== 'sport_events' && (
+              <section className="card space-y-3">
+                <div>
+                  <h2 className="font-semibold text-content">Stat Leaders</h2>
+                  <p className="text-xs text-content-muted">Resolved game stats</p>
                 </div>
-              )}
-            </section>
+                {statsError ? (
+                  <p className="text-sm text-content-muted">{statsError}</p>
+                ) : leaders.length === 0 ? (
+                  <p className="text-sm text-content-muted">No stat leaders yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {leaders.map(leader => (
+                      <div
+                        key={leader.key}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-content truncate">
+                            {leader.playerName}
+                          </p>
+                          <p className="text-xs text-content-muted">{leader.label}</p>
+                        </div>
+                        <p className="text-lg font-bold text-content">{leader.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
             {(error || parkingError) && (
               <section className="rounded-lg border border-danger-line bg-danger px-3 py-2">
@@ -1053,7 +1264,7 @@ export default function GameInfo() {
               >
                 {openingGame
                   ? 'Opening...'
-                  : hockeyDataAuthority === 'sport_events' && game.status === 'final'
+                  : (hockeyDataAuthority === 'sport_events' || baseballDataAuthority === 'sport_events') && game.status === 'final'
                     ? 'Open recorded game (read-only)'
                     : game.status === 'final' ||
                         (sport?.id === 'soccer' && !canTrackGames(teamRole)) ||

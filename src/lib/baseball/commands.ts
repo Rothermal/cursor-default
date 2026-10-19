@@ -1,5 +1,5 @@
 import type { GameState } from '../../types'
-import { isPlainObject } from '../gameEvents/envelope'
+import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
 import {
   applyGameEventAppendsAndMutations,
   hasLegacyAggregateActivity,
@@ -13,6 +13,7 @@ import { baseballPeriod } from './periods'
 import { replayBaseballEvents } from './projector'
 import { createBaseballSportGameState, validateBaseballMatchSetup } from './state'
 import { baseballDecisionEpochId } from './units'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from './cloudPolicy'
 import type {
   BaseballBase,
   BaseballBaserunningPlay,
@@ -69,6 +70,7 @@ const BASES: readonly BaseballBase[] = ['first', 'second', 'third']
  */
 export function initializeBaseballEventGame(state: GameState, setup: BaseballMatchSetup): BaseballCommandResult {
   if (state.sport?.id !== 'baseball') return failure(state, 'not_baseball', 'The active sport is not Baseball.')
+  if (isFinalBaseballCloudGame(state)) return failure(state, 'rejected', BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   if (state.eventStream) {
     const existing = state.sportGameState
     if (
@@ -229,6 +231,11 @@ export function reopenBaseballGame(
   reason: string,
   context: BaseballCommandContext
 ): BaseballCommandResult {
+  if (state.cloudSync.gameId && !isFinalBaseballCloudGame(state) &&
+    (!context.recorderUserId || state.eventStream?.events.some(event =>
+      !isGameEventEnvelope(event) || event.recorderUserId !== context.recorderUserId))) {
+    return failure(state, 'rejected', 'Only this recording\'s recorder can reopen its local history.')
+  }
   return append(state, context, 'baseball.game_reopened', 'neutral', {
     captureCommandId: captureId(context),
     reason,
@@ -246,6 +253,7 @@ export function setBaseballPitcherDecisions(
 ): BaseballCommandResult {
   const sport = baseballSportState(state)
   if (!sport || state.sport?.id !== 'baseball') return notBaseball(state)
+  if (isFinalBaseballCloudGame(state)) return failure(state, 'rejected', BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Start a Baseball event game first.')
   const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
   const epochId = sport.projection.status === 'final' ? baseballDecisionEpochId(inspection.activeEvents) : null
@@ -431,6 +439,7 @@ function append<TType extends BaseballEventType>(
 ): BaseballCommandResult {
   const sport = baseballSportState(state)
   if (!sport || state.sport?.id !== 'baseball') return notBaseball(state)
+  if (isFinalBaseballCloudGame(state)) return failure(state, 'rejected', BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   if (!state.eventStream) return failure(state, 'stream_not_initialized', 'Start a Baseball event game first.')
   const projection = sport.projection
   const period = baseballPeriod(projection.inning, projection.half)
