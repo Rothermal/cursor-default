@@ -40,8 +40,10 @@ export default function BasketballClockStrip({
   settings,
   canOverrideEqualPlay,
   requestedLineupSide = null,
+  requestedLineupLauncher = null,
   onRequestedLineupOpened,
   boundaryReviewRequest = 0,
+  compact = false,
   onAddParticipant,
   onState,
 }: {
@@ -50,10 +52,12 @@ export default function BasketballClockStrip({
   settings: BasketballDeviceSettings
   canOverrideEqualPlay: boolean
   requestedLineupSide?: BasketballTeamSide | null
+  requestedLineupLauncher?: HTMLButtonElement | null
   onRequestedLineupOpened?: () => void
   /** Incremented by the tracker to open boundary review, for example after a blocked End Period. */
   boundaryReviewRequest?: number
-  onAddParticipant?: (teamSide: BasketballTeamSide) => void
+  compact?: boolean
+  onAddParticipant?: (teamSide: BasketballTeamSide, launcher: HTMLButtonElement | null) => void
   onState: (state: GameState) => void
 }) {
   const stateRef = useRef(state)
@@ -72,6 +76,7 @@ export default function BasketballClockStrip({
   const [boundaryReviewOpen, setBoundaryReviewOpen] = useState(false)
   const [boundaryReviewPurpose, setBoundaryReviewPurpose] = useState<'start' | 'end_period'>('start')
   const lineupButtonRef = useRef<HTMLButtonElement>(null)
+  const lineupLauncherRef = useRef<HTMLButtonElement | null>(null)
   const expirationAnnouncementRef = useRef<string | null>(null)
 
   const sportState = state.sportGameState?.sportId === 'basketball'
@@ -215,9 +220,10 @@ export default function BasketballClockStrip({
     setShowSetClock(false)
     setShowStoppage(false)
     setLineupError(null)
+    lineupLauncherRef.current = requestedLineupLauncher
     setLineupSide(requestedLineupSide)
     onRequestedLineupOpened?.()
-  }, [clock, lineupSides, onRequestedLineupOpened, recoveryIssue, requestedLineupSide])
+  }, [clock, lineupSides, onRequestedLineupOpened, recoveryIssue, requestedLineupLauncher, requestedLineupSide])
 
   const hasPendingSides = pendingSides.length > 0
   const handledBoundaryReviewRequestRef = useRef(boundaryReviewRequest)
@@ -312,9 +318,11 @@ export default function BasketballClockStrip({
   }
 
   const closeLineup = () => {
+    const launcher = lineupLauncherRef.current
+    lineupLauncherRef.current = null
     setLineupSide(null)
     setLineupError(null)
-    window.requestAnimationFrame(() => lineupButtonRef.current?.focus())
+    window.requestAnimationFrame(() => launcher?.focus())
   }
 
   const openLineup = () => {
@@ -322,6 +330,7 @@ export default function BasketballClockStrip({
     setShowSetClock(false)
     setShowStoppage(false)
     setLineupError(null)
+    lineupLauncherRef.current = lineupButtonRef.current
     setLineupSide('tracked')
   }
 
@@ -341,11 +350,9 @@ export default function BasketballClockStrip({
       return
     }
     const sideLabel = gameSideDisplayName(stateRef.current.gameInfo, input.teamSide)
-    setLineupSide(null)
-    setLineupError(null)
     setNotice(`${sideLabel} lineup updated.`)
     commitClock(result.state)
-    window.requestAnimationFrame(() => lineupButtonRef.current?.focus())
+    closeLineup()
   }
 
   const handleBoundaryCommit = (input: BasketballBoundaryReviewCommit) => {
@@ -415,6 +422,17 @@ export default function BasketballClockStrip({
           </button>
         </div>
 
+        {pendingSides.length > 0 && !clock.running && (
+          <button type="button" className="btn-primary mt-2 w-full"
+            onClick={() => { setBoundaryReviewPurpose('start'); setBoundaryReviewOpen(true); setLineupError(null) }}>
+            Review lineup
+          </button>
+        )}
+
+        <details open={compact ? undefined : true} className="mt-1">
+          <summary className={compact ? 'flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold text-content-muted' : 'hidden'}>
+            <Settings2 size={14} aria-hidden /> Clock &amp; lineup
+          </summary>
         {currentFive.length > 0 && (
           <div className="mt-2 flex min-h-8 items-center gap-1 overflow-x-auto" aria-label="Current lineup">
             <Users size={15} className="mr-1 shrink-0 text-content-muted" aria-hidden />
@@ -457,16 +475,6 @@ export default function BasketballClockStrip({
             <Users size={15} aria-hidden /> Lineup
           </button>
         </div>
-
-        {pendingSides.length > 0 && !clock.running && (
-          <button
-            type="button"
-            className="btn-primary mt-2 w-full"
-            onClick={() => { setBoundaryReviewPurpose('start'); setBoundaryReviewOpen(true); setLineupError(null) }}
-          >
-            Review lineup
-          </button>
-        )}
 
         {showSetClock && (
           <div className="mt-3 space-y-2 border-t border-line pt-3">
@@ -522,6 +530,7 @@ export default function BasketballClockStrip({
           </div>
         )}
 
+        </details>
         {(unsafeMessage || error) && <p role="alert" className="mt-2 text-sm font-semibold text-danger-content">{unsafeMessage ?? error}</p>}
         {notice && !unsafeMessage && <p role="status" className="mt-2 text-sm text-success-content">{notice}</p>}
         </div>
@@ -532,9 +541,11 @@ export default function BasketballClockStrip({
           initialSide={lineupSide}
           errorMessage={lineupError}
           onAddParticipant={onAddParticipant ? side => {
+            const launcher = lineupLauncherRef.current
+            lineupLauncherRef.current = null
             setLineupSide(null)
             setLineupError(null)
-            onAddParticipant(side)
+            onAddParticipant(side, launcher)
           } : undefined}
           onCommit={handleLineupCommit}
           onClose={closeLineup}

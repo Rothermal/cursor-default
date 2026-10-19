@@ -1,7 +1,9 @@
 # Plan: Shared Tracker UI and Legacy Retirement
 
-Status: owner-approved product direction; implementation not started. Recorded
-2026-10-17. This is a planning-only change, not a release-policy or data migration.
+Status: owner-approved product direction recorded 2026-10-17. TUI-1's Basketball
+layout/action pass is implemented for review; event-only creation and legacy
+retirement are still pending. See the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md).
+No creation policy, legacy authority, migration or saved data changes in this pass.
 
 ## 1. Decisions and Scope
 
@@ -56,8 +58,9 @@ errors. These are baseline observations, not fixed sizing requirements or covera
 of every game state.
 
 This was desktop Chromium at mobile/desktop viewport sizes, not a real phone,
-installed PWA, live Supabase session or full-game signoff. This planning PR adds no
-new runtime verification and does not mark pending regression rows as passed.
+installed PWA, live Supabase session or full-game signoff. New layout-pass checks
+are recorded separately in the linked regression record; neither upgrades pending
+live regression rows to passed.
 
 ### Code Map
 
@@ -263,7 +266,8 @@ The [BKE-6E broader gate](REGRESSION_BKE_6E_RELEASE.md#gono-go) remains blocked 
 D05-D07 and G03-G04. Those checks remain pending, not passed or permanently waived.
 Record the focused cutover smoke and pending checks against the deployed candidate;
 authorization, data-loss and other concrete correctness failures remain blockers.
-No migration, access widening or deployed setting changes occur in this planning PR.
+No migration, access widening or creation-policy change occurs in the layout/action
+pass. The authority cutover remains the next PR.
 
 ## 7. Delivery Proposal
 
@@ -276,6 +280,27 @@ visual changes cannot be reviewed and tested clearly together.
 | TUI-1: Basketball first | Inventory actions; compact shared-ready layout; move filters/status; preserve full-court capture and player details; event-only setup and summary-only legacy cutover with preservation tests | New Basketball uses the single event tracker; old aggregate games can only be reviewed/exported/safely synced, with unchanged stats |
 | TUI-2: Soccer and Hockey alignment | Reuse proven layout pieces, move optional pre-surface controls, add consistent Hockey side context/filter placement where supported; retire existing Hockey aggregate capture | Both sports follow the same visual order without losing sport-specific capture or lifecycle behavior |
 | TUI-3: Football adoption | Build after FBE-1/FBE-2 and FBE-3 Q&A; apply the shared shell in FBE-3, carry retirement through the Football release plan | Football's new event tracker uses the same order; old Football records retain summaries, not a parallel grid tracker |
+
+### TUI-1 Implementation Boundary
+
+Source assessment identified two separate review surfaces within TUI-1:
+
+- **Layout/action pass (implemented for review):** compact event header, Game menu,
+  clock/lineup tools, quick court actions, collapsed chart filters/tools and bottom
+  routine sync/recorder status. Existing commands, setup, release policy, legacy
+  capture and cloud authority stay unchanged. The action inventory and verification
+  are in the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md). Lineup Save/Cancel
+  preserve the actual launcher and clock-disclosure state, including the late-player
+  handoff; no navigation-only gameplay events are added.
+- **Authority cutover (next PR):** event-only new-game creation and summary-only
+  legacy routing, including local source review/export/safe sync, capability
+  recovery, stale drafts and per-sport Summary/Game Info guards. This reaches setup,
+  persistence and shared cloud-open handlers; combining it with the layout move
+  would obscure the data-preservation review. All decisions in sections 1, 5 and 6
+  remain binding. TUI-1 is not complete until this cutover is implemented/tested.
+
+This is a two-PR review boundary, not additional rollout toggles or a new four-phase
+program. TUI-2 remains after completion of the Basketball cutover.
 
 Before TUI-1 implementation, map every existing action to a destination. Include
 quick fouls/free throws, linked assists/rebounds, direct individual/team stats,

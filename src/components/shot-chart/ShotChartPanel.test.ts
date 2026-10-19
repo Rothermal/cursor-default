@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { isValidElement, type ReactElement, type ReactNode } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import ShotChartPanel from './ShotChartPanel'
 import BasketballCourt from './BasketballCourt'
 import CourtEventPopup from './CourtEventPopup'
@@ -38,9 +38,9 @@ function findElement<P>(node: ReactNode, type: unknown): ReactElement<P> | undef
   if (node.type === type) return node as ReactElement<P>
   return findElement<P>(node.props.children, type)
 }
-function renderPanel(selection: { kind: 'all' } | { kind: 'player'; playerId: string } = { kind: 'all' }, onAdministrative = vi.fn()) {
+function renderPanel(selection: { kind: 'all' } | { kind: 'player'; playerId: string } = { kind: 'all' }, onAdministrative = vi.fn(), layout: Partial<Parameters<typeof ShotChartPanel>[0]> = {}) {
   harness.cursor = 0
-  return ShotChartPanel({ selection, capturePlayerId: TEAM_PLAYER_HOME_ID, onSelectPlayer: vi.fn(), onAdministrative })
+  return ShotChartPanel({ selection, capturePlayerId: TEAM_PLAYER_HOME_ID, onSelectPlayer: vi.fn(), onAdministrative, ...layout })
 }
 function popup() {
   const element = findElement<Parameters<typeof CourtEventPopup>[0]>(renderPanel(), CourtEventPopup)
@@ -61,6 +61,27 @@ function tapCourt() {
   court.props.onCourtTap(0, 8)
 }
 describe('ShotChartPanel legacy capture wiring', () => {
+  it('places compact court capture before quick actions and display controls, without changing capture state', () => {
+    const actions = createElement('nav', { id: 'quick-actions' })
+    const filters = createElement('label', { id: 'filters' }, 'Display filters')
+    const tree = renderPanel({ kind: 'all' }, vi.fn(), { compact: true, surfaceActions: actions, reviewControls: filters })
+    const order: unknown[] = []
+    const visit = (node: ReactNode) => {
+      if (Array.isArray(node)) return node.forEach(visit)
+      if (!isValidElement<{ children?: ReactNode; id?: string; open?: boolean }>(node)) return
+      order.push(node.type === BasketballCourt ? 'court' : node.props.id)
+      if (node.type === 'details') expect(node.props.open).toBeUndefined()
+      visit(node.props.children)
+    }
+    visit(tree)
+    expect(order.indexOf('court')).toBeLessThan(order.indexOf('quick-actions'))
+    expect(order.indexOf('quick-actions')).toBeLessThan(order.indexOf('filters'))
+    expect(harness.dispatch).not.toHaveBeenCalled()
+  })
+  it('keeps noncompact chart tools expanded for existing callers', () => {
+    const tools = findElement<{ open?: boolean }>(renderPanel(), 'details')
+    expect(tools?.props.open).toBe(true)
+  })
   it('hands off administrative entry without recording or retaining the court tap', () => {
     tapCourt()
     const administrative = vi.fn()

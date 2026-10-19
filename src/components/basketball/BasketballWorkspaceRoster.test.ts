@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { createElement } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import BasketballWorkspaceRoster from './BasketballWorkspaceRoster'
 import { createInitialState } from '../../lib/gameReducer'
 import { sports } from '../../config/sports'
@@ -50,6 +50,23 @@ function clockedFixture(): GameState {
   return result.state
 }
 describe('Basketball workspace roster', () => {
+  it('passes the actual Manage Lineup and Add Player launchers to the tracker', () => {
+    const onManage = vi.fn()
+    const onAdd = vi.fn()
+    const tree = BasketballWorkspaceRoster({ state: clockedFixture(), side: 'tracked', canAdd: true, onManage, onAdd, onOpen: vi.fn() })
+    function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
+      if (Array.isArray(node)) return node.flatMap(elements)
+      if (!isValidElement<{ children?: ReactNode }>(node)) return []
+      return [node as ReactElement<Record<string, unknown>>, ...elements(node.props.children)]
+    }
+    const [manage, add] = elements(tree).filter(element => element.type === 'button')
+    const manageLauncher = { focus: vi.fn() } as unknown as HTMLButtonElement
+    const addLauncher = { focus: vi.fn() } as unknown as HTMLButtonElement
+    ;(manage.props.onClick as (event: { currentTarget: HTMLButtonElement }) => void)({ currentTarget: manageLauncher })
+    ;(add.props.onClick as (event: { currentTarget: HTMLButtonElement }) => void)({ currentTarget: addLauncher })
+    expect(onManage).toHaveBeenCalledWith(manageLauncher)
+    expect(onAdd).toHaveBeenCalledWith(addLauncher)
+  })
   it('distinguishes on-court and bench participants on both sides', () => {
     const state = clockedFixture()
     const html = render(state)

@@ -333,7 +333,7 @@ describe('Basketball release entry guards', () => {
     expect(handler).toContain('Another local game already owns this cloud ${label} game.')
   })
 
-  it('keeps one anchored clock strip mounted above both Basketball workspaces', () => {
+  it('keeps one anchored clock strip mounted above Basketball workspace content', () => {
     const tracker = source('src/pages/GameTracker.tsx')
     const teamRoleHook = source('src/hooks/useTeamRole.ts')
     const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
@@ -342,10 +342,11 @@ describe('Basketball release entry guards', () => {
     const eventDetail = source('src/components/basketball/BasketballEventDetailDialog.tsx')
     const timeline = source('src/components/basketball/BasketballTimeline.tsx')
     const stripIndex = tracker.indexOf('<BasketballClockStrip')
-    const workspaceIndex = tracker.indexOf('aria-label="Basketball game workspace"')
+    const workspaceIndex = tracker.indexOf("id={isBasketball ? `basketball-${basketballWorkspace}-panel` : undefined}")
 
     expect(stripIndex).toBeGreaterThanOrEqual(0)
     expect(workspaceIndex).toBeGreaterThan(stripIndex)
+    expect(tracker.match(/<BasketballClockStrip\b/g)).toHaveLength(1)
     expect(clockStrip).toContain('deriveBasketballClockDisplay')
     expect(clockStrip).toContain('window.setInterval(() => setNow(')
     expect(clockStrip).toContain('Review lineup')

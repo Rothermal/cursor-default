@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSettings } from '../../context/SettingsContext'
 import { useAuth } from '../../context/AuthContext'
@@ -147,6 +147,9 @@ interface ShotChartPanelProps {
   /** Keeps chart review available while blocking new events for an unavailable player. */
   captureDisabled?: boolean
   captureDisabledMessage?: string
+  compact?: boolean
+  surfaceActions?: ReactNode
+  reviewControls?: ReactNode
   /** `fullCourtPoint` is the tapped full-court spot a foul keeps (BKE-7C). */
   onAdministrative?: (
     kind: 'foul' | 'free_throw',
@@ -162,6 +165,9 @@ export default function ShotChartPanel({
   captureDisabled = false,
   captureDisabledMessage,
   onAdministrative,
+  compact = false,
+  surfaceActions,
+  reviewControls,
 }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
   const { user } = useAuth()
@@ -595,9 +601,8 @@ export default function ShotChartPanel({
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
-  return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2 px-1">
+  const chartHeader = (
+      <div className="flex items-center justify-between gap-2 px-1">
         <p className="text-sm font-semibold text-content-muted truncate">
           Shot chart — {shotViewLabel(selection, players)}
         </p>
@@ -614,8 +619,12 @@ export default function ShotChartPanel({
           </button>
         </div>
       </div>
+  )
 
-      <div className="rounded-xl bg-surface border border-line p-3 shadow-sm">
+  return (
+    <div className="space-y-2">
+      {!compact && <>{reviewControls}{chartHeader}</>}
+      <div className={compact ? 'overflow-hidden border border-line bg-surface' : 'rounded-xl bg-surface border border-line p-3 shadow-sm'}>
         {fullCourtShots ? (
           <BasketballFullCourt
             shots={fullCourtShots}
@@ -640,21 +649,26 @@ export default function ShotChartPanel({
         />}
       </div>
 
+      {surfaceActions}
+      {compact && <>{chartHeader}{reviewControls}</>}
+
       {captureDisabled && captureDisabledMessage && (
         <p role="status" className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm font-semibold text-warning-content">
           {captureDisabledMessage}
         </p>
       )}
 
-      <div className="rounded-xl bg-surface border border-line p-3 shadow-sm">
-        <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
-      </div>
-
       {correctionError && (
         <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
           {correctionError}
         </p>
       )}
+
+      <details open={compact ? undefined : true} className="border-b border-line py-2">
+        <summary className={compact ? 'min-h-9 cursor-pointer text-sm font-semibold text-content-muted' : 'hidden'}>Chart details &amp; tools</summary>
+      <div className={compact ? 'border-y border-line bg-surface p-3' : 'rounded-xl bg-surface border border-line p-3 shadow-sm'}>
+        <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
+      </div>
 
       {!isEventBasketball && <button
         type="button"
@@ -696,6 +710,8 @@ export default function ShotChartPanel({
       >
         Clear all chart shots
       </button>}
+
+      </details>
 
       {pendingTap && (
         <CourtEventPopup

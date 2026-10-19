@@ -9,6 +9,7 @@ interface BasketballEventBonusPanelProps {
   trackedStatus: BasketballBonusStatus
   opponentStatus: BasketballBonusStatus
   hasOneAndOne: boolean
+  compact?: boolean
 }
 
 export default function BasketballEventBonusPanel({
@@ -20,9 +21,15 @@ export default function BasketballEventBonusPanel({
   trackedStatus,
   opponentStatus,
   hasOneAndOne,
+  compact = false,
 }: BasketballEventBonusPanelProps) {
   return (
-    <section className="mt-2 border-y border-line bg-surface px-3 py-2.5" aria-labelledby="basketball-team-fouls-title">
+    <details open={compact ? undefined : true} className="border-y border-line bg-surface px-3 py-2" aria-label="Team fouls and bonus">
+      <summary className={compact ? 'cursor-pointer text-xs font-semibold text-content-muted' : 'hidden'}>
+        Fouls {trackedFouls}-{opponentFouls}
+        {trackedStatus !== 'none' && ` | ${opponentName}: ${trackedStatus === 'one_and_one' ? '1-and-1' : hasOneAndOne ? 'Double bonus' : 'Bonus'}`}
+        {opponentStatus !== 'none' && ` | ${trackedTeamName}: ${opponentStatus === 'one_and_one' ? '1-and-1' : hasOneAndOne ? 'Double bonus' : 'Bonus'}`}
+      </summary>
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h3 id="basketball-team-fouls-title" className="text-sm font-bold text-content">Team fouls & bonus</h3>
         <span className="text-xs font-semibold text-content-muted">{periodLabel}</span>
@@ -43,7 +50,7 @@ export default function BasketballEventBonusPanel({
           hasOneAndOne={hasOneAndOne}
         />
       </div>
-    </section>
+    </details>
   )
 }
 

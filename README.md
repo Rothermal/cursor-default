@@ -36,11 +36,12 @@ Live Soccer uses Field, Lineup and Timeline workflows. Basketball has Court, Lin
 Actions and event Timeline views, with player details opened from lineup cards and
 a separate Manage Lineup action. Hockey uses Track/Timeline with sport-specific sheets.
 
-The [next shared UI plan](docs/PLAN_TRACKER_UI_UNIFICATION.md) aligns clock/score,
+The [shared UI plan](docs/PLAN_TRACKER_UI_UNIFICATION.md) aligns clock/score,
 team selector, surface, quick actions, collapsed filters and bottom sync status.
-It also retires legacy aggregate capture in favor of read-only stat summaries,
-preserving recorded stats and unsynced local data. These cutovers are planned,
-not implemented; Basketball goes first and Football awaits its event foundations.
+Basketball's compact event layout is implemented for review. Event-only creation
+and retirement of legacy capture in favor of read-only summaries remain the next
+PR, preserving recorded stats and unsynced local data. Other sport cutovers are
+planned, not implemented; Football awaits its event foundations.
 
 See [shared product decisions](docs/PRODUCT_AND_INTERACTION_DECISIONS.md) for the
 target model and its implementation status. Opening a document is not evidence
