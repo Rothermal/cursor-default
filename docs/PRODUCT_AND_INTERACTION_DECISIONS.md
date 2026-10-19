@@ -1,8 +1,9 @@
 # Shared Product and Interaction Decisions
 
 Status: approved product direction. Adoption is incremental; this document does
-not claim that every sport already implements the target. Basketball layout and
-legacy retirement are next; see the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
+not claim that every sport already implements the target. Basketball's compact
+layout is implemented for review; event-only/legacy retirement remains next. See
+the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
 
 ## One tracker and shared layout
 
@@ -140,7 +141,7 @@ rules; a running recorder clock is not proof of what the rules permit.
 | Area | Current versus target |
 | --- | --- |
 | Soccer | Closest existing surface-first example; still audit gaps rather than declaring complete cross-sport parity |
-| Basketball | Workspace, event-local dropdowns/roster roles and full court are implemented; layout still crowded and new event creation remains opt-in; shared-layout/event-only cutover is next |
+| Basketball | Compact event workspace, court quick actions, collapsed tools/filters and bottom routine sync are implemented for review; new event creation remains opt-in and legacy capture stays until the next cutover PR |
 | Hockey | Released event-only new-game setup and compact rink; align side/filter/status placement and retire remaining legacy capture |
 | Football | Generic grid only; shared layout follows FBE event foundations, not an immediate route switch |
 | Baseball/future sports | Follow the shared target when ready; no release/gate change authorized by the four-sport audit |

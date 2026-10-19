@@ -57,10 +57,12 @@ eligibility, event payloads, validation and projection. Use focused slots/capabi
 not a universal component containing branches for every sport.
 
 Basketball's workspace, attribution and full court are implemented. The
-[shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md) now owns the next layout pass
-and legacy retirement: one event UI per sport, with legacy aggregate games reduced
-to read-only stat summaries at cutover. This is an approved target, not shipped
-routing or permission to discard local data. Soccer provides examples, not a
+[shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md) owns layout and legacy
+retirement. The compact Basketball event layout/action pass is implemented for
+review; creation remains opt-in and legacy capture is unchanged until the next
+authority-cutover PR. The target is one event UI per sport, with legacy games reduced
+to read-only stat summaries. This is not permission to discard local data. Soccer
+provides examples, not a
 perfect template. Football needs its event foundations before adoption. The
 [earlier Basketball plan](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) remains history.
 
