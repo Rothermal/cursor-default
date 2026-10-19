@@ -11,8 +11,9 @@ StatKeeper is a React/TypeScript PWA. Soccer has a released event-based experien
 Basketball supports both historical aggregate games and an opt-in event tracker.
 Hockey has a released event tracker, Summary and cloud lifecycle; every new Hockey
 game uses events. Baseball has an opt-in tracker, local Summary and cloud sync;
-recorder management/finalization/reopen are implemented for review, while cloud
-Summary remains BSB-6C. Football still uses the generic aggregate grid; its event plans
+recorder management/finalization/reopen merged in #495 and BSB-6C cloud Summary is
+implemented for review. BSB-7 is next, with BSB-6 live exit checks still pending.
+Football still uses the generic aggregate grid; its event plans
 are not an implemented field experience. Pending live verification remains separate.
 
 | Area | Starting points |

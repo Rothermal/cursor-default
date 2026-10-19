@@ -54,15 +54,19 @@ export function baseballRecorderNeedsAttention(recorder: BaseballRecorderSummary
 /** One recorder's cloud stream replayed on its own; another recorder's events never blend in. */
 export async function loadBaseballRecorderProjection(
   gameId: string,
-  recorder: BaseballRecorderSummary
+  recorder: BaseballRecorderSummary,
+  assertCurrent: () => void = () => {},
 ): Promise<BaseballRecorderProjection> {
+  assertCurrent()
   const shell = await loadBaseballCloudShell(gameId)
+  assertCurrent()
   const loaded = await loadGameEventStreamForRecorder(
     gameId,
     recorder.recorderId,
     shell.cloudToLocalPlayerId,
     gameEventRegistry
   )
+  assertCurrent()
   if (!loaded.ok) throw new Error(loaded.error ?? 'Baseball recorder stream could not load.')
 
   const rebuilt = rebuildGameEventProjection(

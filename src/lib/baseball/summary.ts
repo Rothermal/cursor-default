@@ -1,6 +1,8 @@
 import type { GameState } from '../../types'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
+import type { GameEvent, GameEventInspection } from '../gameEvents/types'
+import { createBaseballSportGameState, normalizeBaseballMatchSetup } from './state'
 import { findBaseballRulesProfile } from './profiles'
 import { BASEBALL_GAME_END_LABELS } from './recentPlays'
 import { baseballLineScoreView, type BaseballTeamNames } from './trackerView'
@@ -34,15 +36,18 @@ export const BASEBALL_BATTING_FORMAT_LABELS: Record<BaseballBattingOrderFormat, 
 }
 
 /**
- * Baseball event games open the Baseball Summary. A `gameId` query means a cloud game, which
- * Baseball event games never are yet (BSB-6), so those stay with the other sports' routes.
+ * Cloud links are dispatched only after the route's read-only authority probe. Local event
+ * markers fail closed even if their setup or stream is missing.
  */
 export function isBaseballSummaryRoute(
-  state: Pick<GameState, 'sport' | 'sportGameState' | 'eventStream'>,
+  state: Pick<GameState, 'gameDataAuthority' | 'sport' | 'sportGameState' | 'eventStream'>,
   params: URLSearchParams
 ): boolean {
-  if (params.get('gameId')) return false
-  return state.sport?.id === 'baseball' && (state.sportGameState?.sportId === 'baseball' || Boolean(state.eventStream))
+  if (params.get('gameId')) return params.get('sport') === 'baseball'
+  if (params.get('sport') && params.get('sport') !== 'baseball') return false
+  return state.sport?.id === 'baseball' && (
+    state.gameDataAuthority === 'sport_events' || state.sportGameState?.sportId === 'baseball' || Boolean(state.eventStream)
+  )
 }
 
 export function parseBaseballSummaryTab(params: URLSearchParams): BaseballSummaryTab {
@@ -50,12 +55,51 @@ export function parseBaseballSummaryTab(params: URLSearchParams): BaseballSummar
   return BASEBALL_SUMMARY_TABS.some(entry => entry.tab === tab) ? (tab as BaseballSummaryTab) : 'overview'
 }
 
-export function baseballSummaryPath(tab: BaseballSummaryTab = 'overview'): string {
-  return `/summary?tab=${tab}`
+export interface BaseballSummaryQuery {
+  gameId: string | null
+  tab: BaseballSummaryTab
+  from: 'tracker' | 'sport' | 'games' | 'game-info' | 'team' | null
+  teamId: string | null
+}
+
+export function parseBaseballSummaryQuery(params: URLSearchParams): BaseballSummaryQuery {
+  const from = params.get('from')
+  return {
+    gameId: params.get('gameId') || null,
+    tab: parseBaseballSummaryTab(params),
+    from: from === 'tracker' || from === 'sport' || from === 'games' || from === 'game-info' || from === 'team' ? from : null,
+    teamId: params.get('teamId') || null,
+  }
+}
+
+/** String calls preserve the shipped local URLs; explicit query calls retain cloud context. */
+export function baseballSummaryPath(options: BaseballSummaryTab | Partial<BaseballSummaryQuery> = 'overview'): string {
+  if (typeof options === 'string') return `/summary?tab=${options}`
+  const params = new URLSearchParams({ sport: 'baseball' })
+  if (options.gameId) params.set('gameId', options.gameId)
+  params.set('tab', options.tab ?? 'overview')
+  if (options.from) params.set('from', options.from)
+  if (options.teamId) params.set('teamId', options.teamId)
+  return `/summary?${params.toString()}`
+}
+
+export function baseballSummaryBackPath(query: BaseballSummaryQuery): string {
+  if (query.from === 'games') return '/games?sport=baseball'
+  if (query.from === 'team') return query.teamId ? `/team?teamId=${encodeURIComponent(query.teamId)}` : '/sport/baseball'
+  if (query.gameId && (query.from === 'game-info' || !query.from)) {
+    const params = new URLSearchParams({ gameId: query.gameId })
+    if (query.teamId) params.set('teamId', query.teamId)
+    return `/game-info?${params.toString()}`
+  }
+  return query.from === 'sport' || query.gameId ? '/sport/baseball' : '/game'
 }
 
 export interface BaseballSummarySource {
-  /** The setup and last stored projection, for names and context even when unhealthy. */
+  kind: 'local' | 'cloud_primary' | 'canonical'
+  state: GameState
+  inspection: GameEventInspection<GameEvent>
+  recorderName: string | null
+  /** Validated setup and replayed projection; unhealthy sources expose context only. */
   sport: BaseballSportGameState | null
   /** True when every event inspected and replayed; only then are totals shown. */
   healthy: boolean
@@ -68,22 +112,20 @@ export interface BaseballSummarySource {
  * projection. An unhealthy stream keeps the setup for context but no official totals.
  */
 export function baseballSummarySource(state: GameState): BaseballSummarySource {
-  const stored = state.sportGameState?.sportId === 'baseball' ? (state.sportGameState as BaseballSportGameState) : null
-  if (!stored) {
-    return { sport: null, healthy: false, diagnostic: 'This game has no Baseball setup.' }
-  }
-  const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
+  const setup = state.sportGameState?.sportId === 'baseball' ? normalizeBaseballMatchSetup(state.sportGameState.setup) : null
+  // Seed from immutable setup, never from cached projected values (including on failure).
+  const candidate = { ...state, gameDataAuthority: 'sport_events' as const,
+    sportGameState: setup ? createBaseballSportGameState(setup) : null }
+  const rebuilt = rebuildGameEventProjection(candidate, gameEventRegistry, gameEventProjectors)
   const sport = rebuilt.state.sportGameState?.sportId === 'baseball'
     ? (rebuilt.state.sportGameState as BaseballSportGameState)
-    : stored
-  if (!rebuilt.inspection.complete) {
-    return {
-      sport: stored,
-      healthy: false,
-      diagnostic: rebuilt.inspection.diagnostics[0]?.message ?? 'The game record could not be replayed.',
-    }
+    : null
+  return {
+    kind: 'local', state: rebuilt.state, sport, inspection: rebuilt.inspection, recorderName: null,
+    healthy: Boolean(setup && state.sport?.id === 'baseball' && rebuilt.inspection.complete),
+    diagnostic: !setup ? 'This game has no valid Baseball setup.'
+      : rebuilt.inspection.diagnostics[0]?.message ?? null,
   }
-  return { sport, healthy: true, diagnostic: null }
 }
 
 export interface BaseballSummaryLineScoreRow {

@@ -13,8 +13,9 @@ game review and optional authenticated cloud sync.
 - **Hockey:** released event tracker with rink capture, penalties/strength, Timeline,
   Summary and cloud lifecycle. Every new Hockey game uses events.
 - **Baseball:** opt-in event tracker with diamond, pitch/play capture, lineups,
-  corrections, local Summary and cloud sync. Recorder management/finalize/reopen is
-  implemented for review; cloud Summary remains the next slice.
+  corrections, Summary and cloud sync. Recorder management/finalize/reopen merged
+  in #495; cloud primary/canonical Summary is implemented for review. BSB-7 is next;
+  the BSB-6 live exit checks remain pending and Baseball stays opt-in.
 - **Football:** generic aggregate tracking; its planned event/field experience is
   not implemented.
 

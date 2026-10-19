@@ -12,8 +12,9 @@ cloud-policy and handshake code that HKY-5 extracted.
 
 Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
 until the owner says otherwise. BSB-6A (#489) and BSB-6B1 (#492) are merged and
-deployed; the owner reports migrations 076-078 applied successfully. BSB-6B2 is
-implemented for review. This does not sign off the live two-device regression.
+deployed; the owner reports migrations 076-078 applied successfully. BSB-6B2 merged
+in #495. BSB-6C is implemented for review; BSB-7 is the next implementation phase,
+but the BSB-6 live two-device exit regression remains pending. Baseball stays `opt_in`.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -390,7 +391,7 @@ Filled in as each slice lands.
   and historical reads stay available. See the PR #492 repair evidence in the regression
   record; BSB-6B2, BSB-6C, live verification and the production release stage are unchanged.
 
-### BSB-6B2 (implemented for review)
+### BSB-6B2 (merged, PR #495)
 
 - Fixed Baseball recorder/finalization adapters reuse `EventRecorderManager` and
   `EventFinalizationPanel` on Game Info, gated by event authority and manager role.
@@ -414,3 +415,35 @@ Filled in as each slice lands.
 - Async open and manager-write continuations retain account/lifetime checks. No new
   migration, event schema, setup, aggregate source, release stage or remote Summary
   route is introduced. BSB-6C and the live owner matrix remain pending.
+
+### BSB-6C (implemented for review)
+
+- The synchronous `baseballSummarySource` in `summary.ts` remains the local replay
+  model. `summarySource.ts` selects one local, nonfinal cloud-primary, or active
+  canonical source; a cloud-final local binding also reads canonical. No primary
+  fallback is allowed for an absent, corrupt or nonterminal final publication.
+- Remote replay starts from immutable setup, never cached projection. Canonical
+  envelope/game/primary/ownership checks reuse the strict 077 parsers and compare
+  the complete setup with the cloud shell (participants, team and season included).
+  Recorder streams remain isolated. Unhealthy sources retain safe identity/context
+  but render no scores, tables, charts, decisions or detail dialogs.
+- Source loading confirms primary/publication identity and then cloud status/setup
+  after reading; one authority change retries once, ongoing churn offers Retry
+  without totals. Read-only viewers do not need manager or checkpoint eligibility.
+- All five Summary tabs and player/play/chart detail read only the selected source.
+  Remote/canonical decisions have no Set/Change and no Timeline correction links.
+  Current owned ended local games retain decisions; saves reject changed account,
+  local slot, game, query, source or ending epoch and preserve local preferences.
+- Explicit links preserve `sport`, `gameId`, `tab`, `from` and `teamId` across tabs.
+  Game Info and Cloud Games link to Summary. The bounded bare-`gameId` resolver reads
+  only game/setup metadata before existing sibling dispatch. Setup read failures
+  never fall through; proven legacy Baseball redirects to the requested Game Info,
+  not the unrelated active game's generic Summary. Legacy open/tracking is unchanged.
+- Account/request lifetimes guard every asynchronous continuation, including
+  A -> B -> A and unmount. Query/source/loading transitions unmount review dialogs
+  and drafts immediately. Remote review does not hydrate GameContext or read/write
+  local storage. No migration, settings, aggregates or release-stage changes.
+- Focused automated evidence and coordinator-reported provisional browser checks
+  are recorded in [the regression record](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md).
+  Independent exact-head review, full gates, final-tree browser checks and live
+  Supabase/two-device/mobile/PWA signoff remain separate.

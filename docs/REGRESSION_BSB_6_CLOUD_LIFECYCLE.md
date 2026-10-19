@@ -287,7 +287,7 @@ Author-reported checks before integration: `pnpm typecheck`, `pnpm lint` (no err
 
 ## BSB-6B2 Recorder Authority, Finalize and Reopen
 
-Implemented for review; no new migration or release-stage change. Uses the existing
+Merged in PR #495; no new migration or release-stage change. Uses the existing
 fixed Baseball RPCs from 077 and preserves the capability-v2/078 sync prerequisite.
 The owner confirmed 076-078 execution, not the live checks below.
 
@@ -374,5 +374,61 @@ No migration, event/setup schema, release gate or remote Summary scope changed.
 | A different manager/device reopens | Recorder sees an open binding with its ended stream intact, explicitly reopens locally; the old decisions epoch no longer applies | Pending |
 | Legacy Baseball and sibling sports | Existing aggregate reads/tracking and other sports' cloud paths unchanged | Pending |
 
-BSB-6C still owns remote/cloud/canonical Summary routing. The local Summary remains
-local; this slice does not claim the full BSB-6 exit or broader Baseball release.
+That slice did not add remote Summary. BSB-6C below adds it without claiming the
+full BSB-6 exit or broader Baseball release.
+
+## BSB-6C Cloud Summary (Implemented for Review)
+
+### Automated Scope
+
+- Local active/resumed snapshots, isolated effective primary and active canonical
+  authorities; cached projection/state tampering; compact viewer reads without
+  manager/checkpoint requirements; missing, invalid and quarantined sources.
+- Canonical game/envelope/primary/owner/terminal and immutable setup mismatches,
+  including participant, team and season identity; no final-primary fallback.
+- Primary/status/publication changes during reads, one bounded retry and ongoing
+  churn refusal. Account/request/unmount guards stop stale continuations.
+- All five remote tabs and read-only decisions; source-derived pitch/play/player
+  details, safe unhealthy headers with no totals/details, query-preserving tabs
+  and legacy Baseball's requested-Game-Info redirect with an unrelated game active.
+- Immediate source hiding on route/account/loading changes, A -> B -> A, refresh
+  failure and unmount; stale all-empty local decisions reject changed slot/game/
+  account/epoch. Current local saves preserve original capture preferences.
+- Remote review uses a localStorage read/write trap and a GameContext dispatch
+  spy; the unrelated local snapshot remains unchanged. Existing legacy and sibling
+  Summary/routing tests are included in the focused run.
+
+Observed final developer-focused run: **40 files / 499 tests passed**:
+
+```text
+pnpm test src/lib/baseball src/pages/BaseballSummary.test.ts src/pages/BaseballSummaryViews.test.ts src/pages/BaseballCloudSummaryRoute.test.ts src/pages/BaseballCloudLifecycle.test.ts src/pages/GameInfo.test.ts src/pages/Games.test.ts src/lib/hockey/summary.test.ts src/lib/basketball/summary.test.ts src/lib/soccer/summary.test.ts --maxWorkers=2 --silent
+```
+
+`pnpm typecheck` passed; `git diff --check` was clean. Node initially failed
+workspace path resolution inside the filesystem sandbox (`EPERM`); the approved
+focused commands ran outside that sandbox. Earlier fixture/assertion failures
+were corrected before this run; they do not count as passing evidence. Full
+suite/build/lint, exact-final-tree browser rerun and independent review remain
+coordinator-owned and are not claimed here.
+
+### Coordinator-Reported Working-Tree Browser Evidence
+
+The coordinator reports **40 renders** (five tabs x primary/canonical x phone/
+desktop x Light/Dark), **2 fail-closed publication cases**, **3 stale-lifetime
+probes**, and **2 route cases** passing on the working tree. The fixture mounts
+the real Summary, real read adapters and cloud-route wrapper with synthetic auth
+and simulated SDK responses. It checks source-only names/totals, chart markers,
+no decision/correction controls, unchanged local state/storage, zero context
+writes, query retention, no page errors/unknown requests or horizontal overflow.
+Fixture player-map and heading-locator errors were corrected before those passes.
+These are provisional working-tree results, not exact-final-head or live backend
+evidence. The coordinator owns the final-tree rerun and independent review.
+
+### Pending Exit Checks
+
+BSB-7 is the next implementation phase; Baseball remains `opt_in`. No new
+migration, aggregate destination or settings work is included here. The BSB-6
+owner live matrix remains mandatory: actual Supabase auth/RLS and read wrappers,
+two recorders/devices, finalize/reopen/re-finalize/canonical review, physical
+mobile and installed-PWA behavior. Local tests and simulated browser responses do
+not sign off those checks.
