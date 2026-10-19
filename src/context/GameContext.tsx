@@ -45,6 +45,7 @@ import {
   type BasketballReopenHandoff,
 } from '../lib/basketball/reopenHandoff'
 import { applyHockeyReopenHandoff, type HockeyReopenHandoff } from '../lib/hockey/reopenHandoff'
+import { applyBaseballReopenHandoff, type BaseballReopenHandoff } from '../lib/baseball/reopenHandoff'
 import {
   pauseRunningBasketballClockForWorkflow,
   shouldInterceptRunningBasketballClock,
@@ -128,8 +129,8 @@ import {
 
 const ACCOUNT_CHANGED_REASON = 'The signed-in account changed. Try again.'
 
-/** A Basketball handoff from the server read, or a Hockey one from the manager's reopen result. */
-export type EventReopenHandoff = BasketballReopenHandoff | HockeyReopenHandoff
+/** Basketball's durable server receipt, or a sport-owned handoff from the manager's reopen result. */
+export type EventReopenHandoff = BasketballReopenHandoff | HockeyReopenHandoff | BaseballReopenHandoff
 
 export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
 
@@ -1408,7 +1409,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     suppliedHandoff?: EventReopenHandoff | null
   ) => {
     try {
-      // Only Basketball has a server handoff read; Hockey passes its own reopen result or null.
+      // Only Basketball has a server handoff read; Hockey/Baseball pass a reopen result or null.
       const handoff = suppliedHandoff === undefined
         ? await loadBasketballReopenHandoff(gameId)
         : suppliedHandoff
@@ -1417,11 +1418,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         record => record.gameState.cloudSync.gameId === gameId
       )
       for (const record of matches) {
-        // A Hockey copy learns of a reopen elsewhere only while it still holds the final status,
+        // A copy without a durable receipt learns of a reopen only while it still holds final,
         // so a Game Info visit never clears an unrelated sync error.
         if (
           !handoff &&
-          record.gameState.sportGameState?.sportId === 'hockey' &&
+          (record.gameState.sportGameState?.sportId === 'hockey' || record.gameState.sportGameState?.sportId === 'baseball') &&
           record.gameState.cloudSync.gameStatus !== 'final'
         ) continue
         const cloudStateChanged = record.gameState.cloudSync.gameStatus !== 'in_progress' ||
@@ -1440,7 +1441,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
           : record.gameState
         const applied = handoff && userId
           ? 'sportId' in handoff
-            ? applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+            ? handoff.sportId === 'baseball'
+              ? applyBaseballReopenHandoff(record.gameState, userId, gameId, handoff)
+              : applyHockeyReopenHandoff(cloudReopenedState, userId, gameId, handoff)
             : applyBasketballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
           : { ok: true as const, state: cloudReopenedState, changed: cloudStateChanged }
         if (!applied.ok) {
@@ -1448,7 +1451,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           return
         }
         if (!applied.changed) continue
-        // A Hockey handoff that only reopened the binding appended nothing to upload.
+        // A status-only handoff appended nothing to upload.
         const dirty = handoff
           ? !('sportId' in handoff) || applied.state.eventStream !== cloudReopenedState.eventStream
           : false

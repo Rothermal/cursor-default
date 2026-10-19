@@ -7,10 +7,10 @@ lands.
 
 Migrations `076_baseball_event_platform_publication_constraint.sql` (stages the publication
 sport check `NOT VALID`) and `077_baseball_event_cloud_lifecycle.sql` (validates and swaps
-it, then everything else). Not yet applied to the Supabase project; the owner applies both
-in order. The BSB-6B1 review repair additionally requires 078 before its client ships;
-076-077 alone do not satisfy the new handshake. Until then cloud binding/upload is blocked
-and local-only games remain available.
+it, then everything else). The owner reports migrations 076, 077 and 078 applied
+successfully after #491/#492 deployed. This records migration execution, not live
+runtime signoff. The BSB-6B1 handshake requires contract 2 / migration 78; 076-077
+alone do not satisfy it. Local-only games remain available without that capability.
 
 ### Local database
 
@@ -284,3 +284,53 @@ Author-reported checks before integration: `pnpm typecheck`, `pnpm lint` (no err
 | A second scorer opens the team game | Offered their own recorder stream; it opens unstarted |
 | A viewer opens it | Game Info |
 | Start a Cloud Games open, then sign out and into another account before it finishes | Nothing opens; the other account's parked games are untouched |
+
+## BSB-6B2 Recorder Authority, Finalize and Reopen
+
+Implemented for review; no new migration or release-stage change. Uses the existing
+fixed Baseball RPCs from 077 and preserves the capability-v2/078 sync prerequisite.
+The owner confirmed 076-078 execution, not the live checks below.
+
+### Automated and Browser Evidence
+
+- Recorder parsing/selection, setup-only canonical payloads, exact checkpoints,
+  readiness changes, optional decisions, server score readback and reasoned reopen
+  have focused tests. Game Info tests cover owner/admin versus scorer/viewer,
+  personal creator, legacy isolation, account/unmount cancellation and callbacks.
+- Commands reject cloud-final capture, substitutions, lifecycle and decisions;
+  Undo/Restore and correction previews/saves also refuse without changing facts.
+  Rendering tests preserve local-only edits and remove cloud-final capture/restore/
+  decision controls. A TypeScript test compatibility issue (`Array.at` against the
+  existing ES2020 target) was corrected without changing the target or assertions.
+- Real parking callbacks persist one matching primary-owned reopen, dirty retry
+  state and idempotency. Status-only refreshes leave ended events unchanged and
+  do not clear unrelated sync errors. Foreign recorder histories cannot receive
+  an appended reopen under this account.
+- Disposable Chromium at 390x900 and 1280x900: manager, viewer, and final-viewer in
+  Light/Dark, **12 renders / 4 simulated finalize-and-reopen flows passed**. Checked
+  decision warning, viewer control absence, publication invalidation, palette token
+  application, the reasoned reopen dialog, no horizontal overflow and no page errors.
+  An incorrect stylesheet path in the first preview fixture was fixed; only the
+  rerun with explicit computed-palette assertions counts as themed evidence.
+- These are simulated responses, not live auth/RLS, PostgREST, multi-device,
+  physical-mobile, installed-PWA or full-game signoff.
+- Final local gates: **306 files / 2,881 tests passed** with
+  `pnpm test --maxWorkers=2`; production build/typecheck passed (14 PWA precache
+  entries). ESLint had 0 errors and the same 3 existing Fast Refresh warnings,
+  excluding ignored `qa.local` and `.claude` fixtures. Review-control tests:
+  **22 passed**. Whitespace checks were clean. CI is reported in the PR separately.
+
+### Owner Post-Deployment Checks (Pending)
+
+| Check | Expected | Status |
+| --- | --- | --- |
+| Owner/admin and scorer/viewer inspect the same event game | Managers see primary selection/finalization/history; others have compact read-only presence | Pending |
+| Finish and sync the primary recording, then finalize | Exact checkpoint, optional decisions warning, server-published runs and canonical lock | Pending |
+| Suspend a recording; separately introduce a primary conflict | Suspension/conflict blocks publication; another recorder's audit-only warning does not replace primary authority | Pending |
+| Resume a cloud-final active/parked recording | Capture, lineup writes, decisions, Undo/Restore and corrections remain read-only | Pending |
+| Primary owner reopens on the same device | One reasoned reopen event, no backdating or duplicate append; corrections sync and may be republished | Pending |
+| A different manager/device reopens | Recorder sees an open binding with its ended stream intact, explicitly reopens locally; the old decisions epoch no longer applies | Pending |
+| Legacy Baseball and sibling sports | Existing aggregate reads/tracking and other sports' cloud paths unchanged | Pending |
+
+BSB-6C still owns remote/cloud/canonical Summary routing. The local Summary remains
+local; this slice does not claim the full BSB-6 exit or broader Baseball release.

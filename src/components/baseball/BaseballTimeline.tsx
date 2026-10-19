@@ -12,8 +12,8 @@ interface BaseballTimelineProps {
   onFilter: (filter: BaseballTimelineFilter) => void
   /** Opens a play's details, where it can be removed. */
   onSelect: (id: string) => void
-  onRestore: (id: string) => void
-  onRestoreGroup: (receiptId: string) => void
+  onRestore?: (id: string) => void
+  onRestoreGroup?: (receiptId: string) => void
 }
 
 /**
@@ -132,22 +132,22 @@ function ActiveRow({ row, onSelect }: { row: BaseballTimelineRow; onSelect: (id:
   )
 }
 
-function RemovedRow({ row, onRestore, onRestoreGroup }: { row: BaseballTimelineRow; onRestore: (id: string) => void; onRestoreGroup: (receiptId: string) => void }) {
+function RemovedRow({ row, onRestore, onRestoreGroup }: { row: BaseballTimelineRow; onRestore?: (id: string) => void; onRestoreGroup?: (receiptId: string) => void }) {
   const group = row.group
   return (
     <li className="space-y-1 px-3 py-2">
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 text-content-muted line-through decoration-content-muted/60">{row.label}</span>
-        <button
+        {onRestore && <button
           type="button"
           className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-1 px-3 text-sm"
           onClick={() => onRestore(row.id)}
           aria-label={`Restore ${row.label}`}
         >
           <RotateCcw size={16} aria-hidden="true" /> Restore
-        </button>
+        </button>}
       </div>
-      {group && group.restorable && (
+      {onRestoreGroup && group && group.restorable && (
         <button
           type="button"
           className="text-xs font-semibold text-accent underline underline-offset-2"

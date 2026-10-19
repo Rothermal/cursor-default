@@ -11,7 +11,9 @@ Execution plan for the sixth Baseball phase defined in
 cloud-policy and handshake code that HKY-5 extracted.
 
 Status: approved (planning PR #484 merged 2026-10-15). Q1-Q7 follow the recommendations
-until the owner says otherwise. BSB-6A is merged (PR #489); BSB-6B1 is in review.
+until the owner says otherwise. BSB-6A (#489) and BSB-6B1 (#492) are merged and
+deployed; the owner reports migrations 076-078 applied successfully. BSB-6B2 is
+implemented for review. This does not sign off the live two-device regression.
 
 Exit condition (BSB-0 roadmap): the two-device live check passes, and finalized canonical
 games review read-only.
@@ -51,8 +53,9 @@ Not in BSB-6:
 
 ## 2. Slices
 
-Each slice is its own PR. Migration numbers are taken when each PR opens: today the latest
-is `075_hockey_aggregate_sources.sql`, so BSB-6A would take 076 and 077.
+Each slice is its own PR. BSB-6A used migrations 076-077; BSB-6B1's review added
+078 for initial event revisions and capability contract 2. BSB-6B2 uses those existing
+server surfaces and adds no migration.
 
 ### BSB-6A Server: register Baseball and add its wrappers
 
@@ -335,8 +338,9 @@ Filled in as each slice lands.
 ### BSB-6A (merged, PR #489)
 
 - Migrations `076_baseball_event_platform_publication_constraint.sql` and
-  `077_baseball_event_cloud_lifecycle.sql`, as §2 describes. Not applied yet; the owner
-  applies 076 then 077 before BSB-6B ships.
+  `077_baseball_event_cloud_lifecycle.sql`, as §2 describes. The owner reports 076-078
+  applied successfully after the client merge/deployment. Live behavior remains a
+  separate regression signoff.
 - `validate_baseball_finalization_policy` replays the primary stream in `stream_sequence, id`
   order, keeping only outs and base occupancy per half-inning, and refuses the malformed
   inputs listed in the regression record. Ties and forfeits publish the recorded runs.
@@ -350,7 +354,7 @@ Filled in as each slice lands.
   [REGRESSION_BSB_6_CLOUD_LIFECYCLE.md](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md).
 - Nothing on the client changes in this slice.
 
-### BSB-6B1 (in review)
+### BSB-6B1 (merged, PR #492)
 
 - `src/lib/baseball/cloudSync.ts` adds the Baseball adapter to the shared transport
   (`bind_baseball_event_game_v5`, policy `advance`). Participants are the setup participants,
@@ -374,3 +378,28 @@ Filled in as each slice lands.
   the await. Until 076-078 are applied in order, Cloud stays unavailable; local-only games
   and historical reads stay available. See the PR #492 repair evidence in the regression
   record; BSB-6B2, BSB-6C, live verification and the production release stage are unchanged.
+
+### BSB-6B2 (implemented for review)
+
+- Fixed Baseball recorder/finalization adapters reuse `EventRecorderManager` and
+  `EventFinalizationPanel` on Game Info, gated by event authority and manager role.
+  Legacy Baseball retains its resolved-stat and aggregate tracking paths.
+- Finalization replays only the chosen primary stream, confirms its exact checkpoint,
+  rechecks readiness, and sends a setup-only canonical schema-1 payload. All terminal
+  outcomes except suspension may publish. Missing pitcher decisions warn, not block.
+  The server score wins; if readback fails the page withholds an official score until
+  refreshed rather than presenting an unconfirmed preview as official.
+- Cloud-final command guards cover capture, lifecycle, substitutions, decisions,
+  Undo/Restore and Timeline corrections; the UI removes those actions while leaving
+  recorded detail and filters available. Local-only ended games stay editable.
+- Reopen hands the manager's result to matching owned parked bindings. Only the
+  primary recorder appends a reasoned `baseball.game_reopened`, no earlier than the
+  last event; another account changes binding status only. A status-only refresh
+  never acknowledges an unrelated sync error or creates an event. After a remote
+  reopen the recorder explicitly reopens their ended stream, ending its decisions epoch.
+- The tracker says the cloud game is open and offers Reopen recording. This wording
+  is also accurate for a locally ended stream awaiting its first publication; an
+  `in_progress` binding alone does not prove a previous cloud finalization.
+- Async open and manager-write continuations retain account/lifetime checks. No new
+  migration, event schema, setup, aggregate source, release stage or remote Summary
+  route is introduced. BSB-6C and the live owner matrix remain pending.

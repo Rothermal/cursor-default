@@ -115,6 +115,7 @@ import {
   type BaseballSubstitutionKind,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from '../lib/baseball/cloudPolicy'
 
 const BASE_LABELS: Record<BaseballBase, string> = { first: 'first', second: 'second', third: 'third' }
 
@@ -220,7 +221,14 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   }
   const sideName = (side: 'tracked' | 'opponent') => names[side]
   const diamond = baseballDiamondView(sport)
-  const inProgress = projection.status === 'in_progress'
+  const cloudFinal = isFinalBaseballCloudGame(state)
+  const inProgress = projection.status === 'in_progress' && !cloudFinal
+  useEffect(() => {
+    if (!cloudFinal) return
+    setFlow({ step: 'idle' })
+    setLineupSheet({ type: 'none' })
+    setTimelineSheet(current => current.type === 'detail' ? current : { type: 'none' })
+  }, [cloudFinal])
 
   const start = () => {
     const result = startBaseballGame(state, { recorderUserId: user?.id ?? null, occurredAt: new Date().toISOString() })
@@ -583,6 +591,17 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
         </p>
       )}
       <BaseballCloudSyncAlerts state={state} />
+      {cloudFinal && (
+        <p role="status" className="rounded-md border border-line bg-surface-muted px-3 py-2 text-sm text-content-muted">
+          This game is finalized and read-only. An owner or admin can reopen it from Game Info.
+        </p>
+      )}
+      {!cloudFinal && state.cloudSync.gameStatus === 'in_progress' && baseballCanReopen(projection) && (
+        <section role="status" className="space-y-2 rounded-md border border-line bg-surface-muted p-3 text-sm text-content-muted">
+          <p>The cloud game is open. Reopen this device's ended recording to resume or correct it.</p>
+          <button type="button" className="btn-secondary w-full" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })}>Reopen recording</button>
+        </section>
+      )}
 
       {projection.status === 'pregame' && (
         <section className="space-y-3">
@@ -590,7 +609,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
             {profile?.label ?? 'Custom rules'} · {setup.rulesSnapshot.scheduledInnings} innings ·{' '}
             {BASEBALL_BATTING_FORMAT_LABELS[setup.rulesSnapshot.battingOrderFormat]}
           </p>
-          <button type="button" className="btn-primary w-full" onClick={start}>Start game</button>
+          <button type="button" className="btn-primary w-full" disabled={cloudFinal} onClick={start}>Start game</button>
           <LineupReview setup={setup} teamName={names.tracked} opponentName={names.opponent} />
         </section>
       )}
@@ -685,10 +704,10 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                 <BaseballPlayDetailSheet
                   detail={detail}
                   onClose={() => setTimelineSheet({ type: 'none' })}
-                  onRemove={() => openPreview(previewBaseballRemoval(state, timelineSheet.playId, names))}
-                  onEdit={editable.ok ? () => openEdit(timelineSheet.playId) : null}
-                  editBlocked={editable.ok ? null : editable.message}
-                  onRepair={mismatched.length > 0 && editable.ok
+                  onRemove={cloudFinal ? undefined : () => openPreview(previewBaseballRemoval(state, timelineSheet.playId, names))}
+                  onEdit={!cloudFinal && editable.ok ? () => openEdit(timelineSheet.playId) : null}
+                  editBlocked={cloudFinal ? BASEBALL_FINAL_CLOUD_GAME_MESSAGE : editable.ok ? null : editable.message}
+                  onRepair={!cloudFinal && mismatched.length > 0 && editable.ok
                     ? () => setTimelineSheet({
                       type: 'repair',
                       playId: timelineSheet.playId,
@@ -783,8 +802,8 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
                 setError(null)
                 setTimelineSheet({ type: 'detail', playId })
               }}
-              onRestore={unitId => openPreview(previewBaseballRestore(state, { kind: 'restore_unit', unitId }, names))}
-              onRestoreGroup={receiptId => openPreview(previewBaseballRestore(state, { kind: 'restore_group', receiptId }, names))}
+              onRestore={cloudFinal ? undefined : unitId => openPreview(previewBaseballRestore(state, { kind: 'restore_unit', unitId }, names))}
+              onRestoreGroup={cloudFinal ? undefined : receiptId => openPreview(previewBaseballRestore(state, { kind: 'restore_group', receiptId }, names))}
             />
           )}
         </section>
@@ -854,7 +873,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               </p>
               {result.note && <p className="text-sm text-content-muted">{result.note}</p>}
               <Link to={baseballSummaryPath()} className="btn-primary block w-full text-center">Summary</Link>
-              {flow.step === 'idle' && baseballCanReopen(projection) && (
+              {flow.step === 'idle' && !cloudFinal && baseballCanReopen(projection) && (
                 <button type="button" className="btn-secondary w-full" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })}>
                   Reopen game
                 </button>
@@ -1105,7 +1124,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               />
             </>
           )}
-          {baseballCanReopen(projection) && (
+          {!cloudFinal && baseballCanReopen(projection) && (
             <MenuAction label="Reopen game" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })} />
           )}
           {projection.status !== 'pregame' && (

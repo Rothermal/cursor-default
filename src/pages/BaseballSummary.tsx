@@ -41,6 +41,7 @@ import {
   type BaseballTeamNames,
 } from '../lib/baseball'
 import { createBaseballUuid } from '../lib/baseball/id'
+import { isFinalBaseballCloudGame } from '../lib/baseball/cloudPolicy'
 
 /**
  * Summary for a Baseball event game on this device (BSB-5). It reads a fresh replay of the
@@ -83,11 +84,12 @@ export default function BaseballSummary() {
   const play = playId && source.healthy ? baseballPlayDetail(state, playId, names) : null
   const started = sport.projection.status !== 'pregame'
   const decisions = source.healthy && started ? baseballDecisionsView(sport, events) : null
+  const cloudFinal = isFinalBaseballCloudGame(state)
   // A reopened game closes the sheet: its decisions belonged to the earlier ending.
-  const draft = decisions?.canSet ? decisionDraft : null
+  const draft = decisions?.canSet && !cloudFinal ? decisionDraft : null
 
   const openDecisions = () => {
-    if (!decisions) return
+    if (!decisions || cloudFinal) return
     setDecisionError(null)
     setDecisionDraft(structuredClone(decisions.current?.decisions ?? decisions.suggestion.decisions))
   }
@@ -149,7 +151,7 @@ export default function BaseballSummary() {
             ))}
           </div>
 
-          {view && tab === 'overview' && <Overview view={view} sport={sport} decisions={decisions} names={names} onSetDecisions={openDecisions} />}
+          {view && tab === 'overview' && <Overview view={view} sport={sport} decisions={decisions} names={names} onSetDecisions={cloudFinal ? null : openDecisions} />}
           {tab === 'box' && started && (
             <BaseballBoxScore
               box={baseballBoxScore(sport, events)}
@@ -238,7 +240,7 @@ function Overview({ view, sport, decisions, names, onSetDecisions }: {
   sport: BaseballSportGameState
   decisions: BaseballDecisionsView | null
   names: BaseballTeamNames
-  onSetDecisions: () => void
+  onSetDecisions: (() => void) | null
 }) {
   return (
     <div className="space-y-3">
@@ -322,7 +324,7 @@ function Decisions({ sport, decisions, names, onSet }: {
   sport: BaseballSportGameState
   decisions: BaseballDecisionsView
   names: BaseballTeamNames
-  onSet: () => void
+  onSet: (() => void) | null
 }) {
   const labels = decisions.current ? baseballDecisionLabels(sport, decisions.current.decisions) : null
   const sides = labels ? (['tracked', 'opponent'] as const).filter(side => labels[side].length > 0) : []
@@ -352,9 +354,9 @@ function Decisions({ sport, decisions, names, onSet }: {
           </div>
         </div>
       )}
-      <button type="button" className="btn-secondary w-full" onClick={onSet}>
+      {onSet && <button type="button" className="btn-secondary w-full" onClick={onSet}>
         {decisions.current ? 'Change decisions' : 'Set decisions'}
-      </button>
+      </button>}
     </section>
   )
 }

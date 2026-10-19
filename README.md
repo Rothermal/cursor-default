@@ -12,8 +12,9 @@ game review and optional authenticated cloud sync.
   Court/Lineup/player details, event-local attribution and the full court are implemented.
 - **Hockey:** released event tracker with rink capture, penalties/strength, Timeline,
   Summary and cloud lifecycle. Every new Hockey game uses events.
-- **Baseball:** opt-in local event tracker with diamond, pitch/play capture, lineups,
-  corrections and Summary; cloud lifecycle is planned, not yet implemented.
+- **Baseball:** opt-in event tracker with diamond, pitch/play capture, lineups,
+  corrections, local Summary and cloud sync. Recorder management/finalize/reopen is
+  implemented for review; cloud Summary remains the next slice.
 - **Football:** generic aggregate tracking; its planned event/field experience is
   not implemented.
 

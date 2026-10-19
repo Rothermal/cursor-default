@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GameProvider } from './GameContext'
 import { createInitialState } from '../lib/gameReducer'
 import { sports } from '../config/sports'
-import { saveActiveGameState, parkActiveGame, getParkedGameRecord, hasDirtyParkedGames } from '../lib/gameParking'
+import { saveActiveGameState, parkActiveGame, getParkedGameRecord, hasDirtyParkedGames, saveParkedGameRecordStateAtomically } from '../lib/gameParking'
 import { getPendingSyncFlag, setPendingSyncFlag } from '../lib/gameStorageKeys'
 import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
+import { createBaseballEventGameState } from '../lib/baseball/setupBuilder'
+import { baseballSetup } from '../lib/baseball/testFixtures'
+import { endBaseballGame, startBaseballGame } from '../lib/baseball/commands'
 import { basketballSetupDraftKey, createBasketballSetupDraft, loadBasketballSetupDraft, saveBasketballSetupDraft } from '../lib/basketball/setupDraft'
 
 // Drive the provider's real callbacks and storage. Background effects/network stay off.
@@ -149,5 +152,56 @@ describe('GameProvider callbacks after the account changes', () => {
     const state = { ...createInitialState(), sport: sports.find(sport => sport.id === 'baseball')!,
       gameInfo: { teamName: 'A team', opponentName: 'Away', tournamentName: '', tournamentId: null, date: '2026-10-18' } }
     expect(render().openGameSnapshot(state)).toBe(true)
+  })
+})
+
+describe('Baseball cloud reopen parking handoff', () => {
+  function seed() {
+    setCurrentAuthUserId('user-1')
+    const made = createBaseballEventGameState({ sport: sports.find(sport => sport.id === 'baseball')!,
+      setup: baseballSetup(), teamName: 'Falcons', date: '2026-10-18' })
+    if (!made.ok) throw Error(made.message)
+    const started = startBaseballGame(made.state, { recorderUserId: 'user-1', occurredAt: '2026-10-18T12:00:00Z' })
+    if (!started.ok) throw Error(started.message)
+    const ended = endBaseballGame(started.state, 'time_limit', { recorderUserId: 'user-1', occurredAt: '2026-10-18T12:01:00Z' })
+    if (!ended.ok) throw Error(ended.message)
+    const state = { ...ended.state, cloudSync: { ...ended.state.cloudSync, gameId: 'baseball-cloud', gameStatus: 'final' as const, eventCloudPolicy: 'automatic' as const } }
+    const id = saveActiveGameState(state, 'user-1')[0].localGameId
+    parkActiveGame('user-1')
+    return { id, state }
+  }
+  afterEach(() => resetCurrentAuthUserIdForTests())
+  it('persists one matching recorder-owned event and dirty retry metadata', async () => {
+    const { id, state } = seed(), api = render()
+    const handoff = { sportId: 'baseball' as const, publicationId: 'pub-1', primaryRecorderId: 'user-1',
+      reason: 'Correct runner', reopenedAt: '2026-10-18T12:02:00Z' }
+    await api.markEventCloudGameReopened('baseball-cloud', handoff)
+    const first = getParkedGameRecord(id, 'user-1')!
+    expect(first.gameState.eventStream!.events).toHaveLength(state.eventStream!.events.length + 1)
+    expect(first.gameState.cloudSync.gameStatus).toBe('in_progress')
+    expect(first.sync).toMatchObject({ dirty: true, nextAttemptAt: null })
+    await api.markEventCloudGameReopened('baseball-cloud', handoff)
+    expect(getParkedGameRecord(id, 'user-1')!.gameState.eventStream!.events).toEqual(first.gameState.eventStream!.events)
+  })
+  it('a refresh without a receipt changes status only, preserving the ended recording and later sync errors', async () => {
+    const { id, state } = seed(), api = render()
+    await api.markEventCloudGameReopened('baseball-cloud', null)
+    const opened = getParkedGameRecord(id, 'user-1')!
+    expect(opened.gameState.eventStream).toEqual(state.eventStream)
+    expect(opened.gameState.cloudSync.gameStatus).toBe('in_progress')
+    // A later Game Info visit must not acknowledge an unrelated failure.
+    const failed = { ...opened.gameState, cloudSync: { ...opened.gameState.cloudSync, status: 'error' as const, lastError: 'Still offline' } }
+    saveParkedGameRecordStateAtomically(id, failed, 'user-1', { dirty: true })
+    expect(getParkedGameRecord(id, 'user-1')!.gameState.cloudSync.lastError).toBe('Still offline')
+    await api.markEventCloudGameReopened('baseball-cloud', null)
+    expect(getParkedGameRecord(id, 'user-1')!.gameState.cloudSync.lastError).toBe('Still offline')
+  })
+  it('persists the binding-only change when this manager is not the primary recorder', async () => {
+    const { id, state } = seed()
+    await render().markEventCloudGameReopened('baseball-cloud', { sportId: 'baseball', publicationId: 'pub-1',
+      primaryRecorderId: 'other-recorder', reason: 'Correct runner', reopenedAt: '2026-10-18T12:02:00Z' })
+    const record = getParkedGameRecord(id, 'user-1')!
+    expect(record.gameState.cloudSync.gameStatus).toBe('in_progress')
+    expect(record.gameState.eventStream).toEqual(state.eventStream)
   })
 })

@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { BASEBALL_FINAL_CLOUD_GAME_MESSAGE, isFinalBaseballCloudGame } from './cloudPolicy'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
@@ -93,6 +94,7 @@ export function baseballRecentPlays(
 
 /** True when the newest active unit is a play Undo may remove. */
 export function canUndoBaseballPlay(state: GameState): boolean {
+  if (isFinalBaseballCloudGame(state)) return false
   if (!baseballSportState(state) || !state.eventStream) return false
   const units = groupUnits(activeEvents(state))
   const newest = units[units.length - 1]
@@ -101,6 +103,7 @@ export function canUndoBaseballPlay(state: GameState): boolean {
 
 /** Removes the newest play, keeping a receipt so Restore can bring it back. */
 export function undoBaseballPlay(state: GameState, now: string): BaseballCommandResult {
+  if (isFinalBaseballCloudGame(state)) return failure(state, BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const sport = baseballSportState(state)
   if (!sport || !state.eventStream) return failure(state, 'This is not a Baseball event game.')
   const units = groupUnits(activeEvents(state))
@@ -118,11 +121,12 @@ export function undoBaseballPlay(state: GameState, now: string): BaseballCommand
 
 /** True when the receipt still matches the stream, so Restore would succeed structurally. */
 export function canRestoreBaseballPlay(state: GameState): boolean {
-  return restoreMutations(state) !== null
+  return !isFinalBaseballCloudGame(state) && restoreMutations(state) !== null
 }
 
 /** Restores the play Undo just removed, if nothing has been recorded since. */
 export function restoreBaseballPlay(state: GameState, now: string): BaseballCommandResult {
+  if (isFinalBaseballCloudGame(state)) return failure(state, BASEBALL_FINAL_CLOUD_GAME_MESSAGE)
   const sport = baseballSportState(state)
   if (!sport || !state.eventStream) return failure(state, 'This is not a Baseball event game.')
   const mutations = restoreMutations(state)
