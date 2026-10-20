@@ -1,15 +1,14 @@
 # Plan: BSB-7 Baseball Aggregates, Settings and Release
 
-Status: **Product scope approved, execution plan ready for independent review**
-(2026-10-19). The owner approved all 23 recommendations, Q1-Q23. The engineering
-contracts and four workstreams below are proposed implementation design for review,
-not additional owner answers or shipped behavior. After review, this is the owning
-execution plan; there is no remaining product-Q&A prerequisite.
+Status: **Approved execution plan (#497); BSB-7A server half implemented**
+(2026-10-20). The owner approved all 23 recommendations, Q1-Q23. Migration 079
+delivers the bounded server foundation described below; the BSB-7A client/transport
+and pure aggregate engine remain pending, so 7A is not complete. See the
+[server regression record](REGRESSION_BSB_7A_SERVER.md) for exact evidence.
 
-This documentation change implements nothing, applies no migration and changes no
-release flag. Migration identifiers are assigned during implementation, not here.
-The owner manually applies reviewed migrations after merge. Independent review,
-implementation verification and live signoff must be recorded separately.
+No live migration or release-flag change is made by this work. The owner manually
+applies reviewed migrations after merge. Independent review, implementation
+verification and live signoff are recorded separately.
 
 Direction: [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) and
 [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.md). Dependencies:
@@ -168,7 +167,8 @@ sources without widening either ACL.
 
 ## 4. Explicit Personal Identity Contract
 
-This is proposed engineering design for Q4/Q9-Q12, not a shipped mechanism.
+The server contract for Q4/Q9-Q12 is implemented in migration 079; its client
+commands/intents remain pending. This is not a deployed personal-linking feature.
 Use existing `game_participants.source_player_id` as the confirmed operational
 personal link. Keep personal binder payload source ids null: the latest 055 binder's
 `ON CONFLICT DO NOTHING` preserves an already confirmed source. Do not alter
@@ -181,7 +181,7 @@ missing capability retains intent. No general offline identity queue is required
 
 ### Fixed write and transactional boundary
 
-Proposed fixed RPC: `link_baseball_personal_participant`, accepting game id,
+Implemented fixed RPC: `link_baseball_personal_participant`, accepting game id,
 client participant id, target player id, expected map fingerprint, expected publication
 id, reason and operation id. Exact names may follow local conventions; the contract is:
 
@@ -220,6 +220,12 @@ personal publications as all-null only after proving prior personal source ids w
 null; unexpected non-null history is invalid/review-needed, never retroactive credit.
 Both the 075 player filter and returned participant map must use the pinned personal
 map, not current live rows. Missing/corrupt pins never fall back to a live mapper.
+
+Raw capture preserves an already confirmed operational UUID without rechecking
+current player creator/guardian authority. Losing that authority must not block the
+active game creator's link review, ordinary finalization or reopen/republication.
+Every link write and receipt replay still requires current target authority, and
+the read-time pin resolver excludes unauthorized sources without rewriting pins.
 
 Keep team/sibling mapping unchanged. For immutable personal pins only, resolve
 verified existing `player_merge_audit` lineage to an authorized survivor; unknown,
@@ -375,6 +381,17 @@ in its owning regression record when code lands, with actual commands/results.
 
 ### BSB-7A - Canonical Foundation and Identity
 
+Server/client split delivery: migration `079_baseball_aggregate_identity_foundation.sql`
+implements private pins, historical safe-null bootstrap, audited merge resolution,
+personal review/link CAS and receipts, atomic final Reopen-link, reviewed-map
+finalization, separate aggregate/link capabilities and the bounded latest-075 pager
+extension. Existing canonical schema 1, setup/events, contract 2/078, team/sibling
+authorization and old wrappers remain unchanged. Local SQL/role/concurrency evidence
+is in [REGRESSION_BSB_7A_SERVER.md](REGRESSION_BSB_7A_SERVER.md); live application is
+pending. The client/transport, link intent/command interfaces and pure aggregate
+engine below are not implemented by this server-only delivery. Full 7A exit remains
+open; no player aggregate destination is enabled early.
+
 Deliver fixed paging/eligibility, pinned personal maps and reviewed linking,
 capability surfaces, pure aggregate engine and transport. Include narrow authorized
 team-tournament validation in the transport contract, not a general setup redesign.
@@ -473,7 +490,8 @@ Implementation PRs require focused sport/shared tests plus repository typecheck,
 lint, test and build gates appropriate to their blast radius. Record observed
 counts/results only. New database behavior also needs a disposable SQL harness for
 auth, roles, RLS/grants, CAS, locks and transaction rollback; live PostgREST remains
-a separate owner check. No implementation test or live check was run for this plan.
+a separate owner check. The server-only implementation evidence is recorded in
+[REGRESSION_BSB_7A_SERVER.md](REGRESSION_BSB_7A_SERVER.md); no live check is claimed.
 
 Follow explicit authentication, least-privilege fixed RPC grants and revoked private
 core access. Enable RLS on new identity/receipt/pin tables and test cross-account,
@@ -489,7 +507,8 @@ Unresolved technical adjudication is resolved before its implementation; it is n
 a new pending product batch. If design cannot satisfy an approved decision, raise
 that conflict explicitly rather than silently weakening the contract.
 
-Delivery status: **plan for review; 7A-7D not implemented by this change**.
+Delivery status: **7A server half implemented and locally verified; full 7A and
+7B-7D remain pending**. No settings, UI, client aggregates or cutover ships here.
 Current `opt_in`, exact cloud contract 2/078 and existing access remain unchanged.
 BSB-6 and broader-release live evidence remain pending. The parent owns final
 validation, Git/PR work and fresh review; this document does not authorize migration
