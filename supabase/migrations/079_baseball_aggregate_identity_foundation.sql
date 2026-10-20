@@ -78,17 +78,18 @@ grant execute on function public.merge_players_execute(uuid, uuid, jsonb) to aut
 
 -- Exact tracked identity keys come only from immutable setup, never UUID-shaped names.
 -- This helper also accepts old immutable canonical setups for historical null bootstrap.
+-- Preserve confirmed UUIDs after permission changes; writes authorize their target,
+-- while aggregate reads separately resolve current authority from immutable pins.
 create or replace function public._baseball_personal_raw_map(p_game_id uuid, p_setup jsonb)
 returns jsonb
 language plpgsql stable security definer set search_path = public
 as $$
 declare
-  v_owner uuid;
   v_item jsonb;
   v_participant public.game_participants%rowtype;
   v_map jsonb := '{}'::jsonb;
 begin
-  select game.created_by into v_owner from public.games game
+  perform 1 from public.games game
   where game.id = p_game_id and game.sport_id = 'baseball' and game.cloud_scope = 'personal'
     and game.team_id is null and game.season_id is null;
   if not found then raise exception 'Baseball personal game is unavailable'; end if;
@@ -114,10 +115,6 @@ begin
        or v_participant.participant_kind is distinct from
           (case when v_item->>'playerId' is null then 'anonymous' else 'player' end) then
       raise exception 'Baseball tracked participant does not match immutable setup';
-    end if;
-    if v_participant.source_player_id is not null and
-       not public._baseball_personal_player_authorized(v_participant.source_player_id, v_owner) then
-      raise exception 'Baseball personal source identity is invalid';
     end if;
     if v_participant.source_player_id is null and exists (
       select 1 from public.baseball_personal_link_receipts receipt

@@ -111,6 +111,27 @@ describe('migration 079 Baseball canonical identity server contract', () => {
     expect(completed).toContain("nullif(event.value->>'deletedAt', '') is null")
   })
 
+  it('separates confirmed raw attribution from current link-write and aggregate-read authority', () => {
+    const raw = definition(sql, '_baseball_personal_raw_map')
+    expect(raw).not.toContain('_baseball_personal_player_authorized(')
+    expect(raw).toContain("v_participant.client_player_id is distinct from v_item->>'playerId'")
+    expect(raw).toContain('Confirmed Baseball personal source identity is missing')
+    expect(raw).toContain('jsonb_build_object(v_item->>\'id\', v_participant.source_player_id)')
+    const link = definition(sql, 'link_baseball_personal_participant')
+    expect(link).toContain('_baseball_personal_player_authorized(p_target_player_id, v_user)')
+    expect(link.indexOf('_baseball_personal_player_authorized(')).toBeLessThan(link.indexOf('return v_receipt.result;'))
+    expect(definition(sql, '_baseball_personal_resolve_source')).toContain('_baseball_personal_player_authorized(v_current, p_owner_id)')
+    expect(definition(sql, '_baseball_personal_publication_identity')).not.toContain('_baseball_personal_raw_map(')
+    for (const [name, creatorCheck] of [
+      ['get_baseball_personal_participant_links', 'game.created_by = auth.uid()'],
+      ['finalize_baseball_event_game_reviewed', 'v_game.created_by is distinct from auth.uid()'],
+    ]) {
+      const entry = definition(sql, name)
+      expect(entry).toContain('has_active_app_access()')
+      expect(entry).toContain(creatorCheck)
+    }
+  })
+
   it('has independent exact aggregate/link handshakes and no settings feature claim', () => {
     expect(definition(sql, 'get_baseball_aggregate_capabilities')).toContain(
       "jsonb_build_object('contractVersion', 1, 'sportId', 'baseball', 'aggregateContractVersion', 1, 'migration', 79)"

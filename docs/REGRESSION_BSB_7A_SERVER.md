@@ -15,8 +15,10 @@ manual post-review/merge action. Baseball remains `opt_in`.
   Historical active/invalidated publications bootstrap all-null only with valid
   tracked setup/rows and no unexpected non-null personal source. Anomalies receive
   no inferred credit and surface as invalid identity sources.
-- Creator-only personal link review/write RPCs, current creator/guardian target
-  authority, map/publication CAS, new duplicate-target refusal, same-target retries,
+- Creator-only personal link review/write RPCs; link writes and receipt replay
+  recheck current creator/guardian target authority. Review/finalization preserve
+  already confirmed raw UUIDs after revocation; read-time pins still fail closed.
+  Map/publication CAS, new duplicate-target refusal, same-target retries,
   operation-payload protection and atomic reasoned final Reopen-link. Successful
   linking never republishes automatically; receipt replay cannot reopen again.
 - Reviewed-map finalization locks the game, compares the reviewed raw fingerprint,
@@ -69,21 +71,49 @@ wrappers remain unchanged. No settings capability or schema ships here.
 
 ## Observed Evidence
 
-Developer-focused source/compatibility command passed **4 files / 21 tests**:
+Developer-focused source/compatibility command passed **4 files / 22 tests** after
+the PR #498 revocation repair:
 
 ```text
 pnpm test src/lib/baseball/migration079.test.ts src/lib/baseball/migration078.test.ts src/lib/baseball/migration077.test.ts src/lib/hockey/migration075.test.ts --maxWorkers=2 --silent
 ```
 
-The new 079 file contains **8** source-contract tests, including an exact bounded
-comparison against the latest 075 pager. Source assertions are not SQL execution.
+The 079 file contains **9** source-contract tests, including an exact bounded
+comparison against the latest 075 pager and separation of raw attribution from
+current write/read authorization. Source assertions are not SQL execution.
 
 The [disposable harness](../supabase/tests/bsb7a/README.md) passed against actual
-**PostgreSQL 16.14: 30 check groups, 46 expected refusals, 8 multi-connection races**.
-Developer runs passed, and the coordinator independently reproduced that result.
-The coordinator also reports a fresh Reviewer pass rebuilding actual migrations
-001-079 from `template0`, rather than relying only on the pre-079 template. The
-fixture generator passed **1 test** and produced **24** BSB-6 real-command cases.
+**PostgreSQL 16.14: 33 check groups, 59 expected refusals, 8 multi-connection races**
+in the developer's revocation-repair run. It cloned the actual pre-079 template,
+applied the revised 079 and dropped its own database on completion.
+
+Before this follow-up, the foundation harness passed **30 groups / 46 expected
+refusals / 8 races**, independently reproduced by the coordinator and a fresh
+Reviewer, including a rebuild of actual migrations 001-079 from `template0`.
+Those earlier passes do not establish verification of the revocation repair.
+The fixture generator passed **1 test** and produced **24** BSB-6 real-command cases.
+
+### PR #498 Revocation Repair
+
+Comment `6295677243` identified current target authorization inside raw-map capture
+as a publication blocker after guardian removal. Before the fix, the new invariant
+failed (**1 failed / 8 passed**) and the SQL harness stopped after **6 completed
+groups**, reproducing `Baseball personal source identity is invalid` on link review
+after the real SEC-4 removal RPC. These failures are not passing evidence.
+
+The bounded repair removes only that authorization check from raw capture, leaving
+structural identity and missing-confirmed-source corruption guards intact. Game
+creator/active-account checks, every link-write/receipt-replay target check and the
+read-time pin resolver remain unchanged. No signatures, schemas, capabilities or
+rollout flags changed; the not-yet-live 079 is edited in place.
+
+Three new SQL groups cover both old/reviewed finalizers for unfinalized and
+previously-final/reopened personal games after actual `remove_player_guardian`,
+pin/fingerprint retention, rejected new writes/replay, invalid aggregate items and
+reclaim revalidating the same pins. A real authorized merge from a creator-only
+identity whose guardian row was removed to an unauthorized survivor confirms raw
+review and both republication paths still work while aggregate reads fail closed.
+No arbitrary source replacement or guardian authority is inferred.
 
 The SQL groups verify historical bootstrap/anomalies, complete pins for both
 finalizers and retries, injected receipt failure restoring publication/status/
@@ -100,12 +130,23 @@ reviewed rollback or consistent old-client pinning. Audit-chain checks cover
 one-hop, chain, convergence, ambiguity, cycle, unknown/deleted and unauthorized
 survivors. No production test hooks are installed by 079.
 
-Coordinator-reported repository gates on the implementation working tree:
+Coordinator-reported repository gates before the revocation follow-up:
 **313 files / 2,991 tests passed**, typecheck/build passed, lint **0 errors / 3
 existing Fast Refresh warnings** (ignored local fixtures excluded), and **22
 review-control tests passed**. These are reported separately from developer-focused
-results. The fresh Reviewer's technical verdict is mergeable for this server-only
-scope; final Git/PR handling and exact-candidate checks remain coordinator-owned.
+results. The earlier fresh Reviewer's technical verdict covered the server-only
+foundation; revocation-repair independent rereview, final Git/PR handling and
+exact-candidate checks remain coordinator-owned.
+
+Coordinator follow-up evidence: **313 files / 2,992 tests passed**, build passed,
+lint **0 errors / 3 baseline warnings** (ignored `qa.local` fixtures excluded),
+**22 review-control tests** and the focused **4 files / 22 tests** passed. An
+independent fresh-build PostgreSQL 16.14 run passed **33 groups / 59 expected
+refusals / 8 races** (`qa.local/bsb7a_a6f2efdb82554468/result.json`). The coordinator's
+actual SEC-4 RPC probe changed all six formerly blocked paths from failure to
+success while preserving raw pins/fingerprints and invalid aggregate identity.
+Standalone `pnpm typecheck` passed with exit 0. Fresh independent review and
+exact-head CI results are recorded in the PR.
 
 ## Still Pending
 

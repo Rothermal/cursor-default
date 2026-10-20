@@ -61,7 +61,7 @@ built by `gen.mjs` from the BSB-6 engine cases, with fresh event/game identities
 The Node runner executes the assertions and creates independent connections for
 races; the generated fixture SQL alone is not the complete test suite.
 
-A passing run reports **30 check groups, 46 expected refusals and 8 concurrency
+A passing run reports **33 check groups, 59 expected refusals and 8 concurrency
 scenarios**. The race checks require observed `pg_blocking_pids` relationships,
 then release the controlling transaction and check the result. They cover both
 link/merge directions, both link/finalize directions, link/link, reopen/link, and
@@ -73,6 +73,11 @@ pins, unchanged old wrappers/merge body, receipt replay/reuse, stale CAS, inject
 Reopen-link rollback, guardian/account/team refusals, private grants, independent
 capability failures, pinned membership, corrupt/missing pins, merge chains and
 convergence, invalid lineage, sibling pager equality, tied keysets and outcomes.
+Revocation cases use the actual SEC-4 guardian-removal RPC, exercise both finalizers
+before first publication and after final/reopen, reject new links and receipt replay,
+and verify invalid aggregate reads plus unchanged-pin revalidation after reclaim.
+A real merge from a creator-only identity without a guardian row to an unauthorized
+survivor verifies the same publication-versus-read separation.
 See [the regression record](../../../docs/REGRESSION_BSB_7A_SERVER.md).
 
 Focused source-contract checks:

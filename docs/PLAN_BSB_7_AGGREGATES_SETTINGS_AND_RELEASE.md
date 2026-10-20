@@ -221,6 +221,12 @@ null; unexpected non-null history is invalid/review-needed, never retroactive cr
 Both the 075 player filter and returned participant map must use the pinned personal
 map, not current live rows. Missing/corrupt pins never fall back to a live mapper.
 
+Raw capture preserves an already confirmed operational UUID without rechecking
+current player creator/guardian authority. Losing that authority must not block the
+active game creator's link review, ordinary finalization or reopen/republication.
+Every link write and receipt replay still requires current target authority, and
+the read-time pin resolver excludes unauthorized sources without rewriting pins.
+
 Keep team/sibling mapping unchanged. For immutable personal pins only, resolve
 verified existing `player_merge_audit` lineage to an authorized survivor; unknown,
 ambiguous or cyclic lineage is invalid, not anonymous. Historical confirmed attribution

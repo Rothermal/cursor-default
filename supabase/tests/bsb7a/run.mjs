@@ -230,6 +230,87 @@ try {
     await admin.query('delete from public.player_guardians where player_id=$1 and user_id=$2', [guardedTarget, guardian])
     await refuse(() => callAs(guardian, 'link_baseball_personal_participant', guardianRequest), /Authorized personal player/)
   })
+  for (const previouslyFinal of [false, true]) {
+    await check(`${previouslyFinal ? 'final/reopened' : 'unfinalized'} guardian revocation preserves review and both finalizers, not link or aggregate authority`, async () => {
+      for (const reviewed of [false, true]) {
+        const g = await game(`revoked-${previouslyFinal}-${reviewed}`)
+        const revokedTarget = await player(foreign)
+        await admin.query('insert into public.team_players(team_id,player_id) values($1,$2)', [team, revokedTarget])
+        await callAs(owner, 'claim_player_guardianship', [revokedTarget, team])
+        const request = linkArgs(g, await map(g), participant(g), revokedTarget)
+        const linked = await callAs(owner, 'link_baseball_personal_participant', request)
+        const earlier = previouslyFinal ? await finalize(g, reviewed ? linked.mapFingerprint : null) : null
+        const earlierPin = earlier ? await pin(earlier.publication_id) : null
+        await callAs(foreign, 'remove_player_guardian', [revokedTarget, owner, null])
+        if (previouslyFinal) await callAs(owner, 'reopen_baseball_event_game', [g.game_id, 'Ordinary correction after guardian removal'])
+        const review = await map(g)
+        assert.deepEqual(review.participantSourceMap, linked.participantSourceMap)
+        assert.equal(review.mapFingerprint, linked.mapFingerprint)
+        assert.equal(review.activePublicationId, null)
+        await refuse(() => callAs(owner, 'link_baseball_personal_participant', request), /Authorized personal player/)
+        await refuse(() => callAs(owner, 'link_baseball_personal_participant', linkArgs(g, review, participant(g), revokedTarget)), /Authorized personal player/)
+        await refuse(() => callAs(owner, 'link_baseball_personal_participant', linkArgs(g, review, participant(g, 1), revokedTarget)), /Authorized personal player/)
+        const publication = await finalize(g, reviewed ? review.mapFingerprint : null)
+        const pinned = await pin(publication.publication_id)
+        assert.deepEqual(pinned.participant_source_map, linked.participantSourceMap)
+        assert.equal(pinned.map_fingerprint, linked.mapFingerprint)
+        assert.equal((await state(g)).status, 'final')
+        assert.deepEqual(await finalize(g), publication)
+        assert.deepEqual(await finalize(g, review.mapFingerprint), publication)
+        assert.deepEqual(await pin(publication.publication_id), pinned)
+        if (earlier) assert.deepEqual(await pin(earlier.publication_id), earlierPin)
+        const invalid = (await page(owner, target)).items.find(item => item.publicationId === publication.publication_id)
+        assert.equal(invalid.identityStatus, 'invalid')
+        assert.equal(invalid.identityDiagnostic, 'invalid_pin_or_source')
+        assert.equal(invalid.participantSourceMap, null)
+        assert.equal(invalid.participantMapFingerprint, linked.mapFingerprint)
+        assert.ok(!(await page(owner, revokedTarget)).items.some(item => item.game.id === g.game_id))
+        await callAs(owner, 'claim_player_guardianship', [revokedTarget, team])
+        const valid = (await page(owner, revokedTarget)).items.find(item => item.publicationId === publication.publication_id)
+        assert.equal(valid.identityStatus, 'valid')
+        assert.equal(valid.participantSourceMap[participant(g)], revokedTarget)
+        assert.equal(valid.participantMapFingerprint, linked.mapFingerprint)
+        assert.deepEqual(await pin(publication.publication_id), pinned)
+        const beforeRetry = await state(g)
+        assert.deepEqual(await callAs(owner, 'link_baseball_personal_participant', request), linked)
+        assert.deepEqual(await state(g), beforeRetry)
+      }
+    })
+  }
+  await check('real merge to an unauthorized survivor preserves raw review/publication while pinned aggregate reads fail closed', async () => {
+    const g = await game('legacy-creator-only-merge')
+    const duplicate = await player()
+    const survivor = await player(foreign)
+    // SEC-4 permits removal of the creator's guardian row; creator authority remains.
+    await callAs(owner, 'remove_player_guardian', [duplicate, owner, null])
+    const linked = await callAs(owner, 'link_baseball_personal_participant', linkArgs(g, await map(g), participant(g), duplicate))
+    const original = await finalize(g, linked.mapFingerprint)
+    const originalPin = await pin(original.publication_id)
+    await merge(duplicate, survivor)
+    assert.equal((await admin.query('select count(*)::int count from public.player_guardians where player_id=$1 and user_id=$2', [survivor, owner])).rows[0].count, 0)
+    const review = await map(g)
+    assert.equal(review.participantSourceMap[participant(g)], survivor)
+    await refuse(() => callAs(owner, 'link_baseball_personal_participant', linkArgs(g, review, participant(g), survivor)), /Authorized personal player/)
+    const publications = [original]
+    for (const reviewed of [false, true]) {
+      await callAs(owner, 'reopen_baseball_event_game', [g.game_id, 'Ordinary correction after player merge'])
+      const publication = await finalize(g, reviewed ? review.mapFingerprint : null)
+      publications.push(publication)
+      assert.equal((await pin(publication.publication_id)).participant_source_map[participant(g)], survivor)
+      const invalid = (await page(owner, target)).items.find(item => item.publicationId === publication.publication_id)
+      assert.equal(invalid.identityStatus, 'invalid')
+      assert.equal(invalid.participantSourceMap, null)
+      assert.ok(!(await page(owner, survivor)).items.some(item => item.game.id === g.game_id))
+    }
+    assert.deepEqual(await pin(original.publication_id), originalPin)
+    await callAs(owner, 'claim_player_guardianship', [survivor, team])
+    for (const publication of publications) {
+      const identity = (await admin.query('select public._baseball_personal_publication_identity($1) result', [publication.publication_id])).rows[0].result
+      assert.equal(identity.status, 'valid')
+      assert.equal(identity.participantSourceMap[participant(g)], survivor)
+    }
+    assert.deepEqual(await pin(original.publication_id), originalPin)
+  })
   await check('active account and authenticated UID are required, including receipt retries', async () => {
     for (const user of [null, suspended]) {
       await refuse(() => callAs(user, 'get_baseball_aggregate_capabilities'), /Authentication required|APP_ACCESS_UNAVAILABLE/)
