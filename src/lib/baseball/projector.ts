@@ -219,6 +219,8 @@ export function replayBaseballLineupHistory(
 /** One recorded pitch as the replay saw it (BSB-5C pitch log). */
 export interface BaseballReplayedPitch {
   eventId: string
+  /** First actual pitch of this PA, independent of its starting count or pitcher changes. */
+  firstPitch: boolean
   /** The count when the pitch was thrown. */
   balls: number
   strikes: number
@@ -243,6 +245,7 @@ export function replayBaseballPitches(setup: BaseballMatchSetup, events: readonl
     const before = replay.projection
     const balls = before.balls
     const strikes = before.strikes
+    const firstPitch = before.pitchesInPlateAppearance === 0
     const battingSide = before.battingSide
     const opponentHands = new Map(Object.entries(before.opponentSlotDetails).map(([id, detail]) => [id, detail.bats ?? null]))
     try {
@@ -256,6 +259,7 @@ export function replayBaseballPitches(setup: BaseballMatchSetup, events: readonl
     const batterId = credit?.batterId ?? null
     pitches.push({
       eventId: event.id,
+      firstPitch,
       balls,
       strikes,
       battingSide,
@@ -265,6 +269,75 @@ export function replayBaseballPitches(setup: BaseballMatchSetup, events: readonl
     })
   }
   return pitches
+}
+
+export interface BaseballAggregateAppearances {
+  played: Set<string>
+  started: Set<string>
+  batting: Set<string>
+  fielding: Set<string>
+  pitching: Set<string>
+  pitchingStarted: Set<string>
+  running: Set<string>
+  incompleteBatters: Set<string>
+  incompletePitchers: Set<string>
+}
+
+/** Read-only role history, including runners who never hold a batting/defensive slot. */
+export function replayBaseballAggregateAppearances(
+  setup: BaseballMatchSetup, events: readonly GameEvent[]
+): BaseballAggregateAppearances {
+  const replay = new BaseballReplay(setup)
+  const result: BaseballAggregateAppearances = {
+    played: new Set(), started: new Set(), batting: new Set(), fielding: new Set(),
+    pitching: new Set(), pitchingStarted: new Set(), running: new Set(),
+    incompleteBatters: new Set(), incompletePitchers: new Set(),
+  }
+  const record = (starting: boolean) => {
+    const p = replay.projection
+    const tracked = p.lineups.tracked
+    for (const id of tracked.battingOrder) result.batting.add(id)
+    for (const id of Object.values(tracked.defense)) result.fielding.add(id)
+    if (tracked.defense['1']) {
+      result.pitching.add(tracked.defense['1'])
+      if (starting) result.pitchingStarted.add(tracked.defense['1'])
+    }
+    if (p.battingSide === 'tracked') {
+      for (const runner of Object.values(p.bases)) if (runner) result.running.add(runner.runnerId)
+    }
+    for (const ids of [result.batting, result.fielding, result.pitching, result.running]) {
+      for (const id of ids) result.played.add(id)
+    }
+    if (starting) for (const id of result.played) result.started.add(id)
+  }
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    try { replay.apply(event as BaseballEvent) } catch (error) {
+      if (!(error instanceof BaseballReplayError)) throw error
+      break
+    }
+    if (replay.projection.status !== 'pregame') record(event.eventType === 'baseball.game_started')
+    if (replay.projection.status !== 'pregame' && event.eventType === 'baseball.substitution' && event.teamSide === 'tracked') {
+      for (const change of baseballSubstitutionChanges((event as BaseballEvent<'baseball.substitution'>).payload)) {
+        if (change.kind === 'courtesy_runner' || change.kind === 'pinch_runner') {
+          result.running.add(change.incomingId)
+          result.played.add(change.incomingId)
+        }
+      }
+    }
+    const credit = replay.creditByLastEvent
+    if (credit?.pitcherId && event.eventType !== 'baseball.substitution' && event.teamSide === 'opponent') {
+      result.pitching.add(credit.pitcherId)
+      result.played.add(credit.pitcherId)
+    }
+    if (event.eventType === 'baseball.plate_appearance') {
+      const payload = (event as BaseballEvent<'baseball.plate_appearance'>).payload
+      if (payload.result !== 'intentional_walk' && payload.result !== 'catcher_interference') {
+        if (credit?.batterId) result.incompleteBatters.add(credit.batterId)
+        if (credit?.pitcherId) result.incompletePitchers.add(credit.pitcherId)
+      }
+    }
+  }
+  return result
 }
 
 /** What the decision suggestion (BSB-5D) needs from each applied event. */

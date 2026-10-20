@@ -1,14 +1,17 @@
 # Plan: BSB-7 Baseball Aggregates, Settings and Release
 
-Status: **Approved execution plan (#497); BSB-7A server half implemented**
+Status: **Approved execution plan (#497); BSB-7A server and client foundations implemented**
 (2026-10-20). The owner approved all 23 recommendations, Q1-Q23. Migration 079
-delivers the bounded server foundation described below; the BSB-7A client/transport
-and pure aggregate engine remain pending, so 7A is not complete. See the
-[server regression record](REGRESSION_BSB_7A_SERVER.md) for exact evidence.
+delivers the bounded server foundation described below. The client half now adds
+pure replay aggregates, strict paging, separate feature capabilities and checked
+personal identity/intents, without UI wiring. Full 7A exit is not claimed. See the
+[server record](REGRESSION_BSB_7A_SERVER.md) and
+[client record](REGRESSION_BSB_7A_CLIENT.md) for separately labelled evidence.
 
-No live migration or release-flag change is made by this work. The owner manually
-applies reviewed migrations after merge. Independent review, implementation
-verification and live signoff are recorded separately.
+No agent applies a live migration or changes a release flag in this work. The owner
+reports migration 079 applied on 2026-10-20; this report is not an observed live
+JWT/PostgREST/RLS or lifecycle pass. Independent review, implementation verification
+and live signoff are recorded separately.
 
 Direction: [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) and
 [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.md). Dependencies:
@@ -167,8 +170,9 @@ sources without widening either ACL.
 
 ## 4. Explicit Personal Identity Contract
 
-The server contract for Q4/Q9-Q12 is implemented in migration 079; its client
-commands/intents remain pending. This is not a deployed personal-linking feature.
+The server contract for Q4/Q9-Q12 is implemented in migration 079; the client
+commands/intents are implemented without UI wiring. This is not a deployed
+personal-linking workflow.
 Use existing `game_participants.source_player_id` as the confirmed operational
 personal link. Keep personal binder payload source ids null: the latest 055 binder's
 `ON CONFLICT DO NOTHING` preserves an already confirmed source. Do not alter
@@ -178,6 +182,16 @@ Local explicit intent lives outside immutable setup/events, keyed by account,
 local game and participant; never derive it from UUID shape. Apply online after
 binding, with visible pending/error. Event-sync success is not link acknowledgement;
 missing capability retains intent. No general offline identity queue is required.
+
+The client persists the reviewed payload and operation UUID before dispatch, then
+compares account/local-game/participant/revision/operation before settlement. A CAS
+refresh uses a new review and operation UUID, never a changed retry payload. Link
+receipts are historical: acknowledgement requires a fresh current server map plus
+the still-current local intent. Their `historicalReopen` metadata always carries
+`lifecycleAuthority: 'unverified'`, never an executable local reopen handoff. Even
+an unchanged fingerprint with no active publication cannot distinguish P1's reopen
+from P2's later reopen. BSB-7B must verify current publication history before any
+owned local lifecycle handoff; 7A performs no such mutation or automatic republication.
 
 ### Fixed write and transactional boundary
 
@@ -387,10 +401,12 @@ personal review/link CAS and receipts, atomic final Reopen-link, reviewed-map
 finalization, separate aggregate/link capabilities and the bounded latest-075 pager
 extension. Existing canonical schema 1, setup/events, contract 2/078, team/sibling
 authorization and old wrappers remain unchanged. Local SQL/role/concurrency evidence
-is in [REGRESSION_BSB_7A_SERVER.md](REGRESSION_BSB_7A_SERVER.md); live application is
-pending. The client/transport, link intent/command interfaces and pure aggregate
-engine below are not implemented by this server-only delivery. Full 7A exit remains
-open; no player aggregate destination is enabled early.
+is in [REGRESSION_BSB_7A_SERVER.md](REGRESSION_BSB_7A_SERVER.md). Owner-reported 079
+application on 2026-10-20 remains separate from unrun live checks. The client half
+is implemented in `aggregateTypes/Stats/Projection/Transport`, the additive auth
+epoch API, `featureClient`, `personalIdentity` and `personalLinkIntents`; see
+[REGRESSION_BSB_7A_CLIENT.md](REGRESSION_BSB_7A_CLIENT.md). Full 7A exit remains open;
+no player aggregate destination is enabled early.
 
 Deliver fixed paging/eligibility, pinned personal maps and reviewed linking,
 capability surfaces, pure aggregate engine and transport. Include narrow authorized
@@ -399,6 +415,16 @@ Its interfaces are source envelopes, explicit/pinned identity, derived aggregate
 result/quality and typed capability errors; UI does not own rules or authorization.
 Own the checked online RPC/client link command and persisted-intent interfaces;
 no standalone link UI is required in 7A.
+
+Implemented client boundary: all 079 pages drain before variant filtering; strict
+personal maps include canonical participant nulls, while team mapper aliases remain
+valid. Duplicate-equivalent sources count once and conflicting publication/game
+identities are quarantined in either arrival order. In-flight sharing is scoped by
+client/account/auth epoch/scope/variant/refresh, with independent subscribers and no
+completed authoritative cache. Remote reads never write GameContext or storage.
+Tournament load scopes require both tournament id and its authorized owning team;
+the exported association check rejects personal/cross-team attachment. Actual
+setup/save/reload tournament persistence is BSB-7B, not delivered by this client half.
 
 Acceptance/evidence required:
 - Latest-075 sibling parity, keysets/all-page draining, exact capability parser and
@@ -507,8 +533,9 @@ Unresolved technical adjudication is resolved before its implementation; it is n
 a new pending product batch. If design cannot satisfy an approved decision, raise
 that conflict explicitly rather than silently weakening the contract.
 
-Delivery status: **7A server half implemented and locally verified; full 7A and
-7B-7D remain pending**. No settings, UI, client aggregates or cutover ships here.
+Delivery status: **7A server/client implementations present; full 7A exit and
+7B-7D remain pending**. Client checks and parent-reported local PostgreSQL probes
+are in the client record. No settings, destination/link UI or cutover ships here.
 Current `opt_in`, exact cloud contract 2/078 and existing access remain unchanged.
 BSB-6 and broader-release live evidence remain pending. The parent owns final
 validation, Git/PR work and fresh review; this document does not authorize migration

@@ -13,9 +13,11 @@ Hockey has a released event tracker, Summary and cloud lifecycle; every new Hock
 game uses events. Baseball has an opt-in tracker, local Summary and cloud sync;
 recorder management/finalization/reopen merged in #495 and BSB-6C cloud Summary
 merged in #496. [BSB-7](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) is approved;
-its 7A server foundation is implemented in migration 079, not applied live by this
-work. The client/transport and pure aggregate engine remain pending, so 7A is not
-complete. Baseball stays opt-in until BSB-7D; BSB-6 live exit checks remain pending.
+its 7A server foundation is implemented in migration 079 (owner reports application
+on 2026-10-20). The client half adds pure replay aggregates, strict account/epoch
+paging and checked personal identity/intents, without UI wiring; see the
+[client evidence](REGRESSION_BSB_7A_CLIENT.md). Full 7A exit is not claimed. Baseball
+stays opt-in until BSB-7D; BSB-6/live release checks remain pending.
 Football still uses the generic aggregate grid; its event plans
 are not an implemented field experience. Pending live verification remains separate.
 

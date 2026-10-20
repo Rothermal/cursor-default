@@ -66,6 +66,21 @@ const FIELDING_KEYS: Record<keyof BaseballFieldingLine, string> = {
   cs: 'bsb_f_cs',
 }
 
+export const BASEBALL_COUNTER_STAT_IDS: readonly string[] = Object.freeze([
+  ...Object.values(BATTING_KEYS), ...Object.values(PITCHING_KEYS), ...Object.values(FIELDING_KEYS),
+])
+
+/** Participant identity is retained until the aggregate's confirmed source map is applied. */
+export function baseballParticipantStats(
+  projection: BaseballMatchProjection, participantId: string
+): Record<string, number> {
+  const stats = Object.fromEntries(BASEBALL_COUNTER_STAT_IDS.map(id => [id, 0]))
+  addLine(stats, projection.battingLines[participantId], BATTING_KEYS)
+  addLine(stats, projection.pitchingLines[participantId], PITCHING_KEYS)
+  addLine(stats, projection.fieldingLines[participantId], FIELDING_KEYS)
+  return stats
+}
+
 /** The local player id a setup participant's stats are keyed by. */
 export function baseballLocalPlayerKey(participant: { id: string; playerId: string | null }): string {
   return participant.playerId ?? participant.id
