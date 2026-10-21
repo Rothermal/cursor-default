@@ -3,8 +3,9 @@
 Status: **Server half implemented and locally verified; BSB-7A is not complete**
 (2026-10-20). Owning scope: [BSB-7 sections 3, 4, 7 and 8](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md).
 Migration [079](../supabase/migrations/079_baseball_aggregate_identity_foundation.sql)
-has not been applied to a live project by this work. Owner application remains a
-manual post-review/merge action. Baseball remains `opt_in`.
+was not applied to a live project by an agent in this work. The owner subsequently
+reported it applied on 2026-10-20; no live behavior pass is inferred. The client half
+is now tracked in [its own record](REGRESSION_BSB_7A_CLIENT.md). Baseball remains `opt_in`.
 
 ## Delivered Boundary
 
@@ -150,13 +151,14 @@ exact-head CI results are recorded in the PR.
 
 ## Still Pending
 
-BSB-7A client capability parsing, transport, checked link commands/intents, pure
-aggregate calculations, cancellation/quality handling and their tests remain
-unimplemented. BSB-7B destinations/Legacy Totals/tournament attachment, BSB-7C
+At the server-only delivery, BSB-7A client capability parsing, transport, checked
+link commands/intents, pure calculations and cancellation/quality tests were not
+included. They are now implemented separately in the [client record](REGRESSION_BSB_7A_CLIENT.md),
+without completing the full 7A exit. BSB-7B destinations/Legacy Totals/tournament attachment, BSB-7C
 personal settings/setup and BSB-7D cutover are not delivered here. No frontend,
 settings, legacy aggregate page, rollout, merge UI or live migration was changed.
 
-Actual Supabase JWT/PostgREST/RLS behavior, live migration application, two-device
+Actual Supabase JWT/PostgREST/RLS behavior, independent live migration verification, two-device
 link/finalize/reopen/republish, physical-mobile and installed-PWA checks remain
 pending. Local PostgreSQL roles/transactions and simulated auth are not those
 checks. The [BSB-6 live exit matrix](REGRESSION_BSB_6_CLOUD_LIFECYCLE.md) remains open,
