@@ -7,7 +7,7 @@ unfinished implementation; some retain important verification or follow-up work.
 
 - [Operations: deployment, cloud configuration and icons](OPERATIONS.md)
 - [Automated PR reviews: setup, trust and manual rereviews](AUTOMATED_CODE_REVIEW.md)
-- [Manual Sol/Ultra orchestration: usage and role briefs](CODEX_ORCHESTRATION.md), [scope and adaptation](PLAN_CODEX_ORCHESTRATION.md)
+- [Disabled multi-agent workflow: retained usage and role briefs](CODEX_ORCHESTRATION.md), [status and historical scope](PLAN_CODEX_ORCHESTRATION.md). Single-agent work is the default; re-enablement requires a new explicit user request
 - [App overview and local development](../README.md)
 - [Codebase architecture](AGENT_CODEBASE_OVERVIEW.md)
 - [Shared product and interaction decisions](PRODUCT_AND_INTERACTION_DECISIONS.md)

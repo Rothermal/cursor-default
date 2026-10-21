@@ -1,6 +1,11 @@
 # Shared role instructions
 
-Use these briefs only for an explicitly requested orchestration task with
+Status: **Inactive.** The owner disabled multi-agent work on 2026-10-21.
+Do not activate these briefs from prior chat authorization. A new explicit user
+request must re-enable the workflow; otherwise follow the single-agent default in
+[AGENTS.md](../../../AGENTS.md).
+
+After explicit re-enablement, use these briefs only for the requested task with
 GPT-6.1 Sol / Ultra selected for the coordinating chat and every delegated role.
 Read AGENTS.md, docs/AGENT_CODEBASE_OVERVIEW.md, docs/README.md, nested instructions
 affecting your files, the owning plan and related regression records.

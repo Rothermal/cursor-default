@@ -1,14 +1,21 @@
 # Using the manual orchestration workflow
 
-Select **GPT-6.1 Sol / Ultra** in Codex and explicitly invoke the
+Status: **Disabled by the owner on 2026-10-21.** Single-agent work is the project
+default. This guide and the role briefs are retained reference only; previous chat
+requests do not authorize new delegation. A new explicit user request must re-enable
+the workflow before the instructions below apply. See [AGENTS.md](../AGENTS.md).
+
+## Reference activation (inactive)
+
+After explicit re-enablement, select **GPT-6.1 Sol / Ultra** in Codex and invoke the
 [workflow](../CODEX_MULTI_AGENT_ORCHESTRATION.md) for a task. All delegated roles
 must use the same model/effort. Verify the selection using available client
 information; if it is unavailable, obtain the user's confirmation before
 delegating. Markdown guidance cannot enforce that setting.
 
-A starting request is:
+A request to re-enable it for one task could be:
 
-> Use CODEX_MULTI_AGENT_ORCHESTRATION.md for this task: [describe the change].
+> Re-enable CODEX_MULTI_AGENT_ORCHESTRATION.md for this task: [describe the change].
 > Use GPT-6.1 Sol / Ultra for all roles, choose only the roles needed, implement
 > the change and independently review it. Preserve the existing project conventions.
 
@@ -50,9 +57,10 @@ Use the merge-verdict rules in AGENTS.md; missing required evidence means the
 review is incomplete.
 
 When authorized, prepare a PR with the behavior change, design choices, validation,
-risks and remaining human checks. Existing session authorization continues to
-apply. Inspect CI for the current head when preparing the handoff and report its
-observed status. Do not add a polling loop or background monitor. A pending check
+risks and remaining human checks. Existing authorization for Git/PR actions
+continues to apply; it does not re-enable delegation. Inspect CI for the current
+head when preparing the handoff and report its observed status. Do not add a polling
+loop or background monitor. A pending check
 remains pending until a later explicit check supplies evidence.
 
 ## Stop or return to ordinary work

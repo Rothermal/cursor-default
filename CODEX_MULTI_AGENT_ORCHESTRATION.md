@@ -1,6 +1,13 @@
 # Manual multi-agent workflow for StatTracker
 
-Use this workflow only when the user explicitly requests it in a Codex chat.
+Status: **Disabled by the owner on 2026-10-21.** Work as a single agent under
+[AGENTS.md](AGENTS.md). Prior multi-agent authorization is revoked. The instructions below
+are retained reference, not the default workflow; use them only after a new explicit
+user request to re-enable multi-agent work.
+
+## Reference workflow (inactive)
+
+After explicit re-enablement, use this workflow only for the requested scope.
 Use **GPT-6.1 Sol / Ultra for the coordinating chat and every delegated role**.
 Select that model/effort in Codex before starting; these Markdown files do not
 enforce client settings. Do not substitute another model or effort silently.
