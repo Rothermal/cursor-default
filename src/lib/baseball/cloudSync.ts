@@ -18,6 +18,7 @@ import { isEventGameLocalOnly } from '../eventCloudPolicy'
 import { createInitialCloudSyncState } from '../gameReducer'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { supabase } from '../supabase'
+import { captureAuthIdentity, isCurrentAuthIdentity } from '../authIdentity'
 import { createBaseballSportGameState, normalizeBaseballMatchSetup } from './state'
 import { baseballLocalPlayerKey } from './stats'
 import { ensureBaseballReleaseCapabilities } from './releaseCapabilities'
@@ -119,19 +120,28 @@ export async function syncBaseballEventGameToCloud(
   ))) {
     throw new Error('Baseball cloud sync cannot blend another recorder stream.')
   }
-  input.assertCurrent?.()
+  const hasTournament = Boolean(input.state.gameInfo?.tournamentId)
+  const identity = captureAuthIdentity(input.userId)
+  const assertCurrent = () => {
+    input.assertCurrent?.()
+    if (hasTournament && (!identity || !isCurrentAuthIdentity(identity))) throw Error('The Baseball sync account changed.')
+  }
+  assertCurrent()
   const capability = await ensureBaseballReleaseCapabilities(input.userId, { force: true })
-  input.assertCurrent?.()
+  assertCurrent()
   if (capability.status !== 'ready') throw new Error(capability.error)
-  return syncEventGameToCloud({ ...input, adapter: baseballEventCloudTransportAdapter,
-    validateBinding: async gameId => {
-      input.assertCurrent?.()
-      await input.validateBinding?.(gameId)
-      input.assertCurrent?.()
-      await syncBaseballTournamentAssociation(input.state, gameId, input.userId, () => input.assertCurrent?.())
-      input.assertCurrent?.()
-    },
-  })
+  const synced = await syncEventGameToCloud({ ...input, adapter: baseballEventCloudTransportAdapter, assertCurrent })
+  assertCurrent()
+  // Tournament metadata is recoverable independently of the recorded event checkpoint.
+  let tournamentSyncWarning: string | null = null
+  try {
+    await syncBaseballTournamentAssociation(input.state, synced.gameId, input.userId, assertCurrent)
+  } catch (error) {
+    assertCurrent()
+    tournamentSyncWarning = error instanceof Error ? error.message : 'The Baseball tournament attachment could not be saved.'
+  }
+  assertCurrent()
+  return { ...synced, syncedState: { ...synced.syncedState, cloudSync: { ...synced.syncedState.cloudSync, tournamentSyncWarning } } }
 }
 
 export function loadBaseballCloudDataAuthority(gameId: string): Promise<'sport_events' | 'legacy'> {

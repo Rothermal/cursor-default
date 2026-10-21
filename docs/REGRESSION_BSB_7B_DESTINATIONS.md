@@ -1,11 +1,13 @@
 # BSB-7B Destinations Regression
 
-Status: **Implemented; frozen local gates and simulated browser batch passed; exact-head CI and independent final review pending**
+Status: **Implemented; original exact-head CI and independent final review passed; subsequent review fixes verified separately below**
 (2026-10-21). Owning scope: [BSB-7, section 8](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md).
 Base: `1deb29cc44d22b32238a3a625f36e34824302afa` (#499 merged), branch
-`codex/bsb-7b-stats-destinations`. No commit, push, PR, merge, live SQL, migration,
-release-stage or rollout action was performed by this Developer. The coordinator
-owns Git, full repository gates, exact-candidate browser QA and fresh review.
+`codex/bsb-7b-stats-destinations`, [PR #500](https://github.com/Rothermal/cursor-default/pull/500).
+The original Developer did not commit, push, open the PR, merge, run live SQL or
+change rollout; the coordinator subsequently committed and opened the PR. The
+owner disabled multi-agent work before the review follow-up below, which uses
+single-agent implementation and self-review. No migration or rollout change is added.
 
 ## Implemented Boundary
 
@@ -26,7 +28,10 @@ owns Git, full repository gates, exact-candidate browser QA and fresh review.
   Profile separates its team-season and Personal load; Personal is filtered by
   actual cloud scope. Career pools one variant and exposes team-season/Personal
   segments with readable authorized season labels or unavailable/date fallbacks.
-  Its Sport selector retains sibling navigation. Removed-junction players can
+  Its Sport selector retains sibling navigation from current teams plus paged
+  resolved legacy sport names, without using legacy counters as event totals.
+  Missing legacy-navigation support warns without blocking Baseball totals.
+  Removed-junction players can
   recover identity from an authorized canonical source instead of requiring a
   currently readable `players` row or fabricating a name.
 - Legacy loading pages authorized final games and setup absence checks, excludes
@@ -49,10 +54,13 @@ owns Git, full repository gates, exact-candidate browser QA and fresh review.
   to the old finalizer. Team and ordinary contract-2/078 behavior are preserved.
 - Setup explicitly selects an authorized team tournament. Additive `gameInfo`
   metadata survives save/reload/cloud shell loading without rewriting setup/events.
-  Post-bind validation preserves the duplicate-binding validator, checks auth epoch,
-  verifies team ownership, conditionally updates creator-owned nonfinal games and
-  confirms the affected row/readback before uploads/checkpoints acknowledge sync.
-  Failures retain the local selection for retry; no SQL was needed.
+  Duplicate-binding validation remains before event upload. Optional attachment
+  runs after event upload/checkpoint, checks auth epoch, verifies team ownership,
+  conditionally updates creator-owned nonfinal games and confirms the affected
+  row/readback. Failures retain the selection for retry and show a fingerprint-inert
+  warning, without blocking later event sync. A deleted tournament or differing
+  cloud attachment cannot strand recorded plays or overwrite cloud metadata.
+  No SQL was needed.
 
 ## Developer-Observed Checks
 
@@ -93,9 +101,12 @@ After implementation freeze, the coordinator reports these completed results:
 - Review-control tests: **22 passed**.
 - Changed-document local links: **110 resolve**; whitespace check: **passed**.
 
-These are coordinator-reported frozen-candidate results. Exact-head CI and the
-fresh Reviewer's final whole-source verdict remain pending; neither is inferred
-from local gates. No owned test processes remain; only the QA server remains.
+These are coordinator-reported frozen-candidate results, not inferred live results.
+Original head `2e1ef27e35d73e99962bb586194fbb0fc2298273` subsequently passed
+[exact-head CI](https://github.com/Rothermal/cursor-default/actions/runs/39560252264)
+and [fresh independent final review](https://github.com/Rothermal/cursor-default/pull/500#issuecomment-6310332011).
+Those passes do not substitute for checking later fixes; see the follow-up below
+and PR #500 for the newest head's CI status.
 
 ## Coordinator-Reported Frozen Browser Evidence
 
@@ -113,14 +124,46 @@ explicit Baseball and no-sport default both retain navigation to Hockey's URL.
 
 The coordinator visually reviewed the final screenshots and reports no overflow
 or overlap. This is frozen-candidate simulated-browser evidence, **not live RLS,
-physical-mobile or installed-PWA verification**. Exact-head CI and independent
-final review remain separate. The ignored `qa.local` fixtures/scripts were not
-edited by this Developer.
+physical-mobile or installed-PWA verification**. Original exact-head CI and
+independent final review are separately linked above. The ignored `qa.local`
+fixtures/scripts were not edited by the original Developer.
+
+## PR Review Follow-Up (2026-10-21)
+
+All three findings in the [subsequent review](https://github.com/Rothermal/cursor-default/pull/500#issuecomment-6321342095)
+were validated against the current source and governing plan, then addressed:
+
+1. Tournament association no longer gates event upload/checkpoint. A deleted
+   tournament, different cloud attachment, rejected write or failed readback produces
+   a separate warning. Local selection survives retry, successful retry clears the
+   warning, and auth/lifecycle/duplicate-binding failures still stop stale work.
+2. Career combines current-team sports with paged authorized legacy sport names.
+   Discovery is navigation-only, account/query/unmount guarded, and optional;
+   failure warns while Baseball aggregates remain available.
+3. The plan/index/evidence now distinguish the original completed CI/review from
+   this follow-up, rather than continuing to label that original review pending.
+
+Observed follow-up verification:
+
+- Full suite: **323 files / 3,179 tests passed**.
+- Expanded Baseball/shared sync/sibling-route suite: **49 files / 691 tests passed**.
+- Production build including TypeScript, Vite and PWA: **passed**.
+- `pnpm lint`: **0 errors / 17 warnings** including ignored local QA copies.
+  `pnpm exec eslint . --ignore-pattern qa.local`: **0 errors / 3 existing warnings**.
+- Synthetic browser: **8** legacy-only Hockey navigation cases (explicit/default
+  Baseball x 390/1280 width x Light/Dark) and **1** failed-discovery case passed.
+  Actual components and SDK were exercised; the warning screenshot was visually
+  checked without overlap or horizontal overflow. These are not live RLS/device checks.
+- No independent subagent review is claimed for these changes. Current-head CI
+  and the final merge verdict are reported on PR #500.
+
+The first focused run exposed a reused deferred test response, and TypeScript
+caught a missing envelope narrowing in a new test; both test-harness mistakes were
+corrected before the passing checks above. An initial sandbox Node launch failed
+before executing tests; successful checks used the approved runner.
 
 ## Pending And Risks
 
-- Exact-head CI and independent final review. Completed frozen local gates and
-  simulated-browser results are reported above.
 - Actual Supabase JWT/PostgREST/RLS and creator/guardian/team-role matrices;
   two-device link/finalize/reopen/republish and tournament retry behavior.
 - Physical phone, installed-PWA/offline and the existing
@@ -131,5 +174,5 @@ edited by this Developer.
 
 BSB-7C settings/setup identity creation and BSB-7D event-only cutover are not part
 of this delivery. Baseball remains `opt_in`; full 7A/6 live exit and broader rollout
-are not signed off. **Merge readiness remains incomplete pending exact-head CI
-and independent final review.**
+are not signed off. The original review/CI passes are historical evidence; use the
+latest PR #500 head and reported checks for its current merge verdict.

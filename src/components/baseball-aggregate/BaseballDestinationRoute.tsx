@@ -5,6 +5,7 @@ import { sports as sportConfigs } from '../../config/sports'
 import { useAuth } from '../../context/AuthContext'
 import { captureAuthIdentity, isCurrentAuthIdentity } from '../../lib/authIdentity'
 import { playerDisplayName, teamDisplayName } from '../../lib/display'
+import { careerSportOptions } from '../../lib/careerSportOptions'
 import { supabase } from '../../lib/supabase'
 import { BaseballAggregateDestination } from './BaseballAggregateDestination'
 import { loadBaseballAggregates } from '../../lib/baseball/aggregateTransport'
@@ -12,7 +13,7 @@ import { allocateBaseballRefreshGeneration } from '../../hooks/useBaseballAggreg
 
 type Kind = 'season' | 'team' | 'tournament' | 'profile' | 'career'
 interface Team { id: string; name: string; nickname: string | null; season_id: string; seasons: { id: string; name: string; sport: string } }
-interface Metadata { baseball: boolean; teams: Team[]; team: Team | null; player: { playerId: string; displayName: string; number: string | null } | null; tournament: { id: string; name: string; team_id: string } | null; availableSports: string[] }
+interface Metadata { baseball: boolean; teams: Team[]; team: Team | null; player: { playerId: string; displayName: string; number: string | null } | null; tournament: { id: string; name: string; team_id: string } | null; availableSports: string[]; sportHistoryWarning: string | null }
 
 /** Resolve Baseball before mounting the generic page and its legacy effects. */
 export function BaseballDestinationRoute({ kind, fallback }: { kind: Kind; fallback: ReactNode }) {
@@ -55,7 +56,7 @@ export function BaseballDestinationRoute({ kind, fallback }: { kind: Kind; fallb
 
 async function loadBaseballDestinationMetadata(kind: Kind, params: URLSearchParams, signal: AbortSignal, current: () => void, userId?: string): Promise<Metadata> {
   if (!supabase) throw Error('Supabase is not configured.')
-  const data: Metadata = { baseball: params.get('sport') === 'baseball', teams: [], team: null, player: null, tournament: null, availableSports: [] }
+  const data: Metadata = { baseball: params.get('sport') === 'baseball', teams: [], team: null, player: null, tournament: null, availableSports: [], sportHistoryWarning: null }
   const refreshGeneration = allocateBaseballRefreshGeneration()
   const teamId = params.get('teamId')
   if (teamId) {
@@ -78,7 +79,21 @@ async function loadBaseballDestinationMetadata(kind: Kind, params: URLSearchPara
       for (const row of response.data as unknown as Array<{ teams: { seasons: { sport: string } } }>) sports.add(row.teams.seasons.sport)
       if (response.data.length < 200) break
     }
-    data.availableSports = [...new Set([...sports, ...(params.get('sport') ? [params.get('sport')!] : [])])].sort()
+    const legacySports: string[] = []
+    // Legacy rows discover navigation only; Baseball totals retain their own authority.
+    for (let offset = 0; ; offset += 200) {
+      current()
+      const response = await supabase.rpc('get_career_stats_resolved', { p_player_id: params.get('playerId')! })
+        .select('sport').order('sport').range(offset, offset + 199).abortSignal(signal)
+      current()
+      if (response.error || !Array.isArray(response.data) || response.data.some(row => typeof row?.sport !== 'string')) {
+        data.sportHistoryWarning = 'Some historical sport choices could not load.'
+        break
+      }
+      legacySports.push(...response.data.map(row => row.sport))
+      if (response.data.length < 200) break
+    }
+    data.availableSports = careerSportOptions(legacySports, [...sports], params.get('sport'))
     if (!params.get('sport')) data.baseball = data.availableSports[0] === 'baseball'
   }
   if (!data.baseball) return data
@@ -146,6 +161,7 @@ function BaseballRouteContent({ kind, params, metadata }: { kind: Kind; params: 
   const seasons = [...new Map(metadata.teams.map(row => [row.season_id, row.seasons.name])).entries()]
   return <div className="min-h-screen bg-canvas text-content"><header className="border-b border-line bg-surface px-4 py-4"><div className="max-w-3xl mx-auto flex items-center gap-3"><Link to={back} aria-label="Back" title="Back" className="h-9 w-9 shrink-0 rounded-lg bg-control flex items-center justify-center"><ArrowLeft size={18} /></Link><div className="min-w-0"><h1 className="text-lg font-bold break-words">{title}</h1><p className="text-sm text-content-muted">{team?.seasons.name ?? 'Baseball statistics'}</p></div></div></header>
     <main className="max-w-3xl mx-auto px-4 py-5 space-y-4">
+      {metadata.sportHistoryWarning && <p role="status" className="text-sm text-warning-content">{metadata.sportHistoryWarning}</p>}
       {kind === 'career' && metadata.availableSports.length > 1 && <label className="block text-xs font-semibold text-content-muted">Sport<select className="input-field mt-1" value="baseball" onChange={event => navigate(`/career?playerId=${encodeURIComponent(metadata.player!.playerId)}&sport=${encodeURIComponent(event.target.value)}`, { replace: true })}>{metadata.availableSports.map(id => <option key={id} value={id}>{sportConfigs.find(sport => sport.id === id)?.name ?? id}</option>)}</select></label>}
       {kind === 'season' && <label className="block text-xs font-semibold text-content-muted">Season<select className="input-field mt-1" value={seasonId} onChange={event => setSeasonId(event.target.value)}>{seasons.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
       {kind === 'season' && !seasonId ? <p className="text-sm text-content-muted">No authorized Baseball seasons.</p> : <BaseballAggregateDestination scope={scope} teamIds={teamIds} teamIdForLinks={team?.id ?? null} identity={metadata.player ?? undefined} mode={kind} />}

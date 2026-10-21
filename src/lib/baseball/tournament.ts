@@ -23,7 +23,7 @@ export async function loadBaseballTeamTournaments(teamId: string, current: () =>
   }
 }
 
-/** Creator-owned shared metadata, after bind and before any event/checkpoint acknowledgement. */
+/** Optional creator-owned metadata; callers must not gate event uploads on this attachment. */
 export async function syncBaseballTournamentAssociation(state: GameState, gameId: string, userId: string, current: () => void, client: SupabaseClient | null = supabase): Promise<void> {
   const id = state.gameInfo?.tournamentId
   if (!id) return
@@ -34,12 +34,6 @@ export async function syncBaseballTournamentAssociation(state: GameState, gameId
   const setup = state.sportGameState?.sportId === 'baseball' ? state.sportGameState.setup : null
   if (!setup?.sourceTeamId) throw Error('Personal Baseball games cannot attach a tournament.')
   if (!client) throw Error('Supabase is not configured.')
-  current()
-  const tournament = await client.from('tournaments').select('id,name,team_id').eq('id', id).eq('team_id', setup.sourceTeamId).single()
-  current()
-  if (tournament.error || !tournament.data) throw Error('The selected Baseball tournament is unavailable for this team.')
-  const association = { id: tournament.data.id, teamId: tournament.data.team_id }
-  assertBaseballTournamentAssociation({ cloudScope: 'team', teamId: setup.sourceTeamId, tournamentId: id }, association)
   const read = async () => {
     current()
     const response = await client.from('games').select('id,team_id,created_by,status,sport_id,tournament_id').eq('id', gameId).single()
@@ -51,6 +45,12 @@ export async function syncBaseballTournamentAssociation(state: GameState, gameId
   if (game.tournament_id === id) return
   if (game.tournament_id !== null) throw Error('This Baseball game already belongs to another tournament.')
   if (game.created_by !== userId || game.status === 'final') throw Error('Only the creator can attach this tournament before finalization.')
+  current()
+  const tournament = await client.from('tournaments').select('id,name,team_id').eq('id', id).eq('team_id', setup.sourceTeamId).single()
+  current()
+  if (tournament.error || !tournament.data) throw Error('The selected Baseball tournament is unavailable for this team.')
+  const association = { id: tournament.data.id, teamId: tournament.data.team_id }
+  assertBaseballTournamentAssociation({ cloudScope: 'team', teamId: setup.sourceTeamId, tournamentId: id }, association)
   current()
   const response = await client.from('games').update({ tournament_id: id, tournament_name: tournament.data.name })
     .eq('id', gameId).eq('created_by', userId).eq('team_id', setup.sourceTeamId).neq('status', 'final').is('tournament_id', null).select('id,tournament_id')

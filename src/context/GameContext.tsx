@@ -1077,6 +1077,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
           // survives the re-render that follows the repairing sync.
           repairedPlayerLinks:
             'repairedPlayerLinks' in synced ? synced.repairedPlayerLinks : undefined,
+          ...(syncRoute === 'baseball_events' && 'syncedState' in synced ? {
+            tournamentSyncWarning: synced.syncedState.cloudSync.tournamentSyncWarning ?? null,
+          } : {}),
           lastSyncedGameFingerprint: buildGameSyncFingerprint(syncedPayloadState),
           eventSyncBase: localUnchanged
             ? syncedPayloadState.cloudSync.eventSyncBase ?? {}

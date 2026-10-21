@@ -12,8 +12,13 @@ Game Info links/finalization and explicit team-tournament persistence. Its
 [destination record](REGRESSION_BSB_7B_DESTINATIONS.md) separates developer checks
 from coordinator-reported frozen gates and simulated-browser evidence: full suite
 323 files / 3,163 tests, build including TypeScript/PWA, lint and 22 review-control
-tests passed, as did the frozen browser batch. Exact-head CI and independent final
-review remain pending. BSB-7C/7D and live exit are not delivered here.
+tests passed, as did the frozen browser batch. Original head `2e1ef27e` passed
+[exact-head CI](https://github.com/Rothermal/cursor-default/actions/runs/39560252264)
+and [independent final review](https://github.com/Rothermal/cursor-default/pull/500#issuecomment-6310332011).
+The subsequent PR review identified tournament-sync, Career-navigation and evidence
+drift issues; their single-agent follow-up is recorded in the destination record.
+Current-head CI is reported in PR #500, separately from the original pass.
+BSB-7C/7D and live exit are not delivered here.
 
 No agent applies a live migration or changes a release flag in this work. The owner
 reports migration 079 applied on 2026-10-20; this report is not an observed live
@@ -462,7 +467,10 @@ legacy effects in all five pages. Request identities include account epoch,
 complete query/scope, source, variant and a unique load/refresh generation;
 scope transitions hide previous metadata/totals immediately. Canonical history
 can recover a frozen player label when a removed roster junction makes the current
-player row unreadable. Career retains authorized sibling-sport navigation.
+player row unreadable. Career retains authorized sibling-sport navigation from
+current team membership and paged resolved legacy history. The latter reads sport
+names only, never Baseball totals; an unavailable discovery request warns without
+blocking healthy Baseball aggregates.
 
 Event views expose the full counter catalog, hits-first compact categories,
 nullable sample-visible rates, all 1..15 frozen pitching bases, active zero rows,
@@ -482,10 +490,13 @@ republication remain explicit. The personal review finalizer pins the reviewed m
 through `finalizeReviewed`; team finalization and contract-2/078 remain unchanged.
 
 Explicit team-tournament selection stays additive in `gameInfo`, outside frozen
-setup/events. The existing post-bind validator composes duplicate-binding checks
-with creator-only conditional attachment and readback before event/checkpoint
-acknowledgement. Personal/cross-team/conflicting/final/zero-row writes fail closed;
-equal attachments may be verified without a write. Cloud reload retains the id.
+setup/events. Duplicate-binding validation still blocks invalid event bindings.
+Optional creator-only conditional attachment and readback now run after event
+upload/checkpoint. Deleted tournaments, conflicting cloud attachments, forbidden
+or unconfirmed metadata writes surface a fingerprint-inert warning, retaining
+the local selection for retry without blocking later event sync or overwriting
+cloud metadata. An equal cloud attachment needs no tournament lookup or write.
+Personal/cross-team setup selection remains rejected. Cloud reload retains the id.
 See the [regression record](REGRESSION_BSB_7B_DESTINATIONS.md) for observed counts
 and separately labelled coordinator evidence. The coordinator reports frozen
 local gates passed: **323 files / 3,163 tests**, production build including
@@ -496,8 +507,10 @@ views / 180 transitions**, **8 held races**, **3 unhealthy/capability states**,
 **4 personal-link viewport/theme views**, **2 historical views**, **2 uncertain
 link retry cases** and **2 multi-sport Career cases**. Final screenshots were
 visually reviewed without overflow/overlap. These real-component/SDK fixtures use
-synthetic backend/auth, not live RLS, physical phones or installed PWA. Exact-head
-CI and the final independent review remain pending; this is not full BSB-7A/6 exit.
+synthetic backend/auth, not live RLS, physical phones or installed PWA. Original
+head `2e1ef27e` passed exact-head CI and independent final review (linked above).
+Later review fixes and their single-agent checks are recorded separately in the
+regression record; latest-head CI is tracked on PR #500. This is not full BSB-7A/6 exit.
 
 Route Leaderboard, Team Stats, Tournament Stats, Profile and Career before legacy
 fallback. Use one authoritative source/variant per view, compact category selection,

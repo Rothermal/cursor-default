@@ -7,7 +7,7 @@ import type { BaseballAggregateLoadScope } from '../lib/baseball/aggregateTypes'
 import type { BaseballRulesVariant } from '../lib/baseball/types'
 
 const h = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, effects: [] as Array<() => void>, cleanups: [] as Array<() => void>,
-  userId: 'a' as string | null, query: 'sport=baseball&teamId=t', events: vi.fn(), legacy: vi.fn(), metadata: vi.fn(), from: vi.fn(), navigate: vi.fn() }))
+  userId: 'a' as string | null, query: 'sport=baseball&teamId=t', events: vi.fn(), legacy: vi.fn(), metadata: vi.fn(), from: vi.fn(), navigate: vi.fn(), rpc: vi.fn(), careerHistory: vi.fn() }))
 vi.mock('react', async original => ({ ...await original<typeof import('react')>(),
   useState: (initial: unknown) => { const i = h.cursor++; if (!(i in h.slots)) h.slots[i] = typeof initial === 'function' ? initial() : initial
     return [h.slots[i], (next: unknown) => { h.slots[i] = typeof next === 'function' ? next(h.slots[i]) : next }] },
@@ -36,6 +36,12 @@ vi.mock('../lib/supabase', () => ({ supabase: { from: (table: string) => {
   const q = { select: () => q, eq: () => q, order: () => q, in: () => q, range: () => q, abortSignal: () => q, single: () => q,
     then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => Promise.resolve(h.metadata(table)).then(resolve,reject) }
   return q
+}, rpc: (name: string, args: unknown) => {
+  h.rpc(name, args)
+  let offset = 0
+  const q = { select: () => q, order: () => q, range: (start: number) => { offset = start; return q }, abortSignal: () => q,
+    then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => Promise.resolve(h.careerHistory(offset)).then(resolve,reject) }
+  return q
 } } }))
 const empty = () => ({ aggregate: { players: [], games: [], teams: [], exclusions: [], quality: 'complete', unlinkedAppearances: 0, filteredVariantCount: 0, variant: 'baseball' }, metrics: {} })
 const defer = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r }); return { promise, resolve } }
@@ -45,9 +51,10 @@ let scope: BaseballAggregateLoadScope = { type: 'team', id: 't' }, source: 'even
 function useDestinationHarness() { return useBaseballAggregateDestination({ scope, teamIds: [], source, variant }) }
 const hook = useDestinationHarness
 beforeEach(() => {
-  h.slots = []; h.cleanups = []; h.userId = 'a'; h.query = 'sport=baseball&teamId=t'; h.events.mockReset(); h.legacy.mockReset(); h.metadata.mockReset(); h.from.mockReset(); h.navigate.mockReset()
+  h.slots = []; h.cleanups = []; h.userId = 'a'; h.query = 'sport=baseball&teamId=t'; h.events.mockReset(); h.legacy.mockReset(); h.metadata.mockReset(); h.from.mockReset(); h.navigate.mockReset(); h.rpc.mockReset(); h.careerHistory.mockReset()
   scope = { type: 'team', id: 't' }; source = 'events'; variant = 'baseball'; setCurrentAuthUserId('a')
   h.events.mockResolvedValue(empty()); h.legacy.mockResolvedValue({ players: [], games: [], reviewOnly: [], exclusions: [], quality: 'complete' })
+  h.careerHistory.mockResolvedValue({ data: [], error: null })
   h.metadata.mockImplementation(table => ({ data: table === 'teams' ? { id: 't', name: 'Falcons', nickname: null, season_id: 's', seasons: { id: 's', name: 'Fall', sport: 'baseball' } } : table === 'players' ? { id: 'p', first_name: 'Player', last_name: null, nickname: null } : [], error: null }))
   vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() })
   vi.stubGlobal('document', { addEventListener: vi.fn(), removeEventListener: vi.fn(), visibilityState: 'visible' })
@@ -94,26 +101,62 @@ describe('BSB-7B aggregate hook lifetime', () => {
 })
 describe('BSB-7B outer metadata lifetime and historical identity', () => {
   const route = () => BaseballDestinationRoute({ kind: 'profile', fallback: createElement('div', { id: 'legacy' }) })
+  const career = () => BaseballDestinationRoute({ kind: 'career', fallback: createElement('div', { id: 'legacy' }) })
+  function nodes(node: ReactNode): ReactElement<Record<string,unknown>>[] {
+    if (Array.isArray(node)) return node.flatMap(nodes)
+    if (!isValidElement<{ children?: ReactNode }>(node)) return []
+    return [node as ReactElement<Record<string,unknown>>, ...nodes(node.props.children)]
+  }
+  function content(page: ReactElement) {
+    const Component = page.type as (props: unknown) => ReactNode
+    h.cleanups.forEach(cleanup => cleanup()); h.cleanups = []; h.slots = []
+    return render(() => Component(page.props))
+  }
   it.each([true,false])('preserves sibling-sport Career navigation (explicit Baseball: %s)', async explicit => {
     h.query = `playerId=p${explicit ? '&sport=baseball' : ''}`
     h.metadata.mockImplementation(table => ({ error: null, data: table === 'team_players'
       ? ['baseball','hockey','basketball'].map(sport => ({ teams: { seasons: { sport } } }))
       : { id: 'p', first_name: 'Player', last_name: null, nickname: null } }))
-    const career = () => BaseballDestinationRoute({ kind: 'career', fallback: createElement('div', { id: 'legacy' }) })
     render(career); await drain(); const page = render(career) as ReactElement
-    const Component = page.type as (props: unknown) => ReactNode
-    h.cleanups.forEach(cleanup => cleanup()); h.cleanups = []; h.slots = []
-    const content = render(() => Component(page.props))
-    function nodes(node: ReactNode): ReactElement<Record<string,unknown>>[] {
-      if (Array.isArray(node)) return node.flatMap(nodes)
-      if (!isValidElement<{ children?: ReactNode }>(node)) return []
-      return [node as ReactElement<Record<string,unknown>>, ...nodes(node.props.children)]
-    }
-    const select = nodes(content).find(row => row.type === 'select' && row.props.value === 'baseball')!
+    const select = nodes(content(page)).find(row => row.type === 'select' && row.props.value === 'baseball')!
     expect(select).toBeDefined()
     if (!explicit) expect(h.navigate).toHaveBeenCalledWith('/career?playerId=p&sport=baseball', { replace: true })
     ;(select.props.onChange as (event: unknown) => void)({ target: { value: 'hockey' } })
     expect(h.navigate).toHaveBeenLastCalledWith('/career?playerId=p&sport=hockey', { replace: true })
+  })
+  it.each([true,false])('includes paged legacy-only sports without current memberships (explicit Baseball: %s)', async explicit => {
+    h.query = `playerId=p${explicit ? '&sport=baseball' : ''}`
+    h.metadata.mockImplementation(table => ({ error: null, data: table === 'team_players'
+      ? [{ teams: { seasons: { sport: 'baseball' } } }]
+      : { id: 'p', first_name: 'Player', last_name: null, nickname: null } }))
+    h.careerHistory.mockImplementation(offset => ({ error: null, data: offset === 0 ? Array.from({ length: 200 }, () => ({ sport: 'hockey' })) : [{ sport: 'soccer' }] }))
+    render(career); await drain(); const page = render(career) as ReactElement
+    const select = nodes(content(page)).find(row => row.type === 'select' && row.props.value === 'baseball')!
+    expect(nodes(select).filter(row => row.type === 'option').map(row => row.props.value)).toEqual(['baseball','hockey','soccer'])
+    expect(h.careerHistory.mock.calls.map(([offset]) => offset)).toEqual([0,200])
+    expect(h.rpc).toHaveBeenCalledWith('get_career_stats_resolved', { p_player_id: 'p' })
+    ;(select.props.onChange as (event: unknown) => void)({ target: { value: 'hockey' } })
+    expect(h.navigate).toHaveBeenLastCalledWith('/career?playerId=p&sport=hockey', { replace: true })
+    expect(h.legacy).not.toHaveBeenCalled()
+  })
+  it('keeps Baseball available with a visible warning if historical sport discovery fails', async () => {
+    h.query = 'playerId=p&sport=baseball'
+    h.careerHistory.mockResolvedValue({ error: { message: 'Unavailable RPC' }, data: null })
+    render(career); await drain(); const page = render(career) as ReactElement
+    expect((page.type as { name: string }).name).toBe('BaseballRouteContent')
+    const warning = nodes(content(page)).find(row => row.props.role === 'status')
+    expect(warning?.props.children).toBe('Some historical sport choices could not load.')
+  })
+  it.each(['account','route','unmount'] as const)('ignores stale %s historical sport discovery', async change => {
+    h.query = 'playerId=p&sport=baseball'
+    const pending = defer<{ data: Array<{ sport: string }>; error: null }>()
+    h.careerHistory.mockReturnValueOnce(pending.promise).mockImplementation(() => new Promise(() => {}))
+    render(career); await drain()
+    if (change === 'account') { setCurrentAuthUserId('b'); setCurrentAuthUserId('a') }
+    if (change === 'route') { h.query = 'playerId=other&sport=baseball'; render(career) }
+    if (change === 'unmount') h.cleanups.forEach(cleanup => cleanup())
+    pending.resolve({ data: [{ sport: 'hockey' }], error: null }); await drain()
+    expect(((render(career,false) as ReactElement).type as { name: string }).name).not.toBe('BaseballRouteContent')
   })
   it('routes a Baseball profile without current roster-junction access or generic legacy reads', async () => {
     h.query = 'teamId=t&playerId=p'
