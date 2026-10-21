@@ -73,6 +73,65 @@ describe('BSB-7A checked online personal identity', () => {
     })
     expect(rpc).toHaveBeenNthCalledWith(3, 'get_baseball_personal_participant_links', { p_game_id: gameId })
   })
+  it('settles a lost-reply retry after another participant link changes the current map', async () => {
+    const first = intent()
+    const local = storage()
+    const store = createBaseballLinkIntentStore(local)
+    store.save(first, null)
+    const currentMap: Record<string, string | null> = { t1: null, t2: null }
+    let currentFingerprint = MAP_FINGERPRINT
+    const receipts = new Map<string, { request: Record<string, unknown>; response: Record<string, unknown> }>()
+    const rpc = vi.fn(async (name: string, parameters?: Record<string, unknown>) => {
+      if (name === 'get_baseball_personal_link_capabilities') return ok(BASEBALL_PERSONAL_LINK_CAPABILITIES)
+      if (name === 'get_baseball_personal_participant_links') return ok({
+        ...review(), participantSourceMap: { ...currentMap }, mapFingerprint: currentFingerprint,
+      })
+      expect(name).toBe('link_baseball_personal_participant')
+      const request = parameters!
+      const operationId = request.p_operation_id as string
+      const previous = receipts.get(operationId)
+      if (previous) {
+        expect(request).toEqual(previous.request)
+        return ok(structuredClone(previous.response))
+      }
+      expect(request.p_expected_map_fingerprint).toBe(currentFingerprint)
+      expect(request.p_expected_publication_id).toBeNull()
+      currentMap[request.p_client_participant_id as string] = request.p_target_player_id as string
+      currentFingerprint = operationId === first.operationId ? savedFingerprint : 'c'.repeat(32)
+      const response = {
+        contractVersion: 1, gameId, operationId, participantId: request.p_client_participant_id,
+        targetPlayerId: request.p_target_player_id, participantSourceMap: { ...currentMap },
+        mapFingerprint: currentFingerprint, reopen: null,
+      }
+      receipts.set(operationId, { request: structuredClone(request), response })
+      if (operationId === first.operationId) throw new Error('Network error after server commit')
+      return ok(response)
+    })
+    const client = createBaseballPersonalIdentityClient(AGGREGATE_USER, { client: { rpc } })
+    await expect(client.link(first, store)).rejects.toMatchObject({ code: 'transport' })
+    expect(store.matches(first)).toBe(true)
+    expect(currentMap.t1).toBe(first.targetPlayerId)
+
+    const second: BaseballPersonalLinkIntent = {
+      ...intent(), participantId: 't2', targetPlayerId: aggregateUuid(102), operationId: aggregateUuid(3002),
+      reviewed: { ...first.reviewed!, expectedMapFingerprint: savedFingerprint },
+    }
+    store.save(second, null)
+    expect((await client.link(second, store)).acknowledged).toBe(true)
+    expect(store.matches(first)).toBe(true)
+
+    const retried = await client.link(first, store)
+    expect(retried.receipt.participantSourceMap.t2).toBeNull()
+    expect(retried.currentReview.participantSourceMap.t2).toBe(second.targetPlayerId)
+    expect(retried.currentReview.mapFingerprint).not.toBe(retried.receipt.mapFingerprint)
+    expect(retried.receipt.lifecycleAuthority).toBe('unverified')
+    expect(retried.acknowledged).toBe(true)
+    expect(store.read(first.userId, first.localGameId, first.participantId)).toBeNull()
+    expect(store.read(second.userId, second.localGameId, second.participantId)).toBeNull()
+    const writes = rpc.mock.calls.filter(([name]) => name === 'link_baseball_personal_participant')
+    expect(writes).toHaveLength(3)
+    expect(writes[2][1]).toEqual(writes[0][1])
+  })
   it.each([aggregateUuid(2002), null])('never grants lifecycle authority to a historical P1 receipt after P2 republish/reopen (active %s)', async active => {
     const value = intent(); value.reviewed!.expectedPublicationId = publication; value.reviewed!.reason = 'Link the reviewed player'
     const historical = { game_id: gameId, publication_id: publication, reopened_at: '2026-10-20T12:00:00Z' }
@@ -85,7 +144,7 @@ describe('BSB-7A checked online personal identity', () => {
     expect(result.receipt).not.toHaveProperty('primaryRecorderId')
     expect(rpc.mock.calls.some(([name]) => /reopen|finalize/.test(name))).toBe(false)
   })
-  it('retains intent when a historical receipt no longer matches the current server map', async () => {
+  it('retains intent when the current server target for this participant differs from the receipt', async () => {
     const { client, store, value, rpc, local } = setup()
     rpc.mockImplementation(async name => ok(name.includes('capabilities') ? BASEBALL_PERSONAL_LINK_CAPABILITIES
       : name === 'link_baseball_personal_participant' ? receipt(value) : review({ t1: aggregateUuid(901), t2: null }, 'c'.repeat(32))))

@@ -186,8 +186,12 @@ missing capability retains intent. No general offline identity queue is required
 The client persists the reviewed payload and operation UUID before dispatch, then
 compares account/local-game/participant/revision/operation before settlement. A CAS
 refresh uses a new review and operation UUID, never a changed retry payload. Link
-receipts are historical: acknowledgement requires a fresh current server map plus
-the still-current local intent. Their `historicalReopen` metadata always carries
+receipts are historical: acknowledgement requires a matching validated receipt
+operation, a fresh server read confirming the target for this participant, and the
+still-current local intent. Other participants' subsequent links may change the
+whole map/fingerprint without blocking settlement of this confirmed target; both
+responses still require complete exact map parsing. Write CAS and immutable retry
+expectations remain unchanged. Their `historicalReopen` metadata always carries
 `lifecycleAuthority: 'unverified'`, never an executable local reopen handoff. Even
 an unchanged fingerprint with no active publication cannot distinguish P1's reopen
 from P2's later reopen. BSB-7B must verify current publication history before any

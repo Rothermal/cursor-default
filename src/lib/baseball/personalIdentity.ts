@@ -1,7 +1,6 @@
 import type { GameState } from '../../types'
 import { isPlainObject } from '../gameEvents/envelope'
 import { eventRevisionCheckpoint, eventStreamFingerprint } from '../gameEvents/cloudTransport'
-import { stableJson } from '../gameEvents/stream'
 import { assertExactBaseballParticipants, baseballMapFingerprint, baseballUuid, parseBaseballParticipantMap } from './aggregateIdentity'
 import { createBaseballCanonicalSnapshot } from './finalization'
 import { BaseballFeatureError, createBaseballFeatureClient, exactKeys, invalid, type BaseballFeatureOptions } from './featureClient'
@@ -79,12 +78,11 @@ export function createBaseballPersonalIdentityClient(userId: string, options: Ba
       assertIntent()
       const receipt = parseReceipt(data, intent)
       // Receipts can predate republish and another reopen, even with the same map fingerprint.
-      // Only this fresh read can acknowledge identity; it cannot establish lifecycle authority.
+      // Only this fresh read can acknowledge this participant's target, not lifecycle authority.
+      // Other participants may have been linked since the historical receipt was saved.
       const currentReview = await read(reviewed.gameId, reviewed.participantIds)
       assertIntent()
       const reconciled = currentReview.participantSourceMap[intent.participantId] === intent.targetPlayerId
-        && currentReview.mapFingerprint === receipt.mapFingerprint
-        && stableJson(currentReview.participantSourceMap) === stableJson(receipt.participantSourceMap)
       const acknowledged = reconciled && store.acknowledge(intent)
       feature.assertCurrent()
       return { receipt, currentReview, acknowledged }

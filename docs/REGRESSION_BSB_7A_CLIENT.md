@@ -51,9 +51,11 @@ The [server record](REGRESSION_BSB_7A_SERVER.md) owns migration 079 SQL/role/con
 ## Historical Receipt Boundary
 
 The link command validates operation/game/participant/target, rereads current server
-links, then acknowledges only a matching map and still-current persisted intent.
-Changing a reviewed request requires a new operation UUID. No retry mutates its
-original CAS expectations.
+links, then acknowledges only the confirmed current target for this participant
+and still-current persisted intent. Later links for other participants may change
+the full map/fingerprint without blocking that target's settlement. Both responses
+still require complete exact map parsing. Changing a reviewed request requires a
+new operation UUID. No retry mutates its original CAS expectations.
 
 Receipts expose `historicalReopen` and `lifecycleAuthority: 'unverified'`, never an
 executable `BaseballReopenHandoff`. A P1 receipt replay after P2 republication, or
@@ -106,6 +108,9 @@ live Supabase; the probes do not establish the full role/release matrix.
 
 ## Final Parent-Observed Local Gates
 
+This is the original client-half handoff snapshot, before the PR #499 repair below;
+its counts are not post-repair candidate gates.
+
 The coordinator reports the following final working-tree results on 2026-10-20:
 
 - Full suite: **318 files / 3,087 tests passed**.
@@ -122,6 +127,71 @@ final exact-candidate independent verification, PR references and exact-head CI
 remain pending. No source or test changes were made after these gates; the final
 developer edit records this evidence only. These local passes do not complete the
 live 7A exit or broaden release approval.
+
+## PR #499 Review Repair
+
+Baseline: `3c322aba`; review item `6305746321`. The focused repair removes only the
+whole historical-map/fingerprint equality requirement from link acknowledgement.
+A matching validated operation receipt, fresh confirmation of this participant's
+target, and current account/local-game/participant/revision/operation intent are
+still required. Receipt/current-review schema parsing, write CAS, immutable retry
+payloads and historical-only lifecycle metadata are unchanged.
+
+The new stateful fake-RPC regression uses the real persisted-intent store: operation
+1 links t1 but loses its response, operation 2 links t2 and settles, then operation
+1 retries its original UUID/payload and settles despite its historical map lacking
+t2's later link. The existing different-current-target case still retains intent.
+This is a client/store protocol test, not a new live or SQL integration pass.
+
+Three additional discriminating cases use actual commands and canonical builders:
+both team/season setup-versus-cloud mismatches begin otherwise healthy; an original
+pitcher replaced before game start has explicit decisions accepted by the older
+pregame-inclusive decision history but no actual pitching appearance. The latter
+must report review-needed and no awards. Existing production guards are unchanged.
+The unused three-reference `incompletePitchers` appearance field is removed;
+pitcher coverage still derives from replayed `pitchingLines.untrackedPlateAppearances`.
+
+Observed follow-up commands/results:
+
+```text
+pnpm test src/lib/baseball/personalIdentity.test.ts src/lib/baseball/aggregateProjection.test.ts --maxWorkers=2 --silent
+```
+
+- Tests added first, before the repair: **1 failed / 67 passed** across 2 files;
+  only the lost-reply acknowledgement reproduced the defect.
+- After repair: **2 files / 68 tests passed** (25 identity, 43 aggregate).
+
+```text
+pnpm test src/lib/baseball/aggregateProjection.test.ts -t "actual pitching appearance|otherwise healthy canonical setup/cloud" --maxWorkers=2 --silent
+```
+
+With only the two relevant production guards temporarily disabled, the three new
+cases produced **3 expected failures / 40 skipped**, proving the tests discriminate
+those guards. Both guards were immediately restored, with no retained production
+change to `aggregateProjection.ts`. This deliberately failing probe is not a pass.
+
+```text
+pnpm test src/lib/authIdentity.test.ts src/lib/baseball/aggregateProjection.test.ts src/lib/baseball/featureClient.test.ts src/lib/baseball/aggregateTransport.test.ts src/lib/baseball/personalIdentity.test.ts --maxWorkers=2 --silent
+```
+
+Final focused follow-up: **5 files / 99 tests passed** (43 aggregate, 25 identity,
+15 transport, 14 capability, 2 auth). Original snapshot counts above remain intact.
+
+The coordinator additionally reports the repaired client passing the actual local
+PostgreSQL **16.14** probe in `qa.local/bsb7a-client-probe.mjs` with
+`BSB7AC_CLIENT=1` and `BSB7AC_LINK_RACE=1`: operation 1 links t3 in SQL, an injected
+lost response leaves its intent pending, operation 2 links t4, and the original
+operation 1 retry returns its historical map while the fresh current map includes
+both links. Acknowledgement is **true**, operation 1's pending intent is removed,
+current t3/t4 links remain intact, and lifecycle authority remains **unverified**.
+The earlier P1/P2 historical lifecycle probes also passed again: **2 retries /
+0 lifecycle mutations**. This is parent-reported direct local PostgreSQL evidence,
+not live Supabase/JWT/PostgREST or a migration action. No source or test changed
+after the 99-test focused pass; this addition records integration evidence only.
+
+Parent-owned full gates, exact-candidate independent review and PR/CI verification
+must be rerun for the repair; none is inferred from the original handoff. No
+SQL migration/UI/rollout or live action is included, and full 7A live exit remains pending.
 
 ## Deployment Report And Pending Checks
 

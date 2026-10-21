@@ -4,13 +4,14 @@ import { createInitialState } from '../gameReducer'
 import { adjustBaseballScore, baseballSportState, endBaseballGame, initializeBaseballEventGame,
   proposeBaseballMovements, recordBaseballPlateAppearance, reopenBaseballGame, setBaseballPitcherDecisions,
   startBaseballGame, substituteBaseball } from './commands'
-import { baseballEmptyDecisions } from './decisions'
+import { baseballDecisionsView, baseballEmptyDecisions } from './decisions'
 import { editBaseballPlay, previewBaseballEdit } from './corrections'
 import { baseballActiveEvents } from './units'
 import { aggregateBaseballMatches, projectBaseballCanonicalAggregateSource } from './aggregateProjection'
 import { baseballAggregateRates, emptyBaseballAggregatePlayer } from './aggregateStats'
 import { AGGREGATE_PLAYER, AGGREGATE_TEAM, aggregateUuid, baseballAggregateSource, finishedAggregateState } from './aggregateTestFixtures'
 import { undoBaseballPlay } from './recentPlays'
+import { replayBaseballAggregateAppearances } from './projector'
 import { ballInPlay, baseballSetup, ctx, expectOk, pitch, projection, startedGame, strikeout, walk } from './testFixtures'
 import type { BaseballCanonicalAggregateSource } from './aggregateTypes'
 
@@ -166,6 +167,17 @@ describe('BSB-7A canonical replay aggregates', () => {
     const forfeit = baseballAggregateSource(expectOk(endBaseballGame(startedGame(), 'forfeit', ctx(), { forfeitWinner: 'tracked', note: 'No opponent' })))
     expect(projectBaseballCanonicalAggregateSource(forfeit)).toMatchObject({ ok: false, exclusion: { kind: 'ineligible_source' } })
   })
+  it.each(['teamId', 'seasonId'] as const)('rejects an otherwise healthy canonical setup/cloud %s mismatch', field => {
+    const setup = baseballSetup()
+    setup.sourceTeamId = AGGREGATE_TEAM
+    setup.sourceSeasonId = aggregateUuid(700)
+    const source = baseballAggregateSource(finishedAggregateState(startedGame(setup)))
+    expect(projectBaseballCanonicalAggregateSource(source).ok).toBe(true)
+    source.game[field] = aggregateUuid(701)
+    expect(projectBaseballCanonicalAggregateSource(source)).toMatchObject({
+      ok: false, exclusion: { kind: 'malformed_source', message: 'The Baseball setup and cloud scope disagree.' },
+    })
+  })
 })
 
 describe('BSB-7A pitch and decision coverage', () => {
@@ -246,5 +258,29 @@ describe('BSB-7A pitch and decision coverage', () => {
     state = expectOk(undoBaseballPlay(state, ctx().occurredAt!))
     result = match(baseballAggregateSource(state))
     expect(result.players[0].stats.bsb_p_w).toBe(1)
+  })
+  it('requires actual pitching appearance when a pregame-replaced pitcher has explicit decisions', () => {
+    let state = expectOk(initializeBaseballEventGame({ ...createInitialState(), sport: startedGame().sport }, baseballSetup()))
+    state = expectOk(substituteBaseball(state, 'tracked', { kind: 'defensive', position: 1, incomingId: 't10', outgoingId: 't1' }, ctx()))
+    state = expectOk(startBaseballGame(state, ctx()))
+    state = expectOk(adjustBaseballScore(state, 'tracked', 1, 'Official score', ctx()))
+    state = expectOk(endBaseballGame(state, 'time_limit', ctx()))
+    const decisions = baseballEmptyDecisions()
+    decisions.tracked.win = 't1'
+    state = expectOk(setBaseballPitcherDecisions(state, decisions, ctx()))
+    const sport = baseballSportState(state)!
+    const events = baseballActiveEvents(state)
+    const legacyView = baseballDecisionsView(sport, events)
+    expect(legacyView.current?.decisions.tracked.win).toBe('t1')
+    expect(legacyView.pitchers.tracked).toContain('t1')
+    expect(legacyView.issues).toEqual([])
+    expect(replayBaseballAggregateAppearances(sport.setup, events).pitching.has('t1')).toBe(false)
+
+    const result = match(baseballAggregateSource(state))
+    expect(result.decisions).toMatchObject({ reviewNeeded: 1, valid: 0 })
+    expect(result.players.find(p => p.playerId === aggregateUuid(110))!.decisions.reviewNeeded).toBe(1)
+    for (const id of ['bsb_p_w', 'bsb_p_l', 'bsb_p_sv', 'bsb_p_hld']) {
+      expect(result.players.reduce((total, row) => total + row.stats[id], 0)).toBe(0)
+    }
   })
 })

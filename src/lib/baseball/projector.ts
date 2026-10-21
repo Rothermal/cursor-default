@@ -280,7 +280,6 @@ export interface BaseballAggregateAppearances {
   pitchingStarted: Set<string>
   running: Set<string>
   incompleteBatters: Set<string>
-  incompletePitchers: Set<string>
 }
 
 /** Read-only role history, including runners who never hold a batting/defensive slot. */
@@ -291,7 +290,7 @@ export function replayBaseballAggregateAppearances(
   const result: BaseballAggregateAppearances = {
     played: new Set(), started: new Set(), batting: new Set(), fielding: new Set(),
     pitching: new Set(), pitchingStarted: new Set(), running: new Set(),
-    incompleteBatters: new Set(), incompletePitchers: new Set(),
+    incompleteBatters: new Set(),
   }
   const record = (starting: boolean) => {
     const p = replay.projection
@@ -333,7 +332,6 @@ export function replayBaseballAggregateAppearances(
       const payload = (event as BaseballEvent<'baseball.plate_appearance'>).payload
       if (payload.result !== 'intentional_walk' && payload.result !== 'catcher_interference') {
         if (credit?.batterId) result.incompleteBatters.add(credit.batterId)
-        if (credit?.pitcherId) result.incompletePitchers.add(credit.pitcherId)
       }
     }
   }
