@@ -13,6 +13,7 @@ export interface EventCloudGameRow {
   opponent_name: string
   opponent_nickname?: string | null
   tournament_name: string | null
+  tournament_id?: string | null
   game_date: string
   status: string
 }
@@ -42,7 +43,7 @@ export async function loadEventCloudShellRows(
     supabase
       .from('games')
       .select(
-        'id,team_id,season_id,created_by,tracked_team_name,tracked_team_nickname,opponent_name,opponent_nickname,tournament_name,game_date,status'
+        'id,team_id,season_id,created_by,tracked_team_name,tracked_team_nickname,opponent_name,opponent_nickname,tournament_name,tournament_id,game_date,status'
       )
       .eq('id', gameId)
       .eq('sport_id', sportId)
@@ -116,6 +117,7 @@ function isEventCloudGameRow(value: unknown): value is EventCloudGameRow {
       typeof value.opponent_name === 'string' && value.opponent_name.length > 0 &&
       (value.opponent_nickname == null || typeof value.opponent_nickname === 'string') &&
       (value.tournament_name === null || typeof value.tournament_name === 'string') &&
+      (value.tournament_id == null || typeof value.tournament_id === 'string') &&
       typeof value.game_date === 'string' && Number.isFinite(Date.parse(value.game_date)) &&
       typeof value.status === 'string' && value.status.length > 0
   )

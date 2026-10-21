@@ -1,12 +1,19 @@
 # Plan: BSB-7 Baseball Aggregates, Settings and Release
 
-Status: **Approved execution plan (#497); BSB-7A server and client foundations implemented**
-(2026-10-20). The owner approved all 23 recommendations, Q1-Q23. Migration 079
+Status: **Approved execution plan (#497); BSB-7A foundations implemented; BSB-7B implemented for review**
+(2026-10-21). The owner approved all 23 recommendations, Q1-Q23. Migration 079
 delivers the bounded server foundation described below. The client half now adds
 pure replay aggregates, strict paging, separate feature capabilities and checked
 personal identity/intents, without UI wiring. Full 7A exit is not claimed. See the
 [server record](REGRESSION_BSB_7A_SERVER.md) and
 [client record](REGRESSION_BSB_7A_CLIENT.md) for separately labelled evidence.
+BSB-7B now wires the five destinations, separate Legacy Totals, reviewed personal
+Game Info links/finalization and explicit team-tournament persistence. Its
+[destination record](REGRESSION_BSB_7B_DESTINATIONS.md) separates developer checks
+from coordinator-reported frozen gates and simulated-browser evidence: full suite
+323 files / 3,163 tests, build including TypeScript/PWA, lint and 22 review-control
+tests passed, as did the frozen browser batch. Exact-head CI and independent final
+review remain pending. BSB-7C/7D and live exit are not delivered here.
 
 No agent applies a live migration or changes a release flag in this work. The owner
 reports migration 079 applied on 2026-10-20; this report is not an observed live
@@ -448,6 +455,49 @@ interfaces while retaining one reviewed contract and exit condition. Do not inve
 microphases or ship player aggregates before their identity dependency is safe.
 
 ### BSB-7B - Five Destinations and Separate Legacy Totals
+
+**Implemented for review (2026-10-21), no new SQL or rollout change.** A bounded
+Baseball route boundary resolves authorized metadata before mounting generic
+legacy effects in all five pages. Request identities include account epoch,
+complete query/scope, source, variant and a unique load/refresh generation;
+scope transitions hide previous metadata/totals immediately. Canonical history
+can recover a frozen player label when a removed roster junction makes the current
+player row unreadable. Career retains authorized sibling-sport navigation.
+
+Event views expose the full counter catalog, hits-first compact categories,
+nullable sample-visible rates, all 1..15 frozen pitching bases, active zero rows,
+coverage and read-only canonical Summary history. Profile separates its selected
+team-season from Personal; Career has pooled variant totals and team-season/
+Personal segments with authorized season labels or explicit unavailable/date
+fallbacks. Legacy Totals independently page RLS-visible final games, prove absence
+of every event setup, verify Baseball provenance, drain per-game resolved counters
+and accept only the old Baseball stat ids. Unclassified Personal history has
+review/export links without contributions or inferred variant/rates.
+
+Creator-only personal Game Info review uses paged creator/guardian My Players,
+persists an immutable operation before sending and retries its original payload
+under a stable cloud-game review key. Historical receipts never authorize a local
+Reopen. Settlement refreshes current status only; owned recorder Reopen/end/sync/
+republication remain explicit. The personal review finalizer pins the reviewed map
+through `finalizeReviewed`; team finalization and contract-2/078 remain unchanged.
+
+Explicit team-tournament selection stays additive in `gameInfo`, outside frozen
+setup/events. The existing post-bind validator composes duplicate-binding checks
+with creator-only conditional attachment and readback before event/checkpoint
+acknowledgement. Personal/cross-team/conflicting/final/zero-row writes fail closed;
+equal attachments may be verified without a write. Cloud reload retains the id.
+See the [regression record](REGRESSION_BSB_7B_DESTINATIONS.md) for observed counts
+and separately labelled coordinator evidence. The coordinator reports frozen
+local gates passed: **323 files / 3,163 tests**, production build including
+TypeScript/PWA (**2,412 modules / 14 precache entries**), lint (**0 errors / 3
+unchanged warnings**), **22 review-control tests**, **110 resolved documentation
+links** and whitespace checks. The frozen simulated-browser batch passed **20
+views / 180 transitions**, **8 held races**, **3 unhealthy/capability states**,
+**4 personal-link viewport/theme views**, **2 historical views**, **2 uncertain
+link retry cases** and **2 multi-sport Career cases**. Final screenshots were
+visually reviewed without overflow/overlap. These real-component/SDK fixtures use
+synthetic backend/auth, not live RLS, physical phones or installed PWA. Exact-head
+CI and the final independent review remain pending; this is not full BSB-7A/6 exit.
 
 Route Leaderboard, Team Stats, Tournament Stats, Profile and Career before legacy
 fallback. Use one authoritative source/variant per view, compact category selection,

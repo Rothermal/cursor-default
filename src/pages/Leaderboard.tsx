@@ -9,6 +9,7 @@ import { sportDashboardPath } from '../lib/sportNavigation'
 import { SoccerAggregateDestination } from '../components/soccer-aggregate/SoccerAggregateDestination'
 import { BasketballAggregateDestination } from '../components/basketball-aggregate/BasketballAggregateDestination'
 import { HockeyAggregateDestination } from '../components/hockey-aggregate/HockeyAggregateDestination'
+import { BaseballDestinationRoute } from '../components/baseball-aggregate/BaseballDestinationRoute'
 
 interface TeamRow {
   id: string
@@ -55,6 +56,10 @@ function uniqueSeasonsFromTeams(teams: TeamRow[]): SeasonOption[] {
 }
 
 export default function Leaderboard() {
+  return <BaseballDestinationRoute kind="season" fallback={<LegacyLeaderboard />} />
+}
+
+function LegacyLeaderboard() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const teamIdFromUrl = searchParams.get('teamId')

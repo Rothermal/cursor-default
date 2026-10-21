@@ -22,6 +22,7 @@ import { createBaseballSportGameState, normalizeBaseballMatchSetup } from './sta
 import { baseballLocalPlayerKey } from './stats'
 import { ensureBaseballReleaseCapabilities } from './releaseCapabilities'
 import type { BaseballMatchSetup, BaseballSportGameState } from './types'
+import { syncBaseballTournamentAssociation } from './tournament'
 
 export interface BaseballCloudShell {
   game: EventCloudGameRow
@@ -122,7 +123,15 @@ export async function syncBaseballEventGameToCloud(
   const capability = await ensureBaseballReleaseCapabilities(input.userId, { force: true })
   input.assertCurrent?.()
   if (capability.status !== 'ready') throw new Error(capability.error)
-  return syncEventGameToCloud({ ...input, adapter: baseballEventCloudTransportAdapter })
+  return syncEventGameToCloud({ ...input, adapter: baseballEventCloudTransportAdapter,
+    validateBinding: async gameId => {
+      input.assertCurrent?.()
+      await input.validateBinding?.(gameId)
+      input.assertCurrent?.()
+      await syncBaseballTournamentAssociation(input.state, gameId, input.userId, () => input.assertCurrent?.())
+      input.assertCurrent?.()
+    },
+  })
 }
 
 export function loadBaseballCloudDataAuthority(gameId: string): Promise<'sport_events' | 'legacy'> {
@@ -176,7 +185,7 @@ export async function loadBaseballCloudShell(gameId: string): Promise<BaseballCl
         opponentName: game.opponent_name,
         opponentNickname: game.opponent_nickname,
         tournamentName: game.tournament_name ?? '',
-        tournamentId: null,
+        tournamentId: game.tournament_id ?? null,
         date: game.game_date,
       },
       players,

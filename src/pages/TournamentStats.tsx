@@ -11,6 +11,7 @@ import { playerInfoPath, teamInfoPath, teamStatsPath } from '../lib/teamInfo'
 import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
 import { BasketballAggregateDestinationPage } from '../components/basketball-aggregate/BasketballAggregateDestination'
 import { HockeyAggregateDestinationPage } from '../components/hockey-aggregate/HockeyAggregateDestination'
+import { BaseballDestinationRoute } from '../components/baseball-aggregate/BaseballDestinationRoute'
 
 interface TeamRow {
   id: string
@@ -74,6 +75,10 @@ function placementLabel(p: number | null): string | null {
 }
 
 export default function TournamentStats() {
+  return <BaseballDestinationRoute kind="tournament" fallback={<LegacyTournamentStats />} />
+}
+
+function LegacyTournamentStats() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const tournamentId = searchParams.get('tournamentId')
