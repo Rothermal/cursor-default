@@ -7,6 +7,17 @@
 > approved cross-sport UI targets from shipped behavior. Feature notes below include
 > historical/legacy paths; do not treat them as a new implementation queue.
 
+## Agent Workflow
+
+- Work as a single agent. The owner disabled the manual multi-agent workflow on
+  2026-10-21; prior chat authorization no longer activates it.
+- Do not delegate or apply the retained role/model requirements unless the user
+  explicitly re-enables multi-agent work in a new request. The
+  [workflow documentation](CODEX_MULTI_AGENT_ORCHESTRATION.md) is reference only.
+- Keep normal implementation, testing and code-review standards. Do not describe
+  single-agent self-review as independent agent review. Existing CI and automated
+  PR reviews are unchanged.
+
 ## Code Review Rules
 
 - Read the governing plan and related phase/regression records before judging the
