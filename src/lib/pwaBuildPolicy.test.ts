@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { PWA_MAX_PRECACHE_ASSET_BYTES, PWA_PRECACHE_WARNING_RATIO, pwaPrecacheHeadroomWarning, pwaVendorChunk } from './pwaBuildPolicy'
+import { PWA_MAX_PRECACHE_ASSET_BYTES, PWA_PRECACHE_WARNING_RATIO, pwaPrecacheHeadroomWarning, pwaPrecacheWarningAnnotation, pwaVendorChunk } from './pwaBuildPolicy'
 
 describe('configured production PWA bundle policy', () => {
   it.each([
@@ -46,5 +46,17 @@ describe('configured production PWA bundle policy', () => {
   it.each([0, 1])('still warns at or over the hard limit by %s bytes', over => {
     const warning = pwaPrecacheHeadroomWarning('assets/index.js', PWA_MAX_PRECACHE_ASSET_BYTES + over)
     expect(warning).toContain(over === 0 ? '0 bytes remain' : '1 bytes over the limit')
+  })
+  it.each([undefined, '', 'false', '1'])('does not emit an Actions annotation when GITHUB_ACTIONS is %s', githubActions => {
+    expect(pwaPrecacheWarningAnnotation('Headroom warning', githubActions)).toBeNull()
+  })
+  it('formats the headroom warning as an Actions warning annotation', () => {
+    const warning = pwaPrecacheHeadroomWarning('assets/index.js', PWA_MAX_PRECACHE_ASSET_BYTES)!
+    expect(pwaPrecacheWarningAnnotation(warning, 'true')).toBe(`::warning title=PWA precache headroom::${warning.replace(/%/g, '%25')}`)
+  })
+  it('escapes command data so a message cannot inject additional workflow commands', () => {
+    expect(pwaPrecacheWarningAnnotation('95.3%\r\n::error::not a command\n%0A', 'true')).toBe(
+      '::warning title=PWA precache headroom::95.3%25%0D%0A::error::not a command%0A%250A',
+    )
   })
 })

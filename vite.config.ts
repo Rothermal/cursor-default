@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { Buffer } from 'node:buffer'
-import { PWA_MAX_PRECACHE_ASSET_BYTES, pwaPrecacheHeadroomWarning, pwaVendorChunk } from './src/lib/pwaBuildPolicy'
+import { PWA_MAX_PRECACHE_ASSET_BYTES, pwaPrecacheHeadroomWarning, pwaPrecacheWarningAnnotation, pwaVendorChunk } from './src/lib/pwaBuildPolicy'
 import { APPEARANCE_RELEASE_ENABLED } from './src/lib/appearanceReleasePolicy'
 
 export default defineConfig(({ command }) => ({
@@ -26,7 +26,10 @@ export default defineConfig(({ command }) => ({
         for (const output of Object.values(bundle)) {
           if (output.type !== 'chunk') continue
           const warning = pwaPrecacheHeadroomWarning(output.fileName, Buffer.byteLength(output.code, 'utf8'))
-          if (warning) this.warn(warning)
+          if (!warning) continue
+          this.warn(warning)
+          const annotation = pwaPrecacheWarningAnnotation(warning, process.env.GITHUB_ACTIONS)
+          if (annotation) console.log(annotation)
         }
       },
     },

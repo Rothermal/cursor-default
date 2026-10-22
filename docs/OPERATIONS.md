@@ -39,7 +39,10 @@ The configured #502 follow-up build measured 2,997,113 bytes for the app chunk, 
 can change the exact size. This is measured headroom, not a guarantee that a given
 number of future feature slices will fit. Production builds now warn for any emitted
 JavaScript chunk at or above **90%** of the limit, reporting its size and remaining
-bytes before the unchanged hard failure threshold is reached.
+bytes before the unchanged hard failure threshold is reached. On GitHub Actions,
+the same message is also emitted as a **PWA precache headroom** warning annotation,
+visible in the check/run annotations without opening the raw build log. Local
+builds retain the normal Vite warning without workflow-command output.
 
 **Open follow-up:** introduce route-level splitting for per-sport tracker/statistics
 pages before further growth consumes that headroom. Scope it separately from this
