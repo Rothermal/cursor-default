@@ -34,6 +34,21 @@ Vite places the Supabase SDK in its own vendor chunk. All JavaScript chunks rema
 in the service worker's precache; the existing **3 MiB per-file** budget is unchanged.
 Oversized files still fail the build instead of silently losing offline support.
 
+The configured #502 follow-up build measured 2,997,113 bytes for the app chunk, leaving
+**148,615 bytes (4.7%)** below the 3,145,728-byte limit; build-id/configuration values
+can change the exact size. This is measured headroom, not a guarantee that a given
+number of future feature slices will fit. Production builds now warn for any emitted
+JavaScript chunk at or above **90%** of the limit, reporting its size and remaining
+bytes before the unchanged hard failure threshold is reached.
+
+**Open follow-up:** introduce route-level splitting for per-sport tracker/statistics
+pages before further growth consumes that headroom. Scope it separately from this
+deployment repair: preserve provider/state lifetimes, safe active-game navigation,
+the all-JavaScript precache policy and prompt-based updates; verify route navigation,
+offline chunk loading and update/recovery behavior. The new config-source tests are
+wiring guards, not artifact verification. The configured CI build, generated-worker
+checks and browser cache/offline checks provide the behavioral evidence.
+
 On 2026-10-22, the deployment of #500 and the following docs-only #501 failed at
 service-worker generation: the configured app chunk was about 3.17 MB. Lint and all
 3,179 tests passed; no Pages artifact was uploaded. This was not a database or
