@@ -12,6 +12,8 @@ import { canUndoBaseballPlay, canRestoreBaseballPlay, undoBaseballPlay, restoreB
 import { applyBaseballReopenHandoff, type BaseballReopenHandoff } from './reopenHandoff'
 import { createBaseballEventGameState } from './setupBuilder'
 import { baseballSetup, expectOk, projection } from './testFixtures'
+import { AGGREGATE_USER, aggregateUuid, finishedAggregateState, MAP_FINGERPRINT } from './aggregateTestFixtures'
+import { BASEBALL_PERSONAL_LINK_CAPABILITIES } from './featureClient'
 
 const cloud = vi.hoisted(() => ({ rpc: vi.fn(), recorders: vi.fn(), projection: vi.fn(),
   row: { data: { home_team_score: 3, opponent_score: 2 } as unknown, error: null as unknown } }))
@@ -63,6 +65,43 @@ beforeEach(() => {
 })
 
 describe('BSB-6B2 finalization', () => {
+  it('pins the reviewed personal map through finalizeReviewed and retains server-score readback', async () => {
+    const gameId = aggregateUuid(904), publicationId = aggregateUuid(905)
+    setCurrentAuthUserId(AGGREGATE_USER)
+    const endedState = finishedAggregateState(), state = { ...endedState, cloudSync: { ...endedState.cloudSync, gameId } }
+    const primaryRecorder = { ...recorder, recorderId: AGGREGATE_USER }
+    cloud.recorders.mockResolvedValue([primaryRecorder]); cloud.projection.mockResolvedValue({ ...primary(state), recorder: primaryRecorder })
+    const map = Object.fromEntries((state.sportGameState!.setup as ReturnType<typeof baseballSetup>).participants.map(row => [row.id, null]))
+    cloud.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === 'get_baseball_finalization_readiness' ? ready({ primary_recorded_by: AGGREGATE_USER })
+      : name === 'get_baseball_personal_link_capabilities' ? BASEBALL_PERSONAL_LINK_CAPABILITIES
+        : name === 'get_baseball_personal_participant_links' ? { contractVersion: 1, sportId: 'baseball', gameId, participantSourceMap: map, mapFingerprint: MAP_FINGERPRINT, activePublicationId: null }
+          : name === 'finalize_baseball_event_game_reviewed' ? { publication_id: publicationId, publication_number: 1, primary_recorded_by: AGGREGATE_USER, finalized_at: at(60) } : at(50) }))
+    const preview = await prepareBaseballFinalization(gameId, AGGREGATE_USER, { reviewPersonalLinks: true })
+    expect(preview.personalLinkReview?.participantSourceMap).toEqual(map)
+    const result = await finalizeBaseballGame(preview, AGGREGATE_USER, { reviewPersonalLinks: true })
+    expect(result).toMatchObject({ publicationId, serverScoreConfirmed: true, score: { tracked: 3, opponent: 2 } })
+    expect(cloud.rpc).toHaveBeenCalledWith('finalize_baseball_event_game_reviewed', expect.objectContaining({ p_expected_map_fingerprint: MAP_FINGERPRINT }))
+    expect(cloud.rpc.mock.calls.some(call => call[0] === 'finalize_baseball_event_game')).toBe(false)
+    expect(state.eventStream).toBe(endedState.eventStream)
+  })
+  it('fails only reviewed personal finalization on an old link backend without an old-RPC fallback', async () => {
+    const gameId = aggregateUuid(904)
+    setCurrentAuthUserId(AGGREGATE_USER)
+    const base = finishedAggregateState(), state = { ...base, cloudSync: { ...base.cloudSync, gameId } }
+    const primaryRecorder = { ...recorder, recorderId: AGGREGATE_USER }
+    cloud.recorders.mockResolvedValue([primaryRecorder]); cloud.projection.mockResolvedValue({ ...primary(state), recorder: primaryRecorder })
+    cloud.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === 'get_baseball_finalization_readiness' ? ready({ primary_recorded_by: AGGREGATE_USER }) : name === 'get_baseball_personal_link_capabilities' ? { contractVersion: 0 } : at(50) }))
+    await expect(prepareBaseballFinalization(gameId, AGGREGATE_USER, { reviewPersonalLinks: true })).rejects.toMatchObject({ code: 'backend_update_required' })
+    expect(cloud.rpc.mock.calls.some(call => call[0].startsWith('finalize_'))).toBe(false)
+    expect(state).toEqual({ ...base, cloudSync: { ...base.cloudSync, gameId } })
+  })
+  it('rejects a stale query/account review guard before confirming the checkpoint', async () => {
+    setCurrentAuthUserId(USER); mockReady()
+    let current = true
+    cloud.projection.mockImplementation(async () => { current = false; return primary(bound(ended())) })
+    await expect(prepareBaseballFinalization(GAME, USER, { assertCurrent: () => { if (!current) throw Error('Review changed') }, reviewPersonalLinks: true })).rejects.toThrow('Review changed')
+    expect(cloud.rpc.mock.calls.map(row => row[0])).toEqual(['get_baseball_finalization_readiness'])
+  })
   it('accepts every terminal outcome except suspension and reads replayed runs', () => {
     const p = projection(ended())
     for (const outcome of ['completed', 'run_rule', 'time_limit', 'forfeit', 'abandoned'] as const) {

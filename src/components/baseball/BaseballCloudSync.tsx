@@ -9,5 +9,10 @@ export function BaseballCloudMenuSection({ state, onDone }: { state: GameState; 
 
 /** Sync problems shown on the tracker: conflicts to review, or an error with Retry and Export. */
 export function BaseballCloudSyncAlerts({ state }: { state: GameState }) {
-  return <EventCloudSyncAlerts state={state} sportId="baseball" />
+  return <>
+    {state.cloudSync.tournamentSyncWarning && <p role="status" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
+      Tournament association: {state.cloudSync.tournamentSyncWarning} Events can still sync.
+    </p>}
+    <EventCloudSyncAlerts state={state} sportId="baseball" />
+  </>
 }

@@ -10,6 +10,7 @@ import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
 import { BasketballAggregateDestinationPage } from '../components/basketball-aggregate/BasketballAggregateDestination'
 import { HockeyAggregateDestinationPage } from '../components/hockey-aggregate/HockeyAggregateDestination'
+import { BaseballDestinationRoute } from '../components/baseball-aggregate/BaseballDestinationRoute'
 
 interface TeamRow {
   id: string
@@ -52,6 +53,10 @@ function isMissingRpcError(msg: string): boolean {
 }
 
 export default function TeamStats() {
+  return <BaseballDestinationRoute kind="team" fallback={<LegacyTeamStats />} />
+}
+
+function LegacyTeamStats() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')

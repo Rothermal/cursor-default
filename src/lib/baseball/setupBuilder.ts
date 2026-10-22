@@ -288,10 +288,12 @@ export function createBaseballEventGameState(input: {
   setup: BaseballMatchSetup
   teamName: string
   date: string
+  tournament?: { id: string; teamId: string; name: string } | null
   /** BSB-6B: cloud games sync automatically; device games stay local until enabled. */
   cloudPolicy?: EventCloudPolicy
 }): BaseballCommandResult {
   const initial = createInitialState()
+  if (input.tournament && (!input.setup.sourceTeamId || input.tournament.teamId !== input.setup.sourceTeamId)) return { ok: false, state: initial, code: 'invalid_setup', message: 'Select a tournament belonging to this Baseball team.' }
   const base: GameState = {
     ...initial,
     cloudSync: { ...initial.cloudSync, eventCloudPolicy: input.cloudPolicy ?? 'local_only' },
@@ -299,8 +301,8 @@ export function createBaseballEventGameState(input: {
     gameInfo: {
       teamName: input.teamName.trim().slice(0, 80) || 'Home',
       opponentName: input.setup.opponentName ?? 'Opponent',
-      tournamentName: '',
-      tournamentId: null,
+      tournamentName: input.tournament?.name ?? '',
+      tournamentId: input.tournament?.id ?? null,
       date: input.date,
     },
     players: input.setup.participants.map(participant => ({

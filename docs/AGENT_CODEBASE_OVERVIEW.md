@@ -16,7 +16,10 @@ merged in #496. [BSB-7](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) is approv
 its 7A server foundation is implemented in migration 079 (owner reports application
 on 2026-10-20). The client half adds pure replay aggregates, strict account/epoch
 paging and checked personal identity/intents, without UI wiring; see the
-[client evidence](REGRESSION_BSB_7A_CLIENT.md). Full 7A exit is not claimed. Baseball
+[client evidence](REGRESSION_BSB_7A_CLIENT.md). BSB-7B now implements the five
+destinations, separate Legacy Totals, personal Game Info link review/reviewed
+finalization and explicit team-tournament persistence for review; see its
+[regression record](REGRESSION_BSB_7B_DESTINATIONS.md). Full 7A exit is not claimed. Baseball
 stays opt-in until BSB-7D; BSB-6/live release checks remain pending.
 Football still uses the generic aggregate grid; its event plans
 are not an implemented field experience. Pending live verification remains separate.

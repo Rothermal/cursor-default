@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import BaseballHandChoice from '../components/baseball/BaseballHandChoice'
 import BaseballPositionField from '../components/baseball/BaseballPositionField'
 import { sports } from '../config/sports'
@@ -43,6 +43,8 @@ import {
 import { getBaseballEventCreationPolicy } from '../lib/sportAvailability'
 import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
+import { captureAuthIdentity, isCurrentAuthIdentity } from '../lib/authIdentity'
+import { loadBaseballTeamTournaments, type BaseballTournamentOption } from '../lib/baseball/tournament'
 
 interface BaseballTeamOption {
   id: string
@@ -57,6 +59,7 @@ type RosterStatus = 'idle' | 'loading' | 'ready' | 'error'
  * local roster or a cloud team (prefilled once from team defaults) and opens `/game`.
  */
 export default function BaseballEventSetup() {
+  const { user } = useAuth()
   const { baseballEventTrackerEnabled } = useSettings()
   if (!getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame) {
     return (
@@ -68,17 +71,24 @@ export default function BaseballEventSetup() {
       </main>
     )
   }
-  return <BaseballSetupForm />
+  return <BaseballSetupForm key={JSON.stringify(user ? captureAuthIdentity(user.id) : null)} />
 }
 
 function BaseballSetupForm() {
   const { state, dispatch, prepareActiveGameMutation, startNewGame } = useGame()
   const { user } = useAuth()
+  const [params] = useSearchParams()
   const navigate = useNavigate()
   const cloudAvailable = Boolean(user && supabase)
   const [teams, setTeams] = useState<BaseballTeamOption[]>([])
   const [teamsError, setTeamsError] = useState<string | null>(null)
-  const [teamId, setTeamId] = useState<string>('')
+  const [teamId, setTeamId] = useState<string>(params.get('teamId') ?? '')
+  const [tournamentId, setTournamentId] = useState('')
+  const [tournamentLoad, setTournamentLoad] = useState<{ request: object; rows: BaseballTournamentOption[]; error: string | null } | null>(null)
+  const tournamentScope = useRef({ teamId, request: {} })
+  if (tournamentScope.current.teamId !== teamId) tournamentScope.current = { teamId, request: {} }
+  const tournamentRequest = tournamentScope.current.request
+  const tournaments = tournamentLoad?.request === tournamentRequest ? tournamentLoad.rows : []
   const [teamName, setTeamName] = useState('Home')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [roster, setRoster] = useState<BaseballSetupRosterPlayer[]>([])
@@ -96,6 +106,22 @@ function BaseballSetupForm() {
   const [capability, setCapability] = useState<BaseballSetupCapabilityState>({ status: 'idle' })
   const [capabilityAttempt, setCapabilityAttempt] = useState(0)
   const cloudGate = baseballSetupCloudGate({ cloudAvailable, storage, capability })
+
+  useEffect(() => {
+    if (!teamId || !user) return
+    const identity = captureAuthIdentity(user.id)
+    const controller = new AbortController()
+    const current = () => {
+      if (!identity || !isCurrentAuthIdentity(identity) || controller.signal.aborted || tournamentScope.current.request !== tournamentRequest) throw Error('Tournament selection changed.')
+    }
+    void loadBaseballTeamTournaments(teamId, current, controller.signal).then(rows => {
+      current(); setTournamentLoad({ request: tournamentRequest, rows, error: null })
+    }).catch(error => {
+      try { current() } catch { return }
+      setTournamentLoad({ request: tournamentRequest, rows: [], error: error instanceof Error ? error.message : 'Tournaments unavailable.' })
+    })
+    return () => { controller.abort() }
+  }, [teamId, user, tournamentRequest])
 
   // The handshake keeps Cloud unavailable until the BSB-6A migrations are applied.
   useEffect(() => {
@@ -184,6 +210,7 @@ function BaseballSetupForm() {
   }, [teamId, draftTeamId, rosterStatus, roster, teams, teamSettings.settledTeamId, teamSettings.status, teamSettings.settings, draft.trackedSide, draft.opponentName])
 
   const chooseTeam = (next: string) => {
+    setTournamentId('')
     setTeamId(next)
     setDraftTeamId('')
     setDefaultsNote(null)
@@ -258,6 +285,8 @@ function BaseballSetupForm() {
   const commit = () => {
     const baseball = sports.find(entry => entry.id === 'baseball')
     if (!baseball || !build.ok) return
+    const selectedTournament = tournaments.find(row => row.id === tournamentId)
+    if (tournamentId && (!selectedTournament || selectedTournament.team_id !== teamId)) { setCommitError('Review the tournament for this team before starting.'); return }
     if (!cloudGate.canStart) {
       setCommitError(cloudGate.message ?? 'Checking Baseball cloud support...')
       return
@@ -268,6 +297,7 @@ function BaseballSetupForm() {
       teamName,
       date,
       cloudPolicy: cloudGate.cloudPolicy,
+      tournament: selectedTournament ? { id: selectedTournament.id, teamId: selectedTournament.team_id, name: selectedTournament.name } : null,
     })
     if (!created.ok) {
       setCommitError(created.message)
@@ -338,6 +368,8 @@ function BaseballSetupForm() {
           </label>
         )}
         {teamsError && <p className="text-sm text-danger-content">Teams could not be loaded: {teamsError}</p>}
+        {teamId && <label className="block text-sm font-medium text-content">Tournament<select className="input-field mt-1" value={tournamentId} onChange={event => setTournamentId(event.target.value)} disabled={tournamentLoad?.request !== tournamentRequest}><option value="">No tournament</option>{tournaments.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>}
+        {teamId && tournamentLoad?.request === tournamentRequest && tournamentLoad.error && <p role="alert" className="text-sm text-danger-content">{tournamentLoad.error}</p>}
         <label className="block text-sm font-medium text-content">
           Team name
           <input className="input-field mt-1" maxLength={80} value={teamName} onChange={event => setTeamName(event.target.value)} />
