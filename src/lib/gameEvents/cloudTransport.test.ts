@@ -5,6 +5,7 @@ import { baseballSetup } from '../baseball/testFixtures'
 import { recordBaseballPitch, startBaseballGame } from '../baseball/commands'
 import { syncBaseballEventGameToCloud } from '../baseball/cloudSync'
 import { isGameEventEnvelope } from './envelope'
+import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../authIdentity'
 import { editBaseballPlay, previewBaseballEdit, previewBaseballRemoval, previewBaseballRestore, removeBaseballPlay, restoreBaseballCorrection } from '../baseball/corrections'
 
 const cloud = vi.hoisted(() => ({
@@ -17,7 +18,7 @@ vi.mock('../supabase', () => ({ supabase: {
   from: (table: string) => {
     let action = 'read'
     const builder = {
-      select: () => builder, eq: () => builder, in: () => builder, is: () => builder,
+      select: () => builder, eq: () => builder, neq: () => builder, in: () => builder, is: () => builder, single: () => builder,
       update: () => { action = 'update'; return builder },
       then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
         cloud.query(table, action).then(resolve, reject),
@@ -74,6 +75,26 @@ beforeEach(() => {
 })
 
 describe('event transport account lifetime', () => {
+  it('uploads and checkpoints repeatedly despite a deleted tournament', async () => {
+    setCurrentAuthUserId('recorder-a')
+    try {
+      const state = fixture()
+      const firstEvent = state.eventStream!.events[0]
+      if (!isGameEventEnvelope(firstEvent)) throw Error('Missing fixture event')
+      state.gameInfo!.tournamentId = 'deleted-tournament'
+      cloud.query.mockImplementation(async (table: string, action: string) => {
+        if (table === 'games' && action === 'read') return { error: null, data: { id: 'cloud-1', team_id: 'team-1', sport_id: 'baseball', created_by: 'recorder-a', status: 'in_progress', tournament_id: null } }
+        return { error: null, data: table === 'game_events' ? [] : null }
+      })
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const result = await syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' })
+        expect(result.syncedState.cloudSync.tournamentSyncWarning).toContain('unavailable')
+        expect(result.syncedState.cloudSync.eventSyncBase).toHaveProperty(firstEvent.id)
+      }
+      expect(cloud.rpc.mock.calls.filter(([name]) => name === 'confirm_game_event_stream_checkpoint')).toHaveLength(3)
+      expect(cloud.rpc.mock.calls.filter(([name]) => name === 'upsert_game_event_revisioned')).toHaveLength(3 * state.eventStream!.events.length)
+    } finally { resetCurrentAuthUserIdForTests() }
+  })
   it.each(['capability', 'binding', 'nickname', 'remote', 'event', 'conflict-status', 'resolution', 'checkpoint'])(
     'stops after a pending %s settles for a different account', async stage => {
       const state = fixture()

@@ -237,6 +237,8 @@ export interface CloudSyncState {
    * cloud, so the recorder should check those totals. Cleared by the next clean sync.
    */
   repairedPlayerLinks?: string[]
+  /** Optional Baseball tournament metadata failed; recorded events sync independently. */
+  tournamentSyncWarning?: string | null
   /** Last cloud-confirmed same-recorder event payloads, keyed by event id. */
   eventSyncBase?: Record<string, GameEventSyncBaseEntry>
   /** Competing same-event revisions that require an explicit recorder choice. */

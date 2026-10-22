@@ -6,6 +6,7 @@ import BasketballRecorderManager from '../components/basketball/BasketballRecord
 import HockeyFinalizationPanel from '../components/hockey/HockeyFinalizationPanel'
 import HockeyRecorderManager from '../components/hockey/HockeyRecorderManager'
 import BaseballFinalizationPanel from '../components/baseball/BaseballFinalizationPanel'
+import BaseballPersonalLinks from '../components/baseball/BaseballPersonalLinks'
 import BaseballRecorderManager from '../components/baseball/BaseballRecorderManager'
 import { computePlayerScore, sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
@@ -235,6 +236,7 @@ export default function GameInfo() {
     useState<'sport_events' | 'legacy' | null>(null)
   const [openingGame, setOpeningGame] = useState(false)
   const [finalizationNotice, setFinalizationNotice] = useState<string | null>(null)
+  const [baseballLinksRevision, setBaseballLinksRevision] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -1053,7 +1055,7 @@ export default function GameInfo() {
               </>
             )}
 
-            {sport?.id === 'baseball' && baseballDataAuthority === 'sport_events' && (
+            {sport?.id === 'baseball' && baseballDataAuthority === 'sport_events' && game.id === gameId && (
               <>
                 {finalizationNotice && (
                   <p role="status" className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
@@ -1066,6 +1068,7 @@ export default function GameInfo() {
                   canManage={canManageRecorderAuthority}
                 />
                 <BaseballFinalizationPanel
+                  key={`${game.id}:${userId}:${baseballLinksRevision}`}
                   gameId={game.id}
                   gameStatus={game.status}
                   sideLabels={inspectedSideLabels}
@@ -1126,6 +1129,17 @@ export default function GameInfo() {
                     )
                   }}
                 />
+                {!game.team_id && userId && game.created_by === userId && <BaseballPersonalLinks
+                  gameId={game.id} userId={userId}
+                  localGameId={`cloud:${game.id}`}
+                  onLinked={async () => {
+                    if (!inspectionIsCurrent()) throw Error('The inspected Baseball game changed.')
+                    const status = await refreshBaseballCloudGameStatus(game.id, inspectionIsCurrent)
+                    if (!inspectionIsCurrent() || !status) throw Error('Refresh Game Info to confirm the current Baseball status.')
+                    setGame(current => current?.id === game.id ? { ...current, status, ...(status === 'final' ? {} : { home_team_score: null, opponent_score: 0, home_score_adjustment: 0 }) } : current)
+                    setBaseballLinksRevision(value => value + 1)
+                  }}
+                />}
               </>
             )}
 

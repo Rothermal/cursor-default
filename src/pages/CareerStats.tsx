@@ -11,6 +11,7 @@ import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/Pla
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { BasketballPlayerAggregateDestination } from '../components/basketball-aggregate/BasketballPlayerAggregateDestination'
 import { HockeyPlayerAggregateDestination } from '../components/hockey-aggregate/HockeyPlayerAggregateDestination'
+import { BaseballDestinationRoute } from '../components/baseball-aggregate/BaseballDestinationRoute'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { careerSportOptions } from '../lib/careerSportOptions'
 import type { GameState } from '../types'
@@ -36,6 +37,10 @@ interface PlayerMeta {
 }
 
 export default function CareerStats() {
+  return <BaseballDestinationRoute kind="career" fallback={<LegacyCareerStats />} />
+}
+
+function LegacyCareerStats() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const playerId = searchParams.get('playerId')

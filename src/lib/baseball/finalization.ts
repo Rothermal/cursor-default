@@ -30,6 +30,7 @@ import { normalizeBaseballSportGameState } from './state'
 import { baseballDecisionsView } from './decisions'
 import { assertBaseballCloudAccount } from './cloudPolicy'
 import { BASEBALL_GAME_END_LABELS } from './recentPlays'
+import type { BaseballPersonalLinkReview } from './personalIdentity'
 import {
   BASEBALL_GAME_STATE_VERSION,
   type BaseballGameEndOutcome,
@@ -85,6 +86,7 @@ export interface BaseballFinalizationPreview {
   endReason: BaseballFinalizationEndReason | null
   pitcherDecisionsMissing: boolean
   endReasonLabel: string | null
+  personalLinkReview?: BaseballPersonalLinkReview
 }
 
 export interface BaseballFinalizationResult {
@@ -151,8 +153,8 @@ export function baseballFinalizationEndReason(
   return outcome && outcome !== 'suspended' ? outcome : null
 }
 
-export async function prepareBaseballFinalization(gameId: string, userId?: string | null): Promise<BaseballFinalizationPreview> {
-  const assertCurrent = () => { if (userId !== undefined) assertBaseballCloudAccount(userId) }
+export async function prepareBaseballFinalization(gameId: string, userId?: string | null, options: { assertCurrent?: () => void; reviewPersonalLinks?: boolean } = {}): Promise<BaseballFinalizationPreview> {
+  const assertCurrent = () => { options.assertCurrent?.(); if (userId !== undefined) assertBaseballCloudAccount(userId) }
   assertCurrent()
   let readiness = await loadBaseballFinalizationReadiness(gameId)
   assertCurrent()
@@ -169,7 +171,7 @@ export async function prepareBaseballFinalization(gameId: string, userId?: strin
   const recorder = recorders.find(item => item.recorderId === readiness.primaryRecorderId)
   if (!recorder) throw new Error('Primary recorder stream is unavailable.')
 
-  const projection = await loadBaseballRecorderProjection(gameId, recorder)
+  const projection = await loadBaseballRecorderProjection(gameId, recorder, assertCurrent)
   assertCurrent()
   const baseballState = projection.state.sportGameState?.sportId === 'baseball'
     ? projection.state.sportGameState
@@ -201,6 +203,14 @@ export async function prepareBaseballFinalization(gameId: string, userId?: strin
     throw new Error('Primary recorder readiness changed. Review finalization again.')
   }
 
+  let personalLinkReview: BaseballPersonalLinkReview | undefined
+  if (options.reviewPersonalLinks && baseballState.setup.sourceTeamId === null) {
+    if (!userId || recorder.recorderId !== userId) throw Error('Review personal links as the game creator and primary recorder.')
+    const { createBaseballPersonalIdentityClient } = await import('./personalIdentity')
+    assertCurrent()
+    personalLinkReview = await createBaseballPersonalIdentityClient(userId).review(gameId, baseballState.setup.participants.map(player => player.id))
+    assertCurrent()
+  }
   return {
     gameId,
     readiness,
@@ -211,17 +221,26 @@ export async function prepareBaseballFinalization(gameId: string, userId?: strin
     endReason,
     endReasonLabel: BASEBALL_GAME_END_LABELS[endReason],
     pitcherDecisionsMissing: baseballDecisionsView(baseballState, projection.inspection.activeEvents).current === null,
+    ...(personalLinkReview ? { personalLinkReview } : {}),
   }
 }
 
-export async function finalizeBaseballGame(preview: BaseballFinalizationPreview, userId?: string | null): Promise<BaseballFinalizationResult> {
-  const assertCurrent = () => { if (userId !== undefined) assertBaseballCloudAccount(userId) }
+export async function finalizeBaseballGame(preview: BaseballFinalizationPreview, userId?: string | null, options: { assertCurrent?: () => void; reviewPersonalLinks?: boolean } = {}): Promise<BaseballFinalizationResult> {
+  const assertCurrent = () => { options.assertCurrent?.(); if (userId !== undefined) assertBaseballCloudAccount(userId) }
   assertCurrent()
   if (!preview.snapshot || !preview.score || !preview.endReason || !preview.projection.inspection.complete) {
     throw new Error('Baseball finalization preview is not publishable.')
   }
   const snapshot = createBaseballCanonicalSnapshot(preview.gameId, preview.recorder.recorderId, preview.projection.state)
-  const published = await finalizeEventGame(BASEBALL_FINALIZATION_RPCS, {
+  const personal = preview.projection.state.sportGameState?.sportId === 'baseball' && preview.projection.state.sportGameState.setup.sourceTeamId === null
+  if (options.reviewPersonalLinks && personal && !preview.personalLinkReview) throw Error('Review the personal player links before finalizing.')
+  let published: { publicationId: string; publicationNumber: number; primaryRecorderId: string; finalizedAt: string }
+  if (preview.personalLinkReview) {
+    if (!personal || !userId) throw Error('Reviewed player links require the personal game creator.')
+    const { createBaseballPersonalIdentityClient } = await import('./personalIdentity')
+    assertCurrent()
+    published = await createBaseballPersonalIdentityClient(userId).finalizeReviewed({ state: preview.projection.state, review: preview.personalLinkReview, assertReviewCurrent: assertCurrent })
+  } else published = await finalizeEventGame(BASEBALL_FINALIZATION_RPCS, {
     gameId: preview.gameId,
     recorderId: preview.recorder.recorderId,
     state: preview.projection.state,

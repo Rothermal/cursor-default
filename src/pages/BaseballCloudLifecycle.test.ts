@@ -28,6 +28,14 @@ function finalized(state: GameState): GameState {
 }
 beforeEach(() => { h.configured = false; h.effects = []; h.refresh.mockReset() })
 describe('Baseball finalized cloud UI', () => {
+  it('shows optional tournament metadata warnings without hiding live capture', () => {
+    const state = startedGame()
+    state.cloudSync.tournamentSyncWarning = 'The selected Baseball tournament is unavailable for this team.'
+    const html = view(state, '/game')
+    expect(html).toContain('Tournament association:')
+    expect(html).toContain('Events can still sync.')
+    expect(html).toContain('>Quick PA<')
+  })
   it('refreshes on tracker mount/focus/online and invalidates its caller on unmount', () => {
     h.configured = true
     view(finalized(expectOk(endBaseballGame(startedGame(), 'time_limit', ctx()))), '/game')

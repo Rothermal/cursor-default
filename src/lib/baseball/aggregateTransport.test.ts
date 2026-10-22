@@ -5,6 +5,7 @@ import { BASEBALL_AGGREGATE_CAPABILITIES, type BaseballRpcResponse } from './fea
 import { AGGREGATE_PLAYER, AGGREGATE_TEAM, AGGREGATE_USER, aggregateUuid, baseballAggregateSource, finishedAggregateState } from './aggregateTestFixtures'
 import { baseballSetup, startedGame } from './testFixtures'
 import type { BaseballCanonicalAggregateSource } from './aggregateTypes'
+import { allocateBaseballRefreshGeneration } from '../../hooks/useBaseballAggregateDestination'
 
 const scope = { type: 'career' as const, playerId: AGGREGATE_PLAYER }
 const options = { userId: AGGREGATE_USER, variant: 'baseball' as const }
@@ -102,6 +103,22 @@ describe('BSB-7A complete canonical paging', () => {
 })
 
 describe('BSB-7A shared account/request lifetimes', () => {
+  it('explicit refresh cannot join an older generation held alive by another subscriber', async () => {
+    const old = deferred(), fresh = deferred()
+    let requests = 0
+    const rpc = vi.fn((name: string) => name.includes('capabilities') ? Promise.resolve(ok(BASEBALL_AGGREGATE_CAPABILITIES)) : (++requests === 1 ? old.promise : fresh.promise))
+    const client = { rpc }, oldGeneration = allocateBaseballRefreshGeneration()
+    const one = loadBaseballAggregates(scope, { ...options, client, refreshGeneration: oldGeneration })
+    const peer = loadBaseballAggregates(scope, { ...options, client, refreshGeneration: oldGeneration })
+    const refreshed = loadBaseballAggregates(scope, { ...options, client, refreshGeneration: allocateBaseballRefreshGeneration() })
+    for (let i = 0; i < 8; i++) await Promise.resolve()
+    expect(requests).toBe(2)
+    old.resolve(ok(page([baseballAggregateSource()])))
+    fresh.resolve(ok(page([])))
+    expect((await one).aggregate.games).toHaveLength(1)
+    expect((await peer).aggregate.games).toHaveLength(1)
+    expect((await refreshed).aggregate.games).toHaveLength(0)
+  })
   it('shares only in-flight work and preserves a subscriber when its peer cancels', async () => {
     const pending = deferred()
     const rpc = vi.fn((name: string) => name.includes('capabilities') ? Promise.resolve(ok(BASEBALL_AGGREGATE_CAPABILITIES)) : pending.promise)

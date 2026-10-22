@@ -13,6 +13,7 @@ import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/Pla
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { BasketballPlayerAggregateDestination } from '../components/basketball-aggregate/BasketballPlayerAggregateDestination'
 import { HockeyPlayerAggregateDestination } from '../components/hockey-aggregate/HockeyPlayerAggregateDestination'
+import { BaseballDestinationRoute } from '../components/baseball-aggregate/BaseballDestinationRoute'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
@@ -64,6 +65,10 @@ function isMissingRpcError(msg: string): boolean {
 }
 
 export default function PlayerProfile() {
+  return <BaseballDestinationRoute kind="profile" fallback={<LegacyPlayerProfile />} />
+}
+
+function LegacyPlayerProfile() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
