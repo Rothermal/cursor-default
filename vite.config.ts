@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { PWA_MAX_PRECACHE_ASSET_BYTES } from './src/lib/pwaBuildPolicy'
+import { PWA_MAX_PRECACHE_ASSET_BYTES, pwaVendorChunk } from './src/lib/pwaBuildPolicy'
 import { APPEARANCE_RELEASE_ENABLED } from './src/lib/appearanceReleasePolicy'
 
 export default defineConfig(({ command }) => ({
@@ -12,6 +12,11 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages project sites are served from "/<repo>/".
   // Keep local dev at "/" while ensuring production builds work on Pages.
   base: command === 'build' ? '/cursor-default/' : '/',
+  build: {
+    rollupOptions: {
+      output: { manualChunks: pwaVendorChunk },
+    },
+  },
   plugins: [
     {
       name: 'appearance-preview-gate',

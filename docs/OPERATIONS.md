@@ -25,6 +25,22 @@ Deployment health is determined by the latest Actions run, not this link's prese
   beginning verification. If Update asks to pause a running game, complete that
   guarded workflow; do not bypass it with a forced reload.
 
+### Configured build and offline assets
+
+PR CI builds with a public placeholder Supabase URL/key so it includes the same
+SDK paths as deployment without exposing repository secrets. An unconfigured local
+build can tree-shake those paths and is not a substitute for this configured check.
+Vite places the Supabase SDK in its own vendor chunk. All JavaScript chunks remain
+in the service worker's precache; the existing **3 MiB per-file** budget is unchanged.
+Oversized files still fail the build instead of silently losing offline support.
+
+On 2026-10-22, the deployment of #500 and the following docs-only #501 failed at
+service-worker generation: the configured app chunk was about 3.17 MB. Lint and all
+3,179 tests passed; no Pages artifact was uploaded. This was not a database or
+credential-authentication failure. Splitting the SDK addresses the bundle boundary;
+rerunning the unchanged oversized build does not fix it. Installed-PWA validation
+remains separate from build/precache checks.
+
 ## Cloud configuration
 
 [.env.example](../.env.example) lists local client environment keys. The deployed
