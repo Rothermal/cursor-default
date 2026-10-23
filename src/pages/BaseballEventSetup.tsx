@@ -43,8 +43,11 @@ import {
 import { getBaseballEventCreationPolicy } from '../lib/sportAvailability'
 import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
-import { captureAuthIdentity, isCurrentAuthIdentity } from '../lib/authIdentity'
+import { captureAuthIdentity, isCurrentAuthIdentity, isCurrentAuthUser } from '../lib/authIdentity'
 import { loadBaseballTeamTournaments, type BaseballTournamentOption } from '../lib/baseball/tournament'
+import { resolveBaseballSettingsHierarchy } from '../lib/baseball/settings'
+import { createBaseballMyPlayer, loadBaseballMyPlayers, type BaseballMyPlayer } from '../lib/baseball/personalLinkReview'
+import { persistBaseballSetupPlayerLinks } from '../lib/baseball/setupPersonalLinks'
 
 interface BaseballTeamOption {
   id: string
@@ -75,13 +78,15 @@ export default function BaseballEventSetup() {
 }
 
 function BaseballSetupForm() {
-  const { state, dispatch, prepareActiveGameMutation, startNewGame } = useGame()
+  const { state, prepareActiveGameMutation, commitGameSetup } = useGame()
+  const { baseball: personal, baseballDeviceSettings, setBaseballSettingsPageActive } = useSettings()
   const { user } = useAuth()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const cloudAvailable = Boolean(user && supabase)
   const [teams, setTeams] = useState<BaseballTeamOption[]>([])
   const [teamsError, setTeamsError] = useState<string | null>(null)
+  const [teamsLoaded, setTeamsLoaded] = useState(false)
   const [teamId, setTeamId] = useState<string>(params.get('teamId') ?? '')
   const [tournamentId, setTournamentId] = useState('')
   const [tournamentLoad, setTournamentLoad] = useState<{ request: object; rows: BaseballTournamentOption[]; error: string | null } | null>(null)
@@ -94,6 +99,7 @@ function BaseballSetupForm() {
   const [roster, setRoster] = useState<BaseballSetupRosterPlayer[]>([])
   const [rosterStatus, setRosterStatus] = useState<RosterStatus>('idle')
   const [rosterError, setRosterError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [draft, setDraft] = useState<BaseballSetupDraft>(() =>
     createBaseballSetupDraft({ rules: createBaseballMatchRules(DEFAULT_BASEBALL_PROFILE_ID), roster: [] }))
   const [draftTeamId, setDraftTeamId] = useState<string>('')
@@ -101,11 +107,44 @@ function BaseballSetupForm() {
   const [rulesError, setRulesError] = useState<string | null>(null)
   const [commitError, setCommitError] = useState<string | null>(null)
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: null as string | null })
+  const [personalInitialized, setPersonalInitialized] = useState(false)
+  const [myPlayers, setMyPlayers] = useState<BaseballMyPlayer[]>([])
+  const [myPlayersError, setMyPlayersError] = useState<string | null>(null)
+  const [myPlayersAttempt, setMyPlayersAttempt] = useState(0)
+  const [selectedMyPlayer, setSelectedMyPlayer] = useState('')
+  const [creatingPlayer, setCreatingPlayer] = useState(false)
+  const createRequest = useRef<{ name: string; id: string } | null>(null)
+  const [committing, setCommitting] = useState(false)
+  const committingRef = useRef(false)
+  const lifetime = useRef(true)
   const teamSettings = useSportTeamSettings(baseballTeamSettingsAdapter, teamId || null, Boolean(teamId))
   const [storage, setStorage] = useState<BaseballSetupStorage>('cloud')
   const [capability, setCapability] = useState<BaseballSetupCapabilityState>({ status: 'idle' })
   const [capabilityAttempt, setCapabilityAttempt] = useState(0)
   const cloudGate = baseballSetupCloudGate({ cloudAvailable, storage, capability })
+
+  useEffect(() => { lifetime.current = true; setBaseballSettingsPageActive(true); return () => { lifetime.current = false; setBaseballSettingsPageActive(false) } }, [setBaseballSettingsPageActive])
+  useEffect(() => {
+    if (teamId || personalInitialized || !['local', 'synced', 'pending'].includes(personal.sync.status)) return
+    const resolved = resolveBaseballSettingsHierarchy({ authority: 'personal', personalSettings: personal.settings })
+    if (!resolved.ok) return
+    setDraft(current => setBaseballDraftRules(current, resolved.rules))
+    setPersonalInitialized(true)
+    setDefaultsNote(personal.sync.status === 'pending' ? 'Using this account\'s pending personal defaults.' : 'Personal game defaults')
+  }, [teamId, personalInitialized, personal.settings, personal.sync.status])
+
+  useEffect(() => {
+    if (teamId || !user || !supabase) return
+    const identity = captureAuthIdentity(user.id)
+    const controller = new AbortController()
+    const current = () => { if (controller.signal.aborted || !identity || !isCurrentAuthIdentity(identity)) throw Error('The player selection changed.') }
+    setMyPlayersError(null)
+    void loadBaseballMyPlayers(user.id, current, controller.signal).then(players => { current(); setMyPlayers(players) }).catch(error => {
+      try { current() } catch { return }
+      setMyPlayersError(error instanceof Error ? error.message : 'My Players unavailable.')
+    })
+    return () => controller.abort()
+  }, [user, teamId, myPlayersAttempt])
 
   useEffect(() => {
     if (!teamId || !user) return
@@ -137,6 +176,7 @@ function BaseballSetupForm() {
   useEffect(() => {
     if (!cloudAvailable) return
     let cancelled = false
+    setTeamsError(null)
     void (async () => {
       const { data, error } = await supabase!
         .from('teams')
@@ -144,6 +184,7 @@ function BaseballSetupForm() {
         .eq('seasons.sport', 'baseball')
         .order('created_at', { ascending: false })
       if (cancelled) return
+      setTeamsLoaded(true)
       if (error) {
         setTeamsError(error.message)
         return
@@ -152,7 +193,7 @@ function BaseballSetupForm() {
         .map(row => ({ id: row.id, name: row.name, seasonId: row.season_id })))
     })()
     return () => { cancelled = true }
-  }, [cloudAvailable])
+  }, [cloudAvailable, loadAttempt])
 
   useEffect(() => {
     if (!teamId || !supabase) return
@@ -182,7 +223,7 @@ function BaseballSetupForm() {
       setRosterStatus('ready')
     })()
     return () => { cancelled = true }
-  }, [teamId])
+  }, [teamId, loadAttempt])
 
   // Team defaults are copied into the draft once per chosen team, after the roster and the
   // first cloud settings read have both finished (see planBaseballTeamPrefill).
@@ -191,7 +232,7 @@ function BaseballSetupForm() {
     const prefill = planBaseballTeamPrefill({
       teamId,
       initializedTeamId: draftTeamId || null,
-      rosterReady: rosterStatus === 'ready',
+      rosterReady: rosterStatus === 'ready' && Boolean(team),
       roster,
       settings: {
         settledTeamId: teamSettings.settledTeamId,
@@ -216,6 +257,8 @@ function BaseballSetupForm() {
     setDefaultsNote(null)
     setRoster([])
     setRosterStatus(next ? 'loading' : 'idle')
+    setPersonalInitialized(false)
+    setSelectedMyPlayer('')
     if (!next) {
       setDraft(current => createBaseballSetupDraft({
         rules: createBaseballMatchRules(DEFAULT_BASEBALL_PROFILE_ID),
@@ -238,6 +281,28 @@ function BaseballSetupForm() {
     setRoster(current => [...current, player])
     setDraft(current => setBaseballPlayerSelected(current, player.playerId, true))
     setNewPlayer({ name: '', number: '', position: null })
+  }
+
+  const addMyPlayer = (player: BaseballMyPlayer) => {
+    if (roster.some(row => row.personalPlayerId === player.id)) return
+    const row: BaseballSetupRosterPlayer = { playerId: createBaseballUuid(), personalPlayerId: player.id, displayName: player.displayName, number: newPlayer.number.trim().slice(0, 10) || null, position: normalizeBaseballPosition(newPlayer.position) }
+    setRoster(current => [...current, row])
+    setDraft(current => setBaseballPlayerSelected(current, row.playerId, true))
+    setSelectedMyPlayer('')
+  }
+  const createPlayer = async () => {
+    if (!user || creatingPlayer || teamId || !newPlayer.name.trim()) return
+    const identity = captureAuthIdentity(user.id)
+    const current = () => { if (!lifetime.current || currentCommitKey.current !== commitKey || !identity || !isCurrentAuthIdentity(identity)) throw Error('The setup changed. Refresh My Players to find the created player.') }
+    if (createRequest.current?.name !== newPlayer.name.trim()) createRequest.current = { name: newPlayer.name.trim(), id: createBaseballUuid() }
+    const request = createRequest.current
+    setCreatingPlayer(true); setMyPlayersError(null)
+    try {
+      const player = await createBaseballMyPlayer(user.id, request.id, request.name, current)
+      current(); setMyPlayers(previous => [...previous.filter(row => row.id !== player.id), player]); addMyPlayer(player)
+      setNewPlayer({ name: '', number: '', position: null }); createRequest.current = null
+    } catch (error) { try { current(); setMyPlayersError(error instanceof Error ? error.message : 'Player could not be created.') } catch { /* Old account owns this request. */ } }
+    finally { if (lifetime.current) setCreatingPlayer(false) }
   }
 
   const changeRules = (patch: Partial<BaseballMatchRules>) => {
@@ -266,6 +331,10 @@ function BaseballSetupForm() {
   const dressed = roster.filter(player => draft.selectedPlayerIds.includes(player.playerId))
   const build = useMemo(() => buildBaseballMatchSetup(draft, roster), [draft, roster])
   const waitingForTeam = Boolean(teamId) && draftTeamId !== teamId
+  const waitingForPersonal = !teamId && !personalInitialized
+  const commitKey = JSON.stringify([draft, roster, teamId, teamName, date, storage, tournamentId, personal.scopeKey])
+  const currentCommitKey = useRef(commitKey)
+  currentCommitKey.current = commitKey
 
   const moveBatter = (index: number, offset: number) => {
     const order = [...draft.battingOrder]
@@ -282,7 +351,8 @@ function BaseballSetupForm() {
     setDraft({ ...draft, opponentSlots: slots })
   }
 
-  const commit = () => {
+  const commit = async () => {
+    if (committingRef.current || waitingForPersonal || waitingForTeam || creatingPlayer) return
     const baseball = sports.find(entry => entry.id === 'baseball')
     if (!baseball || !build.ok) return
     const selectedTournament = tournaments.find(row => row.id === tournamentId)
@@ -291,28 +361,48 @@ function BaseballSetupForm() {
       setCommitError(cloudGate.message ?? 'Checking Baseball cloud support...')
       return
     }
-    const created = createBaseballEventGameState({
-      sport: baseball,
-      setup: build.setup,
-      teamName,
-      date,
-      cloudPolicy: cloudGate.cloudPolicy,
-      tournament: selectedTournament ? { id: selectedTournament.id, teamId: selectedTournament.team_id, name: selectedTournament.name } : null,
-    })
-    if (!created.ok) {
-      setCommitError(created.message)
-      return
+    const identity = user ? captureAuthIdentity(user.id) : null
+    const current = () => {
+      if (!lifetime.current || currentCommitKey.current !== commitKey || (user ? !identity || !isCurrentAuthIdentity(identity) : !isCurrentAuthUser(null))) throw Error('Setup changed. Review it before starting.')
     }
-    const hasGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0 || state.eventStream))
-    if (hasGame && !prepareActiveGameMutation('new_game_commit')) return
-    if (!startNewGame(baseball)) return
-    dispatch({ type: 'HYDRATE_STATE', state: created.state })
-    navigate('/game')
+    committingRef.current = true; setCommitting(true); setCommitError(null)
+    try {
+      current()
+      if (cloudAvailable && storage === 'cloud' && user) {
+        const checked = await ensureBaseballReleaseCapabilities(user.id, { force: true })
+        current()
+        if (checked.status !== 'ready') throw Error(checked.error)
+      }
+      const created = createBaseballEventGameState({
+        sport: baseball,
+        setup: build.setup,
+        teamName,
+        date,
+        cloudPolicy: cloudGate.cloudPolicy,
+        captureDefaults: baseballDeviceSettings,
+        tournament: selectedTournament ? { id: selectedTournament.id, teamId: selectedTournament.team_id, name: selectedTournament.name } : null,
+      })
+      if (!created.ok) {
+        setCommitError(created.message)
+        return
+      }
+      const hasGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0 || state.eventStream))
+      if (hasGame && !prepareActiveGameMutation('new_game_commit')) return
+      current()
+      const result = commitGameSetup(created.state, null, localGameId => {
+        current()
+        if (user && !teamId) persistBaseballSetupPlayerLinks(user.id, localGameId, build.setup, roster)
+      })
+      if (!result.ok) { setCommitError(result.reason); return }
+      navigate('/game')
+    } catch (error) { if (lifetime.current) setCommitError(error instanceof Error ? error.message : 'Game could not be created.') }
+    finally { committingRef.current = false; if (lifetime.current) setCommitting(false) }
   }
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
       <h1 className="text-lg font-bold">New Baseball game</h1>
+      <fieldset disabled={committing || creatingPlayer} className="space-y-5 min-w-0">
       {!cloudAvailable && (
         <p className="text-sm text-content-muted">Saved on this device. Sign in to sync Baseball games to the cloud.</p>
       )}
@@ -395,10 +485,13 @@ function BaseballSetupForm() {
         </div>
       </section>
 
-      {waitingForTeam ? (
-        <p className="text-sm text-content-muted" aria-live="polite">
-          {rosterStatus === 'error' ? `The roster could not be loaded: ${rosterError}` : 'Loading the team roster and defaults...'}
-        </p>
+      {waitingForTeam || waitingForPersonal ? (
+        <div className="space-y-2" aria-live="polite">
+          <p className="text-sm text-content-muted">{waitingForTeam ? rosterError ?? teamSettings.error ?? teamsError ?? (teamsLoaded && !teams.some(team => team.id === teamId) ? 'The selected Baseball team is unavailable.' : 'Loading the team roster and defaults...') : personal.sync.error ?? (personal.sync.conflict ? 'Resolve personal defaults in Settings, or explicitly use built-in rules.' : 'Loading personal defaults...')}</p>
+          <button type="button" className="btn-secondary" onClick={() => { if (teamId) { setLoadAttempt(value => value + 1); void teamSettings.refresh() } else void personal.refresh() }}>Retry defaults</button>
+          {!teamId && personal.sync.status !== 'checking' && <button type="button" className="btn-secondary" onClick={() => { setDraft(current => setBaseballDraftRules(current, createBaseballMatchRules(DEFAULT_BASEBALL_PROFILE_ID))); setPersonalInitialized(true); setDefaultsNote('Built-in rules selected for this game; personal defaults unchanged.') }}>Use built-in rules for this game</button>}
+          <Link to="/settings/sports/baseball" className="block text-sm text-accent">Personal defaults</Link>
+        </div>
       ) : (
         <>
           {defaultsNote && (
@@ -446,6 +539,12 @@ function BaseballSetupForm() {
 
           <section className="space-y-2">
             <h2 className="text-sm font-bold uppercase text-content-muted">Players</h2>
+            {!teamId && cloudAvailable && <div className="space-y-2 border-b border-line pb-3">
+              <label className="block text-sm font-medium">My Players<select aria-label="My Players" className="input-field mt-1" value={selectedMyPlayer} disabled={creatingPlayer || committing} onChange={event => setSelectedMyPlayer(event.target.value)}><option value="">Choose a player</option>{myPlayers.filter(player => !roster.some(row => row.personalPlayerId === player.id)).map(player => <option key={player.id} value={player.id}>{player.displayName}</option>)}</select></label>
+              <button type="button" className="btn-secondary" disabled={!selectedMyPlayer || creatingPlayer || committing} onClick={() => { const player = myPlayers.find(row => row.id === selectedMyPlayer); if (player) addMyPlayer(player) }}>Add My Player</button>
+              {myPlayersError && <p role="alert" className="text-sm text-danger-content">{myPlayersError}</p>}
+              <button type="button" className="text-sm text-accent" onClick={() => setMyPlayersAttempt(value => value + 1)}>Refresh My Players</button>
+            </div>}
             {roster.length === 0 && <p className="text-sm text-content-muted">No players yet.</p>}
             <ul className="space-y-1">
               {roster.map(player => (
@@ -455,6 +554,7 @@ function BaseballSetupForm() {
                       onChange={event => setDraft(setBaseballPlayerSelected(draft, player.playerId, event.target.checked))} />
                     {nameOf(player.playerId)}
                     <span className="text-content-muted">· {baseballPositionLabel(player.position)}</span>
+                    {!teamId && <span className="text-xs text-content-muted">{player.personalPlayerId ? 'My Player' : 'Unlinked'}</span>}
                   </label>
                   {draft.selectedPlayerIds.includes(player.playerId) && (
                     <div className="mt-1 flex flex-wrap items-center gap-3 pl-6 text-xs text-content-muted">
@@ -485,8 +585,9 @@ function BaseballSetupForm() {
                 </div>
                 <BaseballPositionField value={newPlayer.position} onChange={position => setNewPlayer({ ...newPlayer, position })} />
                 <button type="button" className="btn-secondary w-full" disabled={!newPlayer.name.trim()} onClick={addLocalPlayer}>
-                  Add player
+                  Add unlinked player
                 </button>
+                {cloudAvailable && <button type="button" className="btn-secondary w-full" disabled={!newPlayer.name.trim() || creatingPlayer || committing} onClick={() => void createPlayer()}>{creatingPlayer ? 'Creating player...' : 'Create Player and add'}</button>}
               </div>
             )}
           </section>
@@ -594,11 +695,13 @@ function BaseballSetupForm() {
               {commitError}
             </p>
           )}
-          <button type="button" className="btn-primary w-full" disabled={!build.ok || !cloudGate.canStart} onClick={commit}>
-            Continue to game
+          <button type="button" className="btn-primary w-full" disabled={!build.ok || !cloudGate.canStart || committing || creatingPlayer} onClick={() => void commit()}>
+            {committing ? 'Creating game...' : 'Continue to game'}
           </button>
         </>
       )}
+      </fieldset>
+      <Link to="/sport/baseball" className="btn-secondary inline-block">Cancel</Link>
     </main>
   )
 }

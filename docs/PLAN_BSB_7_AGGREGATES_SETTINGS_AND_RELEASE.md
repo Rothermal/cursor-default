@@ -1,6 +1,6 @@
 # Plan: BSB-7 Baseball Aggregates, Settings and Release
 
-Status: **Approved execution plan (#497); BSB-7A/7B implemented; BSB-7C1 foundation implemented for review**
+Status: **Approved execution plan (#497); BSB-7A/7B implemented; BSB-7C integration implemented for review**
 (2026-10-23). The owner approved all 23 recommendations, Q1-Q23. Migration 079
 delivers the bounded server foundation described below. The client half now adds
 pure replay aggregates, strict paging, separate feature capabilities and checked
@@ -21,8 +21,11 @@ Current-head CI is reported in PR #500, separately from the original pass.
 BSB-7C1 now adds the personal-settings foundation for review (2026-10-23):
 exact personal parsing, migration 080's fixed account-bound CAS/read/capability,
 and offline reconciliation/controller checks. See the
-[7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). Settings/setup UI integration
-(7C2), 7D and live exit remain pending; the foundation is not a full 7C exit.
+[7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). 7C1 merged in #503. 7C2 now
+mounts the controller/editor, personal setup defaults, My Players/explicit creation,
+post-binding link intents and new-game-only device defaults for review. The owner
+reports 080 applied on 2026-10-23. This is not a live behavioral signoff; 7D and live
+exit remain pending.
 
 No agent applies a live migration or changes a release flag in this work. The owner
 reports migration 079 applied on 2026-10-20; this report is not an observed live
@@ -544,7 +547,7 @@ Acceptance/evidence required:
 
 ### BSB-7C - Personal Rules, Setup and Device Defaults
 
-Delivery boundary: **7C1 foundation implemented for review; 7C2 integration pending**.
+Delivery boundary: **7C1 merged; 7C2 integration implemented for review**.
 7C1 owns the exact settings schema, fixed migration-080 RPCs, independent capability
 and account-lifetime controller with pending/CAS/conflict handling. It does not mount
 new UI, seed setups or change capture preferences. 7C2 combines the editor, controller
@@ -559,6 +562,36 @@ and new-game-only device capture defaults. Reuse bounded shared hooks/fields.
 Own personal new-setup My Players selection and an explicit Create Player action.
 Persist account/local-game/participant link intents for online application after
 binding, without rewriting old setups. Signed-out/offline unlinked play still works.
+
+7C2 delivery: a Baseball-only React adapter owns controller subscription/disposal
+per synchronous auth generation and keeps sibling sport hooks unchanged. Personal
+and team editors share the bounded rules fields. Fresh personal setup waits for
+settled defaults; a failed or missing-feature read offers an explicit match-only
+built-in fallback, never a silent account/team crossover. Team prefill waits for
+the matching team, roster and settings; unreadable settings now require retry.
+Later settings refreshes cannot replace match edits. Capture defaults are device-only
+and seed the fresh candidate, not an effect on current or historical games.
+
+My Players choices use synthetic local roster ids and separate durable link intents,
+not inferred source-player links in frozen personal setup. Explicit Create Player
+can create an account-owned identity even if setup is subsequently cancelled; it
+is not a start-game side effect. A retained generated id supports uncertain retries.
+The existing rollback-safe parking transaction commits the complete game and atomic
+intent batch together after a fresh cloud-capability check; Cancel and failed writes
+preserve the active game. Only selected participants get intents. After binding,
+sync reviews the current personal map, applies explicit choices sequentially and
+retains uncertain operations for retry. A confirmed current map can acknowledge an
+already-applied link; no intent automatically reopens a published result or changes
+frozen setup/events. Link failures retain the cloud binding and recoverable sync
+error rather than claiming the requested player-history links were completed.
+Version-2 setup-origin intents are the only automatically drained requests; manual
+version-1 review requests remain manual. The tracker can explicitly discard one
+pending device request without undoing already-sent requests or deleting cloud
+links/players/history, then retry the remaining work.
+
+No migration, release-contract change or cutover is added by 7C2. See the
+[7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md) for the observed local/browser
+checks and separately pending live evidence.
 
 Acceptance/evidence required:
 - Exact schema/effective-rule parity, stale CAS, offline edits, both conflict choices,
@@ -612,9 +645,9 @@ Unresolved technical adjudication is resolved before its implementation; it is n
 a new pending product batch. If design cannot satisfy an approved decision, raise
 that conflict explicitly rather than silently weakening the contract.
 
-Delivery status: **7A foundations, 7B destinations/link review and 7C1 personal
-settings foundation implemented; full 7A/live exit, 7C2 and 7D remain pending**.
-Evidence is recorded per delivery above. 7C1 does not add settings/setup UI or cutover.
+Delivery status: **7A foundations, 7B destinations/link review and 7C personal
+settings/setup integration implemented for review; full 7A/live exit and 7D remain pending**.
+Evidence is recorded per delivery above. 7C2 adds UI/setup integration, not cutover.
 Current `opt_in`, exact cloud contract 2/078 and existing access remain unchanged.
 BSB-6 and broader-release live evidence remain pending. Follow the current
 single-agent workflow in AGENTS.md for validation and Git/PR work, keeping PR review

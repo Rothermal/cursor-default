@@ -1,26 +1,17 @@
-import { ArrowDown, ArrowUp, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, RefreshCw, Save, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSportTeamSettings, type SportTeamSettingsStatus } from '../../hooks/useSportTeamSettings'
 import { BASEBALL_FIELDING_POSITIONS } from '../../lib/baseball/positions'
-import { baseballRulesProfiles } from '../../lib/baseball/profiles'
+import BaseballRulesDefaultsFields from './BaseballRulesDefaultsFields'
 import {
   BASEBALL_MAX_DEFAULT_BATTING_ORDER,
   baseballTeamSettingsFingerprint,
   pruneBaseballLineupDefaults,
   resolveBaseballTeamRules,
   staleBaseballLineupPlayerIds,
-  type BaseballTeamRuleOverrides,
   type BaseballTeamSettingsV1,
 } from '../../lib/baseball/settings'
 import { baseballTeamSettingsAdapter } from '../../lib/baseball/teamSettingsSync'
-import type { BaseballBattingOrderFormat, BaseballProfileId } from '../../lib/baseball/types'
-
-const FORMAT_LABELS: Record<BaseballBattingOrderFormat, string> = {
-  standard: 'Standard (nine batters)',
-  designated_hitter: 'Designated hitter allowed',
-  extra_hitter: 'Extra hitters',
-  continuous: 'Continuous batting order',
-}
 
 export default function BaseballTeamSettingsPanel({
   teamId,
@@ -59,13 +50,6 @@ export default function BaseballTeamSettingsPanel({
     }
     previousSaved.current = next
   }, [draft, team.revision, team.settings])
-
-  const setOverrides = (patch: BaseballTeamRuleOverrides, remove: Array<keyof BaseballTeamRuleOverrides> = []) =>
-    setDraft(current => {
-      const ruleOverrides = { ...current.ruleOverrides, ...patch }
-      for (const key of remove) delete ruleOverrides[key]
-      return { ...current, ruleOverrides }
-    })
 
   const setBattingOrder = (battingOrder: string[]) =>
     setDraft(current => ({ ...current, lineupDefaults: { ...current.lineupDefaults, battingOrder } }))
@@ -124,98 +108,10 @@ export default function BaseballTeamSettingsPanel({
         </div>
       )}
 
-      <fieldset disabled={!writable} className="space-y-3 border-y border-line py-3">
-        <legend className="font-semibold text-content">Rules</legend>
-        <label className="block space-y-1 text-sm text-content">
-          <span className="font-medium">Rules profile</span>
-          <select className="input-field w-full" value={draft.baseProfile.profileId}
-            onChange={event => setDraft(current => ({
-              ...current,
-              baseProfile: { profileId: event.target.value as BaseballProfileId, profileVersion: 1 },
-            }))}>
-            {baseballRulesProfiles().map(profile => <option key={profile.id} value={profile.id}>{profile.label}</option>)}
-          </select>
-        </label>
-        <p className="text-xs text-content-muted">
-          {baseballRulesProfiles().find(profile => profile.id === draft.baseProfile.profileId)?.description}
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block space-y-1 text-sm text-content">
-            <span className="font-medium">Innings</span>
-            <input type="number" min={1} max={15} className="input-field w-full"
-              value={resolved.ok ? resolved.rules.scheduledInnings : draft.ruleOverrides.scheduledInnings ?? ''}
-              onChange={event => {
-                const value = Number(event.target.value)
-                if (Number.isInteger(value) && value >= 1 && value <= 15) setOverrides({ scheduledInnings: value })
-              }} />
-          </label>
-          <label className="block space-y-1 text-sm text-content">
-            <span className="font-medium">Batting order</span>
-            <select className="input-field w-full"
-              value={resolved.ok ? resolved.rules.battingOrderFormat : draft.ruleOverrides.battingOrderFormat ?? 'standard'}
-              onChange={event => setOverrides({ battingOrderFormat: event.target.value as BaseballBattingOrderFormat })}>
-              {Object.entries(FORMAT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          {resolved.ok && resolved.rules.battingOrderFormat === 'extra_hitter' && (
-            <label className="block space-y-1 text-sm text-content">
-              <span className="font-medium">Extra hitters</span>
-              <input type="number" min={0} max={5} className="input-field w-full" value={resolved.rules.maxExtraHitters}
-                onChange={event => {
-                  const value = Number(event.target.value)
-                  if (Number.isInteger(value) && value >= 0 && value <= 5) setOverrides({ maxExtraHitters: value })
-                }} />
-            </label>
-          )}
-          <label className="block space-y-1 text-sm text-content">
-            <span className="font-medium">Pitch count limit</span>
-            <input type="number" min={1} max={500} className="input-field w-full" placeholder="None"
-              value={resolved.ok ? resolved.rules.pitchCountLimit ?? '' : ''}
-              onChange={event => {
-                if (event.target.value === '') return setOverrides({ pitchCountLimit: null })
-                const value = Number(event.target.value)
-                if (Number.isInteger(value) && value >= 1 && value <= 500) setOverrides({ pitchCountLimit: value })
-              }} />
-          </label>
-        </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-content">Run rules</p>
-          {(resolved.ok ? resolved.rules.runRules : []).map((rule, index, rules) => (
-            <div key={index} className="flex flex-wrap items-center gap-2 text-sm text-content">
-              <span>Lead of</span>
-              <input type="number" min={1} max={100} aria-label={`Run rule ${index + 1} lead`} className="input-field w-20"
-                value={rule.lead} onChange={event => {
-                  const lead = Number(event.target.value)
-                  if (Number.isInteger(lead) && lead >= 1) setOverrides({ runRules: rules.map((entry, i) => i === index ? { ...entry, lead } : entry) })
-                }} />
-              <span>after inning</span>
-              <input type="number" min={1} max={15} aria-label={`Run rule ${index + 1} inning`} className="input-field w-20"
-                value={rule.afterInning} onChange={event => {
-                  const afterInning = Number(event.target.value)
-                  if (Number.isInteger(afterInning) && afterInning >= 1) setOverrides({ runRules: rules.map((entry, i) => i === index ? { ...entry, afterInning } : entry) })
-                }} />
-              <button type="button" className="grid h-9 w-9 place-items-center rounded-md border border-line text-content-muted"
-                aria-label={`Remove run rule ${index + 1}`}
-                onClick={() => setOverrides({ runRules: rules.filter((_, i) => i !== index) })}>
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-          {resolved.ok && resolved.rules.runRules.length < 5 && (
-            <button type="button" className="inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-info-content"
-              onClick={() => setOverrides({ runRules: [...resolved.rules.runRules, { afterInning: 4, lead: 10 }] })}>
-              <Plus size={16} /> Add run rule
-            </button>
-          )}
-        </div>
-        {!resolved.ok && <p role="alert" className="text-sm text-warning-content">{resolved.error}</p>}
-        {Object.keys(draft.ruleOverrides).length > 0 && (
-          <button type="button" className="text-sm font-semibold text-info-content"
-            onClick={() => setDraft(current => ({ ...current, ruleOverrides: {} }))}>
-            Use profile rules
-          </button>
-        )}
-      </fieldset>
+      <div className="border-y border-line py-3">
+        <BaseballRulesDefaultsFields value={draft} disabled={!writable}
+          onChange={next => setDraft(current => ({ ...current, ...next }))} />
+      </div>
 
       <fieldset disabled={!writable || !rosterReady} className="space-y-3 border-b border-line pb-3">
         <legend className="font-semibold text-content">Default lineup</legend>

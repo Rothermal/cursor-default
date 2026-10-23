@@ -374,7 +374,8 @@ interface GameContextType {
   startNewGame: (sport: SportConfig) => boolean
   commitGameSetup: (
     nextState: GameState,
-    expectedLocalGameId?: string | null
+    expectedLocalGameId?: string | null,
+    beforeCommit?: (localGameId: string) => void
   ) => CommitGameSetupResult
   openGameSnapshot: (state: GameState) => boolean
   parkCurrentGame: () => boolean
@@ -612,8 +613,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const commitGameSetup = useCallback(
     (
       nextState: GameState,
-      expectedLocalGameId: string | null = null
+      expectedLocalGameId: string | null = null,
+      beforeCommit?: (localGameId: string) => void
     ): CommitGameSetupResult => {
+      if (isStaleOwner(userId)) return { ok: false, reason: 'The setup account changed.' }
       if (
         !expectedLocalGameId &&
         blockUnpreparedRunningClock('setup_replace_commit')
@@ -632,7 +635,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           // Persisted state is authoritative here so stale tabs and failed preference writes refuse.
           getBasketballEventCreationPolicy(
             loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled
-          ).canCreateNewEventGame
+          ).canCreateNewEventGame,
+          beforeCommit
         )
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
@@ -648,7 +652,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return { ok: false, reason }
       }
     },
-    [blockUnpreparedRunningClock, userId]
+    [blockUnpreparedRunningClock, isStaleOwner, userId]
   )
 
   const openGameSnapshot = useCallback(

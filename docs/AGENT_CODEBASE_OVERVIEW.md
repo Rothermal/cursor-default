@@ -21,11 +21,15 @@ destinations, separate Legacy Totals, personal Game Info link review/reviewed
 finalization and explicit team-tournament persistence for review; see its
 [regression record](REGRESSION_BSB_7B_DESTINATIONS.md). Full 7A exit is not claimed. Baseball
 stays opt-in until BSB-7D; BSB-6/live release checks remain pending.
-BSB-7C1's personal-settings foundation is implemented for review, with fixed
+BSB-7C1's personal-settings foundation merged in #503, with fixed
 migration-080 account-bound CAS/read/capability RPCs and an isolated offline
-controller; see [7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). It is not
-mounted in UI yet. 7C2 owns personal settings/setup/My Players/device-default
-integration; migration 080 is pending manual owner application. Cutover stays in 7D.
+controller; see [7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). It is now
+mounted by 7C2's Baseball-only auth-lifetime hook for review. Settings now shares
+bounded rule fields with Team Manage; fresh setup seeds personal/team defaults,
+offers explicit My Players/Create Player choices and commits separate durable link
+intents with the complete local game. Device capture defaults seed new games only.
+Owner reports migration 080 applied on 2026-10-23; live behavior remains separately
+pending. Cutover stays in 7D and Baseball remains opt-in.
 Football still uses the generic aggregate grid; its event plans
 are not an implemented field experience. Pending live verification remains separate.
 

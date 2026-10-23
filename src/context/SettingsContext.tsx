@@ -4,6 +4,7 @@ import {
   SETTINGS_STORAGE_KEY,
   type AppSettings,
   type BasketballDeviceSettings,
+  type BaseballDeviceSettings,
 } from '../lib/settingsStorage'
 import { useSoccerPersonalSettings } from '../hooks/useSoccerPersonalSettings'
 import { useBasketballPersonalSettings } from '../hooks/useBasketballPersonalSettings'
@@ -11,6 +12,7 @@ import type { SoccerPersonalSettings } from '../lib/soccer/settings'
 import type { SoccerSettingsSyncState } from '../hooks/useSoccerPersonalSettings'
 import type { BasketballPersonalSettingsV1 } from '../lib/basketball/settings'
 import type { BasketballSettingsSyncState } from '../hooks/useBasketballPersonalSettings'
+import { useBaseballPersonalSettings } from '../hooks/useBaseballPersonalSettings'
 
 interface SettingsContextType {
   settings: AppSettings
@@ -25,6 +27,10 @@ interface SettingsContextType {
   setHockeyRinkFlippedByDefault: (flipped: boolean) => void
   baseballEventTrackerEnabled: boolean
   setBaseballEventTrackerEnabled: (enabled: boolean) => void
+  baseball: ReturnType<typeof useBaseballPersonalSettings>
+  baseballDeviceSettings: BaseballDeviceSettings
+  setBaseballDeviceSetting: (key: 'trackPitchLocation' | 'trackBattedBallLocation', enabled: boolean) => void
+  setBaseballSettingsPageActive: (active: boolean) => void
   basketballDeviceSettings: BasketballDeviceSettings
   setBasketballDeviceSetting: (
     key: keyof BasketballDeviceSettings,
@@ -58,6 +64,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(loadSettingsFromStorage)
   const [basketballSettingsPageActive, setBasketballSettingsPageActive] = useState(false)
   const [soccerSettingsPageActive, setSoccerSettingsPageActive] = useState(false)
+  const [baseballSettingsPageActive, setBaseballSettingsPageActive] = useState(false)
+  const baseball = useBaseballPersonalSettings(Boolean(settings.enabledSports.baseball) || baseballSettingsPageActive)
   const basketball = useBasketballPersonalSettings(
     settings.courtCapture.reboundPromptAfterMiss,
     Boolean(settings.enabledSports.basketball) || basketballSettingsPageActive
@@ -148,6 +156,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setBaseballDeviceSetting = useCallback((key: 'trackPitchLocation' | 'trackBattedBallLocation', enabled: boolean) => {
+    setSettings(prev => ({ ...prev, baseball: { ...prev.baseball, [key]: enabled } }))
+  }, [])
+
   return (
     <SettingsContext.Provider
       value={{
@@ -164,6 +176,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setHockeyRinkFlippedByDefault,
         baseballEventTrackerEnabled: settings.baseball.eventTrackerEnabled,
         setBaseballEventTrackerEnabled,
+        baseball,
+        baseballDeviceSettings: settings.baseball,
+        setBaseballDeviceSetting,
+        setBaseballSettingsPageActive,
         basketballDeviceSettings: settings.basketball,
         setBasketballDeviceSetting,
         basketballSettings: basketball.settings,

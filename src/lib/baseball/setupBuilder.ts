@@ -3,7 +3,6 @@ import { createInitialState } from '../gameReducer'
 import { initializeBaseballEventGame, type BaseballCommandResult } from './commands'
 import { createBaseballUuid } from './id'
 import { normalizeBaseballPosition } from './positions'
-import { createBaseballMatchRules, DEFAULT_BASEBALL_PROFILE_ID } from './profiles'
 import { resolveBaseballTeamRules, type BaseballLineupDefaults, type BaseballTeamSettingsV1 } from './settings'
 import { normalizeBaseballMatchSetup, validateBaseballMatchSetup } from './state'
 import { baseballLocalPlayerKey } from './stats'
@@ -16,6 +15,8 @@ export interface BaseballSetupRosterPlayer {
   displayName: string
   number: string | null
   position: string | null
+  /** Explicit My Players choice only; never frozen as source identity in personal setup. */
+  personalPlayerId?: string
 }
 
 export interface BaseballOpponentSlotDraft {
@@ -139,10 +140,11 @@ export function planBaseballTeamPrefill(input: {
 }): BaseballTeamPrefill | null {
   if (!input.teamId || input.initializedTeamId === input.teamId || !input.rosterReady) return null
   if (input.settings.settledTeamId !== input.teamId) return null
-  const usable = input.settings.status !== 'error' && input.settings.status !== 'backend_update_required'
-  const resolved = usable ? resolveBaseballTeamRules(input.settings.settings) : null
-  const rules = resolved?.ok ? resolved.rules : createBaseballMatchRules(DEFAULT_BASEBALL_PROFILE_ID)
-  const defaults = resolved?.ok ? input.settings.settings.lineupDefaults : null
+  if (!['synced', 'missing', 'cached'].includes(input.settings.status)) return null
+  const resolved = resolveBaseballTeamRules(input.settings.settings)
+  if (!resolved.ok) return null
+  const rules = resolved.rules
+  const defaults = input.settings.settings.lineupDefaults
   const draft = createBaseballSetupDraft({
     rules,
     roster: input.roster,
@@ -152,10 +154,8 @@ export function planBaseballTeamPrefill(input: {
     trackedSide: input.trackedSide,
     opponentName: input.opponentName,
   })
-  const missing = defaults ? missingBaseballDefaultPlayers(input.roster, defaults).length : 0
-  const notes = !defaults
-    ? ['Team defaults could not be loaded, so the standard rules are used and the lineup is empty.']
-    : [
+  const missing = missingBaseballDefaultPlayers(input.roster, defaults).length
+  const notes = [
         input.settings.status === 'cached'
           ? "The latest team defaults could not be loaded, so this device's saved copy is used."
           : null,
@@ -291,6 +291,7 @@ export function createBaseballEventGameState(input: {
   tournament?: { id: string; teamId: string; name: string } | null
   /** BSB-6B: cloud games sync automatically; device games stay local until enabled. */
   cloudPolicy?: EventCloudPolicy
+  captureDefaults?: { trackPitchLocation: boolean; trackBattedBallLocation: boolean }
 }): BaseballCommandResult {
   const initial = createInitialState()
   if (input.tournament && (!input.setup.sourceTeamId || input.tournament.teamId !== input.setup.sourceTeamId)) return { ok: false, state: initial, code: 'invalid_setup', message: 'Select a tournament belonging to this Baseball team.' }
@@ -312,7 +313,12 @@ export function createBaseballEventGameState(input: {
       stats: {},
     })),
   }
-  return initializeBaseballEventGame(base, input.setup)
+  const initialized = initializeBaseballEventGame(base, input.setup)
+  if (!initialized.ok || initialized.state.sportGameState?.sportId !== 'baseball' || !input.captureDefaults) return initialized
+  return { ...initialized, state: { ...initialized.state, sportGameState: { ...initialized.state.sportGameState,
+    capturePreferences: { ...initialized.state.sportGameState.capturePreferences,
+      trackPitchLocation: input.captureDefaults.trackPitchLocation,
+      trackBattedBallLocation: input.captureDefaults.trackBattedBallLocation } } } }
 }
 
 function sortDefense(defense: Record<string, string>): Record<string, string> {

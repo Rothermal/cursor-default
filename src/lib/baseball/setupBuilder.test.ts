@@ -239,14 +239,13 @@ describe('Baseball team prefill timing', () => {
     expect(prefill?.note).toContain("this device's saved copy")
   })
 
-  it('falls back to standard rules and an empty lineup when nothing usable loads', () => {
+  it('does not silently replace unreadable team defaults with built-in rules', () => {
     const prefill = planBaseballTeamPrefill({
       teamId: TEAM, initializedTeamId: null, rosterReady: true, roster,
       settings: { settledTeamId: TEAM, status: 'error', settings: cloudRevision2 },
       sourceSeasonId: null, trackedSide: 'home', opponentName: '',
     })
-    expect(prefill?.draft.battingOrder).toEqual([])
-    expect(prefill?.draft.rules.profileId).toBe('nfhs_baseball')
+    expect(prefill).toBeNull()
   })
 
   it('never replaces an initialized or edited draft on later refreshes', () => {
@@ -262,6 +261,17 @@ describe('Baseball team prefill timing', () => {
     ])
     expect(draft?.battingOrder).toEqual([id(9)])
     expect(draft?.rules.scheduledInnings).toBe(5)
+  })
+
+  it('uses a missing team row as its own baseline and refuses unsettled or malformed sources', () => {
+    const input = { teamId: TEAM, initializedTeamId: null, rosterReady: true, roster, sourceSeasonId: null, trackedSide: 'home' as const, opponentName: '' }
+    const missing = planBaseballTeamPrefill({ ...input, settings: { settledTeamId: TEAM, status: 'missing', settings: defaultBaseballTeamSettings() } })
+    expect(missing?.draft.rules.scheduledInnings).toBe(7)
+    expect(missing?.draft.battingOrder).toEqual([])
+    for (const status of ['loading', 'conflict', 'saving', 'backend_update_required', 'unknown']) {
+      expect(planBaseballTeamPrefill({ ...input, settings: { settledTeamId: TEAM, status, settings: cloudRevision2 } })).toBeNull()
+    }
+    expect(planBaseballTeamPrefill({ ...input, settings: { settledTeamId: TEAM, status: 'synced', settings: { ...cloudRevision2, ruleOverrides: { scheduledInnings: 99 } } } })).toBeNull()
   })
 
   it('marks a team settled only when its latest read finishes, and resets on scope change', () => {

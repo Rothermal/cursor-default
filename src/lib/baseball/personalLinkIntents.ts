@@ -11,9 +11,10 @@ export interface BaseballReviewedLinkRequest {
   reason: string
   participantIds: string[]
 }
-/** Device intent only, outside frozen setup/events. No automatic offline identity queue. */
+/** Device intent only, outside frozen setup/events. Only explicit setup choices may auto-drain. */
 export interface BaseballPersonalLinkIntent {
-  version: 1
+  version: 1 | 2
+  origin?: 'setup'
   userId: string
   localGameId: string
   participantId: string
@@ -32,11 +33,14 @@ export interface BaseballLinkIntentStore {
   save(intent: BaseballPersonalLinkIntent, expectedRevision: number | null): void
   matches(intent: BaseballPersonalLinkIntent): boolean
   acknowledge(intent: BaseballPersonalLinkIntent): boolean
+  /** Explicit cancellation of a device request; never unlinks or deletes cloud history. */
+  discard(intent: BaseballPersonalLinkIntent): boolean
 }
 
 export function parseBaseballPersonalLinkIntent(value: unknown): BaseballPersonalLinkIntent {
-  if (!isPlainObject(value) || !exactKeys(value, ['version', 'userId', 'localGameId', 'participantId', 'targetPlayerId', 'operationId', 'revision', 'reviewed'])
-    || value.version !== 1 || !Number.isSafeInteger(value.revision) || Number(value.revision) < 1) throw invalid('Invalid Baseball link intent.')
+  if (!isPlainObject(value) || !exactKeys(value, ['version', 'userId', 'localGameId', 'participantId', 'targetPlayerId', 'operationId', 'revision', 'reviewed', ...(value.version === 2 ? ['origin'] : [])])
+    || (value.version !== 1 && value.version !== 2) || (value.version === 2 && value.origin !== 'setup')
+    || !Number.isSafeInteger(value.revision) || Number(value.revision) < 1) throw invalid('Invalid Baseball link intent.')
   let reviewed: BaseballReviewedLinkRequest | null = null
   if (value.reviewed !== null) {
     const r = value.reviewed
@@ -49,13 +53,15 @@ export function parseBaseballPersonalLinkIntent(value: unknown): BaseballPersona
     reviewed = { gameId: baseballUuid(r.gameId, 'reviewed game'), expectedMapFingerprint: baseballMapFingerprint(r.expectedMapFingerprint),
       expectedPublicationId, reason: r.reason.trim(), participantIds }
   }
-  return { version: 1, userId: baseballUuid(value.userId, 'intent account'), localGameId: requiredString(value.localGameId, 'local game'),
+  return { version: value.version, ...(value.version === 2 ? { origin: 'setup' as const } : {}), userId: baseballUuid(value.userId, 'intent account'), localGameId: requiredString(value.localGameId, 'local game'),
     participantId: requiredString(value.participantId, 'participant'), targetPlayerId: baseballUuid(value.targetPlayerId, 'target player'),
     operationId: baseballUuid(value.operationId, 'operation'), revision: Number(value.revision), reviewed }
 }
 
+export const baseballPersonalLinkIntentKey = (user: string, game: string, participant: string) => `statkeeper_baseball_link_intent:${encodeURIComponent(user)}:${encodeURIComponent(game)}:${encodeURIComponent(participant)}`
+
 export function createBaseballLinkIntentStore(storage: BaseballLinkIntentStorage): BaseballLinkIntentStore {
-  const key = (user: string, game: string, participant: string) => `statkeeper_baseball_link_intent:${encodeURIComponent(user)}:${encodeURIComponent(game)}:${encodeURIComponent(participant)}`
+  const key = baseballPersonalLinkIntentKey
   const assertAccount = (userId: string) => {
     const identity = captureAuthIdentity(userId)
     if (!identity) throw new BaseballFeatureError('stale_account', 'The Baseball link account changed.')
@@ -71,6 +77,14 @@ export function createBaseballLinkIntentStore(storage: BaseballLinkIntentStorage
     return intent
   }
   const matches = (intent: BaseballPersonalLinkIntent) => stableJson(read(intent.userId, intent.localGameId, intent.participantId)) === stableJson(intent)
+  const remove = (intent: BaseballPersonalLinkIntent) => {
+    const current = assertAccount(intent.userId)
+    if (!matches(intent)) return false
+    current()
+    storage.removeItem(key(intent.userId, intent.localGameId, intent.participantId))
+    current()
+    return true
+  }
   return { read, matches,
     save(value, expectedRevision) {
       const intent = parseBaseballPersonalLinkIntent(value)
@@ -84,13 +98,7 @@ export function createBaseballLinkIntentStore(storage: BaseballLinkIntentStorage
       storage.setItem(key(intent.userId, intent.localGameId, intent.participantId), JSON.stringify(intent))
       current()
     },
-    acknowledge(intent) {
-      const current = assertAccount(intent.userId)
-      if (!matches(intent)) return false
-      current()
-      storage.removeItem(key(intent.userId, intent.localGameId, intent.participantId))
-      current()
-      return true
-    },
+    acknowledge: remove,
+    discard: remove,
   }
 }

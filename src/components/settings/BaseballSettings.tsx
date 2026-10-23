@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useSettings } from '../../context/SettingsContext'
 import { getBaseballEventCreationPolicy } from '../../lib/sportAvailability'
+import BaseballPersonalSettingsEditor from './BaseballPersonalSettingsEditor'
 
 /**
  * Baseball device settings (BSB-3D). The only setting is the owner opt-in for new event
@@ -8,12 +10,13 @@ import { getBaseballEventCreationPolicy } from '../../lib/sportAvailability'
  * reachable whatever it is set to.
  */
 export default function BaseballSettings() {
-  const { baseballEventTrackerEnabled, setBaseballEventTrackerEnabled } = useSettings()
+  const { baseballEventTrackerEnabled, setBaseballEventTrackerEnabled, baseball, baseballDeviceSettings, setBaseballDeviceSetting, setBaseballSettingsPageActive } = useSettings()
+  useEffect(() => { setBaseballSettingsPageActive(true); return () => setBaseballSettingsPageActive(false) }, [setBaseballSettingsPageActive])
   const policy = getBaseballEventCreationPolicy(baseballEventTrackerEnabled)
 
   return (
-    <section className="card space-y-3">
-      <h2 className="text-lg font-semibold text-content">⚾ Baseball settings</h2>
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold text-content">Baseball settings</h2>
       <div className="space-y-2 border-y border-info-line bg-info px-3 py-3">
         <div className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
           <span id="baseball-event-tracker-label">New event tracker (preview)</span>
@@ -35,10 +38,14 @@ export default function BaseballSettings() {
         </div>
         <p className="text-xs text-info-content">
           {policy.preferenceAvailable
-            ? 'New Baseball games use the diamond tracker on this device. Games stay on this device and do not sync to the cloud yet.'
+            ? 'New Baseball games use the diamond tracker on this device.'
             : 'Unavailable in this build.'}
         </p>
       </div>
+      <BaseballPersonalSettingsEditor key={baseball.scopeKey} personal={baseball} />
+      <fieldset className="space-y-3 py-2"><legend className="font-semibold text-content">New-game capture defaults</legend>
+        {([['trackPitchLocation', 'Pitch location'], ['trackBattedBallLocation', 'Batted-ball location']] as const).map(([key, label]) => <label key={key} className="flex min-h-11 items-center justify-between gap-3 text-sm text-content"><span>{label}</span><input type="checkbox" checked={baseballDeviceSettings[key]} onChange={event => setBaseballDeviceSetting(key, event.target.checked)} /></label>)}
+      </fieldset>
       <Link to="/settings/sports" className="btn-secondary inline-block text-center">
         Back to Sports
       </Link>
