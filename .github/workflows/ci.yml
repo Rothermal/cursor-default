@@ -41,3 +41,7 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          # Include the production SDK paths without exposing repository secrets to PRs.
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-public-placeholder-key

@@ -1,7 +1,8 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { PWA_MAX_PRECACHE_ASSET_BYTES } from './src/lib/pwaBuildPolicy'
+import { Buffer } from 'node:buffer'
+import { PWA_MAX_PRECACHE_ASSET_BYTES, pwaPrecacheHeadroomWarning, pwaPrecacheWarningAnnotation, pwaVendorChunk } from './src/lib/pwaBuildPolicy'
 import { APPEARANCE_RELEASE_ENABLED } from './src/lib/appearanceReleasePolicy'
 
 export default defineConfig(({ command }) => ({
@@ -12,7 +13,26 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages project sites are served from "/<repo>/".
   // Keep local dev at "/" while ensuring production builds work on Pages.
   base: command === 'build' ? '/cursor-default/' : '/',
+  build: {
+    rollupOptions: {
+      output: { manualChunks: pwaVendorChunk },
+    },
+  },
   plugins: [
+    {
+      name: 'pwa-precache-headroom',
+      apply: 'build',
+      writeBundle(_options, bundle) {
+        for (const output of Object.values(bundle)) {
+          if (output.type !== 'chunk') continue
+          const warning = pwaPrecacheHeadroomWarning(output.fileName, Buffer.byteLength(output.code, 'utf8'))
+          if (!warning) continue
+          this.warn(warning)
+          const annotation = pwaPrecacheWarningAnnotation(warning, process.env.GITHUB_ACTIONS)
+          if (annotation) console.log(annotation)
+        }
+      },
+    },
     {
       name: 'appearance-preview-gate',
       transformIndexHtml: html => html.replace('<html lang="en">', `<html lang="en" data-appearance-preview="${command === 'serve' || APPEARANCE_RELEASE_ENABLED}">`),
