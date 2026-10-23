@@ -1,7 +1,7 @@
 # Plan: BSB-7 Baseball Aggregates, Settings and Release
 
-Status: **Approved execution plan (#497); BSB-7A foundations implemented; BSB-7B implemented for review**
-(2026-10-21). The owner approved all 23 recommendations, Q1-Q23. Migration 079
+Status: **Approved execution plan (#497); BSB-7A/7B implemented; BSB-7C1 foundation implemented for review**
+(2026-10-23). The owner approved all 23 recommendations, Q1-Q23. Migration 079
 delivers the bounded server foundation described below. The client half now adds
 pure replay aggregates, strict paging, separate feature capabilities and checked
 personal identity/intents, without UI wiring. Full 7A exit is not claimed. See the
@@ -18,7 +18,11 @@ and [independent final review](https://github.com/Rothermal/cursor-default/pull/
 The subsequent PR review identified tournament-sync, Career-navigation and evidence
 drift issues; their single-agent follow-up is recorded in the destination record.
 Current-head CI is reported in PR #500, separately from the original pass.
-BSB-7C/7D and live exit are not delivered here.
+BSB-7C1 now adds the personal-settings foundation for review (2026-10-23):
+exact personal parsing, migration 080's fixed account-bound CAS/read/capability,
+and offline reconciliation/controller checks. See the
+[7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). Settings/setup UI integration
+(7C2), 7D and live exit remain pending; the foundation is not a full 7C exit.
 
 No agent applies a live migration or changes a release flag in this work. The owner
 reports migration 079 applied on 2026-10-20; this report is not an observed live
@@ -540,6 +544,14 @@ Acceptance/evidence required:
 
 ### BSB-7C - Personal Rules, Setup and Device Defaults
 
+Delivery boundary: **7C1 foundation implemented for review; 7C2 integration pending**.
+7C1 owns the exact settings schema, fixed migration-080 RPCs, independent capability
+and account-lifetime controller with pending/CAS/conflict handling. It does not mount
+new UI, seed setups or change capture preferences. 7C2 combines the editor, controller
+lifecycle, setup/My Players/link-intent wiring and new-game-only device defaults;
+retain the complete acceptance list below. This boundary separates new authorization/
+storage behavior from the larger user-facing setup workflow, not new product phases.
+
 Deliver exact personal settings/CAS, account-isolated offline reconciliation and
 Settings/setup integration. Preserve team v1, source hierarchy, explicit match edits
 and new-game-only device capture defaults. Reuse bounded shared hooks/fields.
@@ -600,10 +612,11 @@ Unresolved technical adjudication is resolved before its implementation; it is n
 a new pending product batch. If design cannot satisfy an approved decision, raise
 that conflict explicitly rather than silently weakening the contract.
 
-Delivery status: **7A server/client implementations present; full 7A exit and
-7B-7D remain pending**. Client checks and parent-reported local PostgreSQL probes
-are in the client record. No settings, destination/link UI or cutover ships here.
+Delivery status: **7A foundations, 7B destinations/link review and 7C1 personal
+settings foundation implemented; full 7A/live exit, 7C2 and 7D remain pending**.
+Evidence is recorded per delivery above. 7C1 does not add settings/setup UI or cutover.
 Current `opt_in`, exact cloud contract 2/078 and existing access remain unchanged.
-BSB-6 and broader-release live evidence remain pending. The parent owns final
-validation, Git/PR work and fresh review; this document does not authorize migration
+BSB-6 and broader-release live evidence remain pending. Follow the current
+single-agent workflow in AGENTS.md for validation and Git/PR work, keeping PR review
+separate from self-review; this document does not authorize migration
 execution, deployment or access expansion by an agent.

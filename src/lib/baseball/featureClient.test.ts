@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../authIdentity'
 import { AGGREGATE_USER } from './aggregateTestFixtures'
-import { BASEBALL_AGGREGATE_CAPABILITIES, BASEBALL_PERSONAL_LINK_CAPABILITIES,
+import { BASEBALL_AGGREGATE_CAPABILITIES, BASEBALL_PERSONAL_LINK_CAPABILITIES, BASEBALL_PERSONAL_SETTINGS_CAPABILITIES,
   createBaseballFeatureClient, parseBaseballFeatureCapabilities } from './featureClient'
 
 beforeEach(() => setCurrentAuthUserId(AGGREGATE_USER))
 afterEach(resetCurrentAuthUserIdForTests)
 
-describe('independent exact Baseball 079 capabilities', () => {
-  it.each(['aggregate', 'personal_links'] as const)('accepts the exact %s response only', feature => {
-    const value = feature === 'aggregate' ? BASEBALL_AGGREGATE_CAPABILITIES : BASEBALL_PERSONAL_LINK_CAPABILITIES
+describe('independent exact Baseball feature capabilities', () => {
+  it.each(['aggregate', 'personal_links', 'personal_settings'] as const)('accepts the exact %s response only', feature => {
+    const value = feature === 'aggregate' ? BASEBALL_AGGREGATE_CAPABILITIES : feature === 'personal_links' ? BASEBALL_PERSONAL_LINK_CAPABILITIES : BASEBALL_PERSONAL_SETTINGS_CAPABILITIES
     expect(() => parseBaseballFeatureCapabilities(value, feature)).not.toThrow()
     expect(() => parseBaseballFeatureCapabilities({ ...value, extra: 1 }, feature)).toThrow(expect.objectContaining({ code: 'invalid_response' }))
     expect(() => parseBaseballFeatureCapabilities({ contractVersion: 0 }, feature)).toThrow(expect.objectContaining({ code: 'backend_update_required' }))
     expect(() => parseBaseballFeatureCapabilities({ ...value, contractVersion: 2 }, feature)).toThrow(expect.objectContaining({ code: 'client_update_required' }))
     expect(() => parseBaseballFeatureCapabilities({ ...value, migration: -1 }, feature)).toThrow(expect.objectContaining({ code: 'invalid_response' }))
-    expect(() => parseBaseballFeatureCapabilities({ ...value, migration: 80 }, feature)).toThrow(expect.objectContaining({ code: 'client_update_required' }))
-    expect(() => parseBaseballFeatureCapabilities({ ...value, migration: 78 }, feature)).toThrow(expect.objectContaining({ code: 'backend_update_required' }))
+    expect(() => parseBaseballFeatureCapabilities({ ...value, migration: value.migration + 1 }, feature)).toThrow(expect.objectContaining({ code: 'client_update_required' }))
+    expect(() => parseBaseballFeatureCapabilities({ ...value, migration: value.migration - 1 }, feature)).toThrow(expect.objectContaining({ code: 'backend_update_required' }))
   })
   it.each([null, [], {}, { contractVersion: 0, extra: true }, { contractVersion: -1 }, { contractVersion: '1' }])('rejects malformed capability %j', value => {
     expect(() => parseBaseballFeatureCapabilities(value, 'aggregate')).toThrow(expect.objectContaining({ code: 'invalid_response' }))
