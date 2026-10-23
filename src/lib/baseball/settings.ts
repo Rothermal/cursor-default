@@ -41,6 +41,47 @@ export interface BaseballTeamSettingsV1 {
   lineupDefaults: BaseballLineupDefaults
 }
 
+export type BaseballPersonalSettingsV1 = Pick<BaseballTeamSettingsV1, 'settingsSchemaVersion' | 'baseProfile' | 'ruleOverrides'>
+
+export function defaultBaseballPersonalSettings(): BaseballPersonalSettingsV1 {
+  const { settingsSchemaVersion, baseProfile, ruleOverrides } = defaultBaseballTeamSettings()
+  return { settingsSchemaVersion, baseProfile, ruleOverrides }
+}
+
+export function parseBaseballPersonalSettings(value: unknown):
+  | { ok: true; value: BaseballPersonalSettingsV1 }
+  | { ok: false; error: string } {
+  if (value === null || value === undefined) return { ok: true, value: defaultBaseballPersonalSettings() }
+  if (!isPlainObject(value) || !exactKeys(value, ['settingsSchemaVersion', 'baseProfile', 'ruleOverrides'])) {
+    return { ok: false, error: 'Personal Baseball settings contain unknown or missing fields.' }
+  }
+  const parsed = parseBaseballTeamSettings({ ...value, lineupDefaults: emptyBaseballLineupDefaults() })
+  if (!parsed.ok) return parsed
+  const { settingsSchemaVersion, baseProfile, ruleOverrides } = parsed.value
+  return { ok: true, value: { settingsSchemaVersion, baseProfile, ruleOverrides } }
+}
+
+export function baseballPersonalSettingsFingerprint(settings: BaseballPersonalSettingsV1): string {
+  return stableJson(settings)
+}
+
+/** Team authority never falls back to the recorder's personal rules. */
+export function resolveBaseballSettingsHierarchy(input: {
+  authority: 'personal' | 'team'
+  personalSettings?: unknown
+  teamSettings?: unknown
+  matchOverrides?: Partial<BaseballMatchRules>
+}): { ok: true; rules: BaseballMatchRules } | { ok: false; error: string } {
+  const parsed = input.authority === 'personal'
+    ? parseBaseballPersonalSettings(input.personalSettings)
+    : parseBaseballTeamSettings(input.teamSettings)
+  if (!parsed.ok) return parsed
+  const resolved = resolveBaseballTeamRules(parsed.value)
+  if (!resolved.ok) return resolved
+  const rules = normalizeBaseballMatchRules({ ...resolved.rules, ...input.matchOverrides })
+  return rules ? { ok: true, rules } : { ok: false, error: 'Baseball match overrides are invalid.' }
+}
+
 export type BaseballSettingsParseResult =
   | { ok: true; value: BaseballTeamSettingsV1 }
   | { ok: false; error: string }

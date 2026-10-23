@@ -26,11 +26,15 @@ export const BASEBALL_PERSONAL_LINK_CAPABILITIES = Object.freeze({
   contractVersion: 1, sportId: 'baseball', personalLinkContractVersion: 1,
   publicationIdentityVersion: 1, reviewedFinalizationVersion: 1, migration: 79,
 })
-export type BaseballFeature = 'aggregate' | 'personal_links'
+export const BASEBALL_PERSONAL_SETTINGS_CAPABILITIES = Object.freeze({
+  contractVersion: 1, sportId: 'baseball', personalSettingsVersion: 1, migration: 80,
+})
+export type BaseballFeature = 'aggregate' | 'personal_links' | 'personal_settings'
 
-/** Exact, independent 079 contracts. No use of the release checker's completed-ready cache. */
+/** Exact independent feature contracts; never reuse the release checker's ready cache. */
 export function parseBaseballFeatureCapabilities(value: unknown, feature: BaseballFeature): void {
-  const expected = feature === 'aggregate' ? BASEBALL_AGGREGATE_CAPABILITIES : BASEBALL_PERSONAL_LINK_CAPABILITIES
+  const expected = feature === 'aggregate' ? BASEBALL_AGGREGATE_CAPABILITIES
+    : feature === 'personal_links' ? BASEBALL_PERSONAL_LINK_CAPABILITIES : BASEBALL_PERSONAL_SETTINGS_CAPABILITIES
   if (!isPlainObject(value)) throw invalid('Invalid Baseball feature capabilities.')
   const version = value.contractVersion
   if (!Number.isSafeInteger(version) || Number(version) < 0) throw invalid('Invalid Baseball capability version.')
@@ -86,7 +90,8 @@ export function createBaseballFeatureClient(userId: string, options: BaseballFea
   return {
     identity, assertCurrent, request,
     async require(feature) {
-      const data = await request(feature === 'aggregate' ? 'get_baseball_aggregate_capabilities' : 'get_baseball_personal_link_capabilities')
+      const data = await request(feature === 'aggregate' ? 'get_baseball_aggregate_capabilities'
+        : feature === 'personal_links' ? 'get_baseball_personal_link_capabilities' : 'get_baseball_personal_settings_capabilities')
       assertCurrent()
       parseBaseballFeatureCapabilities(data, feature)
     },
