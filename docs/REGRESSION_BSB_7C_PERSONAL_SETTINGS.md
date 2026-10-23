@@ -32,7 +32,7 @@ seed only new games. Keep team hierarchy, current match preferences, active-game
 Cancel/commit safety and frozen historical setups unchanged. No settings/setup UI
 or device-default change is claimed by 7C1. Baseball remains opt-in; 7D owns cutover.
 
-## Observed Local Checks
+## Initial Local Checks (8ffdec68)
 
 - Focused Vitest: **5 files / 90 tests passed** (personal schema/hierarchy, transport,
   controller, parity-fixture generator and independent feature capabilities).
@@ -58,6 +58,35 @@ the proposed device edit and its original base revision survive reload.
 Reproduce the SQL checks with the [committed harness](../supabase/tests/bsb7c/README.md).
 Its auth-claim stand-in does not establish live Supabase JWT, PostgREST schema-cache
 availability, deployed app access or two-device behavior.
+
+## PR Review Follow-Up
+
+Both findings in [the PR review](https://github.com/Rothermal/cursor-default/pull/503#issuecomment-6366687646)
+were validated. New regression assertions reproduced six failures on the original
+controller, including the pending-device value being shown as Cloud and a fabricated
+missing-row timestamp.
+
+Stale-draft saves now persist the proposed device edit, then perform a fresh fixed
+cloud read before offering either conflict choice. They never use the current device
+settings as Cloud. If that read is unavailable, the edit remains pending and no Use
+Cloud choice is offered; reconnect/reload can compare against the actual cloud row.
+The last known cloud revision remains separate from the stale edit's base revision,
+so an offline retry cannot silently re-create a subsequently deleted cloud row.
+Account changes and disposal retain their guards during this added read.
+
+Confirmed missing rows now carry a nullable timestamp in Baseball-only conflict
+metadata. Use Cloud on an absent row retains null cloud/last-sync timestamps rather
+than claiming a sync happened. Shared sport hook types and migration 080 are unchanged.
+
+Follow-up focused tests: **5 files / 96 tests passed**, including **22 controller
+tests** covering real/newer cloud values, offline reload, both choices, account
+switch during the comparison and deleted-row retries. Repository-wide checks and
+exact-head CI are reported with the follow-up commit in the PR. Local full-suite
+verification passed **328 files / 3,280 tests**; the configured TypeScript/Vite/PWA
+build retained **15 precache entries**. Lint passed with **0 errors / 3 baseline
+warnings**, and **22 review-control tests** passed. The SQL harness was not rerun
+for this client-only follow-up; the unchanged migration retains the initial SQL
+evidence above. No new browser/device/live Supabase verification is claimed.
 
 ## Pending Evidence
 

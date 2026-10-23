@@ -6,9 +6,13 @@ import { BaseballFeatureError, type BaseballFeatureOptions } from './featureClie
 import { createBaseballPersonalSettingsAdapter, loadBaseballPersonalSettings, validBaseballPersonalSettingsCache } from './personalSettingsSync'
 import { defaultBaseballPersonalSettings, parseBaseballPersonalSettings, type BaseballPersonalSettingsV1 as Settings } from './settings'
 
+export type BaseballPersonalSettingsConflict = Omit<SportPersonalSettingsConflict<Settings>, 'cloudUpdatedAt'> & {
+  cloudUpdatedAt: string | null
+}
+
 export interface BaseballPersonalSettingsState {
   settings: Settings
-  sync: SportPersonalSettingsSyncState<Settings>
+  sync: Omit<SportPersonalSettingsSyncState<Settings>, 'conflict'> & { conflict: BaseballPersonalSettingsConflict | null }
 }
 
 export interface BaseballPersonalSettingsOptions extends BaseballFeatureOptions {
@@ -50,10 +54,10 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
     state = structuredClone(next)
     for (const listener of listeners) listener()
   }
-  const persist = (settings: Settings, revision: number | null, pending: boolean, updatedAt: string | null) => {
+  const persist = (settings: Settings, revision: number | null, pending: boolean, updatedAt: string | null, pendingBaseRevision = revision) => {
     assertCurrent()
     const record = createSportPersonalSettingsCacheRecord(adapter, settings, {
-      revision, pending: pending ? { baseRevision: revision } : null, cloudUpdatedAt: updatedAt,
+      revision, pending: pending ? { baseRevision: pendingBaseRevision } : null, cloudUpdatedAt: updatedAt,
     })
     const saved = saveSportSettingsCache(scope, record, storage)
     if (!saved.ok) throw Error(saved.error)
@@ -64,7 +68,7 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
   })
   const conflict = (device: Settings, cloud: Settings, revision: number | null, updatedAt: string | null) => commit({
     ...state, settings: device, sync: { ...state.sync, status: 'conflict', error: null,
-      conflict: { device, cloud, cloudRevision: revision, cloudUpdatedAt: updatedAt ?? new Date().toISOString() } },
+      conflict: { device, cloud, cloudRevision: revision, cloudUpdatedAt: updatedAt } },
   })
   const run = async (operation: () => Promise<boolean>): Promise<boolean> => {
     if (busy) return false
@@ -97,6 +101,13 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
     commit({ settings, sync: { ...state.sync, revision, status: userId ? 'saving' : 'local', error: null, conflict: null } })
     return userId ? write(settings, revision) : true
   }
+  const readCloud = async () => {
+    if (!userId) throw Error('Cloud settings require an account.')
+    const loaded = await loadBaseballPersonalSettings(userId, requestOptions)
+    assertCurrent()
+    if (loaded.status !== 'loaded' && loaded.status !== 'missing') throw Error('Baseball settings did not return a valid read.')
+    return loaded
+  }
   return {
     getState(): BaseballPersonalSettingsState { assertCurrent(); return structuredClone(state) },
     subscribe(listener: () => void) { assertCurrent(); listeners.add(listener); return () => { listeners.delete(listener) } },
@@ -104,11 +115,9 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
     refresh: () => run(async () => {
       if (!userId) return true
       commit({ ...state, sync: { ...state.sync, status: 'checking', error: null } })
-      const loaded = await loadBaseballPersonalSettings(userId, requestOptions)
-      assertCurrent()
-      if (loaded.status !== 'loaded' && loaded.status !== 'missing') throw Error('Baseball settings did not return a valid read.')
+      const loaded = await readCloud()
       // A disappeared row is not permission to re-create it at revision 1.
-      if (loaded.status === 'missing' && cache?.revision !== null && cache?.revision !== undefined) {
+      if (loaded.status === 'missing' && (cache?.revision != null || cache?.pending?.baseRevision != null)) {
         conflict(state.settings, defaultBaseballPersonalSettings(), null, null)
         return false
       }
@@ -133,8 +142,11 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
       if (expectedRevision !== null && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1)) throw Error('Invalid Baseball settings revision.')
       if (expectedRevision !== state.sync.revision) {
         if (!userId) throw Error('Device settings do not use cloud revisions.')
-        persist(parsed.value, expectedRevision, true, state.sync.lastSyncedAt)
-        conflict(parsed.value, state.settings, state.sync.revision, state.sync.lastSyncedAt)
+        persist(parsed.value, state.sync.revision, true, state.sync.lastSyncedAt, expectedRevision)
+        commit({ settings: parsed.value, sync: { ...state.sync, status: 'checking', error: null, conflict: null } })
+        const loaded = await readCloud()
+        conflict(parsed.value, loaded.status === 'loaded' ? loaded.record.settings : defaultBaseballPersonalSettings(),
+          loaded.status === 'loaded' ? loaded.record.revision : null, loaded.status === 'loaded' ? loaded.record.updatedAt : null)
         return false
       }
       return savePending(parsed.value, expectedRevision)
@@ -147,7 +159,7 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
       return true
     }),
     keepDevice: () => run(async () => {
-      const selected: SportPersonalSettingsConflict<Settings> | null = state.sync.conflict
+      const selected = state.sync.conflict
       return selected ? savePending(selected.device, selected.cloudRevision) : false
     }),
   }
