@@ -20,17 +20,15 @@ import {
 } from '../../lib/basketball/settings'
 import { DEFAULT_SETTINGS } from '../../lib/settingsStorage'
 import { settingsPath } from '../../lib/settingsNavigation'
-import { getBasketballEventCreationPolicy } from '../../lib/sportAvailability'
 import ConfirmDialog from '../ConfirmDialog'
 import BasketballRulesSettingsFields from './BasketballRulesSettingsFields'
 
-type BasketballSettingsTab = 'rules' | 'capture' | 'display' | 'tracker'
+type BasketballSettingsTab = 'rules' | 'capture' | 'display'
 
 const tabs: Array<{ id: BasketballSettingsTab; label: string }> = [
   { id: 'rules', label: 'Rules' },
   { id: 'capture', label: 'Capture' },
   { id: 'display', label: 'Display' },
-  { id: 'tracker', label: 'Tracker' },
 ]
 
 export default function BasketballSettings() {
@@ -42,8 +40,6 @@ export default function BasketballSettings() {
     useCloudBasketballSettings,
     keepDeviceBasketballSettings,
     setBasketballSettingsPageActive,
-    basketballEventTrackerPreviewEnabled,
-    setBasketballEventTrackerPreviewEnabled,
     basketballDeviceSettings,
     setBasketballDeviceSetting,
   } = useSettings()
@@ -70,10 +66,6 @@ export default function BasketballSettings() {
     draft.baseProfile,
     [{ id: 'personal', overrides: draft.ruleOverrides }]
   ), [draft.baseProfile, draft.ruleOverrides])
-  const eventCreationPolicy = getBasketballEventCreationPolicy(
-    basketballEventTrackerPreviewEnabled
-  )
-  const trackerTabActive = activeTab === 'tracker'
   const soundAvailable = typeof window !== 'undefined' && 'Audio' in window
   const vibrationAvailable = typeof navigator !== 'undefined' && 'vibrate' in navigator
 
@@ -168,11 +160,7 @@ export default function BasketballSettings() {
         <div>
           <h2 className="text-lg font-semibold text-content">Basketball</h2>
           <div className="flex items-center gap-2" aria-live="polite">
-            {trackerTabActive ? (
-              <span className="text-xs text-content-muted">Saved on this device</span>
-            ) : (
-              <SyncStatus status={basketballSettingsSync.status} />
-            )}
+            <SyncStatus status={basketballSettingsSync.status} />
             {dirty && (
               <span className="text-xs font-semibold text-warning-content">
                 Unsaved cloud settings
@@ -180,7 +168,7 @@ export default function BasketballSettings() {
             )}
           </div>
         </div>
-        {!trackerTabActive && (
+        {(
           <button
             type="button"
             onClick={() => void refreshBasketballSettings()}
@@ -197,7 +185,7 @@ export default function BasketballSettings() {
         )}
       </div>
 
-      {!trackerTabActive && basketballSettingsSync.error && (
+      {basketballSettingsSync.error && (
         <p role="alert" className={`rounded-md border px-3 py-2 text-sm ${
           basketballSettingsSync.status === 'backend_update_required' ||
           basketballSettingsSync.status === 'local' ||
@@ -209,7 +197,7 @@ export default function BasketballSettings() {
         </p>
       )}
 
-      {!trackerTabActive && basketballSettingsSync.conflict && (
+      {basketballSettingsSync.conflict && (
         <div role="alert" className="space-y-3 rounded-md border border-warning-line bg-warning p-3">
           <p className="text-sm font-semibold text-warning-content">
             Settings changed on another device.
@@ -356,24 +344,9 @@ export default function BasketballSettings() {
           </div>
         )}
 
-        {activeTab === 'tracker' && (
-          <div className="space-y-3 border-y border-info-line bg-info px-3 py-3">
-            <Toggle
-              label="New event tracker (preview)"
-              checked={basketballEventTrackerPreviewEnabled}
-              disabled={!eventCreationPolicy.preferenceAvailable}
-              onChange={setBasketballEventTrackerPreviewEnabled}
-            />
-            {!eventCreationPolicy.preferenceAvailable && (
-              <p role="status" className="text-xs font-medium text-info-content">
-                Unavailable in this build
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
-      {!trackerTabActive && (
+      {(
         <>
           <div className="flex items-center justify-between border-t border-line pt-2">
             <button

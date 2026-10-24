@@ -671,10 +671,13 @@ export function buildBasketballSetupGameState({
     return { ok: false, error: 'Basketball setup requires the Basketball sport.' }
   }
   const current = parsed.value
+  if (current.authority !== 'sport_events') {
+    return { ok: false, error: 'This saved legacy setup cannot create a game. Start a new Basketball event setup.' }
+  }
   if (!current.source.teamName.trim() || !current.gameInfo.opponentName.trim()) {
     return { ok: false, error: 'Team and opponent are required.' }
   }
-  let state = gameReducer(createInitialState(cloudStatus), { type: 'SET_SPORT', sport })
+  let state: GameState = { ...createInitialState(cloudStatus), sport }
   if (current.authority === 'sport_events') {
     const intent = setBasketballEventCreationIntent(state, true)
     if (!intent.ok) return { ok: false, error: intent.message }

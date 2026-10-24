@@ -45,7 +45,8 @@ function shot(overrides: Partial<ShotRecord> = {}): ShotRecord {
 function base(over: Partial<GameState> = {}): GameState {
   return {
     ...createInitialState(),
-    sport: basketball,
+    // Retained aggregate reducer compatibility uses an unretired sport. Basketball is read-only.
+    sport: { ...basketball, id: 'football' },
     gameInfo: {
       teamName: 'Aces',
       opponentName: 'Bears',
@@ -68,7 +69,7 @@ function base(over: Partial<GameState> = {}): GameState {
   }
 }
 
-describe('gameReducer live tracking', () => {
+describe('gameReducer retained aggregate tracking', () => {
   it('ADD_SHOT increments the made shot stat, appends chart + undoable log', () => {
     const next = gameReducer(base(), { type: 'ADD_SHOT', shot: shot() })
     expect(next.players.find(p => p.id === 'p1')?.stats['2pt']).toBe(1)

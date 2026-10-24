@@ -2,7 +2,7 @@
 
 Status: approved product direction. Adoption is incremental; this document does
 not claim that every sport already implements the target. Basketball's compact
-layout is implemented for review; event-only/legacy retirement remains next. See
+layout merged in #491; event-only/legacy retirement is implemented for review. See
 the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
 
 ## One tracker and shared layout
@@ -31,7 +31,7 @@ the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
   unexecuted checks remain pending. Retirement is per sport: TUI-1 affects Basketball
   only; shared legacy controls for other sports remain until their own cutovers.
 
-These are approved targets, not shipped routing changes. The
+Per-sport delivery is recorded below; these targets do not release every sport at once. The
 [execution plan](PLAN_TRACKER_UI_UNIFICATION.md) owns cutover, preservation and tests.
 
 ## Surface-first tracking
@@ -141,10 +141,10 @@ rules; a running recorder clock is not proof of what the rules permit.
 | Area | Current versus target |
 | --- | --- |
 | Soccer | Closest existing surface-first example; still audit gaps rather than declaring complete cross-sport parity |
-| Basketball | Compact event workspace, court quick actions, collapsed tools/filters and bottom routine sync are implemented for review; new event creation remains opt-in and legacy capture stays until the next cutover PR |
+| Basketball | Compact layout merged #491; TUI-1 event-only creation and read-only legacy cutover implemented for review, preserving recorded stats, exports and authorized old-data sync. Owner-only deployed checks remain pending |
 | Hockey | Released event-only new-game setup and compact rink; align side/filter/status placement and retire remaining legacy capture |
 | Football | Generic grid only; shared layout follows FBE event foundations, not an immediate route switch |
-| Baseball/future sports | Follow the shared target when ready; no release/gate change authorized by the four-sport audit |
+| Baseball/future sports | Baseball's own BSB-7D cutover merged #505; future sports follow their separate release plans. The four-sport audit itself grants no additional rollout |
 | Timing/replay | Separate architectural assessment, not part of the UI-only change |
 
 Current execution proposal: [Shared tracker UI and legacy retirement](PLAN_TRACKER_UI_UNIFICATION.md).

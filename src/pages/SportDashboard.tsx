@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import { isRetiredLegacyGame } from '../lib/legacyGameRetirement'
 import { useSettings } from '../context/SettingsContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
@@ -313,7 +314,7 @@ export default function SportDashboard() {
                 onClick={() => navigate(routeForResumedGame(state))}
                 className="bg-accent text-accent-content px-4 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
               >
-                Resume
+                {isRetiredLegacyGame(state) ? 'View Summary' : 'Resume'}
               </button>
             </div>
           )}
@@ -351,7 +352,7 @@ export default function SportDashboard() {
                       onClick={() => handleResumeParked(game.localGameId)}
                       className="bg-accent text-accent-content px-3 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
                     >
-                      Resume
+                      {game.legacyReadOnly ? 'View Summary' : 'Resume'}
                     </button>
                     <button
                       type="button"

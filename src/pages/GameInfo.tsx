@@ -21,7 +21,8 @@ import {
 import { basketballSummaryPath } from '../lib/basketball/summary'
 import { hockeySummaryPath } from '../lib/hockey/summary'
 import { baseballSummaryPath } from '../lib/baseball/summary'
-import { isLegacyBaseballGame, legacyBaseballBinding } from '../lib/baseball/releasePolicy'
+import { legacyBaseballBinding } from '../lib/baseball/releasePolicy'
+import { isRetiredLegacyGame, legacyRetiredGameBinding } from '../lib/legacyGameRetirement'
 import { listParkedGameRecords } from '../lib/gameParking'
 import {
   createHockeyIndependentRecorderState,
@@ -631,8 +632,9 @@ export default function GameInfo() {
 
   const openFullGame = async () => {
     if (!game || !user || game.id !== gameId || !inspectionIsCurrent()) return
-    const legacyInspectionIdentity = sport?.id === 'baseball' ? captureAuthIdentity(user.id) : null
-    const legacyInspectionCurrent = () => sport?.id !== 'baseball' || Boolean(
+    const retiredSport = sport?.id === 'baseball' || sport?.id === 'basketball'
+    const legacyInspectionIdentity = retiredSport ? captureAuthIdentity(user.id) : null
+    const legacyInspectionCurrent = () => !retiredSport || Boolean(
       legacyInspectionIdentity && isCurrentAuthIdentity(legacyInspectionIdentity) && inspectionIsCurrent()
     )
     const canTrackCurrentGame = game.team_id
@@ -641,7 +643,7 @@ export default function GameInfo() {
     if (
       game.status !== 'final' &&
       !canTrackCurrentGame &&
-      sport?.id !== 'soccer' && sport?.id !== 'baseball'
+      sport?.id !== 'soccer' && !retiredSport
     ) return
     if (sport?.id === 'soccer') {
       if (game.status === 'final' || !canTrackGames(teamRole)) {
@@ -827,6 +829,18 @@ export default function GameInfo() {
       return
     }
 
+    if (sport?.id === 'basketball') {
+      if (basketballDataAuthority !== 'legacy') { setError('Basketball authority is unavailable. Reload before opening this game.'); return }
+      try {
+        const binding = legacyRetiredGameBinding(activeStateRef.current, listParkedGameRecords(user.id), game.id, 'basketball')
+        if (binding) {
+          if (binding.kind === 'parked' && (!prepareActiveGameMutation('resume_commit') || !resumeParkedGame(binding.localGameId))) return
+          navigate('/summary')
+          return
+        }
+      } catch (caught) { setError(caught instanceof Error ? caught.message : 'Local history could not load.'); return }
+    }
+
     setOpeningGame(true)
     setError(null)
 
@@ -891,7 +905,7 @@ export default function GameInfo() {
       return
     }
     setOpeningGame(false)
-    navigate(isLegacyBaseballGame(nextState) || cloudGame.status === 'final' ? '/summary' : '/game')
+    navigate(isRetiredLegacyGame(nextState) || cloudGame.status === 'final' ? '/summary' : '/game')
   }
 
   if (!isConfigured) {
@@ -1295,13 +1309,13 @@ export default function GameInfo() {
               </Link>
             )}
 
-            {sport?.id === 'baseball' && baseballDataAuthority !== 'sport_events' && <section className="border-y border-info-line bg-info px-3 py-3 text-sm text-info-content">
-              <p className="font-semibold">Legacy Baseball / Read-only</p>
+            {((sport?.id === 'baseball' && baseballDataAuthority === 'legacy') || (sport?.id === 'basketball' && basketballDataAuthority === 'legacy')) && <section className="border-y border-info-line bg-info px-3 py-3 text-sm text-info-content">
+              <p className="font-semibold">Legacy {sport?.name} / Read-only</p>
               <p>Recorded stats remain available. Tracking, corrections and finalization are retired.</p>
               {game.status !== 'final' && <p>This unfinished game is excluded from season and career totals.</p>}
             </section>}
 
-            {sport?.id === 'soccer' || sport?.id === 'baseball' ||
+            {sport?.id === 'soccer' || sport?.id === 'baseball' || sport?.id === 'basketball' ||
             basketballDataAuthority === 'sport_events' ||
             game.status === 'final' ||
             canTrackCurrentGame ? (
@@ -1313,7 +1327,7 @@ export default function GameInfo() {
               >
                 {openingGame
                   ? 'Opening...'
-                  : sport?.id === 'baseball' && baseballDataAuthority !== 'sport_events'
+                  : (sport?.id === 'baseball' && baseballDataAuthority === 'legacy') || (sport?.id === 'basketball' && basketballDataAuthority === 'legacy')
                     ? 'View legacy summary (read-only)'
                   : (hockeyDataAuthority === 'sport_events' || baseballDataAuthority === 'sport_events') && game.status === 'final'
                     ? 'Open recorded game (read-only)'

@@ -1,9 +1,10 @@
 # Plan: Shared Tracker UI and Legacy Retirement
 
-Status: owner-approved product direction recorded 2026-10-17. TUI-1's Basketball
-layout/action pass is implemented for review; event-only creation and legacy
-retirement are still pending. See the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md).
-No creation policy, legacy authority, migration or saved data changes in this pass.
+Status: owner-approved direction (2026-10-17). TUI-1 layout/action pass merged in
+#491; its Basketball event-only creation and read-only legacy cutover are implemented
+for review (2026-10-24). See the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md)
+and [cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md). No migration, game
+conversion or access expansion; owner-only deployed checks remain pending.
 
 ## 1. Decisions and Scope
 
@@ -23,8 +24,8 @@ No creation policy, legacy authority, migration or saved data changes in this pa
 - Keep real sport settings, rules, display preferences and sport-discovery controls.
   Removing tracker-version toggles does not mean removing those settings.
 
-The four-sport review does not authorize releasing Baseball or removing its current
-preview gate. Future sports should adopt this interaction contract when ready.
+Baseball's separate BSB-7D cutover merged in #505. This four-sport review does not
+authorize that sport's release; future sports adopt this contract through their own plans.
 
 ### Owner Follow-Up Decisions (2026-10-17)
 
@@ -155,7 +156,7 @@ records must never be relabelled legacy to bypass validation.
 Retirement is an explicit per-sport policy, not a global flag on the shared generic
 Summary or Game Info. TUI-1 retires only Basketball aggregate capture and mutation.
 Hockey follows in TUI-2, Football in its FBE/TUI-3 cutover, and Baseball retirement
-is deferred to its own release plan. Until each cutover, preserve that sport's
+is delivered separately by BSB-7D/#505. Until each cutover, preserve that sport's
 authorized legacy capture, corrections, primary-recorder changes and finalization,
 with all current permission/status guards. Shared handler changes must use both
 the game's sport and authority, not disable every caller of a generic component.
@@ -266,8 +267,8 @@ The [BKE-6E broader gate](REGRESSION_BKE_6E_RELEASE.md#gono-go) remains blocked 
 D05-D07 and G03-G04. Those checks remain pending, not passed or permanently waived.
 Record the focused cutover smoke and pending checks against the deployed candidate;
 authorization, data-loss and other concrete correctness failures remain blockers.
-No migration, access widening or creation-policy change occurs in the layout/action
-pass. The authority cutover remains the next PR.
+No migration, access widening or creation-policy change occurred in the layout/action
+pass. The authority cutover is now implemented for review in the second TUI-1 PR.
 
 ## 7. Delivery Proposal
 
@@ -285,19 +286,20 @@ visual changes cannot be reviewed and tested clearly together.
 
 Source assessment identified two separate review surfaces within TUI-1:
 
-- **Layout/action pass (implemented for review):** compact event header, Game menu,
+- **Layout/action pass (merged #491):** compact event header, Game menu,
   clock/lineup tools, quick court actions, collapsed chart filters/tools and bottom
   routine sync/recorder status. Existing commands, setup, release policy, legacy
   capture and cloud authority stay unchanged. The action inventory and verification
   are in the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md). Lineup Save/Cancel
   preserve the actual launcher and clock-disclosure state, including the late-player
   handoff; no navigation-only gameplay events are added.
-- **Authority cutover (next PR):** event-only new-game creation and summary-only
+- **Authority cutover (implemented for review):** event-only new-game creation and summary-only
   legacy routing, including local source review/export/safe sync, capability
   recovery, stale drafts and per-sport Summary/Game Info guards. This reaches setup,
   persistence and shared cloud-open handlers; combining it with the layout move
   would obscure the data-preservation review. All decisions in sections 1, 5 and 6
-  remain binding. TUI-1 is not complete until this cutover is implemented/tested.
+  remain binding. Implementation and verification are recorded in the
+  [cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md); deployed checks remain separate.
 
 This is a two-PR review boundary, not additional rollout toggles or a new four-phase
 program. TUI-2 remains after completion of the Basketball cutover.

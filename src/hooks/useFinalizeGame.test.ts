@@ -36,9 +36,10 @@ beforeEach(() => {
   harness.ref.current = harness.state; harness.flush.mockResolvedValue({ ok: true })
 })
 
-describe('legacy Baseball raw finalization refusal', () => {
+describe.each(['baseball', 'basketball'])('legacy %s raw finalization refusal', sportId => {
   it.each(['owner', 'admin', 'scorer', 'viewer'])('refuses before sync/write/reset for %s', async role => {
     harness.role = role
+    harness.state = game(sportId)
     const hook = useFinalizeGame()
     expect(hook.canFinalizeCloudGame).toBe(false)
     await hook.handleFinalizeCloudGame()
@@ -53,7 +54,7 @@ describe('legacy Baseball raw finalization refusal', () => {
     harness.state = game('football')
     const previous = useFinalizeGame()
     expect(previous.canFinalizeCloudGame).toBe(true)
-    harness.state = game('baseball'); useFinalizeGame()
+    harness.state = game(sportId); useFinalizeGame()
     await previous.handleFinalizeCloudGame()
     expect(harness.flush).not.toHaveBeenCalled()
     expect(harness.update).not.toHaveBeenCalled()
@@ -66,7 +67,7 @@ describe('legacy Baseball raw finalization refusal', () => {
     harness.flush.mockImplementation(() => new Promise(resolve => { release = () => resolve({ ok: true }) }))
     const pending = useFinalizeGame().handleFinalizeCloudGame()
     expect(harness.flush).toHaveBeenCalledTimes(1)
-    harness.state = game('baseball'); useFinalizeGame(); release(); await pending
+    harness.state = game(sportId); useFinalizeGame(); release(); await pending
     expect(harness.update).not.toHaveBeenCalled()
     expect(harness.clear).not.toHaveBeenCalled()
     expect(harness.dispatch).not.toHaveBeenCalled()

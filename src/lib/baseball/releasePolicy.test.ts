@@ -129,10 +129,10 @@ describe('BSB-7D route gates', () => {
     ['const handleSaveOpponentName = async', 'const handleDeleteGame = async', '.update({ opponent_name: name })'],
   ])('pins the cloud rename authority refusal in %s', (start, end, mutation) => {
     const handler = section('src/pages/Games.tsx', start, end)
-    expect(handler).toContain("if (sportId === 'baseball')")
-    expect(handler).toContain('await loadBaseballCloudDataAuthority(game.id)')
+    expect(handler).toContain("if (sportId === 'baseball' || sportId === 'basketball')")
+    expect(handler).toContain("sportId === 'baseball' ? loadBaseballCloudDataAuthority : loadBasketballCloudDataAuthority")
     expect(handler).toContain("if (authority !== 'sport_events')")
-    expect(handler).toContain("setError('Legacy Baseball games are read-only.')")
+    expect(handler).toContain('games are read-only.')
     expect(handler.indexOf("if (authority !== 'sport_events')")).toBeLessThan(handler.indexOf(mutation))
   })
 })

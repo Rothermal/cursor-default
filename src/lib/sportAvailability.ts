@@ -1,7 +1,7 @@
 import { BASEBALL_NEW_GAME_CREATION_ENABLED } from './baseball/releasePolicy'
 
 export const SOCCER_RELEASED_IN_PRODUCTION = true
-export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
+export const BASKETBALL_EVENT_RELEASE_STAGE = 'released' as const
 /**
  * XS-1 per-sport event stages (HKY-2E). Existing event games stay reachable at every
  * stage; only new games are gated. `released` makes every new game an event game with no
@@ -14,7 +14,7 @@ export const SPORT_EVENT_RELEASE_STAGES = {
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
 export type SportReleaseStage = 'unreleased' | 'preview' | 'released'
-export type BasketballEventReleaseStage = 'internal' | 'opt_in'
+export type BasketballEventReleaseStage = 'internal' | 'released'
 export type SportEventReleaseStage = 'internal' | 'opt_in' | 'released'
 
 export interface SportAvailabilityPolicy {
@@ -38,7 +38,6 @@ export interface BasketballEventCreationPolicy {
 }
 
 interface BasketballEventCreationPolicyOptions {
-  development?: boolean
   releaseStage?: BasketballEventReleaseStage
 }
 
@@ -145,17 +144,15 @@ export function getSportAvailabilityPolicy(
 }
 
 export function getBasketballEventCreationPolicy(
-  enabledOnDevice: boolean,
   {
-    development = DEVELOPMENT_BUILD,
     releaseStage = BASKETBALL_EVENT_RELEASE_STAGE,
   }: BasketballEventCreationPolicyOptions = {}
 ): BasketballEventCreationPolicy {
-  const preferenceAvailable = development || releaseStage === 'opt_in'
+  // Internal is a creation-only rollback, including development. Never restore the grid.
   return {
     releaseStage,
-    preferenceAvailable,
-    canCreateNewEventGame: preferenceAvailable && enabledOnDevice,
+    preferenceAvailable: false,
+    canCreateNewEventGame: releaseStage === 'released',
     canAccessExistingEventGames: true,
   }
 }

@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { acceptedTeamRole, canCorrectStats } from '../lib/teamPermissions'
 import { basketballCourtOrientationForState } from '../lib/basketball/courtGeometry'
-import { isLegacyBaseballGame } from '../lib/baseball/releasePolicy'
+import { isRetiredLegacyGame } from '../lib/legacyGameRetirement'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import GameSyncStatus from '../components/GameSyncStatus'
@@ -79,7 +79,7 @@ export default function GameSummary() {
   const [newGameError, setNewGameError] = useState<string | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
-  const legacyReadOnly = isLegacyBaseballGame(state)
+  const legacyReadOnly = isRetiredLegacyGame(state)
   // Dirty legacy facts stay visible until their existing authorized transport settles.
   const resolvedCloudReview = legacyReadOnly ? Boolean(state.cloudSync.gameId)
     && !shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag()) : isFinalCloudGame
@@ -607,9 +607,9 @@ export default function GameSummary() {
           <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
-              onClick={() => navigate(legacyReadOnly ? '/sport/baseball' : isFinalCloudGame ? '/games' : '/game')}
+              onClick={() => navigate(legacyReadOnly ? sportDashboardPath(sport.id) : isFinalCloudGame ? '/games' : '/game')}
               disabled={finalizing}
-              aria-label={legacyReadOnly ? 'Back to Baseball' : isFinalCloudGame ? 'Back to Cloud Games' : 'Back to Game'}
+              aria-label={legacyReadOnly ? `Back to ${sport.name}` : isFinalCloudGame ? 'Back to Cloud Games' : 'Back to Game'}
               className="w-8 h-8 shrink-0 rounded-full bg-surface flex items-center justify-center
                          active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none"
             >
@@ -639,7 +639,8 @@ export default function GameSummary() {
 
       <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
         {legacyReadOnly && <section className="mb-4 space-y-2 border-y border-info-line bg-info px-3 py-3 text-sm text-info-content">
-          <h2 className="font-semibold">Legacy Baseball / Read-only</h2>
+          <h2 className="font-semibold">Legacy {sport.name} / Read-only</h2>
+          <p>{resolvedCloudReview && resolvedStats !== null ? 'Source: Resolved cloud statistics' : 'Source: Saved device snapshot'}</p>
           <p>Recorded stats are preserved. Tracking, corrections, recorder changes and finalization are retired.</p>
           {!isFinalCloudGame && <p>This unfinished game is excluded from season and career totals. It will not be automatically finalized or converted.</p>}
           <button type="button" className="btn-secondary" onClick={() => navigate('/settings/data')}>Local game export</button>
@@ -1183,7 +1184,7 @@ export default function GameSummary() {
               {finalizing ? 'Finalizing...' : 'Finalize Game & Save to History'}
             </button>
           )}
-          {legacyReadOnly ? <button type="button" className="btn-secondary w-full" onClick={() => navigate('/sport/baseball')}>Back to Baseball</button> : isFinalCloudGame ? (
+          {legacyReadOnly ? <button type="button" className="btn-secondary w-full" onClick={() => navigate(sportDashboardPath(sport.id))}>Back to {sport.name}</button> : isFinalCloudGame ? (
             <button
               onClick={() => navigate('/games')}
               disabled={finalizing}
