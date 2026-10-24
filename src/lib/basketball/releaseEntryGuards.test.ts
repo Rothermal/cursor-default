@@ -58,7 +58,7 @@ describe('Basketball release entry guards', () => {
     )
 
     expect(recovery).toContain('Retry Check')
-    expect(recovery).toContain('Use Legacy Cloud')
+    expect(recovery).not.toContain('Use Legacy Cloud')
     expect(recovery).toContain('Use Event Local-Only')
     expect(recovery).toContain('Cancel')
     expect(recovery).toContain('onClick={handleCancelSetup}')
@@ -128,17 +128,11 @@ describe('Basketball release entry guards', () => {
 
   it('persists Basketball edits as a draft and commits through one context command', () => {
     const setup = source('src/pages/GameSetup.tsx')
-    const eventIntent = between(
-      setup,
-      'const updateBasketballEventIntent = (enabled: boolean): boolean => {',
-      '\n  const updateTeamMode'
-    )
     const handler = between(setup, 'const handleNext = async (', '\n  async function compensate')
 
-    expect(eventIntent).toContain('setBasketballAuthority')
-    expect(eventIntent.indexOf('setBasketballAuthority')).toBeLessThan(
-      eventIntent.indexOf("dispatch({ type: 'HYDRATE_STATE'")
-    )
+    expect(setup).toContain("const basketballAuthority = 'sport_events' as const")
+    expect(setup).not.toContain('updateBasketballEventIntent')
+    expect(setup).toContain('!currentBasketballDraft || staleLegacyDraftRef.current || !restoredBasketballDraftRef.current')
     expect(setup).toContain('saveBasketballSetupDraft(currentBasketballDraft)')
     expect(handler).toContain('commitGameSetup(')
     expect(handler).toContain(
@@ -218,7 +212,7 @@ describe('Basketball release entry guards', () => {
       '\n}'
     )
     expect(policy).toMatch(
-      /export const BASKETBALL_EVENT_RELEASE_STAGE = '(internal|opt_in)' as const/
+      /export const BASKETBALL_EVENT_RELEASE_STAGE = '(internal|released)' as const/
     )
     expect(policy).toContain('export type BasketballEventReleaseStage')
     expect(policy).toContain('export function getBasketballEventCreationPolicy(')
@@ -228,7 +222,6 @@ describe('Basketball release entry guards', () => {
 
   it('keeps every release-policy consumer on an audited allowlist', () => {
     expect(implementationConsumers('getBasketballEventCreationPolicy')).toEqual([
-      'src/components/settings/BasketballSettings.tsx',
       'src/context/GameContext.tsx',
       'src/pages/GameSetup.tsx',
     ])
@@ -257,23 +250,24 @@ describe('Basketball release entry guards', () => {
     expect(guardIndex).toBeLessThan(handler.indexOf('prepareActiveGameMutation'))
     expect(guardIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
     expect(guardIndex).toBeLessThan(handler.indexOf('commitGameSetup('))
-    expect(context).toContain('loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled')
-    expect(context).toContain('Persisted state is authoritative here')
-    expect(context).toContain(').canCreateNewEventGame')
+    expect(context).toContain('getBasketballEventCreationPolicy().canCreateNewEventGame')
+    expect(context).not.toContain('loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled')
     expect(parking).toContain('allowNewBasketballEventGame = false')
     expect(parking).toContain('continuingCommittedBasketballEventSetup')
     expect(parking).toContain('isUninitializedBasketballEventState(nextState)')
   })
 
-  it('keeps the rollout preference outside cloud-backed Basketball settings saves', () => {
+  it('retains old device storage without exposing it as a tracker or cloud setting', () => {
     const context = source('src/context/SettingsContext.tsx')
     const settings = source('src/components/settings/BasketballSettings.tsx')
 
-    expect(context).toContain('setBasketballEventTrackerPreviewEnabled')
-    expect(context).toContain('eventTrackerPreviewEnabled: enabled')
-    expect(settings).toContain('New event tracker (preview)')
-    expect(settings).toContain('disabled={!eventCreationPolicy.preferenceAvailable}')
-    expect(settings).toContain('{!trackerTabActive && (')
+    expect(context).not.toContain('basketballEventTrackerPreviewEnabled')
+    expect(context).not.toContain('setBasketballEventTrackerPreviewEnabled')
+    expect(context).not.toContain('baseballEventTrackerEnabled')
+    expect(context).not.toContain('setBaseballEventTrackerEnabled')
+    expect(settings).not.toContain('New event tracker (preview)')
+    expect(settings).not.toContain('eventTrackerPreviewEnabled')
+    expect(settings).not.toContain("id: 'tracker'")
   })
 
   it('clears Basketball capability success when the auth account changes', () => {

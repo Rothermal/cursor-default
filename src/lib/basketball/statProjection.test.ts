@@ -511,7 +511,7 @@ describe('BKE-1B2 Basketball stat projection', () => {
     })
   })
 
-  it('matches the legacy reducer for an equivalent no-adjustment stat sequence', () => {
+  it('matches frozen legacy totals for an equivalent no-adjustment stat sequence', () => {
     const chartShot: ShotRecord = {
       id: id(1),
       x: 0,
@@ -522,17 +522,12 @@ describe('BKE-1B2 Basketball stat projection', () => {
       playerId: 'player-1',
       timestamp: Date.parse(at(1)),
     }
-    let legacy: GameState = { ...state(), sportGameState: null }
-    legacy = gameReducer(legacy, { type: 'ADD_SHOT', shot: chartShot })
-    legacy = gameReducer(legacy, { type: 'INCREMENT_STAT', playerId: 'player-2', statId: 'ast' })
-    legacy = gameReducer(legacy, {
-      type: 'INCREMENT_STAT',
-      playerId: TEAM_PLAYER_HOME_ID,
-      statId: 'dreb',
-    })
-    legacy = gameReducer(legacy, { type: 'INCREMENT_STAT', playerId: 'player-2', statId: 'stl' })
-    legacy = gameReducer(legacy, { type: 'INCREMENT_STAT', playerId: 'player-1', statId: 'blk' })
-    legacy = gameReducer(legacy, { type: 'INCREMENT_STAT', playerId: 'player-2', statId: 'to' })
+    const frozenStats: Record<string, Record<string, number>> = {
+      'player-1': { '2pt': 1, blk: 1 }, 'player-2': { ast: 1, stl: 1, to: 1 },
+      [TEAM_PLAYER_HOME_ID]: { dreb: 1 },
+    }
+    const legacy: GameState = { ...state(), sportGameState: null, shotChart: [chartShot],
+      players: state().players.map(player => ({ ...player, stats: frozenStats[player.id] ?? {} })) }
 
     const projected = project([
       start(),
@@ -576,6 +571,7 @@ describe('BKE-1B2 Basketball stat projection', () => {
       }
     }
     expect(displayedHomeScore(projected)).toBe(displayedHomeScore(legacy))
+    expect(gameReducer(legacy, { type: 'ADD_SHOT', shot: chartShot })).toBe(legacy)
     expect(projected.shotChart).toEqual([chartShot])
   })
 })

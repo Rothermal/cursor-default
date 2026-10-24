@@ -8,7 +8,7 @@ import { shouldBlockDiscardUnsyncedGame, shouldPreserveLocalAfterFinalizeSuccess
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { useTeamRole } from './useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
-import { canFinalizeAggregateGame } from '../lib/baseball/releasePolicy'
+import { canFinalizeAggregateGame } from '../lib/legacyGameRetirement'
 
 /**
  * Finalize an in-progress cloud game: flush sync → mark final → clear local → reset.

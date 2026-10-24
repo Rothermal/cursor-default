@@ -244,7 +244,7 @@ describe('Basketball setup draft', () => {
     expect(basketballSetupDraftHasMeaningfulEdits(personal)).toBe(true)
   })
 
-  it('builds a complete Legacy setup candidate without mutating an active game', () => {
+  it('preserves parsing of a saved Legacy draft but refuses new creation from it', () => {
     const draft = createBasketballSetupDraft({
       accountScope: 'anonymous',
       source: {
@@ -266,17 +266,8 @@ describe('Basketball setup draft', () => {
       cloudStatus: 'idle',
     })
 
-    expect(built.ok).toBe(true)
-    if (!built.ok) return
-    expect(built.state).toMatchObject({
-      gameDataAuthority: null,
-      sport: { id: 'basketball' },
-      gameInfo: { teamName: 'Falcons', opponentName: 'Tigers' },
-      cloudSync: { teamId: 'team-1', seasonId: 'season-1' },
-      teamStatsConfig: { periods: 4 },
-      players: [],
-      basketballCourtOrientation: 'flipped',
-    })
+    expect(parseBasketballSetupDraft(draft).ok).toBe(true)
+    expect(built).toEqual({ ok: false, error: 'This saved legacy setup cannot create a game. Start a new Basketball event setup.' })
   })
 
   it('persists a complete Event preview while keeping its source authority exact', () => {

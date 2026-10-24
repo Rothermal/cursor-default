@@ -72,9 +72,8 @@ import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment
 import { normalizeGameEventStream } from '../lib/gameEvents/stream'
 import { normalizeSportGameState } from '../lib/sportGameState/state'
 import { eventCloudPolicyForState, normalizeEventCloudPolicyState } from '../lib/eventCloudPolicy'
-import { baseballAuthorityForHydration } from '../lib/baseball/releasePolicy'
+import { retiredGameAuthorityForHydration } from '../lib/legacyGameRetirement'
 import { getBasketballEventCreationPolicy } from '../lib/sportAvailability'
-import { loadSettingsFromStorage } from '../lib/settingsStorage'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
 import { sports } from '../config/sports'
@@ -306,7 +305,7 @@ function loadState(userId: string | null): GameState {
       const restoredState = normalizeEventCloudPolicyState({
         ...createInitialState(restoredStatus),
         ...parsed,
-        gameDataAuthority: baseballAuthorityForHydration(parsed),
+        gameDataAuthority: retiredGameAuthorityForHydration(parsed),
         homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
         homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
         notes: typeof parsed.notes === 'string' ? parsed.notes : '',
@@ -593,8 +592,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const startNewGame = useCallback(
     (sport: SportConfig) => {
-      if (sport.id === 'baseball') {
-        setParkingError('Start Baseball from its event setup. Existing games remain saved.')
+      if (sport.id === 'baseball' || sport.id === 'basketball') {
+        setParkingError(`Start ${sport.name} from its event setup. Existing games remain saved.`)
         return false
       }
       if (blockUnpreparedRunningClock('new_game_commit')) return false
@@ -636,10 +635,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           nextState,
           userId,
           expectedLocalGameId,
-          // Persisted state is authoritative here so stale tabs and failed preference writes refuse.
-          getBasketballEventCreationPolicy(
-            loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled
-          ).canCreateNewEventGame,
+          // Creation policy is rechecked at commit; obsolete device preferences cannot choose authority.
+          getBasketballEventCreationPolicy().canCreateNewEventGame,
           beforeCommit
         )
         stateRef.current = nextState

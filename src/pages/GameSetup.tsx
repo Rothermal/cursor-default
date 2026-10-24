@@ -25,7 +25,6 @@ import {
   hasStartedBasketballEventGame,
   isBasketballEventSetupIntent,
   isBasketballMatchRulesV3,
-  setBasketballEventCreationIntent,
 } from '../lib/basketball'
 import { canCommitBasketballSetup } from '../lib/basketball/releasePolicy'
 import {
@@ -100,7 +99,6 @@ export default function GameSetup() {
     isSportEnabled,
     basketballSettings,
     basketballSettingsSync,
-    basketballEventTrackerPreviewEnabled,
     setBasketballSettingsPageActive,
     hockeyEventTrackerEnabled,
   } = useSettings()
@@ -124,18 +122,19 @@ export default function GameSetup() {
   const initialBasketballDraft = initialBasketballRoute && !reviewCurrentSetup
     ? loadBasketballSetupDraft(accountScope)
     : null
-  const matchingInitialBasketballDraft = initialBasketballDraft &&
+  const routeInitialBasketballDraft = initialBasketballDraft &&
     basketballSetupDraftMatchesRoute(initialBasketballDraft, requestedTeamId)
       ? initialBasketballDraft
       : null
+  const [staleLegacyDraft, setStaleLegacyDraft] = useState(routeInitialBasketballDraft?.authority === 'legacy')
+  const staleLegacyDraftRef = useRef(staleLegacyDraft)
+  const matchingInitialBasketballDraft = routeInitialBasketballDraft?.authority === 'sport_events'
+    ? routeInitialBasketballDraft : null
   const basketballDraftRef = useRef<BasketballSetupDraft | null>(matchingInitialBasketballDraft)
   const isBasketballSetup = sport?.id === 'basketball'
   const sportHomePath = sport ? sportDashboardPath(sport.id) : '/'
   const isCloudFlow = Boolean(isConfigured && user && supabase)
-  const [basketballAuthority, setBasketballAuthority] = useState<'legacy' | 'sport_events'>(
-    matchingInitialBasketballDraft?.authority ??
-    ((initialBasketballRoute || reviewCurrentSetup) && isBasketballEventSetupIntent(state) ? 'sport_events' : 'legacy')
-  )
+  const basketballAuthority = 'sport_events' as const
   const [basketballDisplayFlipped, setBasketballDisplayFlipped] = useState(
     matchingInitialBasketballDraft?.display.defaultCourtFlipped ??
       basketballSettings.display.defaultCourtFlipped
@@ -151,16 +150,14 @@ export default function GameSetup() {
   )
   const [committedLocalGameId, setCommittedLocalGameId] = useState(
     matchingInitialBasketballDraft?.committedLocalGameId ??
-    (!requestedSportId && !requestedTeamId && state.sport?.id === 'basketball' && state.gameInfo
+    (!requestedSportId && !requestedTeamId && isBasketballEventSetupIntent(state) && state.gameInfo
       ? activeLocalGameId
       : null)
   )
   const isBasketballEventIntent = isBasketballSetup
     ? basketballAuthority === 'sport_events'
     : isBasketballEventSetupIntent(state)
-  const basketballEventCreationPolicy = getBasketballEventCreationPolicy(
-    basketballEventTrackerPreviewEnabled
-  )
+  const basketballEventCreationPolicy = getBasketballEventCreationPolicy()
 
   useEffect(() => {
     if (
@@ -543,9 +540,14 @@ export default function GameSetup() {
       restoredBasketballDraftRef.current = true
       return
     }
+    if (restored.authority === 'legacy') {
+      restoredBasketballDraftRef.current = true
+      staleLegacyDraftRef.current = true
+      setStaleLegacyDraft(true)
+      return
+    }
     basketballDraftRef.current = restored
     restoredBasketballDraftRef.current = true
-    setBasketballAuthority(restored.authority)
     setBasketballDisplayFlipped(restored.display.defaultCourtFlipped)
     setBasketballMatchOverrides(restored.event?.matchOverrides ?? {})
     setCommittedLocalGameId(restored.committedLocalGameId)
@@ -813,11 +815,11 @@ export default function GameSetup() {
   ])
 
   useEffect(() => {
-    if (!currentBasketballDraft) return
+    if (!currentBasketballDraft || staleLegacyDraftRef.current || !restoredBasketballDraftRef.current) return
     basketballDraftRef.current = currentBasketballDraft
     const saved = saveBasketballSetupDraft(currentBasketballDraft)
     if (!saved.ok) setSetupError(saved.error)
-  }, [currentBasketballDraft])
+  }, [currentBasketballDraft, staleLegacyDraft])
 
   const handleDeleteTournament = async (tournament: TournamentOption) => {
     if (!supabase || !mayManageSelectedTeam) return
@@ -865,12 +867,8 @@ export default function GameSetup() {
         activeState: state,
       })
     : !isBasketballEventIntent
-  const committedBasketballEventSetup = Boolean(
-    matchingCommittedBasketballSetup &&
-    currentBasketballDraft?.authority === 'sport_events' &&
-    isBasketballEventSetupIntent(state)
-  )
   const canProceed = Boolean(
+    !staleLegacyDraft &&
     resolvedTeamName &&
     opponentName.trim() &&
     (!isBasketballEventIntent || currentBasketballDraft?.event) &&
@@ -879,45 +877,6 @@ export default function GameSetup() {
   const requestedTeamUnavailable = Boolean(
     requestedTeamId && !loadingTeams && !selectedTeam
   )
-  const showBasketballEventToggle = Boolean(
-    sport?.id === 'basketball' &&
-      (basketballEventCreationPolicy.canCreateNewEventGame || isBasketballEventIntent) &&
-      (isBasketballSetup || isBasketballEventIntent || !state.gameInfo)
-  )
-
-  const updateBasketballEventIntent = (enabled: boolean): boolean => {
-    if (isBasketballSetup) {
-      if (committedBasketballEventSetup) {
-        setSetupError('This existing Basketball setup already uses the new tracker.')
-        return false
-      }
-      if (enabled && !basketballEventCreationPolicy.canCreateNewEventGame) {
-        setSetupError(
-          'Enable New event tracker (preview) in Basketball settings before creating this game.'
-        )
-        return false
-      }
-      setBasketballAuthority(enabled ? 'sport_events' : 'legacy')
-      if (enabled && !basketballDraftRef.current?.event) {
-        setBasketballMatchOverrides({})
-        setBasketballCloudIntent(teamMode === 'existing' ? 'automatic' : 'local_only')
-      }
-      if (enabled) setSelectedNewTeamSeasonId('')
-      setBasketballCapabilityFailure(null)
-      setSetupError(null)
-      return true
-    }
-    const result = setBasketballEventCreationIntent(state, enabled)
-    if (!result.ok) {
-      setSetupError(result.message)
-      return false
-    }
-    if (enabled) setSelectedNewTeamSeasonId('')
-    dispatch({ type: 'HYDRATE_STATE', state: result.state })
-    setSetupError(null)
-    return true
-  }
-
   const updateTeamMode = (nextMode: 'existing' | 'new') => {
     setTeamMode(nextMode)
     if (isBasketballEventIntent) {
@@ -987,6 +946,10 @@ export default function GameSetup() {
 
     const basketballDraft = isBasketballSetup ? currentBasketballDraft : null
     if (isBasketballSetup) {
+      if (staleLegacyDraft) {
+        setSetupError('Start a new event setup before continuing this retired draft.')
+        return
+      }
       if (!basketballDraft) {
         setSetupError('Basketball setup is still loading or contains invalid fields.')
         return
@@ -1008,7 +971,7 @@ export default function GameSetup() {
         activeState: state,
       })) {
         setSetupError(
-          'Enable New event tracker (preview) in Basketball settings before creating this game.'
+          'New Basketball game creation is unavailable in this build. Existing games remain saved.'
         )
         return
       }
@@ -1380,9 +1343,6 @@ export default function GameSetup() {
                     <button type="button" onClick={() => { void handleNext(true) }} disabled={checkingBasketballCapabilities} className="btn-secondary min-h-10 text-xs disabled:bg-control-disabled disabled:text-content-disabled">
                       Retry Check
                     </button>
-                    <button type="button" onClick={() => updateBasketballEventIntent(false)} className="btn-secondary min-h-10 text-xs">
-                      Use Legacy Cloud
-                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -1552,44 +1512,21 @@ export default function GameSetup() {
             />
           </div>
 
-          {showBasketballEventToggle && (
+          {isBasketballSetup && staleLegacyDraft && <section role="alert" className="space-y-3 border-y border-warning-line bg-warning px-3 py-3 text-sm text-warning-content">
+            <p>This saved legacy setup is retired. Existing games remain unchanged.</p>
+            <button type="button" className="btn-secondary" onClick={() => {
+              basketballDraftRef.current = null
+              setCommittedLocalGameId(null)
+              setBasketballMatchOverrides({})
+              staleLegacyDraftRef.current = false
+              setStaleLegacyDraft(false)
+            }}>Start new event setup</button>
+          </section>}
+          {isBasketballSetup && !basketballEventCreationPolicy.canCreateNewEventGame && !matchingCommittedBasketballSetup && !staleLegacyDraft && <p role="alert" className="border-y border-warning-line bg-warning px-3 py-3 text-sm text-warning-content">
+            New Basketball game creation is unavailable in this build. Existing games remain saved.
+          </p>}
+          {isBasketballSetup && (
             <section className="space-y-3 border-y border-warning-line bg-warning px-3 py-3">
-              <div>
-                <p className="text-sm font-semibold text-warning-content">Basketball tracker</p>
-                <p className="text-xs text-warning-content">
-                  {committedBasketballEventSetup
-                    ? 'This existing setup uses the new tracker.'
-                    : basketballEventCreationPolicy.canCreateNewEventGame
-                      ? 'Choose the tracker for this game.'
-                      : 'Enable New event tracker (preview) in Basketball settings to continue.'}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 rounded-md bg-warning p-1" role="group" aria-label="Basketball tracker">
-                <button
-                  type="button"
-                  disabled={committedBasketballEventSetup}
-                  onClick={() => updateBasketballEventIntent(false)}
-                  className={`rounded px-3 py-2 text-sm font-semibold disabled:bg-control-disabled disabled:text-content-disabled ${
-                    !isBasketballEventIntent ? 'bg-surface text-content shadow-sm' : 'text-warning-content'
-                  }`}
-                >
-                  Classic tracker
-                </button>
-                <button
-                  type="button"
-                  disabled={
-                    loadingTeams ||
-                    (!basketballEventCreationPolicy.canCreateNewEventGame &&
-                      !committedBasketballEventSetup)
-                  }
-                  onClick={() => updateBasketballEventIntent(true)}
-                  className={`rounded px-3 py-2 text-sm font-semibold disabled:bg-control-disabled disabled:text-content-disabled ${
-                    isBasketballEventIntent ? 'bg-surface text-content shadow-sm' : 'text-warning-content'
-                  }`}
-                >
-                  New tracker
-                </button>
-              </div>
               {isBasketballEventIntent && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-warning-content">

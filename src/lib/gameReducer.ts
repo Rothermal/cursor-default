@@ -25,7 +25,7 @@ import { SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
 import { playerIdMapForRoster, shotChartForRoster } from './rosterAlignment'
 import { normalizeEventCloudPolicyState } from './eventCloudPolicy'
-import { baseballAuthorityForHydration, blocksRetiredBaseballMutation } from './baseball/releasePolicy'
+import { retiredGameAuthorityForHydration, blocksRetiredLegacyMutation } from './legacyGameRetirement'
 
 export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyncState {
   return {
@@ -122,7 +122,7 @@ export function applyUndoLastEntry(state: GameState): GameState | null {
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
-  if (blocksRetiredBaseballMutation(state, action)) return state
+  if (blocksRetiredLegacyMutation(state, action)) return state
   const resetStatus: CloudSyncStatus = state.cloudSync.status === 'offline' ? 'offline' : 'idle'
   if (
     (state.eventStream || state.gameDataAuthority === SPORT_EVENTS_AUTHORITY) &&
@@ -184,7 +184,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const cs = s.cloudSync
       const normalizedState = normalizeEventCloudPolicyState({
         ...s,
-        gameDataAuthority: baseballAuthorityForHydration(s),
+        gameDataAuthority: retiredGameAuthorityForHydration(s),
         eventStream: normalizeGameEventStream(s.eventStream),
         sportGameState: normalizeSportGameState(s.sportGameState),
         basketballCourtOrientation:

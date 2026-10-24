@@ -14,7 +14,8 @@ interface BasketballEventSetupCommitPolicyInput {
 export function canCommitBasketballSetup(
   input: BasketballEventSetupCommitPolicyInput
 ): boolean {
-  if (input.authority === 'legacy' || input.policy.canCreateNewEventGame) return true
+  if (input.authority !== 'sport_events') return false
+  if (input.policy.canCreateNewEventGame) return true
 
   return Boolean(
     input.draftCommittedLocalGameId &&

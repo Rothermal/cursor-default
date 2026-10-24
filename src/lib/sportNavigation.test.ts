@@ -39,19 +39,19 @@ describe('sportNavigation', () => {
 
   it('routes resumed games to the first incomplete game-flow step', () => {
     expect(routeForResumedGame({ ...emptyEventState, sport: null, gameInfo: null, players: [] })).toBe('/')
-    expect(routeForResumedGame({ ...emptyEventState, sport: { id: 'basketball' } as never, gameInfo: null, players: [] })).toBe('/setup')
+    expect(routeForResumedGame({ ...emptyEventState, sport: { id: 'basketball' } as never, gameInfo: null, players: [] })).toBe('/summary')
     expect(routeForResumedGame({
       ...emptyEventState,
       sport: { id: 'basketball' } as never,
       gameInfo: { teamName: 'A', opponentName: 'B', tournamentName: '', date: '2026-07-12' },
       players: [],
-    })).toBe('/players')
+    })).toBe('/summary')
     expect(routeForResumedGame({
       ...emptyEventState,
       sport: { id: 'basketball' } as never,
       gameInfo: { teamName: 'A', opponentName: 'B', tournamentName: '', date: '2026-07-12' },
       players: [{ id: 'p1', name: 'A', number: '1', stats: {} }],
-    })).toBe('/game')
+    })).toBe('/summary')
   })
 
   it('routes soccer setup and started matches to their sport-specific stage', () => {

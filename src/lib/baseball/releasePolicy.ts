@@ -1,4 +1,6 @@
 import type { GameAction, GameState } from '../../types'
+import { isLegacyGameForSport, legacyRetiredGameBinding, retiredGameAuthorityForHydration } from '../legacyGameRetirement'
+export { canFinalizeAggregateGame } from '../legacyGameRetirement'
 
 /** Rollback stops new creation only. Never restore aggregate capture or hide saved games. */
 export const BASEBALL_NEW_GAME_CREATION_ENABLED = true
@@ -6,14 +8,12 @@ export const BASEBALL_NEW_GAME_CREATION_ENABLED = true
 type AuthorityState = Partial<Pick<GameState, 'sport' | 'gameDataAuthority' | 'eventStream' | 'sportGameState'>>
 
 export function isLegacyBaseballGame(state: AuthorityState): boolean {
-  return state.sport?.id === 'baseball' && state.gameDataAuthority !== 'sport_events'
-    && !state.eventStream && !state.sportGameState
+  return isLegacyGameForSport(state, 'baseball')
 }
 
 /** Preserve an event marker before malformed setup/stream normalization can erase it. */
 export function baseballAuthorityForHydration(state: AuthorityState): GameState['gameDataAuthority'] {
-  return (state.sport?.id === 'baseball' && !isLegacyBaseballGame(state)) || state.gameDataAuthority === 'sport_events'
-    ? 'sport_events' : null
+  return retiredGameAuthorityForHydration(state)
 }
 
 export function legacyBaseballBinding(
@@ -21,20 +21,7 @@ export function legacyBaseballBinding(
   records: ReadonlyArray<{ localGameId: string; gameState: GameState }>,
   gameId: string
 ): { kind: 'active' } | { kind: 'parked'; localGameId: string } | null {
-  const matches = records.filter(record => record.gameState.cloudSync.gameId === gameId)
-  if (matches.length > 1 || matches.some(record => !isLegacyBaseballGame(record.gameState))) {
-    throw Error('This cloud game has conflicting local bindings. Review local game exports before opening it.')
-  }
-  if (current.cloudSync.gameId === gameId) {
-    if (!isLegacyBaseballGame(current)) throw Error('The local game has incompatible authority. Its saved data was preserved.')
-    return { kind: 'active' }
-  }
-  return matches[0] ? { kind: 'parked', localGameId: matches[0].localGameId } : null
-}
-
-export function canFinalizeAggregateGame(state: AuthorityState): boolean {
-  return state.sport?.id !== 'baseball' && state.gameDataAuthority !== 'sport_events'
-    && !state.eventStream && !state.sportGameState
+  return legacyRetiredGameBinding(current, records, gameId, 'baseball')
 }
 
 export function blocksRetiredBaseballMutation(state: AuthorityState, action: GameAction): boolean {

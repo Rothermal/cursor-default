@@ -19,14 +19,10 @@ interface SettingsContextType {
   isSportEnabled: (sportId: string) => boolean
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
-  basketballEventTrackerPreviewEnabled: boolean
-  setBasketballEventTrackerPreviewEnabled: (enabled: boolean) => void
   hockeyEventTrackerEnabled: boolean
   setHockeyEventTrackerEnabled: (enabled: boolean) => void
   hockeyRinkFlippedByDefault: boolean
   setHockeyRinkFlippedByDefault: (flipped: boolean) => void
-  baseballEventTrackerEnabled: boolean
-  setBaseballEventTrackerEnabled: (enabled: boolean) => void
   baseball: ReturnType<typeof useBaseballPersonalSettings>
   baseballDeviceSettings: BaseballDeviceSettings
   setBaseballDeviceSetting: (key: 'trackPitchLocation' | 'trackBattedBallLocation', enabled: boolean) => void
@@ -103,16 +99,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const setBasketballEventTrackerPreviewEnabled = useCallback((enabled: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      basketball: {
-        ...prev.basketball,
-        eventTrackerPreviewEnabled: enabled,
-      },
-    }))
-  }, [])
-
   const setHockeyEventTrackerEnabled = useCallback((enabled: boolean) => {
     setSettings(prev => ({
       ...prev,
@@ -129,16 +115,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       hockey: {
         ...prev.hockey,
         rinkFlippedByDefault: flipped,
-      },
-    }))
-  }, [])
-
-  const setBaseballEventTrackerEnabled = useCallback((enabled: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      baseball: {
-        ...prev.baseball,
-        eventTrackerEnabled: enabled,
       },
     }))
   }, [])
@@ -167,15 +143,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         isSportEnabled,
         toggleSport,
         setSportEnabled,
-        basketballEventTrackerPreviewEnabled:
-          settings.basketball.eventTrackerPreviewEnabled,
-        setBasketballEventTrackerPreviewEnabled,
         hockeyEventTrackerEnabled: settings.hockey.eventTrackerEnabled,
         setHockeyEventTrackerEnabled,
         hockeyRinkFlippedByDefault: settings.hockey.rinkFlippedByDefault,
         setHockeyRinkFlippedByDefault,
-        baseballEventTrackerEnabled: settings.baseball.eventTrackerEnabled,
-        setBaseballEventTrackerEnabled,
         baseball,
         baseballDeviceSettings: settings.baseball,
         setBaseballDeviceSetting,

@@ -3,7 +3,7 @@ import type { ParkedGameSummary } from './gameParking'
 import { basketballSummaryPath } from './basketball/summary'
 import { baseballSummaryPath } from './baseball/summary'
 import { hockeySummaryPath } from './hockey/summary'
-import { isLegacyBaseballGame } from './baseball/releasePolicy'
+import { isRetiredLegacyGame } from './legacyGameRetirement'
 
 type ResumableGameState = Pick<
   GameState,
@@ -49,7 +49,7 @@ export function isParkedGameForSport(
 
 export function routeForResumedGame(state: ResumableGameState): string {
   if (!state.sport) return '/'
-  if (isLegacyBaseballGame(state)) return '/summary'
+  if (isRetiredLegacyGame(state)) return '/summary'
   if (state.sport.id === 'baseball') return state.sportGameState?.sportId === 'baseball' &&
     ['final', 'abandoned'].includes(String(state.sportGameState.projection?.status))
     ? baseballSummaryPath() : '/game'
