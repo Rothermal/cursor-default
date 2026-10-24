@@ -234,6 +234,7 @@ describe('Basketball release entry guards', () => {
     ])
     expect(implementationConsumers('getSportAvailabilityPolicy')).toEqual([
       'src/pages/Admin.tsx',
+      'src/pages/BaseballEventSetup.tsx',
       'src/pages/GameSetup.tsx',
       'src/pages/SoccerGameSetup.tsx',
       'src/pages/SportDashboard.tsx',

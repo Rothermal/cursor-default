@@ -72,7 +72,7 @@ import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment
 import { normalizeGameEventStream } from '../lib/gameEvents/stream'
 import { normalizeSportGameState } from '../lib/sportGameState/state'
 import { eventCloudPolicyForState, normalizeEventCloudPolicyState } from '../lib/eventCloudPolicy'
-import { normalizeGameDataAuthority } from '../lib/gameEvents/authority'
+import { baseballAuthorityForHydration } from '../lib/baseball/releasePolicy'
 import { getBasketballEventCreationPolicy } from '../lib/sportAvailability'
 import { loadSettingsFromStorage } from '../lib/settingsStorage'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
@@ -306,7 +306,7 @@ function loadState(userId: string | null): GameState {
       const restoredState = normalizeEventCloudPolicyState({
         ...createInitialState(restoredStatus),
         ...parsed,
-        gameDataAuthority: normalizeGameDataAuthority(parsed.gameDataAuthority),
+        gameDataAuthority: baseballAuthorityForHydration(parsed),
         homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
         homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
         notes: typeof parsed.notes === 'string' ? parsed.notes : '',
@@ -593,6 +593,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const startNewGame = useCallback(
     (sport: SportConfig) => {
+      if (sport.id === 'baseball') {
+        setParkingError('Start Baseball from its event setup. Existing games remain saved.')
+        return false
+      }
       if (blockUnpreparedRunningClock('new_game_commit')) return false
       try {
         saveActiveGameState(stateRef.current, userId)

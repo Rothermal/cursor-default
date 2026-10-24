@@ -12,12 +12,13 @@ game review and optional authenticated cloud sync.
   Court/Lineup/player details, event-local attribution and the full court are implemented.
 - **Hockey:** released event tracker with rink capture, penalties/strength, Timeline,
   Summary and cloud lifecycle. Every new Hockey game uses events.
-- **Baseball:** opt-in event tracker with diamond, pitch/play capture, lineups,
-  corrections, Summary and cloud sync. Recorder management/finalize/reopen merged
-  in #495; cloud primary/canonical Summary merged in #496. The
-  [BSB-7 execution plan](docs/PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) has
-  approved product scope and is under review, not shipped. Baseball remains opt-in
-  until its final implementation slice; BSB-6 live exit checks remain pending.
+- **Baseball:** event-only new-game setup, diamond/pitch/play capture, lineups,
+  corrections, cloud lifecycle, Summary, canonical aggregates and personal defaults.
+  BSB-7D's cutover is implemented for review; legacy games become read-only summaries,
+  with recorded stats, local exports and authorized unsynced-data transport preserved.
+  See the [BSB-7 plan](docs/PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) and
+  [cutover record](docs/REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md). Owner-only
+  post-deployment validation is approved; broader-release live checks remain pending.
 - **Football:** generic aggregate tracking; its planned event/field experience is
   not implemented.
 

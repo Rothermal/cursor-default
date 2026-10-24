@@ -61,6 +61,17 @@ remains separate from build/precache checks.
 
 ## Cloud configuration
 
+### Baseball cutover rollback
+
+BSB-7D implements event-only Baseball creation and read-only legacy games for review.
+Its [release record](REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md) separates local gates
+from pending owner-only deployed checks. To pause new creation, change
+`BASEBALL_NEW_GAME_CREATION_ENABLED` in `src/lib/baseball/releasePolicy.ts` through
+a reviewed build. Do not restore the preview/Legacy selector or remove the old-data
+sync capability: saved events, legacy stats, dirty bindings and exports must remain.
+This is not a cloud-access switch or broader-rollout approval. No new migration is
+part of the cutover; the existing exact contract 2/078 and feature-specific checks remain.
+
 [.env.example](../.env.example) lists local client environment keys. The deployed
 workflow currently reads repository secrets `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY`; do not assume a local publishable-key variable is also

@@ -16,6 +16,10 @@ import { supabase } from '../lib/supabase'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { acceptedTeamRole, canCorrectStats } from '../lib/teamPermissions'
 import { basketballCourtOrientationForState } from '../lib/basketball/courtGeometry'
+import { isLegacyBaseballGame } from '../lib/baseball/releasePolicy'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import GameSyncStatus from '../components/GameSyncStatus'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -75,6 +79,11 @@ export default function GameSummary() {
   const [newGameError, setNewGameError] = useState<string | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
+  const legacyReadOnly = isLegacyBaseballGame(state)
+  // Dirty legacy facts stay visible until their existing authorized transport settles.
+  const resolvedCloudReview = legacyReadOnly ? Boolean(state.cloudSync.gameId)
+    && !shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag()) : isFinalCloudGame
+  const mayCorrect = !legacyReadOnly && isTeamAdmin
   const gameId = state.cloudSync.gameId
   const teamId = state.cloudSync.teamId
   const playerIdMap = state.cloudSync.playerIdMap
@@ -116,10 +125,10 @@ export default function GameSummary() {
   const teamStatHomeStats = useMemo(() => {
     const local = homeTeamPseudo?.stats ?? {}
     const remote = playerIdMap[TEAM_PLAYER_HOME_ID]
-    if (isFinalCloudGame && remote && teamTrackedStatsByRemoteId?.[remote]) {
+    if (resolvedCloudReview && remote && teamTrackedStatsByRemoteId?.[remote]) {
       return teamTrackedStatsByRemoteId[remote]
     }
-    if (isFinalCloudGame && remote && resolvedStats?.[remote]) {
+    if (resolvedCloudReview && remote && resolvedStats?.[remote]) {
       return Object.fromEntries(
         Object.entries(resolvedStats[remote]).map(([k, e]) => [k, e.value])
       )
@@ -127,7 +136,7 @@ export default function GameSummary() {
     return local
   }, [
     homeTeamPseudo?.stats,
-    isFinalCloudGame,
+    resolvedCloudReview,
     playerIdMap,
     resolvedStats,
     teamTrackedStatsByRemoteId,
@@ -136,10 +145,10 @@ export default function GameSummary() {
   const teamStatOppStats = useMemo(() => {
     const local = oppTeamPseudo?.stats ?? {}
     const remote = playerIdMap[TEAM_PLAYER_OPP_ID]
-    if (isFinalCloudGame && remote && teamTrackedStatsByRemoteId?.[remote]) {
+    if (resolvedCloudReview && remote && teamTrackedStatsByRemoteId?.[remote]) {
       return teamTrackedStatsByRemoteId[remote]
     }
-    if (isFinalCloudGame && remote && resolvedStats?.[remote]) {
+    if (resolvedCloudReview && remote && resolvedStats?.[remote]) {
       return Object.fromEntries(
         Object.entries(resolvedStats[remote]).map(([k, e]) => [k, e.value])
       )
@@ -147,7 +156,7 @@ export default function GameSummary() {
     return local
   }, [
     oppTeamPseudo?.stats,
-    isFinalCloudGame,
+    resolvedCloudReview,
     playerIdMap,
     resolvedStats,
     teamTrackedStatsByRemoteId,
@@ -223,7 +232,7 @@ export default function GameSummary() {
 
   useEffect(() => {
     const client = supabase
-    if (!isFinalCloudGame || !gameId || !client) {
+    if (!resolvedCloudReview || !gameId || !client) {
       setTeamTrackedStatsByRemoteId(null)
       return
     }
@@ -252,7 +261,7 @@ export default function GameSummary() {
     return () => {
       cancelled = true
     }
-  }, [isFinalCloudGame, gameId, resolvedKey])
+  }, [resolvedCloudReview, gameId, resolvedKey])
 
   const loadResolved = useCallback(async () => {
     const client = supabase
@@ -306,7 +315,7 @@ export default function GameSummary() {
   }, [teamId])
 
   useEffect(() => {
-    if (!isFinalCloudGame || !gameId || !supabase) return
+    if (!resolvedCloudReview || !gameId || !supabase) return
 
     let cancelled = false
     const load = async () => {
@@ -317,7 +326,7 @@ export default function GameSummary() {
 
     void load()
     return () => { cancelled = true }
-  }, [isFinalCloudGame, gameId, resolvedKey, loadResolved])
+  }, [resolvedCloudReview, gameId, resolvedKey, loadResolved])
 
   const loadAllSubmissions = useCallback(async () => {
     const client = supabase
@@ -351,13 +360,13 @@ export default function GameSummary() {
   }, [gameId, state.players, playerIdMap, loadTeamMemberNameMap])
 
   useEffect(() => {
-    if (!isFinalCloudGame || !gameId || viewMode !== 'all') return
+    if (!resolvedCloudReview || !gameId || viewMode !== 'all') return
     let cancelled = false
     loadAllSubmissions().then(data => {
       if (!cancelled) setAllSubmissions(data)
     })
     return () => { cancelled = true }
-  }, [isFinalCloudGame, gameId, viewMode, loadAllSubmissions])
+  }, [resolvedCloudReview, gameId, viewMode, loadAllSubmissions])
 
   const loadCheckouts = useCallback(async () => {
     const client = supabase
@@ -399,7 +408,7 @@ export default function GameSummary() {
   }, [isFinalCloudGame, gameId, isTeamAdmin, resolvedKey, loadCheckouts])
 
   const handleSetPrimaryRecorder = async (remotePlayerId: string, userId: string) => {
-    if (!gameId || !supabase) return
+    if (legacyReadOnly || !gameId || !supabase) return
     setSettingPrimaryFor(remotePlayerId)
     setPrimaryError(null)
     const { error } = await supabase.rpc('set_primary_recorder', {
@@ -484,7 +493,7 @@ export default function GameSummary() {
   const getPlayerStats = (playerId: string): Record<string, number> => {
     const remoteId = playerIdMap[playerId] ?? playerId
     const player = players.find(p => p.id === playerId)
-    if (isFinalCloudGame && resolvedStats && resolvedStats[remoteId]) {
+    if (resolvedCloudReview && resolvedStats && resolvedStats[remoteId]) {
       const entries = resolvedStats[remoteId]
       return Object.fromEntries(
         Object.entries(entries).map(([statId, entry]) => [statId, entry.value])
@@ -495,7 +504,7 @@ export default function GameSummary() {
 
   /** Metadata for conflict indicator (Part 1): averaged or multiple recorders */
   const getResolvedMeta = (playerId: string, statId: string): { source?: string; recorder_count?: number } | null => {
-    if (!isFinalCloudGame || !resolvedStats) return null
+    if (!resolvedCloudReview || !resolvedStats) return null
     const remoteId = playerIdMap[playerId] ?? playerId
     const entry = resolvedStats[remoteId]?.[statId]
     if (!entry?.source && entry?.recorder_count == null) return null
@@ -542,6 +551,7 @@ export default function GameSummary() {
     statLabel: string,
     currentValue: number
   ) => {
+    if (legacyReadOnly) return
     setCorrecting({ playerId, playerName, statId, statLabel, currentValue })
     setCorrectValue(String(currentValue))
     setCorrectReason('')
@@ -554,7 +564,7 @@ export default function GameSummary() {
   }
 
   const handleSaveCorrection = async () => {
-    if (!correcting || !gameId || !user || !supabase) return
+    if (legacyReadOnly || !correcting || !gameId || !user || !supabase) return
     const client = supabase
     const value = parseInt(correctValue, 10)
     if (Number.isNaN(value) || value < 0) {
@@ -597,9 +607,9 @@ export default function GameSummary() {
           <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
-              onClick={() => navigate(isFinalCloudGame ? '/games' : '/game')}
+              onClick={() => navigate(legacyReadOnly ? '/sport/baseball' : isFinalCloudGame ? '/games' : '/game')}
               disabled={finalizing}
-              aria-label={isFinalCloudGame ? 'Back to Cloud Games' : 'Back to Game'}
+              aria-label={legacyReadOnly ? 'Back to Baseball' : isFinalCloudGame ? 'Back to Cloud Games' : 'Back to Game'}
               className="w-8 h-8 shrink-0 rounded-full bg-surface flex items-center justify-center
                          active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none"
             >
@@ -628,13 +638,19 @@ export default function GameSummary() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
+        {legacyReadOnly && <section className="mb-4 space-y-2 border-y border-info-line bg-info px-3 py-3 text-sm text-info-content">
+          <h2 className="font-semibold">Legacy Baseball / Read-only</h2>
+          <p>Recorded stats are preserved. Tracking, corrections, recorder changes and finalization are retired.</p>
+          {!isFinalCloudGame && <p>This unfinished game is excluded from season and career totals. It will not be automatically finalized or converted.</p>}
+          <button type="button" className="btn-secondary" onClick={() => navigate('/settings/data')}>Local game export</button>
+        </section>}
         {finalizeError && (
           <div className="card bg-danger border-danger-line text-danger-content text-sm mb-4">
             {finalizeError}
           </div>
         )}
 
-        {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && reviewItems.length > 0 && (
+        {isFinalCloudGame && mayCorrect && viewMode === 'primary' && reviewItems.length > 0 && (
           <div className="card mb-4 border-warning-line bg-warning">
             <h3 className="text-sm font-semibold text-warning-content mb-1">Stats needing review</h3>
             <p className="text-xs text-warning-content mb-3">Multiple recorders or averaged values. Correct the stat or set primary recorder below.</p>
@@ -683,7 +699,7 @@ export default function GameSummary() {
           </div>
         )}
 
-        {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && checkoutsByPlayer && Object.keys(checkoutsByPlayer).length > 0 && (
+        {isFinalCloudGame && mayCorrect && viewMode === 'primary' && checkoutsByPlayer && Object.keys(checkoutsByPlayer).length > 0 && (
           <>
             {primaryError && (
               <div className="card bg-danger border-danger-line text-danger-content text-sm mb-4">
@@ -779,7 +795,7 @@ export default function GameSummary() {
               </button>
             )}
           </div>
-        {isFinalCloudGame && summaryTab === 'players' && (
+        {resolvedCloudReview && summaryTab === 'players' && (
           <>
             <div className="flex rounded-lg border border-line bg-surface p-0.5">
               <button
@@ -801,7 +817,7 @@ export default function GameSummary() {
                 All submissions
               </button>
             </div>
-            {isTeamAdmin && (
+            {mayCorrect && (
               <>
                 <button
                   type="button"
@@ -973,7 +989,7 @@ export default function GameSummary() {
                                             ⚠️
                                           </span>
                                         )}
-                                        {reviewMode && isFinalCloudGame && isTeamAdmin && (
+                                        {reviewMode && isFinalCloudGame && mayCorrect && (
                                           <button
                                             type="button"
                                             onClick={() =>
@@ -1167,7 +1183,7 @@ export default function GameSummary() {
               {finalizing ? 'Finalizing...' : 'Finalize Game & Save to History'}
             </button>
           )}
-          {isFinalCloudGame ? (
+          {legacyReadOnly ? <button type="button" className="btn-secondary w-full" onClick={() => navigate('/sport/baseball')}>Back to Baseball</button> : isFinalCloudGame ? (
             <button
               onClick={() => navigate('/games')}
               disabled={finalizing}
@@ -1194,9 +1210,13 @@ export default function GameSummary() {
           {(newGameError || parkingError) && (
             <p className="text-sm text-danger-content text-center">{newGameError ?? parkingError}</p>
           )}
+          {legacyReadOnly && <>
+            {state.cloudSync.lastError && <p role="alert" className="text-danger-content">{state.cloudSync.lastError}</p>}
+            <GameSyncStatus />
+          </>}
         </div>
 
-        {correcting && (
+        {!legacyReadOnly && correcting && (
           <StatCorrectionModal
             playerName={correcting.playerName}
             statLabel={correcting.statLabel}

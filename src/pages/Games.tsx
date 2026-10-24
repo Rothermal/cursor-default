@@ -33,9 +33,10 @@ import {
 import { createSoccerIndependentRecorderState } from '../lib/soccer/recorders'
 import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
-import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
+import { hasUnsyncedParkedBindingForCloudGame, listParkedGameRecords } from '../lib/gameParking'
+import { isLegacyBaseballGame, legacyBaseballBinding } from '../lib/baseball/releasePolicy'
 import { sports } from '../config/sports'
-import { isCurrentAuthUser } from '../lib/authIdentity'
+import { captureAuthIdentity, isCurrentAuthIdentity, isCurrentAuthUser } from '../lib/authIdentity'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -181,6 +182,7 @@ export default function Games() {
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingOpponentName, setEditingOpponentName] = useState('')
   const [savingOpponentName, setSavingOpponentName] = useState(false)
+  const editRequestRef = useRef(0)
   const [confirmDeleteGame, setConfirmDeleteGame] = useState<GameRow | null>(null)
   const [deletingGameId, setDeletingGameId] = useState<string | null>(null)
   const visibleGames = useMemo(
@@ -748,9 +750,19 @@ export default function Games() {
     const canTrackCurrentGame = game.team_id
       ? canTrackGames(teamRole)
       : game.created_by === userId
-    if (game.status !== 'final' && !canTrackCurrentGame) {
+    if (game.status !== 'final' && !canTrackCurrentGame && gameSportId !== 'baseball') {
       if (game.team_id) navigate(gameInfoPath(game.id, game.team_id))
       return
+    }
+    if (gameSportId === 'baseball') {
+      try {
+        const binding = legacyBaseballBinding(localOpenStateRef.current.state, listParkedGameRecords(userId), game.id)
+        if (binding) {
+          if (binding.kind === 'parked' && (!prepareActiveGameMutation('resume_commit') || !resumeParkedGame(binding.localGameId))) return
+          navigate('/summary')
+          return
+        }
+      } catch (caught) { setError(caught instanceof Error ? caught.message : 'Local history could not load.'); return }
     }
     setError(null)
     setLoadingGameId(game.id)
@@ -814,20 +826,36 @@ export default function Games() {
       return
     }
     setLoadingGameId(null)
-    navigate(cloudGame.status === 'final' ? '/summary' : '/game')
+    navigate(isLegacyBaseballGame(nextState) || cloudGame.status === 'final' ? '/summary' : '/game')
   }
 
-  const startEditOpponentName = (game: GameRow) => {
+  const startEditOpponentName = async (game: GameRow) => {
+    const request = ++editRequestRef.current
+    const identity = userId ? captureAuthIdentity(userId) : null
+    const current = () => request === editRequestRef.current && Boolean(identity && isCurrentAuthIdentity(identity)) && !openIsStale(userId ?? '')
+    const sportId = game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
+    if (sportId === 'baseball') {
+      try {
+        const authority = await loadBaseballCloudDataAuthority(game.id)
+        if (!current()) return
+        if (authority !== 'sport_events') { setError('Legacy Baseball games are read-only.'); return }
+      } catch (caught) { if (current()) setError(caught instanceof Error ? caught.message : 'Game authority could not load.'); return }
+    }
     setEditingGameId(game.id)
     setEditingOpponentName(game.opponent_name)
   }
 
   const cancelEditOpponentName = () => {
+    editRequestRef.current += 1
+    setSavingOpponentName(false)
     setEditingGameId(null)
     setEditingOpponentName('')
   }
 
   const handleSaveOpponentName = async () => {
+    const request = ++editRequestRef.current
+    const identity = userId ? captureAuthIdentity(userId) : null
+    const current = () => request === editRequestRef.current && Boolean(identity && isCurrentAuthIdentity(identity)) && !openIsStale(userId ?? '')
     const game = games.find(candidate => candidate.id === editingGameId)
     if (
       !supabaseClient ||
@@ -836,6 +864,14 @@ export default function Games() {
       !canTrackGames(game.team_id ? teamRolesById[game.team_id] ?? null : null) ||
       !editingOpponentName.trim()
     ) return
+    const sportId = game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
+    if (sportId === 'baseball') {
+      try {
+        const authority = await loadBaseballCloudDataAuthority(game.id)
+        if (!current()) return
+        if (authority !== 'sport_events') { setError('Legacy Baseball games are read-only.'); cancelEditOpponentName(); return }
+      } catch (caught) { if (current()) setError(caught instanceof Error ? caught.message : 'Game authority could not load.'); return }
+    }
     setError(null)
     setSavingOpponentName(true)
     const name = editingOpponentName.trim()
@@ -843,6 +879,7 @@ export default function Games() {
       .from('games')
       .update({ opponent_name: name })
       .eq('id', editingGameId)
+    if (!current()) return
     setSavingOpponentName(false)
     if (updateError) {
       setError(updateError.message)
@@ -948,7 +985,7 @@ export default function Games() {
             )}
             {game.status !== 'final' && canTrackGames(teamRole) && (
               <button
-                onClick={() => startEditOpponentName(game)}
+                onClick={() => { void startEditOpponentName(game) }}
                 className="text-content-subtle hover:text-content-muted p-0.5"
                 title="Edit opponent name"
                 aria-label="Edit opponent name"

@@ -14,34 +14,34 @@ function implementationFiles(directory: string): string[] {
   })
 }
 
-describe('BSB-3D baseballEvent release stage', () => {
-  it('ships as a production opt-in', () => {
-    expect(SPORT_EVENT_RELEASE_STAGES.baseball).toBe('opt_in')
+describe('BSB-7D Baseball event-only release', () => {
+  it('ships event-only creation independently of sport discovery', () => {
+    expect(SPORT_EVENT_RELEASE_STAGES.baseball).toBe('released')
   })
 
-  it('needs the device toggle in production and keeps existing games reachable', () => {
+  it('ignores the retired device toggle and keeps existing games reachable', () => {
     expect(getBaseballEventCreationPolicy(false, { development: false })).toEqual({
-      releaseStage: 'opt_in',
-      preferenceAvailable: true,
-      canCreateNewEventGame: false,
+      releaseStage: 'released',
+      preferenceAvailable: false,
+      canCreateNewEventGame: true,
       canAccessExistingEventGames: true,
     })
     expect(getBaseballEventCreationPolicy(true, { development: false }).canCreateNewEventGame).toBe(true)
   })
 
-  it('rolls back to internal by hiding the toggle and ignoring a stored opt-in', () => {
-    const internal = getBaseballEventCreationPolicy(true, { development: false, releaseStage: 'internal' })
+  it('rolls back new creation without restoring opt-in or gating existing games', () => {
+    const internal = getBaseballEventCreationPolicy(true, { development: false, releaseStage: 'internal', creationEnabled: false })
     expect(internal.preferenceAvailable).toBe(false)
     expect(internal.canCreateNewEventGame).toBe(false)
     expect(internal.canAccessExistingEventGames).toBe(true)
   })
 
-  it('keeps the development preview without the toggle', () => {
+  it('uses the same explicit creation rollback in development', () => {
     expect(getBaseballEventCreationPolicy(false, { development: true }).canCreateNewEventGame).toBe(true)
-    expect(getBaseballEventCreationPolicy(false, { development: true, releaseStage: 'internal' }).canCreateNewEventGame).toBe(true)
+    expect(getBaseballEventCreationPolicy(true, { development: true, releaseStage: 'opt_in', creationEnabled: false }).canCreateNewEventGame).toBe(false)
   })
 
-  it('stores the device toggle default-off and fails closed on malformed values', () => {
+  it('preserves old device settings without using them for authority', () => {
     expect(mergeStoredSettings({}).baseball.eventTrackerEnabled).toBe(false)
     expect(mergeStoredSettings({ baseball: { eventTrackerEnabled: true } }).baseball.eventTrackerEnabled).toBe(true)
     expect(mergeStoredSettings({ baseball: { eventTrackerEnabled: 'true' } }).baseball.eventTrackerEnabled).toBe(false)
@@ -49,16 +49,16 @@ describe('BSB-3D baseballEvent release stage', () => {
   })
 })
 
-describe('BSB-3D route gates', () => {
+describe('BSB-7D route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
     expect(setupRoute).toContain("eventsRequested: searchParams.get('events') === '1'")
     expect(source('src/lib/gameSetupRoute.ts'))
-      .toContain("if (requestedSport === 'baseball' && eventsRequested) return 'baseball_events'")
-    expect(setupRoute).toContain('<BaseballEventSetup />')
+      .toContain("if (sport === 'baseball') return 'baseball_events'")
+    expect(setupRoute).toContain('<BaseballEventSetup key=')
     expect(source('src/pages/BaseballEventSetup.tsx'))
-      .toContain('if (!getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame)')
+      .toContain('if (!getBaseballEventCreationPolicy().canCreateNewEventGame)')
   })
 
   it('opens existing Baseball event games without consulting the release stage', () => {
@@ -81,9 +81,17 @@ describe('BSB-3D route gates', () => {
       .filter(path => path !== 'src/lib/sportAvailability.ts' && source(path).includes('getBaseballEventCreationPolicy'))
       .sort()
     expect(consumers).toEqual([
-      'src/components/settings/BaseballSettings.tsx',
       'src/pages/BaseballEventSetup.tsx',
-      'src/pages/SportDashboard.tsx',
     ])
+  })
+
+  it('removes preview UI while retaining capture controls and data-safe update prompts', () => {
+    const settings = source('src/components/settings/BaseballSettings.tsx')
+    expect(settings).not.toMatch(/New event tracker|eventTrackerEnabled|role="switch"/)
+    expect(settings).toContain('New-game capture defaults')
+    const pwa = source('src/components/PwaStatus.tsx')
+    expect(pwa).toContain("prepareActiveGameMutation('reload_commit')")
+    expect(pwa).toContain('updateServiceWorker(true)')
+    expect(pwa).toContain('Later')
   })
 })
