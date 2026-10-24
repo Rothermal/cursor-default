@@ -12,7 +12,19 @@ export type BaseballPersonalSettingsConflict = Omit<SportPersonalSettingsConflic
 
 export interface BaseballPersonalSettingsState {
   settings: Settings
-  sync: Omit<SportPersonalSettingsSyncState<Settings>, 'conflict'> & { conflict: BaseballPersonalSettingsConflict | null }
+  sync: Omit<SportPersonalSettingsSyncState<Settings>, 'conflict' | 'status'> & {
+    conflict: BaseballPersonalSettingsConflict | null
+    status: SportPersonalSettingsSyncState<Settings>['status'] | 'cached'
+  }
+}
+
+function isNetworkReadFailure(error: unknown): boolean {
+  if (!(error instanceof BaseballFeatureError) || error.code !== 'transport') return false
+  const detail = error.causeDetail
+  // PostgREST supplies an empty code for client fetch failures, unlike SQL/API errors.
+  if (!(detail instanceof Error) && detail && typeof detail === 'object' && 'code' in detail && detail.code) return false
+  const message = detail instanceof Error ? detail.message : error.message
+  return /\b(offline|failed to fetch|fetch failed|networkerror|network request failed|network error|load failed|err_network|econnreset|econnrefused)\b/i.test(message)
 }
 
 export interface BaseballPersonalSettingsOptions extends BaseballFeatureOptions {
@@ -70,14 +82,16 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
     ...state, settings: device, sync: { ...state.sync, status: 'conflict', error: null,
       conflict: { device, cloud, cloudRevision: revision, cloudUpdatedAt: updatedAt } },
   })
-  const run = async (operation: () => Promise<boolean>): Promise<boolean> => {
+  const run = async (operation: () => Promise<boolean>, allowCachedRead = false): Promise<boolean> => {
     if (busy) return false
     busy = true
     try { assertCurrent(); return await operation() } catch (error) {
       try { assertCurrent() } catch { return false }
+      const useCache = allowCachedRead && cache?.revision != null && !cache.pending
+        && !state.sync.conflict && isNetworkReadFailure(error)
       commit({ ...state, sync: { ...state.sync,
         status: error instanceof BaseballFeatureError && error.code === 'backend_update_required'
-          ? 'backend_update_required' : cache?.pending ? 'pending' : 'error',
+          ? 'backend_update_required' : cache?.pending ? 'pending' : useCache ? 'cached' : 'error',
         error: error instanceof Error ? error.message : 'Baseball settings could not be saved.' } })
       return false
     } finally { busy = false }
@@ -135,7 +149,7 @@ export function createBaseballPersonalSettingsController(userId: string | null, 
         return savePending(decision.settings, decision.expectedRevision)
       } else throw Error(decision.error)
       return decision.action !== 'conflict'
-    }),
+    }, true),
     save: (settings: Settings, expectedRevision: number | null = state.sync.revision) => run(async () => {
       const parsed = parseBaseballPersonalSettings(settings)
       if (settings == null || !parsed.ok) throw Error(parsed.ok ? 'Baseball settings are required.' : parsed.error)

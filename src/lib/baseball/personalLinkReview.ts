@@ -8,6 +8,23 @@ import { createBaseballUuid } from './id'
 import type { BaseballLinkIntentStore, BaseballPersonalLinkIntent } from './personalLinkIntents'
 
 export interface BaseballMyPlayer { id: string; displayName: string }
+/** Explicit creation only; caller retains the id for a safe retry after a lost response. */
+export async function createBaseballMyPlayer(userId: string, id: string, displayName: string, current: () => void, client: SupabaseClient | null = supabase): Promise<BaseballMyPlayer> {
+  if (!client || !displayName.trim()) throw Error('A player name and configured account are required.')
+  const identity = captureAuthIdentity(userId)
+  const guard = () => { current(); if (!identity || !isCurrentAuthIdentity(identity)) throw Error('The player account changed.') }
+  guard()
+  const created = await client.from('players').insert({ id, created_by: userId, first_name: displayName.trim().slice(0, 80), last_name: null }).select('id,first_name,last_name,nickname').single()
+  guard()
+  if (!created.error && created.data?.id === id) return { id, displayName: playerDisplayName(created.data) }
+  // A retry with the same generated id may find the already committed player.
+  if (created.error?.code === '23505') {
+    const existing = await client.from('players').select('id,first_name,last_name,nickname').eq('id', id).eq('created_by', userId).single()
+    guard()
+    if (!existing.error && existing.data?.id === id) return { id, displayName: playerDisplayName(existing.data) }
+  }
+  throw Error(created.error?.message ?? 'Player could not be created. Retry with the same name.')
+}
 export async function loadBaseballMyPlayers(userId: string, current: () => void, signal?: AbortSignal, client: SupabaseClient | null = supabase): Promise<BaseballMyPlayer[]> {
   if (!client) throw Error('Supabase is not configured.')
   const identity = captureAuthIdentity(userId)
@@ -69,7 +86,7 @@ export function prepareBaseballPersonalLinkIntent(input: {
   if (input.review.participantSourceMap[input.participantId] && input.review.participantSourceMap[input.participantId] !== input.targetPlayerId) throw Error('An existing player-history link cannot be replaced.')
   if (Object.entries(input.review.participantSourceMap).some(([id, player]) => id !== input.participantId && player === input.targetPlayerId)) throw Error('This player is already linked to another participant.')
   const previous = store.read(input.userId, input.localGameId, input.participantId)
-  const intent: BaseballPersonalLinkIntent = { version: 1, userId: input.userId, localGameId: input.localGameId, participantId: input.participantId,
+  const intent: BaseballPersonalLinkIntent = { version: previous?.origin === 'setup' ? 2 : 1, ...(previous?.origin === 'setup' ? { origin: 'setup' as const } : {}), userId: input.userId, localGameId: input.localGameId, participantId: input.participantId,
     targetPlayerId: input.targetPlayerId, operationId: createBaseballUuid(), revision: (previous?.revision ?? 0) + 1,
     reviewed: { gameId: input.review.gameId, expectedMapFingerprint: input.review.mapFingerprint, expectedPublicationId: input.review.activePublicationId,
       reason: input.reason, participantIds: [...input.participantIds] } }

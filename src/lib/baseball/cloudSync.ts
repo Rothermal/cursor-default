@@ -24,6 +24,7 @@ import { baseballLocalPlayerKey } from './stats'
 import { ensureBaseballReleaseCapabilities } from './releaseCapabilities'
 import type { BaseballMatchSetup, BaseballSportGameState } from './types'
 import { syncBaseballTournamentAssociation } from './tournament'
+import { syncBaseballSetupPlayerLinks } from './setupPersonalLinks'
 
 export interface BaseballCloudShell {
   game: EventCloudGameRow
@@ -132,6 +133,9 @@ export async function syncBaseballEventGameToCloud(
   if (capability.status !== 'ready') throw new Error(capability.error)
   const synced = await syncEventGameToCloud({ ...input, adapter: baseballEventCloudTransportAdapter, assertCurrent })
   assertCurrent()
+  const boundState: GameState = { ...synced.syncedState, cloudSync: { ...synced.syncedState.cloudSync,
+    gameId: synced.gameId, teamId: synced.teamId, seasonId: synced.seasonId,
+    gameStatus: synced.gameStatus ?? synced.syncedState.cloudSync.gameStatus, playerIdMap: synced.playerIdMap } }
   // Tournament metadata is recoverable independently of the recorded event checkpoint.
   let tournamentSyncWarning: string | null = null
   try {
@@ -141,7 +145,14 @@ export async function syncBaseballEventGameToCloud(
     tournamentSyncWarning = error instanceof Error ? error.message : 'The Baseball tournament attachment could not be saved.'
   }
   assertCurrent()
-  return { ...synced, syncedState: { ...synced.syncedState, cloudSync: { ...synced.syncedState.cloudSync, tournamentSyncWarning } } }
+  try {
+    await syncBaseballSetupPlayerLinks({ ...input, state: boundState, assertCurrent })
+  } catch (error) {
+    assertCurrent()
+    throw new BaseballCloudRecoveryError(`Events saved; player-history links need attention: ${error instanceof Error ? error.message : 'Retry sync or review player links.'}`, boundState)
+  }
+  assertCurrent()
+  return { ...synced, syncedState: { ...boundState, cloudSync: { ...boundState.cloudSync, tournamentSyncWarning } } }
 }
 
 export function loadBaseballCloudDataAuthority(gameId: string): Promise<'sport_events' | 'legacy'> {

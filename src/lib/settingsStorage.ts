@@ -17,6 +17,8 @@ export interface HockeyDeviceSettings {
 export interface BaseballDeviceSettings {
   /** BSB-3D: owner opt-in for new Baseball event games; defaults off. */
   eventTrackerEnabled: boolean
+  trackPitchLocation: boolean
+  trackBattedBallLocation: boolean
 }
 
 export interface AppSettings {
@@ -49,6 +51,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   baseball: {
     eventTrackerEnabled: false,
+    trackPitchLocation: true,
+    trackBattedBallLocation: true,
   },
   courtCapture: {
     reboundPromptAfterMiss: false,
@@ -111,6 +115,8 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
     baseball: {
       // Only an explicit true opts in; malformed values fail closed.
       eventTrackerEnabled: baseball.eventTrackerEnabled === true,
+      trackPitchLocation: typeof baseball.trackPitchLocation === 'boolean' ? baseball.trackPitchLocation : true,
+      trackBattedBallLocation: typeof baseball.trackBattedBallLocation === 'boolean' ? baseball.trackBattedBallLocation : true,
     },
     courtCapture: {
       reboundPromptAfterMiss:

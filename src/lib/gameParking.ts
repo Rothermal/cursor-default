@@ -836,7 +836,9 @@ export function commitGameSetupState(
   nextState: GameState,
   ownerId: string | null,
   expectedLocalGameId: string | null = null,
-  allowNewBasketballEventGame = false
+  allowNewBasketballEventGame = false,
+  /** Optional atomic metadata persistence; it must restore its own keys if it throws. */
+  beforeCommit?: (localGameId: string) => void
 ): CommitGameSetupResult {
   const manifest = migrateLegacyGameStorage(ownerId)
   const snapshot = snapshotParkingStorage(manifest)
@@ -866,12 +868,14 @@ export function commitGameSetupState(
       if (getActiveLocalGameId(ownerId) !== expectedLocalGameId) {
         throw new Error('The active local game changed while setup was being saved.')
       }
+      beforeCommit?.(expectedLocalGameId)
       return { localGameId: expectedLocalGameId, summaries }
     }
 
     saveActiveGameState(currentState, ownerId)
     const localGameId = beginNewActiveParkedGame(ownerId)
     const summaries = saveActiveGameState(nextState, ownerId)
+    beforeCommit?.(localGameId)
     return { localGameId, summaries }
   } catch (error) {
     restoreParkingStorage(snapshot)

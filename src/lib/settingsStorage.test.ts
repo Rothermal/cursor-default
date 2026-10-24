@@ -7,6 +7,11 @@ import {
 } from './settingsStorage'
 
 describe('mergeStoredSettings', () => {
+  it('defaults both Baseball capture options on, preserving explicit device-only booleans', () => {
+    expect(mergeStoredSettings({}).baseball).toEqual({ eventTrackerEnabled: false, trackPitchLocation: true, trackBattedBallLocation: true })
+    expect(mergeStoredSettings({ baseball: { trackPitchLocation: false, trackBattedBallLocation: false } }).baseball).toMatchObject({ trackPitchLocation: false, trackBattedBallLocation: false })
+    expect(mergeStoredSettings({ baseball: { trackPitchLocation: 'false', trackBattedBallLocation: 0 } }).baseball).toMatchObject({ trackPitchLocation: true, trackBattedBallLocation: true })
+  })
   it('fills missing nested keys from defaults', () => {
     const merged = mergeStoredSettings({
       enabledSports: { basketball: false },
