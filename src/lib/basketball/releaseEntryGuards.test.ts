@@ -261,8 +261,10 @@ describe('Basketball release entry guards', () => {
     const context = source('src/context/SettingsContext.tsx')
     const settings = source('src/components/settings/BasketballSettings.tsx')
 
-    expect(context).toContain('setBasketballEventTrackerPreviewEnabled')
-    expect(context).toContain('eventTrackerPreviewEnabled: enabled')
+    expect(context).not.toContain('basketballEventTrackerPreviewEnabled')
+    expect(context).not.toContain('setBasketballEventTrackerPreviewEnabled')
+    expect(context).not.toContain('baseballEventTrackerEnabled')
+    expect(context).not.toContain('setBaseballEventTrackerEnabled')
     expect(settings).not.toContain('New event tracker (preview)')
     expect(settings).not.toContain('eventTrackerPreviewEnabled')
     expect(settings).not.toContain("id: 'tracker'")

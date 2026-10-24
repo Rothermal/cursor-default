@@ -38,7 +38,7 @@ best effort, not permission to erase stored rows or stats.
 
 ## Observed Verification
 
-- Full final working-tree suite: **334 files / 3,374 tests passed**. Final focused
+- Initial implementation suite: **334 files / 3,374 tests passed**. Final focused
   malformed-authority, finalization, cloud-open and context run: **4 files / 81 tests
   passed**. Earlier broad focused coverage passed 14 files / 233 tests before the
   seven additional malformed-marker cases; the final full suite includes them all.
@@ -72,6 +72,33 @@ Browser fixtures mount real routes/components with synthetic auth/Supabase respo
 and isolated GameContext adapters. They are not live RLS, full-game, physical-mobile
 or installed-PWA signoff. No SQL was changed or run. The existing independent-review
 and live-check records are not retroactively marked passed.
+
+## PR Comment Follow-Up
+
+Both comments in [PR #506's review](https://github.com/Rothermal/cursor-default/pull/506#issuecomment-6382248234)
+were accepted and addressed without changing game/cloud policy:
+
+- Added nine committed Game Info runtime cases: dirty active/parked Basketball and
+  Baseball history, incompatible active/parked Basketball event bindings, unknown
+  Basketball authority, and refused prepare/resume transitions. The tests exercise
+  real parked storage and assert no cloud replacement, dispatch or storage rewrite.
+- Temporarily disabled both Game Info binding blocks: all nine new cases failed.
+  Restored both production blocks unchanged; the focused run passed **5 files /
+  97 tests**. The mutation is not part of the committed change.
+- Removed the unused Basketball/Baseball preview getters and setters from
+  `SettingsContext`. Stored fields and parsing remain untouched; two explicit
+  true/false round-trip cases preserve both old preferences. No creation consumer
+  or Hockey setting was changed.
+- Reran the synthetic Chromium cutover batch after the context cleanup: **8 views /
+  16 interaction cases passed**, with the same synthetic-service limitations above.
+- Follow-up full suite: **334 files / 3,385 tests passed**. Configured
+  TypeScript/Vite/PWA build passed with placeholder public Supabase configuration
+  and build id `tui1-review-20261024`: **2,421 modules / 15 precache entries**,
+  **3,025,928-byte** app chunk, **119,800 bytes** below the unchanged cap. Review
+  controls: **22 tests passed**. Source lint (`pnpm lint --ignore-pattern
+  'qa.local/**'`): **0 errors / 3 existing Fast Refresh warnings**. The unrestricted
+  local lint also scanned ignored QA fixtures/copied checkouts and failed on two
+  unrelated unused variables there; CI runs without those local-only files.
 
 ## Rollback and Pending Release Evidence
 

@@ -2,12 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import GameInfo from './GameInfo'
 import { createInitialState } from '../lib/gameReducer'
+import { saveActiveGameState } from '../lib/gameParking'
+import { sports } from '../config/sports'
+import type { GameState } from '../types'
 import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from '../lib/authIdentity'
 
 const h = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, effects: [] as Array<() => void>,
   cleanups: [] as Array<() => void>, userId: 'account-a', role: 'owner', team: true,
-  gameId: 'cloud-a', authority: vi.fn(), load: vi.fn(), independent: vi.fn(), rpc: vi.fn(),
-  dispatch: vi.fn(), open: vi.fn(), navigate: vi.fn(), reopen: vi.fn(), finalized: vi.fn(), refresh: vi.fn(), state: {} as unknown,
+  gameId: 'cloud-a', sportId: 'baseball', authority: vi.fn(), load: vi.fn(), independent: vi.fn(), rpc: vi.fn(),
+  legacy: vi.fn(), touch: vi.fn(), resume: vi.fn(), prepare: vi.fn(),
+  dispatch: vi.fn(), open: vi.fn(), navigate: vi.fn(), reopen: vi.fn(), finalized: vi.fn(), refresh: vi.fn(), state: {} as GameState,
 }))
 vi.mock('react', async original => ({ ...await original<typeof import('react')>(),
   useCallback: (callback: unknown) => callback,
@@ -30,27 +34,39 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => h.navigate,
   useSearchParams: () => [new URLSearchParams({ gameId: h.gameId })], Link: 'a' }))
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: h.userId }, isConfigured: true }) }))
 vi.mock('../context/GameContext', () => ({ useGame: () => ({ state: h.state, dispatch: h.dispatch,
-  activeLocalGameId: null, parkedGames: [], openGameSnapshot: h.open, prepareActiveGameMutation: () => true,
-  resumeParkedGame: vi.fn(), flushCloudGameSync: vi.fn(), markEventCloudGameReopened: h.reopen,
+  activeLocalGameId: null, parkedGames: [], openGameSnapshot: h.open, prepareActiveGameMutation: h.prepare,
+  resumeParkedGame: h.resume, flushCloudGameSync: vi.fn(), markEventCloudGameReopened: h.reopen,
   markBaseballCloudGameFinalized: h.finalized, refreshBaseballCloudGameStatus: h.refresh, parkingError: null }) }))
 vi.mock('../lib/baseball/cloudSync', () => ({ loadBaseballCloudDataAuthority: (...args: unknown[]) => h.authority(...args),
   loadBaseballCloudGameById: (...args: unknown[]) => h.load(...args),
   createBaseballIndependentRecorderState: (...args: unknown[]) => h.independent(...args) }))
+vi.mock('../lib/basketball/cloudSync', () => ({ loadBasketballCloudDataAuthority: (...args: unknown[]) => h.authority(...args),
+  loadBasketballCloudGameById: (...args: unknown[]) => h.load(...args),
+  createBasketballIndependentRecorderState: (...args: unknown[]) => h.independent(...args) }))
+vi.mock('../lib/cloudSync', () => ({ loadCloudGameById: (...args: unknown[]) => h.legacy(...args),
+  touchCloudGameLastOpened: (...args: unknown[]) => h.touch(...args) }))
 vi.mock('../components/baseball/BaseballFinalizationPanel', () => ({ default: 'baseball-finalization' }))
 vi.mock('../components/baseball/BaseballRecorderManager', () => ({ default: 'baseball-recorders' }))
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => h.rpc(...args), from: (table: string) => {
   const data = () => table === 'games' ? { id: h.gameId, team_id: h.team ? 'team-1' : null,
-    created_by: 'account-a', sport_id: 'baseball', tracked_team_name: 'Falcons', opponent_name: 'Wolves',
+    created_by: 'account-a', sport_id: h.sportId, tracked_team_name: 'Falcons', opponent_name: 'Wolves',
     status: 'in_progress', opponent_score: 0, home_team_score: null, home_score_adjustment: 0,
     game_date: '2026-10-18', notes: null, tournament_name: null, tournament_id: null }
     : table === 'teams' ? { id: 'team-1', name: 'Falcons', nickname: 'Falcons', owner_id: h.role === 'owner' ? h.userId : 'owner-b',
-      seasons: { id: 'season-1', name: 'Fall', sport: 'baseball' } }
+      seasons: { id: 'season-1', name: 'Fall', sport: h.sportId } }
       : table === 'team_members' ? { role: h.role, accepted_at: '2026-10-18' } : []
   const builder = { select: () => builder, eq: () => builder,
     single: () => Promise.resolve({ data: data(), error: null }), maybeSingle: () => Promise.resolve({ data: data(), error: null }),
     then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: data(), error: null }).then(resolve) }
   return builder
 } } }))
+
+class MemoryStorage {
+  store = new Map<string, string>()
+  getItem(key: string) { return this.store.get(key) ?? null }
+  setItem(key: string, value: string) { this.store.set(key, value) }
+  removeItem(key: string) { this.store.delete(key) }
+}
 
 function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(elements)
@@ -60,19 +76,101 @@ function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
 function render() { h.cursor = 0; h.effects = []; const tree = elements(GameInfo()); h.effects.forEach(effect => effect()); return tree }
 async function drain() { for (let i = 0; i < 16; i++) await Promise.resolve() }
 async function loaded() { render(); await drain(); return render() }
+async function openLegacy() {
+  const tree = await loaded()
+  const button = tree.find(element => element.type === 'button' &&
+    ['View legacy summary (read-only)', 'Open game'].includes(element.props.children as string))
+  if (!button) throw new Error('Missing saved-game open action')
+  await (button.props.onClick as () => Promise<void>)()
+  return render()
+}
+function localHistory(): GameState {
+  return { ...createInitialState(), sport: sports.find(sport => sport.id === h.sportId)!,
+    gameInfo: { teamName: 'Falcons', opponentName: 'Wolves', date: '2026-10-18', tournamentName: '', tournamentId: null },
+    notes: 'Unsynced local facts', players: [{ id: 'p', name: 'Pat', number: '1', stats: { ast: 4 } }],
+    cloudSync: { ...createInitialState().cloudSync, gameId: h.gameId, status: 'offline' } }
+}
+function expectNoCloudReplacement() {
+  expect(h.legacy).not.toHaveBeenCalled()
+  expect(h.load).not.toHaveBeenCalled()
+  expect(h.open).not.toHaveBeenCalled()
+  expect(h.touch).not.toHaveBeenCalled()
+  expect(h.dispatch).not.toHaveBeenCalled()
+}
 function panel(tree: ReturnType<typeof render>, type = 'baseball-finalization') {
   const item = tree.find(element => element.type === type)
   if (!item) throw new Error(`Missing ${type}`)
   return item.props
 }
 beforeEach(() => {
-  h.slots = []; h.cursor = 0; h.effects = []; h.cleanups = []; h.userId = 'account-a'; h.gameId = 'cloud-a'; h.role = 'owner'; h.team = true
+  h.slots = []; h.cursor = 0; h.effects = []; h.cleanups = []; h.userId = 'account-a'; h.gameId = 'cloud-a'; h.sportId = 'baseball'; h.role = 'owner'; h.team = true
   h.state = createInitialState(); setCurrentAuthUserId(h.userId)
-  for (const mock of [h.authority, h.load, h.independent, h.rpc, h.dispatch, h.open, h.navigate, h.reopen, h.finalized, h.refresh]) mock.mockReset()
+  for (const mock of [h.authority, h.load, h.independent, h.rpc, h.dispatch, h.open, h.navigate, h.reopen, h.finalized, h.refresh,
+    h.legacy, h.touch, h.resume, h.prepare]) mock.mockReset()
   h.authority.mockResolvedValue('sport_events'); h.rpc.mockResolvedValue({ data: [], error: null }); h.open.mockReturnValue(true)
+  h.legacy.mockResolvedValue(null); h.touch.mockResolvedValue(undefined); h.resume.mockReturnValue(true); h.prepare.mockReturnValue(true)
+  vi.stubGlobal('localStorage', new MemoryStorage())
   vi.stubGlobal('window', { confirm: () => true })
 })
 afterEach(() => { h.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
+
+describe('Game Info retired legacy local bindings', () => {
+  it.each([['basketball', 'active'], ['basketball', 'parked'], ['baseball', 'active'], ['baseball', 'parked']])(
+    'preserves dirty %s %s history instead of replacing it with cloud data', async (sport, kind) => {
+      h.sportId = sport; h.authority.mockResolvedValue('legacy')
+      const local = localHistory()
+      const parked = kind === 'parked' ? saveActiveGameState(local, h.userId) : []
+      if (kind === 'active') h.state = local
+      const before = new Map((localStorage as unknown as MemoryStorage).store)
+      await openLegacy()
+      expect(h.navigate).toHaveBeenCalledWith('/summary')
+      expectNoCloudReplacement()
+      if (kind === 'parked') {
+        expect(h.prepare).toHaveBeenCalledWith('resume_commit')
+        expect(h.resume).toHaveBeenCalledWith(parked[0].localGameId)
+      } else {
+        expect(h.resume).not.toHaveBeenCalled()
+        expect(h.state).toBe(local)
+      }
+      expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+    }
+  )
+  it.each(['active', 'parked'])('refuses incompatible Basketball %s event authority without replacing history', async kind => {
+    h.sportId = 'basketball'; h.authority.mockResolvedValue('legacy')
+    const local = { ...localHistory(), gameDataAuthority: 'sport_events' as const }
+    if (kind === 'active') h.state = local
+    else saveActiveGameState(local, h.userId)
+    const before = new Map((localStorage as unknown as MemoryStorage).store)
+    const tree = await openLegacy()
+    expect(h.navigate).not.toHaveBeenCalled()
+    expect(h.resume).not.toHaveBeenCalled()
+    expectNoCloudReplacement()
+    expect(tree.some(element => typeof element.props.children === 'string' &&
+      /incompatible authority|conflicting local bindings/.test(element.props.children))).toBe(true)
+    expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+  })
+  it('refuses unknown Basketball authority even with compatible local history', async () => {
+    h.sportId = 'basketball'; h.authority.mockResolvedValue(null); h.state = localHistory()
+    const tree = await openLegacy()
+    expect(h.navigate).not.toHaveBeenCalled()
+    expect(h.resume).not.toHaveBeenCalled()
+    expectNoCloudReplacement()
+    expect(tree.some(element => element.props.children ===
+      'Basketball authority is unavailable. Reload before opening this game.')).toBe(true)
+  })
+  it.each(['prepare', 'resume'] as const)('does not navigate when a parked Basketball %s guard refuses', async guard => {
+    h.sportId = 'basketball'; h.authority.mockResolvedValue('legacy')
+    saveActiveGameState(localHistory(), h.userId); h[guard].mockReturnValue(false)
+    const before = new Map((localStorage as unknown as MemoryStorage).store)
+    await openLegacy()
+    expect(h.prepare).toHaveBeenCalledWith('resume_commit')
+    if (guard === 'prepare') expect(h.resume).not.toHaveBeenCalled()
+    else expect(h.resume).toHaveBeenCalled()
+    expect(h.navigate).not.toHaveBeenCalled()
+    expectNoCloudReplacement()
+    expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+  })
+})
 
 describe('BSB-6B2 Game Info', () => {
   it.each(['owner', 'admin', 'scorer', 'viewer'])('exposes manager controls only for %s authority', async role => {
