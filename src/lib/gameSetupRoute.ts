@@ -29,7 +29,9 @@ export function gameSetupRouteTarget(input: GameSetupRouteInput): GameSetupRoute
     if (!input.teamSportId || !['soccer', 'basketball', 'hockey', 'baseball', 'football'].includes(input.teamSportId)
       || (requestedSport && input.teamSportId !== requestedSport)) return 'unavailable_team'
   }
-  const sport = teamId ? input.teamSportId : requestedSport ?? activeSportId
+  // Plain setup edits mounted legacy Hockey through the generic page, not new event setup.
+  const activeSetupSport = activeSportId === 'soccer' || activeSportId === 'baseball' ? activeSportId : null
+  const sport = teamId ? input.teamSportId : requestedSport ?? activeSetupSport
   if (sport === 'baseball') return 'baseball_events'
   if (sport === 'soccer') return 'soccer'
   if (sport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'

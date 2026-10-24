@@ -58,6 +58,35 @@ resolved-team route expression/availability consumer; no test was skipped. SQL w
 not rerun because this slice changes no backend behavior. Exact-head CI is reported
 on the PR separately; no independent agent review is claimed.
 
+## PR Review Follow-Up
+
+2026-10-24: all three items in the
+[review](https://github.com/Rothermal/cursor-default/pull/505#issuecomment-6381074962)
+were valid and addressed:
+
+- Restored plain `/setup` with mounted Hockey to generic setup. Three restored/new
+  routing expectations failed before the fix and passed afterwards. Explicit Hockey
+  and resolved-team event setup, active Soccer setup and Baseball event-only setup
+  retain their intended routes. A synthetic browser case also confirms plain Hockey
+  setup preserves the mounted game's state without a commit or cloud write.
+- Added seven executable finalization-hook tests: all four legacy Baseball roles
+  refuse before sync/write/reset, stale callbacks and in-flight sync cannot bypass
+  retirement, and Football aggregate finalization still works. Four committed source
+  audits pin tracker/roster/checkout redirects, Summary correction/primary guards and
+  cloud rename refusals. Source audits supplement runtime evidence, not live checks.
+- Removed the unused Baseball release-stage entry and ignored preview/development
+  policy arguments. `BASEBALL_NEW_GAME_CREATION_ENABLED` remains the only creation
+  rollback switch; existing-game access and rollout authorization are unchanged.
+
+Follow-up verification: **333 files / 3,350 tests passed**; focused route, Baseball/
+Hockey release and finalization-hook tests: **4 files / 43 tests passed**. Configured
+TypeScript/Vite/PWA build passed with local build id `bsb-7d-review-20261024`:
+**2,420 modules / 15 precache entries**, app chunk **3,026,268 bytes (96.2%)**,
+**119,460 bytes** below the unchanged hard limit. Lint: **0 errors / 3 existing
+Fast Refresh warnings**. The cutover Chromium batch passed **8 views / 18 interaction
+cases**, including the new plain Hockey setup case. The prior 7C batch above was not
+rerun in this follow-up. No SQL or live/device/PWA checks were performed.
+
 ## Rollback and Client Refresh
 
 - Set `BASEBALL_NEW_GAME_CREATION_ENABLED` to false in

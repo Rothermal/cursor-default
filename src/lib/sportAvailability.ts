@@ -10,7 +10,6 @@ export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
  */
 export const SPORT_EVENT_RELEASE_STAGES = {
   hockey: 'released',
-  baseball: 'released',
 } as const satisfies Record<string, SportEventReleaseStage>
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
@@ -102,12 +101,10 @@ function sportEventCreationPolicy(
  * creation switch also applies in development; existing games are never gated by it.
  */
 export function getBaseballEventCreationPolicy(
-  _enabledOnDevice: boolean = false,
   {
     creationEnabled = BASEBALL_NEW_GAME_CREATION_ENABLED,
-  }: SportEventCreationPolicyOptions & { creationEnabled?: boolean } = {}
+  }: { creationEnabled?: boolean } = {}
 ): SportEventCreationPolicy {
-  void _enabledOnDevice
   return { releaseStage: 'released', preferenceAvailable: false,
     canCreateNewEventGame: creationEnabled, canAccessExistingEventGames: true }
 }

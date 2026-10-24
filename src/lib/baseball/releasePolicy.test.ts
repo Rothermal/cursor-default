@@ -6,6 +6,13 @@ import { getBaseballEventCreationPolicy, SPORT_EVENT_RELEASE_STAGES } from '../s
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
+function section(path: string, start: string, end: string): string {
+  const text = source(path), from = text.indexOf(start), to = text.indexOf(end, from + start.length)
+  expect(from).toBeGreaterThanOrEqual(0)
+  expect(to).toBeGreaterThan(from)
+  return text.slice(from, to)
+}
+
 function implementationFiles(directory: string): string[] {
   return readdirSync(resolve(process.cwd(), directory), { withFileTypes: true }).flatMap(entry => {
     const path = `${directory}/${entry.name}`
@@ -16,29 +23,31 @@ function implementationFiles(directory: string): string[] {
 
 describe('BSB-7D Baseball event-only release', () => {
   it('ships event-only creation independently of sport discovery', () => {
-    expect(SPORT_EVENT_RELEASE_STAGES.baseball).toBe('released')
+    expect(getBaseballEventCreationPolicy().releaseStage).toBe('released')
+    expect(SPORT_EVENT_RELEASE_STAGES).not.toHaveProperty('baseball')
   })
 
-  it('ignores the retired device toggle and keeps existing games reachable', () => {
-    expect(getBaseballEventCreationPolicy(false, { development: false })).toEqual({
+  it('uses only the creation switch and keeps existing games reachable', () => {
+    expect(getBaseballEventCreationPolicy()).toEqual({
       releaseStage: 'released',
       preferenceAvailable: false,
       canCreateNewEventGame: true,
       canAccessExistingEventGames: true,
     })
-    expect(getBaseballEventCreationPolicy(true, { development: false }).canCreateNewEventGame).toBe(true)
+    expect(getBaseballEventCreationPolicy({ creationEnabled: true }).canCreateNewEventGame).toBe(true)
   })
 
   it('rolls back new creation without restoring opt-in or gating existing games', () => {
-    const internal = getBaseballEventCreationPolicy(true, { development: false, releaseStage: 'internal', creationEnabled: false })
+    const internal = getBaseballEventCreationPolicy({ creationEnabled: false })
     expect(internal.preferenceAvailable).toBe(false)
     expect(internal.canCreateNewEventGame).toBe(false)
     expect(internal.canAccessExistingEventGames).toBe(true)
   })
 
-  it('uses the same explicit creation rollback in development', () => {
-    expect(getBaseballEventCreationPolicy(false, { development: true }).canCreateNewEventGame).toBe(true)
-    expect(getBaseballEventCreationPolicy(true, { development: true, releaseStage: 'opt_in', creationEnabled: false }).canCreateNewEventGame).toBe(false)
+  it('exposes no preview or development override of creation rollback', () => {
+    const policy = source('src/lib/sportAvailability.ts').split('export function getBaseballEventCreationPolicy(')[1].split('export function getSportAvailabilityPolicy')[0]
+    expect(policy).not.toMatch(/enabledOnDevice|development|SportEventCreationPolicyOptions/)
+    expect(getBaseballEventCreationPolicy({ creationEnabled: false }).canCreateNewEventGame).toBe(false)
   })
 
   it('preserves old device settings without using them for authority', () => {
@@ -93,5 +102,37 @@ describe('BSB-7D route gates', () => {
     expect(pwa).toContain("prepareActiveGameMutation('reload_commit')")
     expect(pwa).toContain('updateServiceWorker(true)')
     expect(pwa).toContain('Later')
+  })
+
+  it('redirects retired Baseball before mounting the generic tracker, roster or checkout', () => {
+    const tracker = section('src/App.tsx', 'function GameTrackerRoute()', 'function GameCheckoutRoute()')
+    expect(tracker).toContain("if (state.sport?.id === 'baseball') return isLegacyBaseballGame(state)")
+    expect(tracker).toContain('? <Navigate to="/summary" replace /> : <BaseballGameTracker />')
+    for (const [start, end] of [['function PlayerSetupRoute()', 'function GameTrackerRoute()'], ['function GameCheckoutRoute()', 'function GameSummaryRoute()']]) {
+      expect(section('src/App.tsx', start, end)).toContain("isLegacyBaseballGame(state) ? '/summary' : '/game'")
+    }
+  })
+
+  it('pins both Summary handler refusals independently of their hidden controls', () => {
+    const summary = source('src/pages/GameSummary.tsx')
+    expect(summary).toContain('const mayCorrect = !legacyReadOnly && isTeamAdmin')
+    const primary = section('src/pages/GameSummary.tsx', 'const handleSetPrimaryRecorder = async', '\n  useEffect(')
+    expect(primary).toContain('if (legacyReadOnly || !gameId || !supabase) return')
+    expect(primary.indexOf('if (legacyReadOnly')).toBeLessThan(primary.indexOf("supabase.rpc('set_primary_recorder'"))
+    const correction = section('src/pages/GameSummary.tsx', 'const handleSaveCorrection = async', '\n  return (')
+    expect(correction).toContain('if (legacyReadOnly || !correcting || !gameId || !user || !supabase) return')
+    expect(correction.indexOf('if (legacyReadOnly')).toBeLessThan(correction.indexOf(".from('stat_corrections')"))
+  })
+
+  it.each([
+    ['const startEditOpponentName = async', 'const cancelEditOpponentName =', 'setEditingGameId(game.id)'],
+    ['const handleSaveOpponentName = async', 'const handleDeleteGame = async', '.update({ opponent_name: name })'],
+  ])('pins the cloud rename authority refusal in %s', (start, end, mutation) => {
+    const handler = section('src/pages/Games.tsx', start, end)
+    expect(handler).toContain("if (sportId === 'baseball')")
+    expect(handler).toContain('await loadBaseballCloudDataAuthority(game.id)')
+    expect(handler).toContain("if (authority !== 'sport_events')")
+    expect(handler).toContain("setError('Legacy Baseball games are read-only.')")
+    expect(handler.indexOf("if (authority !== 'sport_events')")).toBeLessThan(handler.indexOf(mutation))
   })
 })

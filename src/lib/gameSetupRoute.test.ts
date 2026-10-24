@@ -35,7 +35,7 @@ describe('gameSetupRouteTarget', () => {
     expect(gameSetupRouteTarget({ ...base, requestedSport: 'baseball' })).toBe('baseball_events')
     // Plain /setup resumes the mounted sport: Soccer setup, or the generic setup for legacy Hockey.
     expect(gameSetupRouteTarget({ ...base, activeSportId: 'soccer' })).toBe('soccer')
-    expect(gameSetupRouteTarget({ ...base, activeSportId: 'hockey' })).toBe('hockey_events')
+    expect(gameSetupRouteTarget({ ...base, activeSportId: 'hockey' })).toBe('generic')
     expect(gameSetupRouteTarget({ ...base, teamId: 'team-1', activeSportId: 'hockey' })).toBe('resolve_team_sport')
     expect(gameSetupRouteTarget({ ...base, teamId: 'team-1' })).toBe('resolve_team_sport')
   })
@@ -52,6 +52,12 @@ describe('gameSetupRouteTarget', () => {
 
   it('routes stale plain Baseball setup links to event setup', () => {
     expect(gameSetupRouteTarget({ ...base, activeSportId: 'baseball' })).toBe('baseball_events')
+  })
+
+  it.each([true, false])('preserves plain Hockey setup with event availability %s', hockeyNewGamesUseEvents => {
+    for (const eventsRequested of [true, false]) {
+      expect(gameSetupRouteTarget({ ...base, activeSportId: 'hockey', hockeyNewGamesUseEvents, eventsRequested })).toBe('generic')
+    }
   })
 })
 
