@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
 import { useTeamRole } from '../../hooks/useTeamRole'
 import { eventCloudPolicyForState } from '../../lib/eventCloudPolicy'
+import { buildGameSyncFingerprint } from '../../lib/gameSyncFingerprint'
 import { canOfferDeletedSourcePlayerRecovery, deletedSourceRecoveryTeamId } from '../../lib/gameEvents/deletedSourceRecovery'
 import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
@@ -35,13 +36,20 @@ function eventCloudStatusLine(state: GameState): string {
     case 'offline': return 'Offline. Events sync when you reconnect.'
     case 'error': return state.cloudSync.lastError ?? 'Cloud sync needs attention.'
     case 'synced': return 'Synced to the cloud.'
-    default: return 'Waiting to sync.'
+    default: {
+      const cloud = state.cloudSync
+      const clean = cloud.gameId && cloud.lastSyncedGameFingerprint != null &&
+        !cloud.eventConflicts?.length && !cloud.pendingEventConflictResolutions?.length &&
+        cloud.lastSyncedGameFingerprint === buildGameSyncFingerprint(state)
+      return clean ? 'Synced to the cloud.' : 'Waiting to sync.'
+    }
   }
 }
 
 /** Routine status stays below the surface; blocking recovery alerts remain separate. */
 export function EventCloudStatus({ state }: { state: GameState }) {
-  return <p role="status" aria-label="Game sync status" className="break-words border-t border-line py-3 text-xs text-content-muted [overflow-wrap:anywhere]">{eventCloudStatusLine(state)}</p>
+  const label = useMemo(() => eventCloudStatusLine(state), [state])
+  return <p role="status" aria-label="Game sync status" className="break-words border-t border-line py-3 text-xs text-content-muted [overflow-wrap:anywhere]">{label}</p>
 }
 
 /**

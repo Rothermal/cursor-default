@@ -46,8 +46,10 @@ guards; this pass changes no sport's creation or legacy authority.
 | Routine sync / Hockey Enable cloud sync | Footer | Existing availability, confirmation, ownership and capability flow; rejected enable remains visible, never treated as success |
 | Conflicts, save failures and recovery export | Visible attention/error banners | Remain above the surface, not hidden in footer/menu/filter disclosures |
 
-The shared status line reports explicit `synced` state as synced; an idle bound
-record says Waiting to sync rather than inferring success from its cloud id.
+The shared status line reports explicit `synced` state as synced. An idle bound
+record also says Synced when its current payload matches the acknowledged sync
+fingerprint and no conflict/recovery acknowledgment remains pending. Missing or
+mismatched acknowledgments say Waiting to sync; a cloud id alone is not proof.
 Baseball's existing shared cloud menu uses the same status presentation, without
 changing its enable/transport policy.
 
@@ -98,6 +100,31 @@ no live Supabase client and an isolated GameContext adapter using real reducers
 and checked commands. They are desktop Chromium, not physical-phone, installed-PWA,
 live RLS/cloud enable or full-match signoff. No game on the owner's browser was
 loaded, changed or uploaded.
+
+## PR Comment Follow-Up
+
+The [reconnect-status report](https://github.com/Rothermal/cursor-default/pull/507#issuecomment-6388154760)
+is valid: connectivity returns clean games to `idle`, but fingerprint-clean records
+do not enter the upload queue, so no later upload changes their status to `synced`.
+The footer now recognizes that acknowledged payload instead of showing a permanent
+pending label. The queue, stored status, fingerprint and cloud writes are unchanged.
+
+- Eleven added cases cover clean reconnect and dirty-bound behavior across Soccer,
+  Hockey and Baseball; missing binding/acknowledgment; offline/syncing/error priority;
+  and pending conflict-audit work. Before the repair, all three clean-reconnect
+  cases failed. Afterward, the focused run passed **3 files / 64 tests**.
+- The status label is memoized against immutable game state, so live-clock-only
+  renders do not repeatedly serialize the same event history. Tests render the
+  real component through React's server renderer rather than invoking its hooks
+  outside React.
+- The synthetic Chromium matrix passed **8 views / 33 interaction cases**, adding
+  clean -> offline -> idle -> dirty footer checks in both real tracker components.
+  Existing fixture/service/device limitations remain in force.
+- Final follow-up verification passed **337 files / 3,426 tests**, source lint
+  (**0 errors / 3 existing Fast Refresh warnings**), and **22 review-control tests**.
+  The configured production build and PWA generation passed; the app chunk is
+  **3,028,947 bytes**, leaving **116,781 bytes** below the enforced precache limit.
+  These local checks do not establish deployed cloud, mobile or installed-PWA signoff.
 
 ## Pending Deployed Validation
 
