@@ -214,11 +214,11 @@ beforeEach(() => {
 describe('gameParking', () => {
   it('commits one complete setup while parking the prior active game', () => {
     const current = gameState(basketball, 'Current', 'One')
-    const next = gameState(basketball, 'Next', 'Two')
+    const next = basketballEventSetupState('Next', 'Two')
     saveActiveGameState(current, null)
     const previousId = getActiveLocalGameId(null)
 
-    const committed = commitGameSetupState(current, next, null)
+    const committed = commitGameSetupState(current, next, null, null, true)
 
     expect(committed.localGameId).not.toBe(previousId)
     expect(getActiveLocalGameId(null)).toBe(committed.localGameId)
@@ -257,7 +257,7 @@ describe('gameParking', () => {
     const storage = new FailNthManifestWriteStorage()
     vi.stubGlobal('localStorage', storage)
     const current = gameState(basketball, 'Current', 'One')
-    const next = gameState(basketball, 'Next', 'Two')
+    const next = basketballEventSetupState('Next', 'Two')
     saveActiveGameState(current, null)
     const previousId = getActiveLocalGameId(null)
     const manifestBefore = storage.getItem(GAMES_MANIFEST_KEY)
@@ -265,7 +265,7 @@ describe('gameParking', () => {
     const mirrorBefore = storage.getItem(GAME_STORAGE_KEY)
     storage.failOnManifestWrite(3)
 
-    expect(() => commitGameSetupState(current, next, null)).toThrow(ParkedGameStorageError)
+    expect(() => commitGameSetupState(current, next, null, null, true)).toThrow(ParkedGameStorageError)
 
     expect(storage.getItem(GAMES_MANIFEST_KEY)).toBe(manifestBefore)
     expect(storage.getItem(`${GAME_RECORD_KEY_PREFIX}${previousId}`)).toBe(recordBefore)
@@ -275,8 +275,8 @@ describe('gameParking', () => {
   })
 
   it('updates a matching committed setup without creating another local game', () => {
-    const current = gameState(basketball, 'Current', 'One')
-    const next = gameState(basketball, 'Current', 'Updated')
+    const current = basketballEventSetupState('Current', 'One')
+    const next = basketballEventSetupState('Current', 'Updated')
     saveActiveGameState(current, null)
     const localGameId = getActiveLocalGameId(null)!
 
@@ -294,7 +294,7 @@ describe('gameParking', () => {
     const previousId = getActiveLocalGameId(null)
 
     expect(() => commitGameSetupState(current, next, null)).toThrow(
-      'Enable New event tracker (preview)'
+      'New Basketball game creation is unavailable'
     )
     expect(getActiveLocalGameId(null)).toBe(previousId)
     expect(listParkedGames(null)).toHaveLength(1)
@@ -315,7 +315,7 @@ describe('gameParking', () => {
     const previousId = getActiveLocalGameId(null)
 
     expect(() => commitGameSetupState(current, next, null)).toThrow(
-      'Enable New event tracker (preview)'
+      'New Basketball game creation is unavailable'
     )
     expect(getActiveLocalGameId(null)).toBe(previousId)
     expect(listParkedGames(null)).toHaveLength(1)
@@ -349,7 +349,7 @@ describe('gameParking', () => {
       basketballEventSetupState('Aces', 'Eagles'),
       null,
       'different-local-id'
-    )).toThrow('Enable New event tracker (preview)')
+    )).toThrow('New Basketball game creation is unavailable')
   })
   it('round-trips marked Basketball setup intent without aggregate fallback', () => {
     const marked = {

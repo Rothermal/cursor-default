@@ -1,7 +1,8 @@
 # TUI-1 Basketball Layout and Action Inventory
 
-Status: layout/action pass implemented for review. This is the first of two TUI-1
-PRs, not completion of the event-only/legacy-retirement cutover.
+Status: layout/action pass merged in #491. This is the first of two TUI-1 PRs;
+the second cutover's implementation is recorded in
+[REGRESSION_TUI_1_BASKETBALL_CUTOVER.md](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md).
 Plan: [Shared tracker UI](PLAN_TRACKER_UI_UNIFICATION.md).
 
 ## Scope and Preserved Contracts
@@ -118,7 +119,7 @@ Observed on 2026-10-18, starting from `08a463f1`:
 
 ## Remaining Work
 
-The next TUI-1 PR owns event-only setup/commit, stale legacy drafts, read-only
+The second TUI-1 PR now implements event-only setup/commit, stale legacy drafts, read-only
 active/parked/cloud legacy source review, exclusion notices/export, safe existing-data
 sync and shared Summary/Game Info mutation guards keyed by sport and authority.
 Other sports' legacy controls must remain intact. The owner-only validation timing

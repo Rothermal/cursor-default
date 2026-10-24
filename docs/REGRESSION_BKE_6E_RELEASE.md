@@ -5,6 +5,13 @@ BKE-6E2 merge candidate is deployed; BKE-6E3 owner smoke and final sign-off are 
 
 Plan: [PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md)
 
+Current candidate (2026-10-24): TUI-1's event-only creation and read-only legacy
+cutover are implemented for review. The
+[cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md) owns its new policy,
+rollback, entry inventory and evidence. Opt-in/Legacy expectations below remain
+historical, not acceptance requirements to restore that UI. Existing result cells,
+open bugs and broader-release holds are not upgraded by this implementation.
+
 Prospective cutover disposition (2026-10-17): the owner approved remaining live
 checks as post-deployment validation for the owner-only event-only Basketball
 cutover in [TUI-1](PLAN_TRACKER_UI_UNIFICATION.md). This supersedes the earlier

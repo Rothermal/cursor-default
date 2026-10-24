@@ -6,8 +6,7 @@ import { setBasketballEventCreationIntent } from './commands'
 import { canCommitBasketballSetup } from './releasePolicy'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
-const internalProduction = getBasketballEventCreationPolicy(true, {
-  development: false,
+const internalProduction = getBasketballEventCreationPolicy({
   releaseStage: 'internal',
 })
 
@@ -30,22 +29,19 @@ function committedEventSetupState() {
 }
 
 describe('Basketball Event setup release policy', () => {
-  it('allows Legacy and opted-in new Event commits', () => {
+  it('rejects Legacy even while event creation is available', () => {
     const state = createInitialState()
     expect(canCommitBasketballSetup({
       authority: 'legacy',
-      policy: internalProduction,
+      policy: getBasketballEventCreationPolicy(),
       draftCommittedLocalGameId: null,
       activeLocalGameId: null,
       activeState: state,
-    })).toBe(true)
+    })).toBe(false)
 
     expect(canCommitBasketballSetup({
       authority: 'sport_events',
-      policy: getBasketballEventCreationPolicy(true, {
-        development: true,
-        releaseStage: 'internal',
-      }),
+      policy: getBasketballEventCreationPolicy(),
       draftCommittedLocalGameId: null,
       activeLocalGameId: null,
       activeState: state,

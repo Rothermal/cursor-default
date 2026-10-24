@@ -8,10 +8,12 @@ assuming a plan or old note is the implemented behavior.
 ## Current Architecture
 
 StatKeeper is a React/TypeScript PWA. Soccer has a released event-based experience.
-Basketball supports both historical aggregate games and an opt-in event tracker.
+Basketball's event-only creation and read-only aggregate retirement are implemented
+for review in TUI-1; its compact full-court event tracker is already merged. See the
+[cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md).
 Hockey has a released event tracker, Summary and cloud lifecycle; every new Hockey
 game uses events. Baseball's BSB-7D event-only creation and legacy retirement are
-implemented for review; existing event games and authorized legacy-data sync remain
+merged in #505; existing event games and authorized legacy-data sync remain
 available independently of the creation rollback switch. See its
 [cutover record](REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md). Baseball has a tracker, Summary and cloud sync;
 recorder management/finalization/reopen merged in #495 and BSB-6C cloud Summary
@@ -81,9 +83,8 @@ not a universal component containing branches for every sport.
 
 Basketball's workspace, attribution and full court are implemented. The
 [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md) owns layout and legacy
-retirement. The compact Basketball event layout/action pass is implemented for
-review; creation remains opt-in and legacy capture is unchanged until the next
-authority-cutover PR. The target is one event UI per sport, with legacy games reduced
+retirement. The compact layout merged in #491; event-only creation and legacy
+retirement are now implemented for review. The target is one event UI per sport, with legacy games reduced
 to read-only stat summaries. This is not permission to discard local data. Soccer
 provides examples, not a
 perfect template. Football needs its event foundations before adoption. The

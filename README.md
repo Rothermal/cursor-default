@@ -7,14 +7,15 @@ game review and optional authenticated cloud sync.
 
 - **Soccer:** released sport-specific setup, pitch capture, lineup management,
   Timeline, shootouts, Summary and canonical cloud results. Enable it in Settings.
-- **Basketball:** existing aggregate games remain supported; the event tracker is
-  a device-level opt-in with clock, lineups, corrections and cloud review.
-  Court/Lineup/player details, event-local attribution and the full court are implemented.
+- **Basketball:** compact full-court event tracker with clock, lineups, corrections,
+  cloud review and aggregates. TUI-1's event-only creation and read-only legacy
+  cutover are implemented for review; saved stats, exports and authorized old-data
+  sync remain available. See the [cutover record](docs/REGRESSION_TUI_1_BASKETBALL_CUTOVER.md).
 - **Hockey:** released event tracker with rink capture, penalties/strength, Timeline,
   Summary and cloud lifecycle. Every new Hockey game uses events.
 - **Baseball:** event-only new-game setup, diamond/pitch/play capture, lineups,
   corrections, cloud lifecycle, Summary, canonical aggregates and personal defaults.
-  BSB-7D's cutover is implemented for review; legacy games become read-only summaries,
+  BSB-7D's cutover merged in #505; legacy games are read-only summaries,
   with recorded stats, local exports and authorized unsynced-data transport preserved.
   See the [BSB-7 plan](docs/PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) and
   [cutover record](docs/REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md). Owner-only

@@ -104,7 +104,7 @@ function render() {
 async function drain() { for (let i = 0; i < 12; i += 1) await Promise.resolve() }
 async function open() {
   render(); await drain()
-  const button = render().find(element => element.type === 'button' && ['View Details', 'Review Game'].includes(element.props.children as string))
+  const button = render().find(element => element.type === 'button' && ['View Details', 'Review Game', 'View Summary', 'Open saved game'].includes(element.props.children as string))
   if (!button) throw new Error('Missing cloud open action')
   const click = button.props.onClick as () => void
   click()
@@ -129,6 +129,34 @@ beforeEach(() => {
 afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
 
 describe('Cloud Games open lifetime', () => {
+  it.each([['basketball', 'active'], ['basketball', 'parked'], ['baseball', 'active'], ['baseball', 'parked']])(
+    'preserves dirty %s %s history instead of loading an older cloud snapshot', async (sport, kind) => {
+      harness.sportId = sport; harness.authority.mockResolvedValue('legacy')
+      const local = { ...candidate(), notes: 'Unsynced local facts',
+        players: [{ id: 'p', name: 'Pat', number: '1', stats: { ast: 4 } }],
+        cloudSync: { ...createInitialState().cloudSync, gameId: 'cloud-a', status: 'offline' as const } }
+      if (kind === 'active') harness.state = local
+      else { harness.parked = saveActiveGameState(local, 'account-a'); harness.activeId = 'another-slot' }
+      const before = new Map((localStorage as unknown as MemoryStorage).store)
+      await open(); await drain()
+      expect(harness.navigate).toHaveBeenCalledWith('/summary')
+      expect(harness.legacy).not.toHaveBeenCalled()
+      expect(harness.open).not.toHaveBeenCalled()
+      expect(harness.touch).not.toHaveBeenCalled()
+      if (kind === 'parked') expect(harness.resume).toHaveBeenCalledWith(harness.parked[0].localGameId)
+      else expect(harness.state).toBe(local)
+      expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
+    }
+  )
+  it('refuses a legacy Basketball open with incompatible event-bound local history', async () => {
+    harness.sportId = 'basketball'; harness.authority.mockResolvedValue('legacy')
+    harness.state = { ...candidate(), gameDataAuthority: 'sport_events',
+      cloudSync: { ...createInitialState().cloudSync, gameId: 'cloud-a' } }
+    await open(); await drain()
+    expect(harness.navigate).not.toHaveBeenCalled()
+    expect(harness.open).not.toHaveBeenCalled()
+    expect(harness.legacy).not.toHaveBeenCalled()
+  })
   it.each(['active', 'parked'])('refreshes a reopened %s Baseball binding before opening its local history', async kind => {
     const local = { ...candidate(), gameDataAuthority: 'sport_events' as const,
       cloudSync: { ...createInitialState().cloudSync, gameId: 'cloud-a', gameStatus: 'final' } }

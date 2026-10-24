@@ -3,6 +3,15 @@
 Required follow-up roadmap for moving basketball from its current counter/action-log/shot
 record combination onto the shared `GameEvent` foundation introduced by the soccer program.
 
+Current direction (2026-10-24): the original BKE phases below describe their delivered
+boundaries. BKE-7's full court and #491's compact layout are merged; TUI-1 now
+implements event-only creation/read-only aggregate retirement for review. See the
+[shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md) and
+[cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md). Earlier opt-in/Legacy
+fallback instructions are superseded by that cutover, not a new implementation queue.
+Clock independence/running-clock substitutions remain separately proposed, and
+live/device/PWA validation remains pending.
+
 Status: BKE-0 architecture and product-model decisions are approved in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md).
 BKE-1A, all BKE-1B slices, and all BKE-1C slices are complete. BKE-2 product and delivery decisions

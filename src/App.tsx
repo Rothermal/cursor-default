@@ -9,6 +9,7 @@ import { gameSetupPath } from './lib/teamInfo'
 import { supabase } from './lib/supabase'
 import { captureAuthIdentity, isCurrentAuthIdentity } from './lib/authIdentity'
 import { isLegacyBaseballGame } from './lib/baseball/releasePolicy'
+import { isLegacyGameForSport } from './lib/legacyGameRetirement'
 import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
 import SportSelect from './pages/SportSelect'
@@ -111,12 +112,14 @@ function GameSetupRoute() {
         <Link className="btn-secondary inline-block" to="/sports">Back to Sports</Link>
       </main>
     default:
+      if (!requestedSport && !teamId && isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
       return <GameSetup />
   }
 }
 
 function PlayerSetupRoute() {
   const { state } = useGame()
+  if (isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
   if (state.sport?.id === 'baseball') return <Navigate to={isLegacyBaseballGame(state) ? '/summary' : '/game'} replace />
   if (state.sport?.id !== 'soccer') return <PlayerSetup />
   return <SoccerPlayerSetup />
@@ -124,6 +127,7 @@ function PlayerSetupRoute() {
 
 function GameTrackerRoute() {
   const { state } = useGame()
+  if (isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
   // Hockey event games never fall through to the legacy stat grid.
   if (state.sport?.id === 'hockey' && (state.sportGameState || state.eventStream)) {
     return <HockeyGameTracker />
@@ -139,6 +143,7 @@ function GameTrackerRoute() {
 
 function GameCheckoutRoute() {
   const { state } = useGame()
+  if (isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
   if (state.sport?.id === 'baseball') return <Navigate to={isLegacyBaseballGame(state) ? '/summary' : '/game'} replace />
   if (state.sport?.id !== 'soccer') return <GameCheckout />
   return <Navigate to="/players" replace />

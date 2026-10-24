@@ -9,43 +9,34 @@ import {
 
 describe('getSportAvailabilityPolicy', () => {
   it.each([
-    ['internal', true, false, false, true],
-    ['internal', true, true, true, true],
-    ['internal', false, false, false, false],
-    ['internal', false, true, false, false],
-    ['opt_in', true, false, false, true],
-    ['opt_in', true, true, true, true],
-    ['opt_in', false, false, false, true],
-    ['opt_in', false, true, true, true],
+    ['internal', false],
+    ['released', true],
   ] as const)(
-    'resolves Basketball Event %s development=%s enabled=%s',
-    (releaseStage, development, enabled, canCreate, preferenceAvailable) => {
-      expect(getBasketballEventCreationPolicy(enabled, {
-        development,
+    'resolves Basketball event-only %s creation',
+    (releaseStage, canCreate) => {
+      expect(getBasketballEventCreationPolicy({ releaseStage })).toEqual({
         releaseStage,
-      })).toEqual({
-        releaseStage,
-        preferenceAvailable,
+        preferenceAvailable: false,
         canCreateNewEventGame: canCreate,
         canAccessExistingEventGames: true,
       })
     }
   )
 
-  it('keeps the shipped Basketball stage rollback-safe and default-off', () => {
+  it('ships event-only Basketball with creation-only rollback', () => {
     const releaseStage = BASKETBALL_EVENT_RELEASE_STAGE as BasketballEventReleaseStage
 
-    expect(['internal', 'opt_in']).toContain(releaseStage)
-    expect(getBasketballEventCreationPolicy(false, { development: false })).toEqual({
+    expect(['internal', 'released']).toContain(releaseStage)
+    expect(getBasketballEventCreationPolicy()).toEqual({
       releaseStage,
-      preferenceAvailable: releaseStage === 'opt_in',
-      canCreateNewEventGame: false,
+      preferenceAvailable: false,
+      canCreateNewEventGame: releaseStage === 'released',
       canAccessExistingEventGames: true,
     })
-    expect(getBasketballEventCreationPolicy(true, { development: false })).toEqual({
-      releaseStage,
-      preferenceAvailable: releaseStage === 'opt_in',
-      canCreateNewEventGame: releaseStage === 'opt_in',
+    expect(getBasketballEventCreationPolicy({ releaseStage: 'internal' })).toEqual({
+      releaseStage: 'internal',
+      preferenceAvailable: false,
+      canCreateNewEventGame: false,
       canAccessExistingEventGames: true,
     })
   })

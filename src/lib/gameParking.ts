@@ -14,7 +14,8 @@ import {
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
-import { BASEBALL_NEW_GAME_CREATION_ENABLED, baseballAuthorityForHydration, isLegacyBaseballGame } from './baseball/releasePolicy'
+import { BASEBALL_NEW_GAME_CREATION_ENABLED, isLegacyBaseballGame } from './baseball/releasePolicy'
+import { retiredGameAuthorityForHydration, isLegacyGameForSport, isRetiredLegacyGame } from './legacyGameRetirement'
 import {
   eventCloudPolicyForState,
   normalizeEventCloudPolicyState,
@@ -61,6 +62,7 @@ export interface ParkedGameSummary {
   syncDirty: boolean
   syncLastError: string | null
   eventCloudPolicy?: 'automatic' | 'local_only'
+  legacyReadOnly?: boolean
 }
 
 export interface ParkedGamesManifest {
@@ -253,7 +255,7 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
 function normalizePersistedGameState(state: GameState): GameState {
   return normalizeEventCloudPolicyState({
     ...state,
-    gameDataAuthority: baseballAuthorityForHydration(state),
+    gameDataAuthority: retiredGameAuthorityForHydration(state),
     eventStream: normalizeGameEventStream(state.eventStream),
     sportGameState: normalizeSportGameState(state.sportGameState),
   })
@@ -403,6 +405,7 @@ function buildSummary(
     syncDirty: sync.dirty,
     syncLastError: sync.lastError,
     eventCloudPolicy: eventCloudPolicyForState(state) ?? undefined,
+    legacyReadOnly: isRetiredLegacyGame(state),
   }
 }
 
@@ -846,6 +849,10 @@ export function commitGameSetupState(
     nextState.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||
     nextState.sportGameState?.sportId !== 'baseball' || !nextState.eventStream
   )) throw new Error('New Baseball games require the available event setup. Existing games remain saved.')
+  if (nextState.sport?.id === 'basketball' && (isLegacyGameForSport(nextState, 'basketball') ||
+    !isUninitializedBasketballEventState(nextState))) {
+    throw new Error('New Basketball games require event setup. Existing games remain saved.')
+  }
   const manifest = migrateLegacyGameStorage(ownerId)
   const snapshot = snapshotParkingStorage(manifest)
 
@@ -862,7 +869,7 @@ export function commitGameSetupState(
       !continuingCommittedBasketballEventSetup
     ) {
       throw new Error(
-        'Enable New event tracker (preview) in Basketball settings before creating this game.'
+        'New Basketball game creation is unavailable in this build. Existing games remain saved.'
       )
     }
 
