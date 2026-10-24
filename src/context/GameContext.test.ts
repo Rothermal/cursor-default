@@ -60,6 +60,13 @@ function render() {
   harness.cursor = 0
   return GameProvider({ children: null }).props.value
 }
+
+it('refuses legacy Baseball creation before parking or changing the existing game', () => {
+  const value = render(), before = [...(localStorage as unknown as MemoryStorage).store]
+  expect(value.startNewGame(sports.find(sport => sport.id === 'baseball')!)).toBe(false)
+  expect([...(localStorage as unknown as MemoryStorage).store]).toEqual(before)
+  expect(harness.dispatch).not.toHaveBeenCalled()
+})
 function seedGame(cloudId: string) {
   const state = { ...createInitialState(), sport: sports.find(sport => sport.id === 'basketball')!,
     gameInfo: { teamName: 'Home', opponentName: 'Away', tournamentName: '', tournamentId: null, date: '2026-09-22' },

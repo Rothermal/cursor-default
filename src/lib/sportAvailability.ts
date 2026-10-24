@@ -1,13 +1,15 @@
+import { BASEBALL_NEW_GAME_CREATION_ENABLED } from './baseball/releasePolicy'
+
 export const SOCCER_RELEASED_IN_PRODUCTION = true
 export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
 /**
  * XS-1 per-sport event stages (HKY-2E). Existing event games stay reachable at every
  * stage; only new games are gated. `released` makes every new game an event game with no
- * device toggle (HKY-6C). Rollback: `released` -> `opt_in`, `opt_in` -> `internal`.
+ * device toggle (HKY-6C). Hockey rollback: `released` -> `opt_in` -> `internal`.
+ * Baseball's cutover instead uses the creation-only switch; stages cannot revive its grid.
  */
 export const SPORT_EVENT_RELEASE_STAGES = {
   hockey: 'released',
-  baseball: 'opt_in',
 } as const satisfies Record<string, SportEventReleaseStage>
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
@@ -95,18 +97,16 @@ function sportEventCreationPolicy(
 }
 
 /**
- * BSB-3D (Q1): new Baseball event games need the owner's device toggle in production,
- * which defaults off; development keeps the preview without it. Event Baseball stays
- * local-only at every stage; BSB-7 owns the wider release.
+ * BSB-7D: old preview preferences/stages cannot revive aggregate creation. The separate
+ * creation switch also applies in development; existing games are never gated by it.
  */
 export function getBaseballEventCreationPolicy(
-  enabledOnDevice: boolean,
   {
-    development = DEVELOPMENT_BUILD,
-    releaseStage = SPORT_EVENT_RELEASE_STAGES.baseball,
-  }: SportEventCreationPolicyOptions = {}
+    creationEnabled = BASEBALL_NEW_GAME_CREATION_ENABLED,
+  }: { creationEnabled?: boolean } = {}
 ): SportEventCreationPolicy {
-  return sportEventCreationPolicy(enabledOnDevice, development, releaseStage)
+  return { releaseStage: 'released', preferenceAvailable: false,
+    canCreateNewEventGame: creationEnabled, canAccessExistingEventGames: true }
 }
 
 export function getSportAvailabilityPolicy(

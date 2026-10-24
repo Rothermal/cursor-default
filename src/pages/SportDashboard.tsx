@@ -17,7 +17,6 @@ import {
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import {
-  getBaseballEventCreationPolicy,
   hockeyNewGamesUseEventTracker,
   getSportAvailabilityPolicy,
 } from '../lib/sportAvailability'
@@ -57,7 +56,7 @@ export default function SportDashboard() {
   const { sportId } = useParams()
   const navigate = useNavigate()
   const { isConfigured, user } = useAuth()
-  const { isSportEnabled, hockeyEventTrackerEnabled, baseballEventTrackerEnabled } = useSettings()
+  const { isSportEnabled, hockeyEventTrackerEnabled } = useSettings()
   const {
     state,
     activeLocalGameId,
@@ -148,13 +147,9 @@ export default function SportDashboard() {
       navigate('/setup?sport=hockey&events=1')
       return
     }
-    // BSB-3D: the same for Baseball, whose diamond tracker replaces the stat grid on this device.
-    if (
-      sport.id === 'baseball' &&
-      baseballEventTrackerEnabled &&
-      getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame
-    ) {
-      navigate('/setup?sport=baseball&events=1')
+    // Setup is mutation-free; its creation gate also handles rollback without a legacy fallback.
+    if (sport.id === 'baseball') {
+      navigate('/setup?sport=baseball')
       return
     }
     if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return

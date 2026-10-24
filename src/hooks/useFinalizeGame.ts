@@ -8,6 +8,7 @@ import { shouldBlockDiscardUnsyncedGame, shouldPreserveLocalAfterFinalizeSuccess
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { useTeamRole } from './useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
+import { canFinalizeAggregateGame } from '../lib/baseball/releasePolicy'
 
 /**
  * Finalize an in-progress cloud game: flush sync → mark final → clear local → reset.
@@ -25,6 +26,7 @@ export function useFinalizeGame() {
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const canFinalizeCloudGame = Boolean(
+    canFinalizeAggregateGame(state) &&
     isConfigured &&
       user &&
       supabase &&
@@ -34,7 +36,7 @@ export function useFinalizeGame() {
   )
 
   const handleFinalizeCloudGame = async () => {
-    if (!canFinalizeCloudGame || !state.cloudSync.gameId) return
+    if (!canFinalizeCloudGame || !canFinalizeAggregateGame(stateRef.current) || !state.cloudSync.gameId) return
     setFinalizeError(null)
     setFinalizing(true)
 
@@ -58,6 +60,7 @@ export function useFinalizeGame() {
     }
 
     const afterFlush = stateRef.current
+    if (!canFinalizeAggregateGame(afterFlush)) { setFinalizing(false); return }
     if (shouldBlockDiscardUnsyncedGame(afterFlush, getPendingSyncFlag())) {
       setFinalizing(false)
       setFinalizeError('Latest changes could not be synced. Try again.')

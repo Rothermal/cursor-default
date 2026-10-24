@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Routes, Route, Navigate, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
@@ -7,6 +7,8 @@ import { hockeyNewGamesUseEventTracker } from './lib/sportAvailability'
 import { gameSetupRouteTarget, loadTeamSportId } from './lib/gameSetupRoute'
 import { gameSetupPath } from './lib/teamInfo'
 import { supabase } from './lib/supabase'
+import { captureAuthIdentity, isCurrentAuthIdentity } from './lib/authIdentity'
+import { isLegacyBaseballGame } from './lib/baseball/releasePolicy'
 import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
 import SportSelect from './pages/SportSelect'
@@ -63,19 +65,21 @@ function GameSetupRoute() {
   const requestedSport = searchParams.get('sport')
   const teamId = searchParams.get('teamId')
   const activeSportId = state.sport?.id ?? null
-  // A team-only link while Soccer is mounted needs the team's sport first (HKY-6C).
-  const needsTeamSport = !requestedSport && Boolean(teamId) && activeSportId === 'soccer'
-  const [teamSport, setTeamSport] = useState<{ teamId: string; sportId: string | null } | null>(null)
+  const identity = user ? captureAuthIdentity(user.id) : null
+  const teamScope = JSON.stringify([teamId, identity])
+  const [attempt, setAttempt] = useState(0)
+  const [teamSport, setTeamSport] = useState<{ scope: string; sportId: string | null } | null>(null)
   useEffect(() => {
-    if (!needsTeamSport || !teamId) return
+    if (!teamId) return
     let cancelled = false
-    void loadTeamSportId(user ? supabase : null, teamId).then(sportId => {
-      if (!cancelled) setTeamSport({ teamId, sportId })
+    const currentIdentity = user ? captureAuthIdentity(user.id) : null
+    void loadTeamSportId(currentIdentity ? supabase : null, teamId).then(sportId => {
+      if (!cancelled && (!currentIdentity || isCurrentAuthIdentity(currentIdentity))) setTeamSport({ scope: teamScope, sportId })
     })
     return () => {
       cancelled = true
     }
-  }, [needsTeamSport, teamId, user])
+  }, [teamId, teamScope, user, attempt])
 
   const hockeyNewGamesUseEvents = hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)
   const target = gameSetupRouteTarget({
@@ -84,7 +88,7 @@ function GameSetupRoute() {
     teamId,
     activeSportId,
     hockeyNewGamesUseEvents,
-    teamSportId: teamSport && teamSport.teamId === teamId ? teamSport.sportId : undefined,
+    teamSportId: teamSport?.scope === teamScope ? teamSport.sportId : undefined,
   })
   switch (target) {
     case 'soccer':
@@ -97,9 +101,15 @@ function GameSetupRoute() {
         : <Navigate to={`${gameSetupPath(teamId ?? '', 'hockey')}&events=1`} replace />
     // BaseballEventSetup applies the baseballEvent creation policy and shows the notice when off.
     case 'baseball_events':
-      return <BaseballEventSetup />
+      return <BaseballEventSetup key={JSON.stringify([teamId, identity])} />
     case 'resolve_team_sport':
       return <p className="p-6 text-center text-sm text-content-muted animate-pulse">Loading team...</p>
+    case 'unavailable_team':
+      return <main className="mx-auto max-w-lg space-y-3 px-4 py-6">
+        <p role="alert" className="text-danger-content">The selected team is unavailable or does not match this sport. No game was changed.</p>
+        <button type="button" className="btn-secondary" onClick={() => { setTeamSport(null); setAttempt(value => value + 1) }}>Retry team</button>
+        <Link className="btn-secondary inline-block" to="/sports">Back to Sports</Link>
+      </main>
     default:
       return <GameSetup />
   }
@@ -107,6 +117,7 @@ function GameSetupRoute() {
 
 function PlayerSetupRoute() {
   const { state } = useGame()
+  if (state.sport?.id === 'baseball') return <Navigate to={isLegacyBaseballGame(state) ? '/summary' : '/game'} replace />
   if (state.sport?.id !== 'soccer') return <PlayerSetup />
   return <SoccerPlayerSetup />
 }
@@ -118,9 +129,8 @@ function GameTrackerRoute() {
     return <HockeyGameTracker />
   }
   // Baseball event games never fall through to the legacy stat grid either.
-  if (state.sport?.id === 'baseball' && (state.sportGameState || state.eventStream)) {
-    return <BaseballGameTracker />
-  }
+  if (state.sport?.id === 'baseball') return isLegacyBaseballGame(state)
+    ? <Navigate to="/summary" replace /> : <BaseballGameTracker />
   if (state.sport?.id !== 'soccer') return <GameTracker />
   return state.eventStream?.events.length
     ? <SoccerGameTracker />
@@ -129,6 +139,7 @@ function GameTrackerRoute() {
 
 function GameCheckoutRoute() {
   const { state } = useGame()
+  if (state.sport?.id === 'baseball') return <Navigate to={isLegacyBaseballGame(state) ? '/summary' : '/game'} replace />
   if (state.sport?.id !== 'soccer') return <GameCheckout />
   return <Navigate to="/players" replace />
 }
@@ -144,14 +155,14 @@ function GameSummaryRoute() {
 }
 
 function SportGameSummaryRoute() {
-  const { state } = useGame()
+  const { state, activeLocalGameId } = useGame()
   const [searchParams] = useSearchParams()
   if (isBasketballSummaryRoute(state, searchParams)) return <BasketballSummary />
   // Baseball event games never fall through to the legacy grid Summary.
   if (isBaseballSummaryRoute(state, searchParams)) return <BaseballSummary />
   // Hockey event games, local or cloud by gameId, open the Hockey Summary (HKY-6A1).
   if (isHockeySummaryRoute(state, searchParams)) return <HockeySummary />
-  if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary />
+  if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary key={`${activeLocalGameId}:${state.cloudSync.gameId}`} />
   return <SoccerSummary />
 }
 

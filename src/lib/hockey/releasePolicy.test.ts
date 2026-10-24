@@ -74,7 +74,7 @@ describe('HKY-2E and HKY-6C route gates', () => {
     expect(setupRoute).toContain('gameSetupRouteTarget({')
     expect(setupRoute).toContain('<HockeyGameSetup />')
     expect(source('src/lib/gameSetupRoute.ts'))
-      .toContain("if (requestedSport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'")
+      .toContain("if (sport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'")
     expect(source('src/pages/HockeyGameSetup.tsx'))
       .toContain('if (!getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame)')
   })

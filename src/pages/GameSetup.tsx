@@ -357,6 +357,10 @@ export default function GameSetup() {
         setLoadingRequestedTeamSport(false)
         return
       }
+      if (requestedSport.id === 'baseball') {
+        navigate(`${gameSetupPath(requestedTeamId ?? '', 'baseball')}`, { replace: true })
+        return
+      }
       // HKY-6C: a team-only link to a Hockey team opens the event setup instead.
       if (requestedSport.id === 'hockey' && requestedTeamId && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)) {
         navigate(`${gameSetupPath(requestedTeamId, 'hockey')}&events=1`, { replace: true })
@@ -972,6 +976,7 @@ export default function GameSetup() {
   }
 
   const handleNext = async (forceCapabilityCheck = false) => {
+    if (sport?.id === 'baseball') { navigate('/setup?sport=baseball'); return }
     if (!canProceed) return
     if (isCloudFlow && teamMode === 'existing' && !canTrackGames(selectedTeam?.accessRole ?? null)) {
       setSetupError('Viewer access is read-only. Choose a team you can track.')

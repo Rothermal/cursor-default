@@ -1,7 +1,7 @@
 # Plan: BSB-7 Baseball Aggregates, Settings and Release
 
-Status: **Approved execution plan (#497); BSB-7A/7B implemented; BSB-7C integration implemented for review**
-(2026-10-23). The owner approved all 23 recommendations, Q1-Q23. Migration 079
+Status: **Approved execution plan (#497); BSB-7A-7C merged; BSB-7D cutover implemented for review**
+(2026-10-24). The owner approved all 23 recommendations, Q1-Q23. Migration 079
 delivers the bounded server foundation described below. The client half now adds
 pure replay aggregates, strict paging, separate feature capabilities and checked
 personal identity/intents, without UI wiring. Full 7A exit is not claimed. See the
@@ -21,13 +21,14 @@ Current-head CI is reported in PR #500, separately from the original pass.
 BSB-7C1 now adds the personal-settings foundation for review (2026-10-23):
 exact personal parsing, migration 080's fixed account-bound CAS/read/capability,
 and offline reconciliation/controller checks. See the
-[7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). 7C1 merged in #503. 7C2 now
-mounts the controller/editor, personal setup defaults, My Players/explicit creation,
-post-binding link intents and new-game-only device defaults for review. The owner
-reports 080 applied on 2026-10-23. This is not a live behavioral signoff; 7D and live
-exit remain pending.
+[7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). 7C1 merged in #503 and 7C2
+in #504, including the offline synced-default review fix. The owner reports 080
+applied on 2026-10-23. 7D now implements event-only creation, read-only aggregate
+retirement and data-safe creation rollback for review; see the
+[cutover record](REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md). Full live exit remains pending.
 
-No agent applies a live migration or changes a release flag in this work. The owner
+No agent applies a live migration or deploys this work. 7A-7C retained the opt-in
+stage; the approved 7D implementation proposes event-only creation in its PR. The owner
 reports migration 079 applied on 2026-10-20; this report is not an observed live
 JWT/PostgREST/RLS or lifecycle pass. Independent review, implementation verification
 and live signoff are recorded separately.
@@ -45,7 +46,7 @@ Direction: [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) and
   pending independently of BSB-7. Source analysis and simulated checks are not live
   Supabase/RLS, two-device, physical-mobile or installed-PWA evidence.
 - Team settings v1 already ship through 071. Personal settings are new here.
-  Current Baseball remains `opt_in` until the BSB-7D implementation cutover.
+  BSB-7A-7C retained `opt_in`; BSB-7D implements the event-only cutover for review.
 - Scope: canonical aggregates and explicit personal identity links; five stats
   destinations and separate Legacy Totals; personal rules/device capture defaults;
   event-only creation, read-only legacy retirement and release evidence.
@@ -607,9 +608,24 @@ Acceptance/evidence required:
 
 ### BSB-7D - Event-Only Cutover and Release Evidence
 
-Only after foundation/destinations/settings readiness, switch every new Baseball
-entry to events, remove opt-in creation UI and retire aggregate capture everywhere.
-Preserve existing-data transport/export and implement the data-safe rollback policy.
+Delivery: **implemented for review (2026-10-24), after #504 merged**. Dashboard,
+Team Info, explicit/plain/team-only setup and stale `events` parameters use event
+setup without parking until commit. Team authority is resolved independently of
+the active sport; unreadable/mismatched teams cannot start a game. Creation rollback
+uses `BASEBALL_NEW_GAME_CREATION_ENABLED`, including the transaction guard; it never
+restores the grid. Existing event games retain their tracker/Summary/cloud paths.
+
+Legacy Baseball routes/imports/parked resume open read-only Summary. Reducer facts,
+generic corrections/primary/finalization and cloud metadata edits are guarded.
+Unfinished games are labelled excluded from totals, never finalized or converted.
+Cloud opens prefer existing local bindings; ambiguous/incompatible bindings refuse.
+Exports, unsynced metadata and authorized old-data transport remain. Malformed event
+markers survive normalization rather than becoming legacy. Preview UI is removed;
+sport discovery and capture-location preferences remain distinct. The old preview
+storage field is retained inertly, not used as creation authority.
+
+The [cutover record](REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md) records actual local
+gates, simulated browsers, entrypoint coverage and separately pending deployed checks.
 
 Acceptance/evidence required:
 - The complete entrypoint inventory above, unrelated active sports, unsupported/team
@@ -648,9 +664,9 @@ a new pending product batch. If design cannot satisfy an approved decision, rais
 that conflict explicitly rather than silently weakening the contract.
 
 Delivery status: **7A foundations, 7B destinations/link review and 7C personal
-settings/setup integration implemented for review; full 7A/live exit and 7D remain pending**.
-Evidence is recorded per delivery above. 7C2 adds UI/setup integration, not cutover.
-Current `opt_in`, exact cloud contract 2/078 and existing access remain unchanged.
+settings/setup merged; 7D event-only cutover implemented for review. Full 7A/live exit remains pending**.
+Evidence is recorded per delivery above. Exact cloud contract 2/078 and existing
+access remain unchanged; only 7D changes creation/legacy-capture policy.
 BSB-6 and broader-release live evidence remain pending. Follow the current
 single-agent workflow in AGENTS.md for validation and Git/PR work, keeping PR review
 separate from self-review; this document does not authorize migration

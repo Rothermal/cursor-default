@@ -206,6 +206,10 @@ export default function TeamInfo() {
       navigate(gameSetupPath(team.id, sport.id))
       return
     }
+    if (sport.id === 'baseball') {
+      navigate(gameSetupPath(team.id, sport.id))
+      return
+    }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
 

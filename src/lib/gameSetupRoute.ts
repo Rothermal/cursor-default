@@ -6,6 +6,7 @@ export type GameSetupRouteTarget =
   | 'baseball_events'
   | 'generic'
   | 'resolve_team_sport'
+  | 'unavailable_team'
 
 export interface GameSetupRouteInput {
   requestedSport: string | null
@@ -18,23 +19,22 @@ export interface GameSetupRouteInput {
 }
 
 /**
- * Picks the setup page for `/setup`. A team-only link (`teamId` without `sport`) while a
- * Soccer game is mounted resolves the team's sport first, so a Hockey or other team does
- * not fall into the active Soccer setup (HKY-6C). The other cases are unchanged.
+ * Resolve team authority before using a sport parameter or the unrelated active game.
+ * Stale events/preview parameters cannot restore retired Baseball creation.
  */
 export function gameSetupRouteTarget(input: GameSetupRouteInput): GameSetupRouteTarget {
   const { requestedSport, eventsRequested, teamId, activeSportId, hockeyNewGamesUseEvents } = input
-  if (requestedSport === 'soccer') return 'soccer'
-  if (requestedSport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'
-  if (requestedSport === 'baseball' && eventsRequested) return 'baseball_events'
-  if (requestedSport) return 'generic'
-  if (activeSportId !== 'soccer') return 'generic'
-  if (!teamId) return 'soccer'
-  const { teamSportId } = input
-  if (teamSportId === undefined) return 'resolve_team_sport'
-  // An unreadable team keeps the earlier behavior: the active Soccer setup.
-  if (teamSportId === null || teamSportId === 'soccer') return 'soccer'
-  if (teamSportId === 'hockey' && hockeyNewGamesUseEvents) return 'hockey_events'
+  if (teamId) {
+    if (input.teamSportId === undefined) return 'resolve_team_sport'
+    if (!input.teamSportId || !['soccer', 'basketball', 'hockey', 'baseball', 'football'].includes(input.teamSportId)
+      || (requestedSport && input.teamSportId !== requestedSport)) return 'unavailable_team'
+  }
+  // Plain setup edits mounted legacy Hockey through the generic page, not new event setup.
+  const activeSetupSport = activeSportId === 'soccer' || activeSportId === 'baseball' ? activeSportId : null
+  const sport = teamId ? input.teamSportId : requestedSport ?? activeSetupSport
+  if (sport === 'baseball') return 'baseball_events'
+  if (sport === 'soccer') return 'soccer'
+  if (sport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'
   return 'generic'
 }
 

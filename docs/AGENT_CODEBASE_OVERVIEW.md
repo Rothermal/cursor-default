@@ -10,7 +10,10 @@ assuming a plan or old note is the implemented behavior.
 StatKeeper is a React/TypeScript PWA. Soccer has a released event-based experience.
 Basketball supports both historical aggregate games and an opt-in event tracker.
 Hockey has a released event tracker, Summary and cloud lifecycle; every new Hockey
-game uses events. Baseball has an opt-in tracker, local Summary and cloud sync;
+game uses events. Baseball's BSB-7D event-only creation and legacy retirement are
+implemented for review; existing event games and authorized legacy-data sync remain
+available independently of the creation rollback switch. See its
+[cutover record](REGRESSION_BSB_7D_EVENT_ONLY_RELEASE.md). Baseball has a tracker, Summary and cloud sync;
 recorder management/finalization/reopen merged in #495 and BSB-6C cloud Summary
 merged in #496. [BSB-7](PLAN_BSB_7_AGGREGATES_SETTINGS_AND_RELEASE.md) is approved;
 its 7A server foundation is implemented in migration 079 (owner reports application
@@ -20,16 +23,17 @@ paging and checked personal identity/intents, without UI wiring; see the
 destinations, separate Legacy Totals, personal Game Info link review/reviewed
 finalization and explicit team-tournament persistence for review; see its
 [regression record](REGRESSION_BSB_7B_DESTINATIONS.md). Full 7A exit is not claimed. Baseball
-stays opt-in until BSB-7D; BSB-6/live release checks remain pending.
+has no new-game authority toggle after 7D; BSB-6/live release checks remain pending.
 BSB-7C1's personal-settings foundation merged in #503, with fixed
 migration-080 account-bound CAS/read/capability RPCs and an isolated offline
 controller; see [7C evidence](REGRESSION_BSB_7C_PERSONAL_SETTINGS.md). It is now
-mounted by 7C2's Baseball-only auth-lifetime hook for review. Settings now shares
+mounted by 7C2's Baseball-only auth-lifetime hook (merged #504). Settings now shares
 bounded rule fields with Team Manage; fresh setup seeds personal/team defaults,
 offers explicit My Players/Create Player choices and commits separate durable link
 intents with the complete local game. Device capture defaults seed new games only.
 Owner reports migration 080 applied on 2026-10-23; live behavior remains separately
-pending. Cutover stays in 7D and Baseball remains opt-in.
+pending. Legacy Baseball games are read-only, including unfinished/offline games;
+they never convert or auto-finalize. Corrupt event authority cannot fall back to legacy.
 Football still uses the generic aggregate grid; its event plans
 are not an implemented field experience. Pending live verification remains separate.
 

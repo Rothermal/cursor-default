@@ -40,7 +40,7 @@ import {
   type BaseballSetupCapabilityState,
   type BaseballSetupStorage,
 } from '../lib/baseball/setupCloud'
-import { getBaseballEventCreationPolicy } from '../lib/sportAvailability'
+import { getBaseballEventCreationPolicy, getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
 import { captureAuthIdentity, isCurrentAuthIdentity, isCurrentAuthUser } from '../lib/authIdentity'
@@ -58,19 +58,25 @@ interface BaseballTeamOption {
 type RosterStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /**
- * BSB-2 development setup for Baseball event games: builds the frozen BSB-1 setup from a
+ * Baseball event setup: builds the frozen BSB-1 setup from a
  * local roster or a cloud team (prefilled once from team defaults) and opens `/game`.
  */
 export default function BaseballEventSetup() {
   const { user } = useAuth()
-  const { baseballEventTrackerEnabled } = useSettings()
-  if (!getBaseballEventCreationPolicy(baseballEventTrackerEnabled).canCreateNewEventGame) {
+  const { isSportEnabled } = useSettings()
+  if (!getSportAvailabilityPolicy('baseball', isSportEnabled('baseball')).canStartNewGame) return (
+    <main className="max-w-2xl mx-auto px-4 py-5 space-y-3">
+      <p role="alert">Enable Baseball in App settings before starting a new game.</p>
+      <Link to="/settings/app" className="btn-secondary inline-block">App settings</Link>
+    </main>
+  )
+  if (!getBaseballEventCreationPolicy().canCreateNewEventGame) {
     return (
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-3">
         <p className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">
-          Baseball event tracking is not available in this build yet. Turn on the new event tracker in Baseball settings to try it on this device.
+          New Baseball game creation is temporarily unavailable. Existing games and summaries remain saved.
         </p>
-        <Link to="/settings/sports/baseball" className="btn-secondary inline-block">Baseball settings</Link>
+        <Link to="/sport/baseball" className="btn-secondary inline-block">Back to Baseball</Link>
       </main>
     )
   }
@@ -354,6 +360,7 @@ function BaseballSetupForm() {
 
   const commit = async () => {
     if (committingRef.current || waitingForPersonal || waitingForTeam || creatingPlayer) return
+    if (!getBaseballEventCreationPolicy().canCreateNewEventGame) { setCommitError('New Baseball game creation is temporarily unavailable.'); return }
     const baseball = sports.find(entry => entry.id === 'baseball')
     if (!baseball || !build.ok) return
     const selectedTournament = tournaments.find(row => row.id === tournamentId)

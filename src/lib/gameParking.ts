@@ -14,6 +14,7 @@ import {
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
+import { BASEBALL_NEW_GAME_CREATION_ENABLED, baseballAuthorityForHydration, isLegacyBaseballGame } from './baseball/releasePolicy'
 import {
   eventCloudPolicyForState,
   normalizeEventCloudPolicyState,
@@ -252,7 +253,7 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
 function normalizePersistedGameState(state: GameState): GameState {
   return normalizeEventCloudPolicyState({
     ...state,
-    gameDataAuthority: normalizeGameDataAuthority(state.gameDataAuthority),
+    gameDataAuthority: baseballAuthorityForHydration(state),
     eventStream: normalizeGameEventStream(state.eventStream),
     sportGameState: normalizeSportGameState(state.sportGameState),
   })
@@ -840,6 +841,11 @@ export function commitGameSetupState(
   /** Optional atomic metadata persistence; it must restore its own keys if it throws. */
   beforeCommit?: (localGameId: string) => void
 ): CommitGameSetupResult {
+  if (nextState.sport?.id === 'baseball' && (
+    !BASEBALL_NEW_GAME_CREATION_ENABLED || isLegacyBaseballGame(nextState) ||
+    nextState.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||
+    nextState.sportGameState?.sportId !== 'baseball' || !nextState.eventStream
+  )) throw new Error('New Baseball games require the available event setup. Existing games remain saved.')
   const manifest = migrateLegacyGameStorage(ownerId)
   const snapshot = snapshotParkingStorage(manifest)
 
