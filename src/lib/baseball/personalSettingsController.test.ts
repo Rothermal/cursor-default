@@ -14,11 +14,13 @@ function fixture() {
   let cloud: ReturnType<typeof record> | null = null
   let offline = false
   let missingCapability = false
+  let failure: { code: string; message: string } | null = null
   let pause: Promise<void> | null = null
   let pauseName: string | undefined
   const rpc = vi.fn(async (name: string, args?: Record<string, unknown>) => {
     if (pause && (!pauseName || name === pauseName)) { const held = pause; pause = null; await held }
     if (offline) throw Error('Offline')
+    if (failure) return { data: null, error: failure }
     if (name === 'get_baseball_personal_settings_capabilities') return missingCapability
       ? { data: null, error: { code: 'PGRST202', message: 'Migration 080 is required.' } }
       : { data: BASEBALL_PERSONAL_SETTINGS_CAPABILITIES, error: null }
@@ -32,6 +34,7 @@ function fixture() {
     cloud: (next: ReturnType<typeof record> | null) => { cloud = next },
     offline: (value: boolean) => { offline = value },
     missing: (value: boolean) => { missingCapability = value },
+    fail: (value: typeof failure) => { failure = value },
     hold: (name?: string) => { pauseName = name; let release!: () => void; pause = new Promise<void>(resolve => { release = resolve }); return release },
     saves: () => rpc.mock.calls.filter(([name]) => name === 'save_baseball_user_settings_revisioned'),
     cache: (user = AGGREGATE_USER) => JSON.parse(rows.get(sportSettingsCacheKey({ kind: 'user', userId: user }, 'baseball'))!),
@@ -41,6 +44,65 @@ beforeEach(() => setCurrentAuthUserId(AGGREGATE_USER))
 afterEach(resetCurrentAuthUserIdForTests)
 
 describe('Baseball account-scoped personal settings controller', () => {
+  it('exposes a valid synced account cache after an offline reload without writes or a fabricated sync', async () => {
+    const f = fixture(), online = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    f.cloud(record(1, 6)); await online.refresh(); online.dispose()
+    const cacheBefore = f.cache(), writesBefore = f.storage.setItem.mock.calls.length
+    f.offline(true)
+    const reloaded = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    expect(reloaded.getState().sync.status).toBe('checking')
+    expect(await reloaded.refresh()).toBe(false)
+    expect(reloaded.getState()).toMatchObject({ settings: settings(6), sync: { status: 'cached', revision: 1, lastSyncedAt: record().updatedAt, conflict: null } })
+    expect(reloaded.getState().sync.error).not.toBeNull()
+    expect(f.storage.setItem).toHaveBeenCalledTimes(writesBefore)
+    expect(f.cache()).toEqual(cacheBefore); expect(f.saves()).toHaveLength(0)
+    f.offline(false); f.cloud(record(2, 9)); expect(await reloaded.refresh()).toBe(true)
+    expect(reloaded.getState()).toMatchObject({ settings: settings(9), sync: { status: 'synced', revision: 2, error: null } })
+  })
+  it('also recognizes Supabase resolved fetch failures without treating database errors as offline', async () => {
+    const f = fixture(), controller = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    f.cloud(record(1, 6)); await controller.refresh()
+    f.fail({ code: '', message: 'TypeError: Failed to fetch' })
+    await controller.refresh(); expect(controller.getState().sync.status).toBe('cached')
+    f.fail({ code: 'XX000', message: 'Network request failed inside database function' })
+    await controller.refresh(); expect(controller.getState().sync.status).toBe('error')
+  })
+  it('keeps no-cache, corrupt-cache and another-account offline reads blocked', async () => {
+    const f = fixture(); f.offline(true)
+    const empty = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    await empty.refresh(); expect(empty.getState().sync.status).toBe('error'); empty.dispose()
+    f.offline(false)
+    const online = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    f.cloud(record(1, 6)); await online.refresh(); online.dispose(); f.offline(true)
+    setCurrentAuthUserId('other')
+    const other = createBaseballPersonalSettingsController('other', f.options)
+    await other.refresh(); expect(other.getState().sync.status).toBe('error')
+    expect(other.getState().settings).toEqual(defaultBaseballPersonalSettings())
+    setCurrentAuthUserId(AGGREGATE_USER)
+    f.rows.set(sportSettingsCacheKey({ kind: 'user', userId: AGGREGATE_USER }, 'baseball'), JSON.stringify({ ...f.cache(), settings: { extra: true } }))
+    const corrupt = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    await corrupt.refresh(); expect(corrupt.getState().sync.status).toBe('error')
+    expect(corrupt.getState().settings).toEqual(defaultBaseballPersonalSettings())
+  })
+  it.each(['backend', 'access', 'invalid'])('does not offer cached rules after a %s failure', async kind => {
+    const f = fixture(), controller = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    f.cloud(record(1, 6)); await controller.refresh()
+    if (kind === 'backend') f.missing(true)
+    else if (kind === 'access') f.fail({ code: '42501', message: 'Permission denied' })
+    else f.cloud({ ...record(2, 9), settings: { extra: true } as never })
+    await controller.refresh()
+    expect(controller.getState().sync.status).toBe(kind === 'backend' ? 'backend_update_required' : 'error')
+    expect(controller.getState().settings).toEqual(settings(6))
+  })
+  it('does not relabel a known settings conflict as a usable synced cache after a network failure', async () => {
+    const f = fixture(), controller = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
+    f.cloud(record(1, 6)); await controller.refresh(); f.offline(true); await controller.save(settings(8), 1)
+    f.offline(false); f.cloud(record(2, 9)); await controller.refresh()
+    expect(controller.getState().sync.conflict).not.toBeNull()
+    f.offline(true); await controller.refresh()
+    expect(controller.getState().sync.status).not.toBe('cached')
+    expect(controller.getState().sync.conflict).toMatchObject({ device: settings(8), cloud: settings(9) })
+  })
   it('opening and refreshing missing defaults never creates a row or pending edit', async () => {
     const f = fixture(), controller = createBaseballPersonalSettingsController(AGGREGATE_USER, f.options)
     expect(f.rpc).not.toHaveBeenCalled()

@@ -150,6 +150,41 @@ Repository lint: **0 errors / 3 existing Fast Refresh warnings**. Review control
 The unchanged SQL was not rerun for this UI/client-only integration;
 7C1's separately labelled disposable PostgreSQL evidence above still applies.
 
+## PR Review Follow-Up: Offline Defaults
+
+Date: 2026-10-23. The [PR #504 finding](https://github.com/Rothermal/cursor-default/pull/504#issuecomment-6377334799)
+was valid: a failed network read retained synced personal rules but reported an
+error state that prevented fresh setup from using them. Two focused tests failed
+before the fix.
+
+- Only a network-only refresh failure with a validated, revisioned, non-pending
+  cache for the current account may report `cached`. Setup visibly identifies the
+  saved device copy; Settings does not label it synced. No write or sync timestamp
+  is fabricated. Online refresh still replaces it with the current cloud value.
+- Missing/corrupt/other-account caches, missing backend support, access failures,
+  malformed responses and known conflicts cannot use this fallback. A coded
+  database error is not a network failure even if its message mentions networking.
+- Pending edits retain their existing reconciliation path. Setup explicitly rejects
+  a retained conflict after a failed refresh. Later refreshes do not overwrite match
+  edits. Sibling sports, team defaults, SQL and release gates are unchanged.
+
+Observed follow-up gates: **331 files / 3,314 tests passed**; focused controller,
+transport and feature-client coverage passed **3 files / 71 tests**, including
+**7 added tests**. TypeScript and the configured Vite/PWA build passed:
+**2,419 modules / 15 precache entries**, app chunk **3,021,118 bytes (96.0%)**,
+**124,610 bytes** below the unchanged 3 MiB per-file cap. The existing route-splitting
+follow-up remains necessary. Repository lint passed with **0 errors / 3 existing
+Fast Refresh warnings**; **22 review-control tests** passed.
+
+Real-component synthetic Chromium passed **10 focused offline/failure scenarios**,
+including full new-game commits from saved six-inning defaults at narrow Light,
+narrow Dark and desktop Dark sizes, using local unlinked players without cloud
+writes. Missing/corrupt caches, backend/access/payload failures and retained
+conflicts remained blocked. The original **12 views / 15 scenarios** also passed
+again. Screenshots were inspected; no horizontal overflow or page errors occurred.
+These are simulated auth/Supabase/browser checks, not live offline, RLS, physical
+mobile or installed-PWA signoff. The unchanged SQL was not rerun.
+
 ## Pending Evidence
 
 - Live own-account/cross-account checks after owner-reported application of 080.

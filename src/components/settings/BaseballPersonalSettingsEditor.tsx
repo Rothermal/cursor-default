@@ -28,7 +28,7 @@ export default function BaseballPersonalSettingsEditor({ personal }: { personal:
   }
   return <section className="space-y-3 border-y border-line py-4 text-content">
     <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Personal game defaults</h3><button type="button" title="Refresh personal defaults" aria-label="Refresh personal defaults" className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-line" disabled={busy} onClick={() => void personal.refresh()}><RefreshCw size={17} className={busy ? 'animate-spin' : ''} /></button></div>
-    <p role="status" className="text-xs text-content-muted">{personal.sync.status.replace(/_/g, ' ')}{dirty ? ' · Unsaved changes' : ''}</p>
+    <p role="status" className="text-xs text-content-muted">{personal.sync.status === 'cached' ? 'Saved copy on this device' : personal.sync.status.replace(/_/g, ' ')}{dirty ? ' · Unsaved changes' : ''}</p>
     {personal.sync.error && <p role="alert" className="text-sm text-danger-content">{personal.sync.error}</p>}
     {personal.sync.conflict && <div role="alert" className="space-y-2 border border-warning-line bg-warning rounded-md p-3 text-warning-content"><p className="text-sm">Personal defaults changed in the cloud. Choose which saved version to keep.</p><div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="btn-secondary" onClick={() => void choose(true)}>Use Cloud</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => void choose(false)}>Keep This Device</button></div></div>}
     <BaseballRulesDefaultsFields value={draft} onChange={setDraft} disabled={busy || Boolean(personal.sync.conflict)} />

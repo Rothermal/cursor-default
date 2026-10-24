@@ -566,8 +566,10 @@ binding, without rewriting old setups. Signed-out/offline unlinked play still wo
 7C2 delivery: a Baseball-only React adapter owns controller subscription/disposal
 per synchronous auth generation and keeps sibling sport hooks unchanged. Personal
 and team editors share the bounded rules fields. Fresh personal setup waits for
-settled defaults; a failed or missing-feature read offers an explicit match-only
-built-in fallback, never a silent account/team crossover. Team prefill waits for
+settled defaults. A network-only read failure may use a validated last-synced copy
+for the same account, with a visible saved-copy note and no fabricated sync time.
+No-cache, unreadable, missing-feature, access and conflict failures retain explicit
+retry/match-only built-in choices, never a silent account/team crossover. Team prefill waits for
 the matching team, roster and settings; unreadable settings now require retry.
 Later settings refreshes cannot replace match edits. Capture defaults are device-only
 and seed the fresh candidate, not an effect on current or historical games.

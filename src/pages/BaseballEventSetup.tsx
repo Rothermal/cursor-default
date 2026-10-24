@@ -125,13 +125,14 @@ function BaseballSetupForm() {
 
   useEffect(() => { lifetime.current = true; setBaseballSettingsPageActive(true); return () => { lifetime.current = false; setBaseballSettingsPageActive(false) } }, [setBaseballSettingsPageActive])
   useEffect(() => {
-    if (teamId || personalInitialized || !['local', 'synced', 'pending'].includes(personal.sync.status)) return
+    if (teamId || personalInitialized || personal.sync.conflict || !['local', 'synced', 'pending', 'cached'].includes(personal.sync.status)) return
     const resolved = resolveBaseballSettingsHierarchy({ authority: 'personal', personalSettings: personal.settings })
     if (!resolved.ok) return
     setDraft(current => setBaseballDraftRules(current, resolved.rules))
     setPersonalInitialized(true)
-    setDefaultsNote(personal.sync.status === 'pending' ? 'Using this account\'s pending personal defaults.' : 'Personal game defaults')
-  }, [teamId, personalInitialized, personal.settings, personal.sync.status])
+    setDefaultsNote(personal.sync.status === 'cached' ? 'Personal defaults could not be refreshed. Using this account\'s saved copy on this device.'
+      : personal.sync.status === 'pending' ? 'Using this account\'s pending personal defaults.' : 'Personal game defaults')
+  }, [teamId, personalInitialized, personal.settings, personal.sync.status, personal.sync.conflict])
 
   useEffect(() => {
     if (teamId || !user || !supabase) return
