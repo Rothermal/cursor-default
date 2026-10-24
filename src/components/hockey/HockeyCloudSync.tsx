@@ -2,7 +2,7 @@ import { hockeyCloudEnableAvailability } from '../../lib/hockey/enableCloudSync'
 import type { GameState } from '../../types'
 import { EventCloudMenuSection, EventCloudSyncAlerts } from '../game-events/EventCloudSync'
 
-/** Game menu section: sync status, and Enable cloud sync for a device game (HKY-5B, plan §7 Q4). */
+/** Footer controls: sync status and Enable cloud sync for a device game (HKY-5B). */
 export function HockeyCloudMenuSection({ state, onDone }: { state: GameState; onDone: () => void }) {
   return <EventCloudMenuSection state={state} onDone={onDone} availability={hockeyCloudEnableAvailability} />
 }

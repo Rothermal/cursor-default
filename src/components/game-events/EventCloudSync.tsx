@@ -35,8 +35,13 @@ function eventCloudStatusLine(state: GameState): string {
     case 'offline': return 'Offline. Events sync when you reconnect.'
     case 'error': return state.cloudSync.lastError ?? 'Cloud sync needs attention.'
     case 'synced': return 'Synced to the cloud.'
-    default: return state.cloudSync.gameId ? 'Synced to the cloud.' : 'Waiting to sync.'
+    default: return 'Waiting to sync.'
   }
+}
+
+/** Routine status stays below the surface; blocking recovery alerts remain separate. */
+export function EventCloudStatus({ state }: { state: GameState }) {
+  return <p role="status" aria-label="Game sync status" className="break-words border-t border-line py-3 text-xs text-content-muted [overflow-wrap:anywhere]">{eventCloudStatusLine(state)}</p>
 }
 
 /**
@@ -67,7 +72,7 @@ export function EventCloudMenuSection({ state, onDone, availability: availabilit
 
   return (
     <section className="space-y-2 border-t border-line pt-3" aria-label="Cloud sync">
-      <p className="text-sm text-content-muted">{eventCloudStatusLine(state)}</p>
+      <EventCloudStatus state={state} />
       {availability.offer ? (
         <button type="button" className="btn-secondary w-full" disabled={busy} onClick={() => setConfirmOpen(true)}>
           {busy ? 'Enabling cloud sync…' : 'Enable cloud sync'}

@@ -1,8 +1,10 @@
 # Plan: Shared Tracker UI and Legacy Retirement
 
 Status: owner-approved direction (2026-10-17). TUI-1 layout/action pass merged in
-#491; its Basketball event-only creation and read-only legacy cutover are implemented
-for review (2026-10-24). See the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md)
+#491; its Basketball event-only creation and read-only legacy cutover merged in
+#506 (2026-10-24). TUI-2 Soccer/Hockey layout alignment is implemented for review;
+Hockey legacy retirement remains the next authority slice. See its
+[alignment record](REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md), the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md)
 and [cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md). No migration, game
 conversion or access expansion; owner-only deployed checks remain pending.
 
@@ -268,7 +270,7 @@ D05-D07 and G03-G04. Those checks remain pending, not passed or permanently waiv
 Record the focused cutover smoke and pending checks against the deployed candidate;
 authorization, data-loss and other concrete correctness failures remain blockers.
 No migration, access widening or creation-policy change occurred in the layout/action
-pass. The authority cutover is now implemented for review in the second TUI-1 PR.
+pass. The authority cutover merged in #506, the second TUI-1 PR.
 
 ## 7. Delivery Proposal
 
@@ -293,7 +295,7 @@ Source assessment identified two separate review surfaces within TUI-1:
   are in the [layout record](REGRESSION_TUI_1_BASKETBALL_LAYOUT.md). Lineup Save/Cancel
   preserve the actual launcher and clock-disclosure state, including the late-player
   handoff; no navigation-only gameplay events are added.
-- **Authority cutover (implemented for review):** event-only new-game creation and summary-only
+- **Authority cutover (merged #506):** event-only new-game creation and summary-only
   legacy routing, including local source review/export/safe sync, capability
   recovery, stale drafts and per-sport Summary/Game Info guards. This reaches setup,
   persistence and shared cloud-open handlers; combining it with the layout move
@@ -302,7 +304,25 @@ Source assessment identified two separate review surfaces within TUI-1:
   [cutover record](REGRESSION_TUI_1_BASKETBALL_CUTOVER.md); deployed checks remain separate.
 
 This is a two-PR review boundary, not additional rollout toggles or a new four-phase
-program. TUI-2 remains after completion of the Basketball cutover.
+program. TUI-1 implementation is complete; owner deployed checks remain separate.
+
+### TUI-2 Implementation Boundary
+
+- **Soccer/Hockey layout alignment (implemented for review):** shared named-side
+  buttons, modal chrome using the existing focus hook, and routine footer status;
+  compact Soccer navigation/clock with capture modes below the pitch; Hockey
+  capture context, collapsed family/team/period filters, compact strength/count
+  and an explicit penalty-details sheet. Capture, clock, faceoff, goalie, penalty,
+  correction and cloud commands remain sport-owned. See the
+  [alignment record](REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md).
+- **Hockey authority retirement (next):** separately apply the summary-only legacy
+  contract across routes, setup continuation, reducer/summary/finalization guards,
+  metadata and cloud opens, with local-binding/debt/export preservation tests.
+  This alignment pass does not change any sport's creation or legacy authority.
+
+These are two review surfaces, not additional rollout switches. Combining the two
+sport layouts keeps the UI changes together; isolating retirement keeps its shared
+data-preservation review readable. Football still awaits its event foundations.
 
 Before TUI-1 implementation, map every existing action to a destination. Include
 quick fouls/free throws, linked assists/rebounds, direct individual/team stats,
@@ -339,7 +359,7 @@ must identify superseded expectations instead of retroactively marking rows pass
 | Clock/authority | Supported Start/Pause/Set Clock and lifecycle/lineup guards remain unchanged; tabs/menus/filters do not emit events or mutate fingerprints; terminal/viewer/recovery paths stay read-only |
 | Summary/destinations | Local and authorized cloud legacy summaries still show recorded/resolved stats; existing Basketball canonical/legacy aggregate contributions do not collide or disappear |
 | Layout/accessibility | Actual screenshots/interactions at 390px and 1280px, Light/Dark, long names, empty/opponent rosters, dense penalties/bonus, running/paused/clockless, errors/conflicts; surface visible in healthy phone first viewport, no overlap/overflow, usable focus and touch targets |
-| Sibling isolation | TUI-1 retirement is Basketball-only; authorized Hockey/Football/Baseball legacy capture, correction, primary selection and finalization remain usable until their own cutovers; event routing and mixed-sport parking/recovery stay correct; Football never routes to a missing tracker |
+| Sibling isolation | TUI-1 retires Basketball; Baseball's #505 retirement remains intact. Authorized Hockey/Football legacy capture, correction, primary selection and finalization remain usable until their own cutovers; event routing and mixed-sport parking/recovery stay correct; Football never routes to a missing tracker |
 | Release/rollback | `released` ignores obsolete preview preferences; `internal` blocks every new production Basketball game without Legacy fallback, while existing event access and exact committed pre-start continuation remain usable |
 | Deployment | Owner-approved post-deployment validation: fresh event game, old unfinished local Summary with exclusion notice/export, cloud sync/review and refreshed installed-PWA checks reported separately from desktop fixtures and unit/build results; broader gate stays pending until its live evidence is recorded |
 
