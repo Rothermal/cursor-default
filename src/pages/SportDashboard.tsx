@@ -18,7 +18,6 @@ import {
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import {
-  hockeyNewGamesUseEventTracker,
   getSportAvailabilityPolicy,
 } from '../lib/sportAvailability'
 import { gameSideDisplayName } from '../lib/display'
@@ -57,7 +56,7 @@ export default function SportDashboard() {
   const { sportId } = useParams()
   const navigate = useNavigate()
   const { isConfigured, user } = useAuth()
-  const { isSportEnabled, hockeyEventTrackerEnabled } = useSettings()
+  const { isSportEnabled } = useSettings()
   const {
     state,
     activeLocalGameId,
@@ -142,9 +141,8 @@ export default function SportDashboard() {
       navigate('/setup?sport=basketball')
       return
     }
-    // HKY-6C: new Hockey games use the event tracker (before release, only with the device
-    // toggle on). Its setup page replaces the active game only when Start is pressed.
-    if (sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)) {
+    // Always reach event setup, including its creation-only rollback notice.
+    if (sport.id === 'hockey') {
       navigate('/setup?sport=hockey&events=1')
       return
     }

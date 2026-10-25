@@ -36,7 +36,7 @@ beforeEach(() => {
   harness.ref.current = harness.state; harness.flush.mockResolvedValue({ ok: true })
 })
 
-describe.each(['baseball', 'basketball'])('legacy %s raw finalization refusal', sportId => {
+describe.each(['baseball', 'basketball', 'hockey'])('legacy %s raw finalization refusal', sportId => {
   it.each(['owner', 'admin', 'scorer', 'viewer'])('refuses before sync/write/reset for %s', async role => {
     harness.role = role
     harness.state = game(sportId)

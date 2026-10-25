@@ -16,6 +16,7 @@ import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents
 import { normalizeSportGameState } from './sportGameState/state'
 import { BASEBALL_NEW_GAME_CREATION_ENABLED, isLegacyBaseballGame } from './baseball/releasePolicy'
 import { retiredGameAuthorityForHydration, isLegacyGameForSport, isRetiredLegacyGame } from './legacyGameRetirement'
+import { getHockeyEventCreationPolicy } from './sportAvailability'
 import {
   eventCloudPolicyForState,
   normalizeEventCloudPolicyState,
@@ -844,6 +845,11 @@ export function commitGameSetupState(
   /** Optional atomic metadata persistence; it must restore its own keys if it throws. */
   beforeCommit?: (localGameId: string) => void
 ): CommitGameSetupResult {
+  if (nextState.sport?.id === 'hockey' && (
+    !getHockeyEventCreationPolicy(false).canCreateNewEventGame ||
+    nextState.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||
+    nextState.sportGameState?.sportId !== 'hockey' || !nextState.eventStream
+  )) throw new Error('New Hockey games require the available event setup. Existing games remain saved.')
   if (nextState.sport?.id === 'baseball' && (
     !BASEBALL_NEW_GAME_CREATION_ENABLED || isLegacyBaseballGame(nextState) ||
     nextState.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||

@@ -27,21 +27,6 @@ describe('HKY-6C hockeyEvent release stage', () => {
     expect(hockeyNewGamesUseEventTracker(true, { development: false })).toBe(true)
   })
 
-  it('rolls back to opt_in: the device toggle decides again', () => {
-    const optIn = { development: false, releaseStage: 'opt_in' as const }
-    expect(getHockeyEventCreationPolicy(false, optIn)).toEqual({
-      releaseStage: 'opt_in',
-      preferenceAvailable: true,
-      canCreateNewEventGame: false,
-      canAccessExistingEventGames: true,
-    })
-    expect(getHockeyEventCreationPolicy(true, optIn).canCreateNewEventGame).toBe(true)
-    expect(hockeyNewGamesUseEventTracker(false, optIn)).toBe(false)
-    expect(hockeyNewGamesUseEventTracker(true, optIn)).toBe(true)
-    // Development keeps the preview but still follows the toggle for where new games go.
-    expect(hockeyNewGamesUseEventTracker(false, { development: true, releaseStage: 'opt_in' })).toBe(false)
-  })
-
   it('rolls back to internal by hiding the toggle and ignoring a stored opt-in', () => {
     const internal = getHockeyEventCreationPolicy(true, { development: false, releaseStage: 'internal' })
     expect(internal.preferenceAvailable).toBe(false)
@@ -50,9 +35,9 @@ describe('HKY-6C hockeyEvent release stage', () => {
     expect(hockeyNewGamesUseEventTracker(true, { development: false, releaseStage: 'internal' })).toBe(false)
   })
 
-  it('keeps the development preview without the toggle', () => {
+  it('does not bypass creation rollback in development', () => {
     expect(getHockeyEventCreationPolicy(false, { development: true }).canCreateNewEventGame).toBe(true)
-    expect(getHockeyEventCreationPolicy(false, { development: true, releaseStage: 'internal' }).canCreateNewEventGame).toBe(true)
+    expect(getHockeyEventCreationPolicy(false, { development: true, releaseStage: 'internal' }).canCreateNewEventGame).toBe(false)
   })
 
   it('stores the device settings default-off and fails closed on malformed values', () => {
@@ -74,7 +59,7 @@ describe('HKY-2E and HKY-6C route gates', () => {
     expect(setupRoute).toContain('gameSetupRouteTarget({')
     expect(setupRoute).toContain('<HockeyGameSetup />')
     expect(source('src/lib/gameSetupRoute.ts'))
-      .toContain("if (sport === 'hockey' && (eventsRequested || hockeyNewGamesUseEvents)) return 'hockey_events'")
+      .toContain("if (sport === 'hockey') return 'hockey_events'")
     expect(source('src/pages/HockeyGameSetup.tsx'))
       .toContain('if (!getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame)')
   })
@@ -88,14 +73,14 @@ describe('HKY-2E and HKY-6C route gates', () => {
   })
 
   it('sends new Hockey games from every entry point to the event setup once released', () => {
-    expect(source('src/pages/SportDashboard.tsx')).toContain("sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)")
+    expect(source('src/pages/SportDashboard.tsx')).toContain("if (sport.id === 'hockey')")
     const teamInfo = source('src/pages/TeamInfo.tsx')
-    expect(teamInfo).toContain("sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)")
+    expect(teamInfo).toContain("if (sport.id === 'hockey')")
     expect(teamInfo).toContain('navigate(`${gameSetupPath(team.id, sport.id)}&events=1`)')
     // A team-only /setup link resolves the team's sport, then hands Hockey to the event setup.
     const gameSetup = source('src/pages/GameSetup.tsx')
-    expect(gameSetup).toContain("requestedSport.id === 'hockey' && requestedTeamId && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)")
-    expect(gameSetup.indexOf("requestedSport.id === 'hockey' && requestedTeamId")).toBeLessThan(gameSetup.indexOf('if (!startNewGame(requestedSport))'))
+    expect(gameSetup).toContain("if (requestedSport.id === 'hockey')")
+    expect(gameSetup.indexOf("requestedSport.id === 'hockey'")).toBeLessThan(gameSetup.indexOf('if (!startNewGame(requestedSport))'))
   })
 
   it('seeds the rink orientation default only into the new game\'s display preference', () => {
@@ -109,11 +94,8 @@ describe('HKY-2E and HKY-6C route gates', () => {
       .sort()
     expect(consumers).toEqual([
       'src/App.tsx',
-      'src/components/settings/HockeySettings.tsx',
-      'src/pages/GameSetup.tsx',
+      'src/lib/gameParking.ts',
       'src/pages/HockeyGameSetup.tsx',
-      'src/pages/SportDashboard.tsx',
-      'src/pages/TeamInfo.tsx',
     ])
   })
 })

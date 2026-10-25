@@ -125,7 +125,7 @@ describe('TUI-1 Basketball legacy retirement', () => {
     expect(summary).toContain('if (legacyReadOnly || !correcting')
     expect(summary).toContain('if (legacyReadOnly || !gameId || !supabase) return')
     const games = readFileSync('src/pages/Games.tsx', 'utf8')
-    expect(games.match(/sportId === 'baseball' \|\| sportId === 'basketball'/g)).toHaveLength(2)
+    expect(games.match(/if \(isRetiredLegacySport\(sportId\)\)/g)).toHaveLength(2)
     const sibling = { ...legacy(), sport: sports.find(sport => sport.id === 'football')! }
     expect(gameReducer(sibling, { type: 'INCREMENT_STAT', playerId: 'p', statId: 'ast' }).players[0].stats.ast).toBe(3)
   })

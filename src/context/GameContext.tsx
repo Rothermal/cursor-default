@@ -592,7 +592,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const startNewGame = useCallback(
     (sport: SportConfig) => {
-      if (sport.id === 'baseball' || sport.id === 'basketball') {
+      if (sport.id === 'baseball' || sport.id === 'basketball' || sport.id === 'hockey') {
         setParkingError(`Start ${sport.name} from its event setup. Existing games remain saved.`)
         return false
       }

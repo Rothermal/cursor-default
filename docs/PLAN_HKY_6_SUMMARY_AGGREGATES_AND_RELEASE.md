@@ -16,6 +16,13 @@ aggregate games, including unfinished ones, become read-only summaries, not a
 parallel tracker; preserve their stats and unsynced data. Historical implementation
 and regression evidence below remains unchanged. New Hockey games already use events.
 
+Cutover follow-up (2026-10-25, implemented for review): the
+[TUI-2 record](REGRESSION_TUI_2_HOCKEY_CUTOVER.md) owns summary-only legacy retirement,
+atomic event setup and creation-only rollback to `internal`. It supersedes the old
+`opt_in` rollback/toggle and continued generic-grid expectations below, not their
+historical evidence or the remaining live/broader-rollout checks. No legacy totals
+are added to Hockey's event-based aggregates.
+
 ---
 
 ## 1. Goal

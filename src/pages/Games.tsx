@@ -35,7 +35,7 @@ import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBloc
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { hasUnsyncedParkedBindingForCloudGame, listParkedGameRecords } from '../lib/gameParking'
 import { legacyBaseballBinding } from '../lib/baseball/releasePolicy'
-import { isRetiredLegacyGame, legacyRetiredGameBinding } from '../lib/legacyGameRetirement'
+import { isRetiredLegacyGame, legacyRetiredGameBinding, isRetiredLegacySport } from '../lib/legacyGameRetirement'
 import { sports } from '../config/sports'
 import { captureAuthIdentity, isCurrentAuthIdentity, isCurrentAuthUser } from '../lib/authIdentity'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
@@ -751,7 +751,7 @@ export default function Games() {
     const canTrackCurrentGame = game.team_id
       ? canTrackGames(teamRole)
       : game.created_by === userId
-    if (game.status !== 'final' && !canTrackCurrentGame && gameSportId !== 'baseball' && gameSportId !== 'basketball') {
+    if (game.status !== 'final' && !canTrackCurrentGame && !isRetiredLegacySport(gameSportId)) {
       if (game.team_id) navigate(gameInfoPath(game.id, game.team_id))
       return
     }
@@ -765,9 +765,9 @@ export default function Games() {
         }
       } catch (caught) { setError(caught instanceof Error ? caught.message : 'Local history could not load.'); return }
     }
-    if (gameSportId === 'basketball') {
+    if (gameSportId === 'basketball' || gameSportId === 'hockey') {
       try {
-        const binding = legacyRetiredGameBinding(localOpenStateRef.current.state, listParkedGameRecords(userId), game.id, 'basketball')
+        const binding = legacyRetiredGameBinding(localOpenStateRef.current.state, listParkedGameRecords(userId), game.id, gameSportId)
         if (binding) {
           if (binding.kind === 'parked' && (!prepareActiveGameMutation('resume_commit') || !resumeParkedGame(binding.localGameId))) return
           navigate('/summary')
@@ -845,11 +845,11 @@ export default function Games() {
     const identity = userId ? captureAuthIdentity(userId) : null
     const current = () => request === editRequestRef.current && Boolean(identity && isCurrentAuthIdentity(identity)) && !openIsStale(userId ?? '')
     const sportId = game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
-    if (sportId === 'baseball' || sportId === 'basketball') {
+    if (isRetiredLegacySport(sportId)) {
       try {
-        const authority = await (sportId === 'baseball' ? loadBaseballCloudDataAuthority : loadBasketballCloudDataAuthority)(game.id)
+        const authority = await (sportId === 'baseball' ? loadBaseballCloudDataAuthority : sportId === 'hockey' ? loadHockeyCloudDataAuthority : loadBasketballCloudDataAuthority)(game.id)
         if (!current()) return
-        if (authority !== 'sport_events') { setError(`Legacy ${sportId === 'baseball' ? 'Baseball' : 'Basketball'} games are read-only.`); return }
+        if (authority !== 'sport_events') { setError(`Legacy ${sports.find(sport => sport.id === sportId)?.name} games are read-only.`); return }
       } catch (caught) { if (current()) setError(caught instanceof Error ? caught.message : 'Game authority could not load.'); return }
     }
     setEditingGameId(game.id)
@@ -876,11 +876,11 @@ export default function Games() {
       !editingOpponentName.trim()
     ) return
     const sportId = game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
-    if (sportId === 'baseball' || sportId === 'basketball') {
+    if (isRetiredLegacySport(sportId)) {
       try {
-        const authority = await (sportId === 'baseball' ? loadBaseballCloudDataAuthority : loadBasketballCloudDataAuthority)(game.id)
+        const authority = await (sportId === 'baseball' ? loadBaseballCloudDataAuthority : sportId === 'hockey' ? loadHockeyCloudDataAuthority : loadBasketballCloudDataAuthority)(game.id)
         if (!current()) return
-        if (authority !== 'sport_events') { setError(`Legacy ${sportId === 'baseball' ? 'Baseball' : 'Basketball'} games are read-only.`); cancelEditOpponentName(); return }
+        if (authority !== 'sport_events') { setError(`Legacy ${sports.find(sport => sport.id === sportId)?.name} games are read-only.`); cancelEditOpponentName(); return }
       } catch (caught) { if (current()) setError(caught instanceof Error ? caught.message : 'Game authority could not load.'); return }
     }
     setError(null)
@@ -1058,7 +1058,7 @@ export default function Games() {
                 ? 'Loading...'
                 : game.status === 'final' || (state.cloudSync.gameId === game.id && isRetiredLegacyGame(state)) || parkedGames.some(saved => saved.cloudGameId === game.id && saved.legacyReadOnly)
                   ? 'View Summary'
-                  : sport?.id === 'basketball' || sport?.id === 'baseball'
+                  : isRetiredLegacySport(sport?.id)
                     ? 'Open saved game'
                   : canTrackGames(teamRole)
                     ? 'Resume Game'

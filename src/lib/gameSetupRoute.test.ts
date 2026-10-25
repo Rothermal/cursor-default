@@ -20,20 +20,20 @@ describe('gameSetupRouteTarget', () => {
     expect(gameSetupRouteTarget({ ...link, teamSportId: 'basketball' })).toBe('generic')
     // No active sport can stand in for unreadable team authority.
     expect(gameSetupRouteTarget({ ...link, teamSportId: null })).toBe('unavailable_team')
-    // Rolled back to opt_in with the toggle off: the generic setup starts the legacy game.
-    expect(gameSetupRouteTarget({ ...link, teamSportId: 'hockey', hockeyNewGamesUseEvents: false })).toBe('generic')
+    // Creation rollback still reaches the event setup notice, never the aggregate page.
+    expect(gameSetupRouteTarget({ ...link, teamSportId: 'hockey', hockeyNewGamesUseEvents: false })).toBe('hockey_events')
   })
 
   it('keeps explicit sport links and active-game resumes unchanged', () => {
     expect(gameSetupRouteTarget({ ...base, requestedSport: 'hockey', teamId: 'team-1', teamSportId: 'hockey', activeSportId: 'soccer' }))
       .toBe('hockey_events')
-    expect(gameSetupRouteTarget({ ...base, requestedSport: 'hockey', hockeyNewGamesUseEvents: false })).toBe('generic')
+    expect(gameSetupRouteTarget({ ...base, requestedSport: 'hockey', hockeyNewGamesUseEvents: false })).toBe('hockey_events')
     expect(gameSetupRouteTarget({ ...base, requestedSport: 'hockey', eventsRequested: true, hockeyNewGamesUseEvents: false }))
       .toBe('hockey_events')
     expect(gameSetupRouteTarget({ ...base, requestedSport: 'soccer', activeSportId: 'hockey' })).toBe('soccer')
     expect(gameSetupRouteTarget({ ...base, requestedSport: 'baseball', eventsRequested: true })).toBe('baseball_events')
     expect(gameSetupRouteTarget({ ...base, requestedSport: 'baseball' })).toBe('baseball_events')
-    // Plain /setup resumes the mounted sport: Soccer setup, or the generic setup for legacy Hockey.
+    // Plain Hockey continuation is intercepted by App before mounting the generic page.
     expect(gameSetupRouteTarget({ ...base, activeSportId: 'soccer' })).toBe('soccer')
     expect(gameSetupRouteTarget({ ...base, activeSportId: 'hockey' })).toBe('generic')
     expect(gameSetupRouteTarget({ ...base, teamId: 'team-1', activeSportId: 'hockey' })).toBe('resolve_team_sport')

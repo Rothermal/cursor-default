@@ -69,9 +69,9 @@ export default function HockeyGameSetup() {
     return (
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-3">
         <p className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">
-          Hockey event tracking is not available in this build yet. Turn on the new event tracker in Hockey settings to try it on this device.
+          New Hockey games are unavailable in this build. Existing games, summaries and exports remain available.
         </p>
-        <Link to="/settings/sports/hockey" className="btn-secondary inline-block">Hockey settings</Link>
+        <Link to="/sport/hockey" className="btn-secondary inline-block">Back to Hockey</Link>
       </main>
     )
   }
@@ -79,7 +79,7 @@ export default function HockeyGameSetup() {
 }
 
 function HockeySetupForm() {
-  const { state, dispatch, prepareActiveGameMutation, startNewGame } = useGame()
+  const { state, prepareActiveGameMutation, commitGameSetup } = useGame()
   const { hockeyRinkFlippedByDefault } = useSettings()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -289,9 +289,9 @@ function HockeySetupForm() {
     }
     const hasGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0 || state.eventStream))
     if (hasGame && !prepareActiveGameMutation('new_game_commit')) return
-    if (!startNewGame(hockey)) return
     // The device's rink orientation default (HKY-6C) is display only, outside fingerprints.
-    dispatch({ type: 'HYDRATE_STATE', state: hockeyRinkFlippedByDefault ? setHockeyRinkFlipped(created.state, true) : created.state })
+    const committed = commitGameSetup(hockeyRinkFlippedByDefault ? setHockeyRinkFlipped(created.state, true) : created.state)
+    if (!committed.ok) { setError(committed.reason); return }
     navigate('/game')
   }
 

@@ -111,7 +111,7 @@ describe('BSB-7D legacy retirement and preservation', () => {
     expect(event.sportGameState?.sportId).toBe('baseball')
   })
 
-  it.each(['soccer', 'hockey', 'football'])('does not retire sibling %s aggregate behavior', id => {
+  it.each(['soccer', 'football'])('does not retire sibling %s aggregate behavior', id => {
     const state = { ...legacy(), sport: sports.find(sport => sport.id === id)! }
     expect(isLegacyBaseballGame(state)).toBe(false)
     expect(canFinalizeAggregateGame(state)).toBe(true)
