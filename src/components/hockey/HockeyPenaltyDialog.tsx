@@ -25,6 +25,7 @@ import { ActorField, Choices, Group } from './hockeyFields'
 
 interface HockeyPenaltyDialogProps {
   sport: HockeySportGameState
+  defaultSide?: HockeySide
   recentOpponentLabels: string[]
   trackedLabel: string
   opponentLabel: string
@@ -66,6 +67,7 @@ const OFFENDER_KINDS: Array<{ value: HockeyOffenderKind; label: string }> = [
  */
 export default function HockeyPenaltyDialog({
   sport,
+  defaultSide = 'tracked',
   recentOpponentLabels,
   trackedLabel,
   opponentLabel,
@@ -76,7 +78,7 @@ export default function HockeyPenaltyDialog({
   const titleId = useId()
   const editing = initial !== undefined
   const [rows, setRows] = useState<PenaltyRow[]>(() =>
-    initial ? initial.penalties.map((penalty, index) => storedRow(index, penalty, sport)) : [newRow(0, 'tracked')]
+    initial ? initial.penalties.map((penalty, index) => storedRow(index, penalty, sport)) : [newRow(0, defaultSide)]
   )
   const [coincidental, setCoincidental] = useState(initial?.coincidental ?? false)
   const [error, setError] = useState<string | null>(null)

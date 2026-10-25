@@ -23,6 +23,9 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
+import TrackerSideSelector from '../components/TrackerSideSelector'
+import TrackerDialog from '../components/TrackerDialog'
+import { EventCloudStatus } from '../components/game-events/EventCloudSync'
 import SoccerField, {
   type SoccerFieldMarker,
   type SoccerFieldMarkerKind,
@@ -50,7 +53,6 @@ import SoccerShotCaptureDialog, {
 } from '../components/soccer/SoccerShotCaptureDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
-import type { GameState } from '../types'
 import type { GameEvent } from '../lib/gameEvents/types'
 import {
   endSoccerPeriod,
@@ -271,7 +273,6 @@ export default function SoccerGameTracker() {
   const segments = projection ? orderedSoccerSegments(projection.currentRules) : []
   const currentSegment = segments.find(segment => segment.id === projection?.currentPeriodId) ?? null
   const lifecycleAction = projection ? soccerLifecycleAction(projection) : { kind: 'none' as const }
-  const nextSegment = lifecycleAction.kind === 'start_period' ? lifecycleAction.segment : null
   const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
   const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
 
@@ -470,32 +471,27 @@ export default function SoccerGameTracker() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-canvas pb-8" aria-busy={isApplying}>
+    <div className="min-h-screen overflow-x-clip bg-canvas pb-8" aria-busy={isApplying}>
       {isApplying && <div className="fixed inset-0 z-[70] cursor-wait" aria-hidden="true" />}
-      <header className="bg-control text-content px-4 py-3">
-        <div className="mx-auto flex w-full min-w-0 max-w-2xl items-center gap-3">
+      <main className="mx-auto w-full min-w-0 max-w-2xl">
+      <header className="sticky top-0 z-20 border-b border-line bg-surface pt-[env(safe-area-inset-top)] text-content">
+        <div className="relative flex min-h-12 w-full min-w-0 items-center gap-1 px-3 py-1">
           <button type="button" onClick={() => navigate(sportDashboardPath('soccer'))} className="h-9 w-9 grid place-items-center rounded-md bg-surface" aria-label="Back to soccer dashboard" title="Back">
             <ChevronLeft size={20} />
           </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-bold truncate">{trackedLabel} vs {opponentLabel}</h1>
-            <p className="flex min-w-0 items-center gap-2 text-xs text-success-content">
-              <span className="truncate">{currentSegment?.label ?? (ended ? 'Match ended' : nextSegment ? `${nextSegment.label} next` : 'Periods complete')}</span>
-              <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 font-semibold">
-                {soccerCloudStatusLabel(state)}
-              </span>
-            </p>
-          </div>
+          <h1 className="sr-only">{trackedLabel} vs {opponentLabel}</h1>
+          <nav className="grid min-w-0 flex-1 grid-cols-3" aria-label="Soccer tracker views">
+            <TabButton active={mainTab === 'field'} label={shootoutActive ? 'Shootout' : 'Field'} icon={shootoutActive ? <Goal size={17} /> : <Map size={17} />} onClick={() => setMainTab('field')} />
+            <TabButton active={mainTab === 'lineup'} label="Lineup" icon={<Users size={17} />} onClick={() => setMainTab('lineup')} />
+            <TabButton active={mainTab === 'timeline'} label="Timeline" icon={<History size={17} />} onClick={() => setMainTab('timeline')} />
+          </nav>
           {!ended && (
             <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy || isApplying || cloudFinal} className="h-9 w-9 grid place-items-center rounded-md bg-surface disabled:bg-control-disabled disabled:text-content-disabled" aria-label="Match actions" title="Match actions">
               <MoreHorizontal size={21} />
             </button>
           )}
         </div>
-      </header>
-
-      <main className="mx-auto w-full min-w-0 max-w-2xl">
-        <section className="px-4 py-4 text-center border-b border-line bg-surface">
+        <section className="px-4 pb-3 pt-1 text-center" aria-label="Scoreboard">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
             <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-canvas" aria-label={`Open ${trackedLabel} scoring timeline`}>
               <p className="truncate text-xs font-semibold text-content-muted">{trackedLabel}</p>
@@ -507,7 +503,7 @@ export default function SoccerGameTracker() {
                 <span className={`h-2 w-2 rounded-full ${projection.clock.running ? 'bg-success' : 'bg-control'}`} />
               </div>
               <div className="mt-1 flex min-h-9 items-baseline justify-center gap-1">
-                <p className="text-3xl font-bold text-content tabular-nums leading-none">{clockValue.primary}</p>
+                <p className="text-3xl font-bold text-content tabular-nums leading-none" aria-label="Game clock">{clockValue.primary}</p>
                 {clockValue.overrun && <span className="text-sm font-bold text-warning-content tabular-nums">{clockValue.overrun}</span>}
               </div>
               <p className="mt-1 text-[11px] font-medium text-content-muted">{projection.clock.running ? 'Running' : 'Stopped'}</p>
@@ -569,7 +565,7 @@ export default function SoccerGameTracker() {
               </button>
             </div>
           ) : shootoutActive ? null : (
-            <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
+            <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
               <button type="button" onClick={primaryClockAction} className={`rounded-md px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2 ${projection.clock.running ? 'bg-warning' : 'bg-success'}`}>
                 {projection.clock.running ? <Pause size={19} /> : <Play size={19} />}
                 {projection.clock.running ? 'Pause Clock' : 'Start Clock'}
@@ -578,6 +574,7 @@ export default function SoccerGameTracker() {
             </div>
           )}
         </section>
+      </header>
 
         {error && <div className="mx-4 mt-4 rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</div>}
 
@@ -609,13 +606,7 @@ export default function SoccerGameTracker() {
           </div>
         )}
 
-        <nav className="grid grid-cols-3 border-b border-line bg-surface" aria-label="Soccer tracker views">
-          <TabButton active={mainTab === 'field'} label={shootoutActive ? 'Shootout' : 'Field'} icon={shootoutActive ? <Goal size={17} /> : <Map size={17} />} onClick={() => setMainTab('field')} />
-          <TabButton active={mainTab === 'lineup'} label="Lineup" icon={<Users size={17} />} onClick={() => setMainTab('lineup')} />
-          <TabButton active={mainTab === 'timeline'} label="Timeline" icon={<History size={17} />} onClick={() => setMainTab('timeline')} />
-        </nav>
-
-        <div className="px-4 py-5">
+        <div className="px-4 py-3">
           {mainTab === 'field' && shootoutActive ? (
             <div className="space-y-6">
               <SoccerShootoutWorkspace
@@ -650,19 +641,7 @@ export default function SoccerGameTracker() {
             </div>
           ) : mainTab === 'field' ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 rounded-md bg-control p-1">
-                <ModeButton active={capturePreferences.teamSide === 'tracked'} label={trackedLabel} onClick={() => setCaptureSide('tracked')} />
-                <ModeButton active={capturePreferences.teamSide === 'opponent'} label={opponentLabel} onClick={() => setCaptureSide('opponent')} />
-              </div>
-
-              <div>
-                <p className="mb-1 text-[11px] font-bold uppercase text-content-muted">Field capture</p>
-                <div className="grid grid-cols-3 rounded-md bg-control p-1">
-                  <ModeButton active={capturePreferences.captureMode === 'shot'} label="Shot" onClick={() => setCaptureMode('shot')} />
-                  <ModeButton active={capturePreferences.captureMode === 'defense'} label="Defense" onClick={() => setCaptureMode('defense')} />
-                  <ModeButton active={capturePreferences.captureMode === 'foul'} label="Foul" onClick={() => setCaptureMode('foul')} />
-                </div>
-              </div>
+              <TrackerSideSelector side={capturePreferences.teamSide} labels={{ tracked: trackedLabel, opponent: opponentLabel }} onChange={setCaptureSide} />
 
               <SoccerField
                 trackedDirection={projection.attackingDirection}
@@ -698,6 +677,14 @@ export default function SoccerGameTracker() {
                 }}
                 onCluster={restartArmed ? undefined : setClusterEventIds}
               />
+
+              <div role="group" aria-label="Field capture">
+                <div className="grid grid-cols-3 rounded-md bg-control p-1">
+                  <ModeButton active={capturePreferences.captureMode === 'shot'} label="Shot" onClick={() => setCaptureMode('shot')} />
+                  <ModeButton active={capturePreferences.captureMode === 'defense'} label="Defense" onClick={() => setCaptureMode('defense')} />
+                  <ModeButton active={capturePreferences.captureMode === 'foul'} label="Foul" onClick={() => setCaptureMode('foul')} />
+                </div>
+              </div>
 
               <div className="grid grid-cols-4 gap-2" role="group" aria-label="Quick capture">
                 <QuickCaptureButton
@@ -904,6 +891,7 @@ export default function SoccerGameTracker() {
             )}
           </button>
         )}
+        <div className="px-4"><EventCloudStatus state={state} /></div>
       </main>
 
       {actionsOpen && (
@@ -1101,14 +1089,6 @@ export default function SoccerGameTracker() {
   )
 }
 
-function soccerCloudStatusLabel(state: GameState): string {
-  if (state.cloudSync.gameStatus === 'final') return 'Finalized'
-  if (state.cloudSync.status === 'error') return 'Needs Attention'
-  if (state.cloudSync.status === 'syncing') return 'Syncing'
-  if (state.cloudSync.status === 'synced') return 'Synced'
-  return 'Local'
-}
-
 function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled, canResolve, onRole, onResolve }: {
   participant: SoccerProjectedParticipant
   projection: SoccerMatchProjection
@@ -1158,24 +1138,21 @@ function ActionSheet({ status, onClose, onAction, onDirection }: {
     ? standardActions
     : [{ kind: 'end' as const, label: 'Match status', icon: <Flag size={20} /> }]
   return (
-    <div className="fixed inset-0 z-40 bg-overlay/[0.45] flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="bg-surface w-full sm:max-w-md rounded-t-lg sm:rounded-lg p-4" onClick={event => event.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-content">Match Actions</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
+    <TrackerDialog title="Match Actions" onClose={onClose}>
         <div className="grid grid-cols-2 gap-2">
           {actions.map(action => <button key={action.kind} type="button" onClick={() => onAction(action.kind)} className="min-h-16 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3">{action.icon}{action.label}</button>)}
           {standardControls && <button type="button" onClick={onDirection} className="min-h-16 min-w-0 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3"><Compass size={20} className="shrink-0" /><span>Switch attacking direction</span></button>}
         </div>
-      </div>
-    </div>
+    </TrackerDialog>
   )
 }
 
 function TabButton({ active, label, icon, onClick }: { active: boolean; label: string; icon: ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-12 flex items-center justify-center gap-2 text-sm font-bold border-b-2 ${active ? 'border-success-line text-success-content' : 'border-transparent text-content-muted'}`}>{icon}{label}</button>
+  return <button type="button" onClick={onClick} aria-pressed={active} className={`min-h-11 min-w-0 flex flex-wrap items-center justify-center gap-1 px-1 text-xs font-bold border-b-2 ${active ? 'border-success-line text-success-content' : 'border-transparent text-content-muted'}`}>{icon}{label}</button>
 }
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>{label}</button>
+  return <button type="button" onClick={onClick} aria-pressed={active} className={`min-h-10 min-w-0 break-words rounded px-1 py-1 text-xs font-semibold [overflow-wrap:anywhere] ${active ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>{label}</button>
 }
 
 function QuickCaptureButton({ label, icon, disabled, pressed, onClick }: { label: string; icon: ReactNode; disabled: boolean; pressed?: boolean; onClick: () => void }) {

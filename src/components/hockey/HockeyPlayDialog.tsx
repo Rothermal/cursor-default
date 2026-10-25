@@ -26,6 +26,7 @@ export interface HockeyTeamPlayInput {
 export interface HockeyPlayDraft {
   kind: HockeyPlayDialogKind
   location: { x: number; y: number } | null
+  side?: HockeySide
 }
 
 /** Edit mode (HKY-4B): the stored values. The kind is fixed, except icing and offside. */
@@ -81,7 +82,7 @@ export default function HockeyPlayDialog({
   const titleId = useId()
   const editing = initial !== undefined
   const [kind, setKind] = useState<HockeyPlayDialogKind>(initial?.kind ?? draft.kind)
-  const [side, setSide] = useState<HockeySide>(initial?.side ?? 'tracked')
+  const [side, setSide] = useState<HockeySide>(initial?.side ?? draft.side ?? 'tracked')
   const [player, setPlayer] = useState(choiceText(initial?.player))
   const [hitPlayer, setHitPlayer] = useState(choiceText(initial?.hitPlayer))
   const [location, setLocation] = useState(initial ? initial.location : draft.location)

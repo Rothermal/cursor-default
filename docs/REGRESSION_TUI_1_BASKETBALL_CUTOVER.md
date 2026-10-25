@@ -1,6 +1,6 @@
 # TUI-1 Basketball Event-Only Cutover
 
-Date: 2026-10-24. Status: **implemented for review; deployed checks pending**.
+Date: 2026-10-24. Status: **implementation merged in #506; deployed checks pending**.
 Governing plan: [Shared tracker UI](PLAN_TRACKER_UI_UNIFICATION.md), especially
 sections 5-8. Layout merged in #491. This second PR changes creation/legacy policy,
 not clock semantics, event schemas, Supabase contracts, migrations or app/team access.

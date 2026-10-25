@@ -1,5 +1,5 @@
-import { ChevronLeft, Menu, Pause, Play, X } from 'lucide-react'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { Activity, ChevronLeft, Crosshair, Menu, Pause, Play, Shield, UserRound } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import HockeyFaceoffControl from '../components/hockey/HockeyFaceoffControl'
 import HockeyGoalieDialog, { type HockeyGoalieChange } from '../components/hockey/HockeyGoalieDialog'
@@ -12,6 +12,8 @@ import HockeyTimeline from '../components/hockey/HockeyTimeline'
 import HockeyTimelineEditor, { type HockeyTimelineAction } from '../components/hockey/HockeyTimelineEditor'
 import HockeyShootoutPanel from '../components/hockey/HockeyShootoutPanel'
 import HockeyShotDialog, { type HockeyShotDraft } from '../components/hockey/HockeyShotDialog'
+import TrackerSideSelector from '../components/TrackerSideSelector'
+import TrackerDialog from '../components/TrackerDialog'
 import { HockeyCloudMenuSection, HockeyCloudSyncAlerts } from '../components/hockey/HockeyCloudSync'
 import { HOCKEY_FINAL_CLOUD_GAME_MESSAGE, isFinalHockeyCloudGame } from '../lib/hockey/cloudPolicy'
 import { hockeySummaryPath } from '../lib/hockey/summary'
@@ -28,15 +30,14 @@ import {
   formatHockeyFinalScore,
   HOCKEY_RESULT_LABELS,
   formatHockeyPeriod,
+  formatHockeyStrength,
   hockeyActivePeriod,
   hockeyClockDisplay,
   hockeyGoalStrengthFor,
   hockeyOnIceLimits,
   hockeyPenaltyBoxNow,
-  hockeyPlayMarkers,
   hockeyRecentEvents,
   hockeyTimeline,
-  hockeyShotMarkers,
   hockeySpecialTeams,
   hockeySportState,
   interruptHockeyMatch,
@@ -74,10 +75,11 @@ import {
   type RecordHockeyShotInput,
 } from '../lib/hockey'
 import type { GameEvent, GameEventLocation } from '../lib/gameEvents/types'
+import { hockeyTrackerMarkers, type HockeyTrackerFilters } from '../lib/hockey/trackerView'
 
 /**
  * The Hockey event tracker (HKY-2E). Top to bottom: the scoreboard strip with the clock and
- * the penalty box (HKY-3A), the rink, the quick row and Recent Events; period and match controls live in the Game
+ * compact strength context, named recording side, rink, quick row, filters and Recent Events; period and match controls live in the Game
  * menu. Existing event games always open here, whatever the release stage.
  */
 export default function HockeyGameTracker() {
@@ -104,6 +106,9 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [shotDraft, setShotDraft] = useState<HockeyShotDraft | null>(null)
   const [goalieOpen, setGoalieOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [penaltyDetailsOpen, setPenaltyDetailsOpen] = useState(false)
+  const [captureSide, setCaptureSide] = useState<HockeySide>('tracked')
+  const [markerFilters, setMarkerFilters] = useState<HockeyTrackerFilters>({ family: 'all', side: 'all', scope: 'match' })
   const [tap, setTap] = useState<GameEventLocation | null>(null)
   const [faceoffDot, setFaceoffDot] = useState<HockeyFaceoffDotId | null>(null)
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
@@ -179,6 +184,10 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const opponentLabel = state.gameInfo?.opponentName || 'Opponent'
   const sideLabel = (side: HockeySide) => (side === 'tracked' ? trackedLabel : opponentLabel)
   const streamEvents = (state.eventStream?.events ?? []) as GameEvent[]
+  const markers = hockeyTrackerMarkers(sport.setup, streamEvents, period?.id ?? null, markerFilters)
+  const penaltyCount = projection.clock
+    ? penaltyBox.box.tracked.length + penaltyBox.box.opponent.length
+    : projection.penalties.filter(record => record.periodId === projection.activePeriodId && record.durationMs > 0).length
   const canCapture = inProgress && active && !projection.decidedInPeriodId
   const recentLabels = recentHockeyOpponentLabels(streamEvents)
   const specialTeams = hockeySpecialTeams(sport.setup, projection, penaltyBox.box)
@@ -245,9 +254,9 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
     if (!tap) return
     const point = { x: tap.x, y: tap.y }
     setTap(null)
-    if (choice === 'shot') setShotDraft({ side: 'tracked', location: point })
+    if (choice === 'shot') setShotDraft({ side: captureSide, location: point })
     else if (choice === 'faceoff') setFaceoffDot(nearestHockeyFaceoffDot(point).id)
-    else setPlayDraft({ kind: choice, location: point })
+    else setPlayDraft({ kind: choice, location: point, side: captureSide })
   }
 
   /** Runs a menu action and closes the menu. */
@@ -271,11 +280,13 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           <Link to="/sport/hockey" className="grid h-10 w-10 shrink-0 place-items-center text-content-muted" aria-label="Back to Hockey" title="Back to Hockey">
             <ChevronLeft size={22} />
           </Link>
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-content-muted">
-            {period ? formatHockeyPeriod(period) : 'Not started'}
-            {period && !active && inProgress ? ' ended' : ''}
-            {!inProgress && projection.status !== 'pregame' ? ` · ${projection.status.replace('_', ' ')}` : ''}
-          </p>
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-1" role="group" aria-label="Tracker view">
+            {(['track', 'timeline'] as const).map(id => (
+              <button key={id} type="button" aria-pressed={tab === id}
+                className={`min-h-11 min-w-0 rounded px-1 text-xs font-semibold ${tab === id ? 'bg-accent text-accent-content' : 'text-content-muted'}`}
+                onClick={() => setTab(id)}>{id === 'track' ? 'Track' : 'Timeline'}</button>
+            ))}
+          </div>
           <button
             type="button"
             className="inline-flex h-10 shrink-0 items-center gap-1 rounded-md border border-line-strong px-3 text-sm font-semibold text-content"
@@ -300,6 +311,11 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             </div>
           ))}
           <div className="order-2 flex flex-col items-center gap-1">
+            <p className="text-center text-[11px] font-semibold text-content-muted">
+              {period ? formatHockeyPeriod(period) : 'Not started'}
+              {period && !active && inProgress ? ' ended' : ''}
+              {!inProgress && projection.status !== 'pregame' ? ` · ${projection.status.replace('_', ' ')}` : ''}
+            </p>
             {reading ? (
               <>
                 <p
@@ -325,15 +341,11 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
           </div>
         </div>
         {projection.status !== 'pregame' && (
-          <HockeyPenaltyBox
-            sport={sport}
-            reading={penaltyBox}
-            sideLabel={sideLabel}
-            onRelease={projection.clock && inProgress && active
-              ? entry => askReason('Why is this penalty ending early?', reason =>
-                  releaseHockeyPenalty(state, { penaltyEventId: entry.penaltyEventId, segment: entry.segment, reason }, context()))
-              : undefined}
-          />
+          <button type="button" onClick={() => setPenaltyDetailsOpen(true)} aria-label="Open penalty box" aria-haspopup="dialog"
+            className="flex min-h-9 w-full items-center justify-center gap-2 rounded border border-line px-2 text-xs font-semibold text-content-muted">
+            {penaltyBox.strength && <span className="tabular-nums text-content">{formatHockeyStrength(penaltyBox.strength)}</span>}
+            <span>{penaltyCount} {penaltyCount === 1 ? 'penalty' : 'penalties'}{!projection.clock ? ' this period' : ''}</span>
+          </button>
         )}
         {projection.result && (
           <p className="text-center text-sm font-semibold text-content" aria-label="Final result">
@@ -420,21 +432,6 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-1 rounded-md border border-line bg-surface p-1" role="tablist" aria-label="Tracker view">
-        {(['track', 'timeline'] as const).map(id => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            className={`min-h-10 rounded text-sm font-semibold ${tab === id ? 'bg-accent text-accent-content' : 'text-content-muted'}`}
-            onClick={() => setTab(id)}
-          >
-            {id === 'track' ? 'Track' : 'Timeline'}
-          </button>
-        ))}
-      </div>
-
       {tab === 'timeline' ? (
         <HockeyTimeline
           {...hockeyTimeline(state, { tracked: trackedLabel, opponent: opponentLabel })}
@@ -451,14 +448,20 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
       ) : (
         <>
         <section className="space-y-2" aria-label="Rink capture">
+          <TrackerSideSelector side={captureSide} labels={{ tracked: trackedLabel, opponent: opponentLabel }} onChange={side => {
+            setCaptureSide(side)
+            setTap(null)
+            setFaceoffDot(null)
+          }} />
           <HockeyRink
             trackedDirection={direction}
+            captureSide={captureSide}
             flipped={flipped}
             trapezoid={sport.setup.rulesSnapshot.trapezoid}
             trackedLabel={trackedLabel}
             opponentLabel={opponentLabel}
             disabled={!canCapture}
-            markers={[...hockeyShotMarkers(sport.setup, streamEvents), ...hockeyPlayMarkers(sport.setup, streamEvents)]}
+            markers={markers}
             highlightDotId={faceoffDot}
             onFaceoffDot={dotId => {
               setTap(null)
@@ -499,25 +502,35 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             />
           )}
           {canCapture && (
-            <div className="grid grid-cols-5 gap-2" role="group" aria-label="Quick capture">
-              {(['tracked', 'opponent'] as const).map(side => (
-                <button
-                  key={side}
-                  type="button"
-                  className="btn-secondary flex min-w-0 flex-col items-center px-1 py-1 leading-tight"
-                  onClick={() => setShotDraft({ side, location: null })}
-                  aria-label={`${sideLabel(side)} shot`}
-                >
-                  <span className="w-full truncate text-[11px] font-semibold text-content-muted">{sideLabel(side)}</span>
-                  <span>Shot</span>
-                </button>
-              ))}
-              <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPenaltyOpen(true)}>Penalty</button>
-              <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setGoalieOpen(true)}>Goalie</button>
-              <button type="button" className="btn-secondary px-0.5 text-sm" onClick={() => setPlayDraft({ kind: 'hit', location: null })}>Play</button>
+            <div className="grid grid-cols-4 gap-2" role="group" aria-label="Quick capture">
+              <button type="button" className="btn-secondary flex min-h-12 min-w-0 flex-col items-center gap-1 px-1 py-2 text-xs" onClick={() => setShotDraft({ side: captureSide, location: null })} aria-label={`${sideLabel(captureSide)} shot`}><Crosshair size={18} />Shot</button>
+              <button type="button" className="btn-secondary flex min-h-12 min-w-0 flex-col items-center gap-1 px-1 py-2 text-xs" onClick={() => setPenaltyOpen(true)}><Shield size={18} />Penalty</button>
+              <button type="button" className="btn-secondary flex min-h-12 min-w-0 flex-col items-center gap-1 px-1 py-2 text-xs" onClick={() => setGoalieOpen(true)}><UserRound size={18} />Goalie</button>
+              <button type="button" className="btn-secondary flex min-h-12 min-w-0 flex-col items-center gap-1 px-1 py-2 text-xs" onClick={() => setPlayDraft({ kind: 'hit', location: null, side: captureSide })}><Activity size={18} />Play</button>
             </div>
           )}
         </section>
+
+        <details className="border-y border-line py-2">
+          <summary className="min-h-9 cursor-pointer text-sm font-semibold text-content-muted">Marker filters <span className="font-normal">{markers.length} shown</span></summary>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <label className="text-xs font-semibold text-content-muted">Family
+              <select aria-label="Marker family" className="input-field mt-1" value={markerFilters.family} onChange={event => setMarkerFilters(value => ({ ...value, family: event.target.value as HockeyTrackerFilters['family'] }))}>
+                <option value="all">All markers</option><option value="shots">Shots</option><option value="plays">Plays</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-content-muted">Team
+              <select aria-label="Marker team" className="input-field mt-1" value={markerFilters.side} onChange={event => setMarkerFilters(value => ({ ...value, side: event.target.value as HockeyTrackerFilters['side'] }))}>
+                <option value="all">Both teams</option><option value="tracked">{trackedLabel}</option><option value="opponent">{opponentLabel}</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-content-muted">Period
+              <select aria-label="Marker period" className="input-field mt-1" value={markerFilters.scope} onChange={event => setMarkerFilters(value => ({ ...value, scope: event.target.value as HockeyTrackerFilters['scope'] }))}>
+                <option value="match">Whole game</option><option value="current">Current / latest period</option>
+              </select>
+            </label>
+          </div>
+        </details>
 
         <HockeyRecentEvents
           rows={hockeyRecentEvents(state, { tracked: trackedLabel, opponent: opponentLabel })}
@@ -528,8 +541,21 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         </>
       )}
 
+      <HockeyCloudMenuSection state={state} onDone={() => {}} />
+
+      {penaltyDetailsOpen && (
+        <TrackerDialog title="Penalty box" onClose={() => setPenaltyDetailsOpen(false)}>
+          {penaltyCount === 0 && <p className="text-sm text-content-muted">No penalties in the box.</p>}
+          <HockeyPenaltyBox sport={sport} reading={penaltyBox} sideLabel={sideLabel}
+            onRelease={projection.clock && inProgress && active
+              ? entry => askReason('Why is this penalty ending early?', reason =>
+                  releaseHockeyPenalty(state, { penaltyEventId: entry.penaltyEventId, segment: entry.segment, reason }, context()))
+              : undefined} />
+        </TrackerDialog>
+      )}
+
       {menuOpen && (
-        <GameMenu onClose={() => setMenuOpen(false)}>
+        <TrackerDialog title="Game" onClose={() => setMenuOpen(false)}>
           <MenuButton onClick={fromMenu(() => navigate(hockeySummaryPath({ from: 'tracker' })))}>
             {inProgress ? 'Summary (in progress)' : 'Summary'}
           </MenuButton>
@@ -591,8 +617,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
               Reopen game
             </MenuButton>
           )}
-          <HockeyCloudMenuSection state={state} onDone={() => setMenuOpen(false)} />
-        </GameMenu>
+        </TrackerDialog>
       )}
 
       {correction && (
@@ -632,6 +657,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
       {goalieOpen && inProgress && (
         <HockeyGoalieDialog
           sport={sport}
+          defaultSide={captureSide}
           trackedLabel={trackedLabel}
           opponentLabel={opponentLabel}
           onSubmit={recordGoalieChange}
@@ -641,6 +667,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
       {penaltyOpen && (
         <HockeyPenaltyDialog
           sport={sport}
+          defaultSide={captureSide}
           recentOpponentLabels={recentLabels}
           trackedLabel={trackedLabel}
           opponentLabel={opponentLabel}
@@ -661,36 +688,6 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
         />
       )}
     </main>
-  )
-}
-
-function GameMenu({ onClose, children }: { onClose: () => void; children: ReactNode }) {
-  const titleId = useId()
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface pb-[env(safe-area-inset-bottom)] sm:max-w-md sm:rounded-lg"
-        onClick={event => event.stopPropagation()}
-      >
-        <header className="flex min-h-14 items-center gap-3 border-b border-line px-4">
-          <h2 id={titleId} className="flex-1 font-bold text-content">Game</h2>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close" autoFocus>
-            <X size={20} />
-          </button>
-        </header>
-        <div className="space-y-2 p-4">{children}</div>
-      </div>
-    </div>
   )
 }
 

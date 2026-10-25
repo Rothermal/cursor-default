@@ -2,7 +2,8 @@
 
 Status: approved product direction. Adoption is incremental; this document does
 not claim that every sport already implements the target. Basketball's compact
-layout merged in #491; event-only/legacy retirement is implemented for review. See
+layout merged in #491; event-only/legacy retirement merged in #506. Soccer/Hockey
+layout alignment is implemented for review, without retiring Hockey legacy authority. See
 the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
 
 ## One tracker and shared layout
@@ -140,9 +141,9 @@ rules; a running recorder clock is not proof of what the rules permit.
 
 | Area | Current versus target |
 | --- | --- |
-| Soccer | Closest existing surface-first example; still audit gaps rather than declaring complete cross-sport parity |
-| Basketball | Compact layout merged #491; TUI-1 event-only creation and read-only legacy cutover implemented for review, preserving recorded stats, exports and authorized old-data sync. Owner-only deployed checks remain pending |
-| Hockey | Released event-only new-game setup and compact rink; align side/filter/status placement and retire remaining legacy capture |
+| Soccer | TUI-2 compact navigation/clock and below-pitch modes/status implemented for review; see the [alignment record](REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md) |
+| Basketball | Compact layout merged #491; event-only creation and read-only legacy cutover merged #506, preserving recorded stats, exports and authorized old-data sync. Owner-only deployed checks remain pending |
+| Hockey | Released event-only new-game setup; TUI-2 side/filter/status and compact penalty context implemented for review. Legacy retirement remains the next authority slice |
 | Football | Generic grid only; shared layout follows FBE event foundations, not an immediate route switch |
 | Baseball/future sports | Baseball's own BSB-7D cutover merged #505; future sports follow their separate release plans. The four-sport audit itself grants no additional rollout |
 | Timing/replay | Separate architectural assessment, not part of the UI-only change |

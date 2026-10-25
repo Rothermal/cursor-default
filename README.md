@@ -9,7 +9,7 @@ game review and optional authenticated cloud sync.
   Timeline, shootouts, Summary and canonical cloud results. Enable it in Settings.
 - **Basketball:** compact full-court event tracker with clock, lineups, corrections,
   cloud review and aggregates. TUI-1's event-only creation and read-only legacy
-  cutover are implemented for review; saved stats, exports and authorized old-data
+  cutover merged in #506; saved stats, exports and authorized old-data
   sync remain available. See the [cutover record](docs/REGRESSION_TUI_1_BASKETBALL_CUTOVER.md).
 - **Hockey:** released event tracker with rink capture, penalties/strength, Timeline,
   Summary and cloud lifecycle. Every new Hockey game uses events.
@@ -44,10 +44,10 @@ a separate Manage Lineup action. Hockey uses Track/Timeline with sport-specific 
 
 The [shared UI plan](docs/PLAN_TRACKER_UI_UNIFICATION.md) aligns clock/score,
 team selector, surface, quick actions, collapsed filters and bottom sync status.
-Basketball's compact event layout is implemented for review. Event-only creation
-and retirement of legacy capture in favor of read-only summaries remain the next
-PR, preserving recorded stats and unsynced local data. Other sport cutovers are
-planned, not implemented; Football awaits its event foundations.
+Basketball's layout and authority cutover are merged (#491/#506). Soccer/Hockey
+layout alignment is implemented for review in
+[TUI-2](docs/REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md), with no authority change.
+Hockey's legacy retirement is the next slice; Football awaits its event foundations.
 
 See [shared product decisions](docs/PRODUCT_AND_INTERACTION_DECISIONS.md) for the
 target model and its implementation status. Opening a document is not evidence

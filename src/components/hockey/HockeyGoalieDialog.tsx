@@ -19,6 +19,7 @@ export interface HockeyGoalieChange {
 
 interface HockeyGoalieDialogProps {
   sport: HockeySportGameState
+  defaultSide?: HockeySide
   trackedLabel: string
   opponentLabel: string
   /** Returns an error message, or null once the change is recorded. */
@@ -27,9 +28,9 @@ interface HockeyGoalieDialogProps {
 }
 
 /** Goalie changes and pulls for either net (HKY-2B). New opponent goalies are added here. */
-export default function HockeyGoalieDialog({ sport, trackedLabel, opponentLabel, onSubmit, onClose }: HockeyGoalieDialogProps) {
+export default function HockeyGoalieDialog({ sport, defaultSide = 'tracked', trackedLabel, opponentLabel, onSubmit, onClose }: HockeyGoalieDialogProps) {
   const titleId = useId()
-  const [side, setSide] = useState<HockeySide>('tracked')
+  const [side, setSide] = useState<HockeySide>(defaultSide)
   const [newLabel, setNewLabel] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [error, setError] = useState<string | null>(null)
