@@ -64,8 +64,7 @@ interface HockeyTeamOption {
  * team the recorder adds quick local players. Start freezes setup v1 and opens `/game`.
  */
 export default function HockeyGameSetup() {
-  const { hockeyEventTrackerEnabled } = useSettings()
-  if (!getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame) {
+  if (!getHockeyEventCreationPolicy().canCreateNewEventGame) {
     return (
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-3">
         <p className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">

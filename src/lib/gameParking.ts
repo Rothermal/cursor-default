@@ -846,7 +846,7 @@ export function commitGameSetupState(
   beforeCommit?: (localGameId: string) => void
 ): CommitGameSetupResult {
   if (nextState.sport?.id === 'hockey' && (
-    !getHockeyEventCreationPolicy(false).canCreateNewEventGame ||
+    !getHockeyEventCreationPolicy().canCreateNewEventGame ||
     nextState.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||
     nextState.sportGameState?.sportId !== 'hockey' || !nextState.eventStream
   )) throw new Error('New Hockey games require the available event setup. Existing games remain saved.')

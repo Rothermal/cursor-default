@@ -7,13 +7,15 @@ import {
 } from './settingsStorage'
 
 describe('mergeStoredSettings', () => {
-  it.each([false, true])('preserves retired Basketball/Baseball preview storage set to %s', enabled => {
+  it.each([false, true])('preserves retired Basketball/Baseball/Hockey preview storage set to %s', enabled => {
     const merged = mergeStoredSettings({
       basketball: { eventTrackerPreviewEnabled: enabled },
       baseball: { eventTrackerEnabled: enabled },
+      hockey: { eventTrackerEnabled: enabled },
     })
     expect(merged.basketball.eventTrackerPreviewEnabled).toBe(enabled)
     expect(merged.baseball.eventTrackerEnabled).toBe(enabled)
+    expect(merged.hockey.eventTrackerEnabled).toBe(enabled)
     expect(mergeStoredSettings(JSON.parse(JSON.stringify(merged)))).toEqual(merged)
   })
   it('defaults both Baseball capture options on, preserving explicit device-only booleans', () => {

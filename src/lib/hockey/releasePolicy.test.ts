@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { mergeStoredSettings } from '../settingsStorage'
-import { getHockeyEventCreationPolicy, hockeyNewGamesUseEventTracker, SPORT_EVENT_RELEASE_STAGES } from '../sportAvailability'
+import { getHockeyEventCreationPolicy, SPORT_EVENT_RELEASE_STAGES } from '../sportAvailability'
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
@@ -17,27 +17,25 @@ function implementationFiles(directory: string): string[] {
 describe('HKY-6C hockeyEvent release stage', () => {
   it('ships released: every new Hockey game is an event game, with no device toggle', () => {
     expect(SPORT_EVENT_RELEASE_STAGES.hockey).toBe('released')
-    expect(getHockeyEventCreationPolicy(false, { development: false })).toEqual({
+    expect(getHockeyEventCreationPolicy()).toEqual({
       releaseStage: 'released',
       preferenceAvailable: false,
       canCreateNewEventGame: true,
       canAccessExistingEventGames: true,
     })
-    expect(hockeyNewGamesUseEventTracker(false, { development: false })).toBe(true)
-    expect(hockeyNewGamesUseEventTracker(true, { development: false })).toBe(true)
   })
 
   it('rolls back to internal by hiding the toggle and ignoring a stored opt-in', () => {
-    const internal = getHockeyEventCreationPolicy(true, { development: false, releaseStage: 'internal' })
+    const internal = getHockeyEventCreationPolicy({ releaseStage: 'internal' })
     expect(internal.preferenceAvailable).toBe(false)
     expect(internal.canCreateNewEventGame).toBe(false)
     expect(internal.canAccessExistingEventGames).toBe(true)
-    expect(hockeyNewGamesUseEventTracker(true, { development: false, releaseStage: 'internal' })).toBe(false)
   })
 
-  it('does not bypass creation rollback in development', () => {
-    expect(getHockeyEventCreationPolicy(false, { development: true }).canCreateNewEventGame).toBe(true)
-    expect(getHockeyEventCreationPolicy(false, { development: true, releaseStage: 'internal' }).canCreateNewEventGame).toBe(false)
+  it('exposes no retired preview API or route input', () => {
+    expect(source('src/context/SettingsContext.tsx')).not.toMatch(/hockeyEventTrackerEnabled|setHockeyEventTrackerEnabled/)
+    expect(source('src/lib/gameSetupRoute.ts')).not.toMatch(/eventsRequested|hockeyNewGamesUseEvents/)
+    expect(source('src/lib/sportAvailability.ts')).not.toContain('hockeyNewGamesUseEventTracker')
   })
 
   it('stores the device settings default-off and fails closed on malformed values', () => {
@@ -55,13 +53,13 @@ describe('HKY-2E and HKY-6C route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
-    expect(setupRoute).toContain('const hockeyNewGamesUseEvents = hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)')
+    expect(setupRoute).not.toMatch(/eventsRequested|hockeyNewGamesUseEvents|hockeyEventTrackerEnabled/)
     expect(setupRoute).toContain('gameSetupRouteTarget({')
     expect(setupRoute).toContain('<HockeyGameSetup />')
     expect(source('src/lib/gameSetupRoute.ts'))
       .toContain("if (sport === 'hockey') return 'hockey_events'")
     expect(source('src/pages/HockeyGameSetup.tsx'))
-      .toContain('if (!getHockeyEventCreationPolicy(hockeyEventTrackerEnabled).canCreateNewEventGame)')
+      .toContain('if (!getHockeyEventCreationPolicy().canCreateNewEventGame)')
   })
 
   it('opens existing Hockey event games without consulting the release stage', () => {
@@ -90,10 +88,9 @@ describe('HKY-2E and HKY-6C route gates', () => {
 
   it('keeps the policy consumers audited', () => {
     const consumers = implementationFiles('src')
-      .filter(path => path !== 'src/lib/sportAvailability.ts' && /getHockeyEventCreationPolicy|hockeyNewGamesUseEventTracker/.test(source(path)))
+      .filter(path => path !== 'src/lib/sportAvailability.ts' && /getHockeyEventCreationPolicy/.test(source(path)))
       .sort()
     expect(consumers).toEqual([
-      'src/App.tsx',
       'src/lib/gameParking.ts',
       'src/pages/HockeyGameSetup.tsx',
     ])

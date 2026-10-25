@@ -10,10 +10,8 @@ export type GameSetupRouteTarget =
 
 export interface GameSetupRouteInput {
   requestedSport: string | null
-  eventsRequested: boolean
   teamId: string | null
   activeSportId: string | null
-  hockeyNewGamesUseEvents: boolean
   /** A team-only link's team sport: undefined while loading, null when it could not be read. */
   teamSportId?: string | null
 }

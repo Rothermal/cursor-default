@@ -739,6 +739,10 @@ export default function GameInfo() {
       return
     }
     if (sport?.id === 'hockey' && hockeyDataAuthority === 'sport_events') {
+      if (!canTrackCurrentGame) {
+        navigate(hockeySummaryPath({ gameId: game.id, from: 'game-info', teamId: team?.id ?? fallbackTeamId }))
+        return
+      }
       await openHockeyEventGame(game, user.id)
       return
     }
@@ -754,6 +758,10 @@ export default function GameInfo() {
       } catch (caught) { setError(caught instanceof Error ? caught.message : 'Local history could not load.'); return }
     }
     if (game.sport_id === 'baseball' && baseballDataAuthority === 'sport_events') {
+      if (!canTrackCurrentGame) {
+        navigate(baseballSummaryPath({ gameId: game.id, from: 'game-info', teamId: team?.id ?? fallbackTeamId }))
+        return
+      }
       await openBaseballEventGame(game, user.id)
       return
     }
@@ -1358,7 +1366,7 @@ export default function GameInfo() {
                     ? 'Open recorded game (read-only)'
                     : game.status === 'final' ||
                         (sport?.id === 'soccer' && !canTrackGames(teamRole)) ||
-                        (basketballDataAuthority === 'sport_events' && !canTrackCurrentGame)
+                        ((basketballDataAuthority === 'sport_events' || hockeyDataAuthority === 'sport_events' || baseballDataAuthority === 'sport_events') && !canTrackCurrentGame)
                       ? 'View full summary'
                       : 'Open game'}
               </button>

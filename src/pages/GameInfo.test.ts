@@ -187,6 +187,38 @@ describe('Game Info retired legacy local bindings', () => {
   })
 })
 
+describe.each(['hockey', 'baseball'])('%s Game Info event access', sportId => {
+  it.each(['viewer', 'unrecognized'])('sends a %s to read-only Summary without opening a recorder stream', async role => {
+    h.sportId = sportId; h.role = role
+    h.load.mockResolvedValue(null); h.independent.mockResolvedValue(createInitialState())
+    const before = JSON.stringify(h.state)
+    const tree = await loaded()
+    const button = tree.find(element => element.type === 'button' &&
+      ['Open game', 'View full summary'].includes(element.props.children as string))
+    if (!button) throw new Error('Missing read-only review action')
+    await (button.props.onClick as () => Promise<void>)()
+    expect(h.navigate).toHaveBeenCalledWith(`/summary?sport=${sportId}&gameId=cloud-a&tab=overview&from=game-info&teamId=team-1`)
+    expect(h.load).not.toHaveBeenCalled()
+    expect(h.independent).not.toHaveBeenCalled()
+    expect(h.open).not.toHaveBeenCalled()
+    expect(h.prepare).not.toHaveBeenCalled()
+    expect(h.resume).not.toHaveBeenCalled()
+    expect(h.dispatch).not.toHaveBeenCalled()
+    expect(JSON.stringify(h.state)).toBe(before)
+  })
+
+  it.each(['owner', 'admin', 'scorer'])('keeps recorder access for %s', async role => {
+    h.sportId = sportId; h.role = role; h.load.mockResolvedValue(createInitialState())
+    const tree = await loaded()
+    const button = tree.find(element => element.type === 'button' && element.props.children === 'Open game')
+    if (!button) throw new Error('Missing authorized recorder action')
+    await (button.props.onClick as () => Promise<void>)()
+    expect(h.load).toHaveBeenCalled()
+    expect(h.open).toHaveBeenCalledOnce()
+    expect(h.navigate).toHaveBeenCalledWith('/game')
+  })
+})
+
 describe('BSB-6B2 Game Info', () => {
   it.each(['owner', 'admin', 'scorer', 'viewer'])('exposes manager controls only for %s authority', async role => {
     h.role = role; const tree = await loaded()

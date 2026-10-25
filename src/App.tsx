@@ -2,8 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
-import { SettingsProvider, useSettings } from './context/SettingsContext'
-import { hockeyNewGamesUseEventTracker } from './lib/sportAvailability'
+import { SettingsProvider } from './context/SettingsContext'
 import { gameSetupRouteTarget, loadTeamSportId } from './lib/gameSetupRoute'
 import { gameSetupPath } from './lib/teamInfo'
 import { supabase } from './lib/supabase'
@@ -61,7 +60,6 @@ const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/Appea
 function GameSetupRoute() {
   const { state } = useGame()
   const { user } = useAuth()
-  const { hockeyEventTrackerEnabled } = useSettings()
   const [searchParams] = useSearchParams()
   const requestedSport = searchParams.get('sport')
   const teamId = searchParams.get('teamId')
@@ -82,13 +80,10 @@ function GameSetupRoute() {
     }
   }, [teamId, teamScope, user, attempt])
 
-  const hockeyNewGamesUseEvents = hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)
   const target = gameSetupRouteTarget({
     requestedSport,
-    eventsRequested: searchParams.get('events') === '1',
     teamId,
     activeSportId,
-    hockeyNewGamesUseEvents,
     teamSportId: teamSport?.scope === teamScope ? teamSport.sportId : undefined,
   })
   switch (target) {

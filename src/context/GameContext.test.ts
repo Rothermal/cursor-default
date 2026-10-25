@@ -61,7 +61,7 @@ function render() {
   return GameProvider({ children: null }).props.value
 }
 
-it.each(['baseball', 'basketball'])('refuses legacy %s creation before parking or changing the existing game', sportId => {
+it.each(['baseball', 'basketball', 'hockey'])('refuses legacy %s creation before parking or changing the existing game', sportId => {
   const value = render(), before = [...(localStorage as unknown as MemoryStorage).store]
   expect(value.startNewGame(sports.find(sport => sport.id === sportId)!)).toBe(false)
   expect([...(localStorage as unknown as MemoryStorage).store]).toEqual(before)

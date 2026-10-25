@@ -62,7 +62,7 @@ describe('BSB-7D route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
-    expect(setupRoute).toContain("eventsRequested: searchParams.get('events') === '1'")
+    expect(setupRoute).not.toContain('eventsRequested')
     expect(source('src/lib/gameSetupRoute.ts'))
       .toContain("if (sport === 'baseball') return 'baseball_events'")
     expect(setupRoute).toContain('<BaseballEventSetup key=')

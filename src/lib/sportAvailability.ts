@@ -49,34 +49,17 @@ export interface SportEventCreationPolicy {
   canAccessExistingEventGames: true
 }
 
-interface SportEventCreationPolicyOptions {
-  development?: boolean
-  releaseStage?: SportEventReleaseStage
-}
-
 /**
  * Hockey's retired preview preference is ignored. Rollback blocks new games, including
  * development/local-only setup, without reviving the aggregate tracker.
  */
 export function getHockeyEventCreationPolicy(
-  _enabledOnDevice: boolean,
   {
     releaseStage = SPORT_EVENT_RELEASE_STAGES.hockey,
-  }: SportEventCreationPolicyOptions = {}
+  }: { releaseStage?: SportEventReleaseStage } = {}
 ): SportEventCreationPolicy {
   return { releaseStage, preferenceAvailable: false,
     canCreateNewEventGame: releaseStage === 'released', canAccessExistingEventGames: true }
-}
-
-/**
- * Whether creation is available. Routes always reach event setup, even during rollback.
- */
-export function hockeyNewGamesUseEventTracker(
-  enabledOnDevice: boolean,
-  options: SportEventCreationPolicyOptions = {}
-): boolean {
-  const policy = getHockeyEventCreationPolicy(enabledOnDevice, options)
-  return policy.canCreateNewEventGame
 }
 
 /**

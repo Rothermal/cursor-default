@@ -70,6 +70,43 @@ and a GameContext adapter using real reducers and parking transactions. They do 
 exercise live Supabase/RLS, real network reconnects, physical-mobile, installed PWA
 or full-match behavior. No owner browser/game was loaded, changed or uploaded.
 
+## PR Comment Follow-Up
+
+The [review at e00011b](https://github.com/Rothermal/cursor-default/pull/508#issuecomment-6401811364)
+identified a valid permission regression: extending legacy review to Hockey also
+made its event-game open action visible to viewers, and the event branch could
+create/adopt a recorder stream. Non-tracking users now go directly to read-only
+Hockey Summary before any recorder loading/creation or local adoption. The action
+label reflects review, not tracking. The adjacent, pre-existing Baseball gap is
+closed in the same narrow branch; owners/admins/scorers retain recorder access.
+
+- Four new viewer/unrecognized-role cases reproduced tracker navigation before
+  the fix. They now assert Summary routing and no recorder load, creation, prepare,
+  resume, dispatch or adoption; six authorized-role cases preserve recorder access.
+- Added the missing `startNewGame(hockey)` refusal test and **16 real React Summary
+  rendering cases** for bound/nonfinal retry visibility, final/unbound suppression,
+  sibling sports and unchanged saved facts. Temporarily removing the start guard
+  failed its new test; hiding Retry Sync failed **9** cases. Both mutation probes
+  were restored before the passing full run.
+- Removed dead route flags, the Hockey preview helper/ignored arguments and unused
+  SettingsContext accessors. Stored true/false preview values still round-trip;
+  rink orientation, real rules, discovery and creation rollback remain unchanged.
+  Route coverage no longer duplicates obsolete preview-flag combinations.
+- Final follow-up local suite: **339 files / 3,486 tests passed**. Focused access/
+  recovery run: **3 files / 80 tests passed**; cleanup/storage run: **4 files /
+  49 tests passed**. Source lint: **0 errors / 3 existing Fast Refresh warnings**;
+  review controls: **22 passed**. Configured production/PWA build passed with
+  **3,029,497-byte** app chunk and **116,231 bytes** below the unchanged limit.
+- Synthetic Chromium rerun: **8 views / 19 interaction cases passed**, including
+  viewer Game Info -> Summary for Hockey and Baseball without a prompt, commit or
+  state change. Screenshots inspected. These additional role fixtures intentionally
+  do not implement cloud recorder/publication readiness; they prove navigation and
+  non-adoption, not healthy live remote Summary reads or RLS. Original service/device
+  limitations remain, and no pending deployed check is marked passed.
+
+The initial ready verdict is superseded by the follow-up head and CI evidence on
+the PR. This remains single-agent implementation/self-review, not independent review.
+
 ## Rollback and Pending Deployment
 
 Set `SPORT_EVENT_RELEASE_STAGES.hockey` to `internal` in a reviewed build to stop
