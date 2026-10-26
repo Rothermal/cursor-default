@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { isLegacyGameForSport } from '../legacyGameRetirement'
 import { hockeyOpponentGoalieLabel, hockeyParticipantLabel } from './captureCommands'
 import { hockeyGoalStrengthLabel, type HockeyGameLines, type HockeyGoalStrengthLabel } from './gameLines'
 import { formatHockeyClock } from './live'
@@ -51,11 +52,11 @@ export interface HockeySummaryQuery {
  * otherwise the active local event game. Stat-grid Hockey games keep the generic Summary.
  */
 export function isHockeySummaryRoute(
-  state: Pick<GameState, 'gameDataAuthority' | 'sport' | 'sportGameState'>,
+  state: Pick<GameState, 'gameDataAuthority' | 'sport' | 'sportGameState'> & Partial<Pick<GameState, 'eventStream'>>,
   params: URLSearchParams
 ): boolean {
   if (params.get('gameId')) return params.get('sport') === 'hockey'
-  return state.gameDataAuthority === 'sport_events' && state.sport?.id === 'hockey' && state.sportGameState?.sportId === 'hockey'
+  return state.sport?.id === 'hockey' && !isLegacyGameForSport(state, 'hockey')
 }
 
 export function parseHockeySummaryQuery(params: URLSearchParams): HockeySummaryQuery {

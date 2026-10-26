@@ -25,7 +25,7 @@ import {
   type TeamInfoGame,
 } from '../lib/teamInfo'
 import { acceptedTeamRole, canTrackGames } from '../lib/teamPermissions'
-import { getSportAvailabilityPolicy, hockeyNewGamesUseEventTracker } from '../lib/sportAvailability'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import {
   basketballSetupAccountScope,
   basketballSetupDraftHasMeaningfulEdits,
@@ -67,7 +67,7 @@ export default function TeamInfo() {
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const { user, isConfigured } = useAuth()
-  const { isSportEnabled, hockeyEventTrackerEnabled } = useSettings()
+  const { isSportEnabled } = useSettings()
   const {
     state: gameState,
     prepareActiveGameMutation,
@@ -185,7 +185,7 @@ export default function TeamInfo() {
     }
     // HKY-6C: new Hockey team games open the event setup, which replaces the active game
     // only when Start is pressed.
-    if (sport.id === 'hockey' && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)) {
+    if (sport.id === 'hockey') {
       navigate(`${gameSetupPath(team.id, sport.id)}&events=1`)
       return
     }

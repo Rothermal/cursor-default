@@ -19,8 +19,6 @@ interface SettingsContextType {
   isSportEnabled: (sportId: string) => boolean
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
-  hockeyEventTrackerEnabled: boolean
-  setHockeyEventTrackerEnabled: (enabled: boolean) => void
   hockeyRinkFlippedByDefault: boolean
   setHockeyRinkFlippedByDefault: (flipped: boolean) => void
   baseball: ReturnType<typeof useBaseballPersonalSettings>
@@ -99,16 +97,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const setHockeyEventTrackerEnabled = useCallback((enabled: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      hockey: {
-        ...prev.hockey,
-        eventTrackerEnabled: enabled,
-      },
-    }))
-  }, [])
-
   const setHockeyRinkFlippedByDefault = useCallback((flipped: boolean) => {
     setSettings(prev => ({
       ...prev,
@@ -143,8 +131,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         isSportEnabled,
         toggleSport,
         setSportEnabled,
-        hockeyEventTrackerEnabled: settings.hockey.eventTrackerEnabled,
-        setHockeyEventTrackerEnabled,
         hockeyRinkFlippedByDefault: settings.hockey.rinkFlippedByDefault,
         setHockeyRinkFlippedByDefault,
         baseball,

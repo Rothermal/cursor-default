@@ -1,7 +1,11 @@
 import type { GameAction, GameState } from '../types'
 
 export type LegacyAuthorityState = Partial<Pick<GameState, 'sport' | 'gameDataAuthority' | 'eventStream' | 'sportGameState'>>
-export type RetiredLegacySport = 'basketball' | 'baseball'
+export type RetiredLegacySport = 'basketball' | 'baseball' | 'hockey'
+
+export function isRetiredLegacySport(sportId: string | null | undefined): sportId is RetiredLegacySport {
+  return sportId === 'basketball' || sportId === 'baseball' || sportId === 'hockey'
+}
 
 export function isLegacyGameForSport(state: LegacyAuthorityState, sportId: RetiredLegacySport): boolean {
   return state.sport?.id === sportId && state.gameDataAuthority == null
@@ -9,12 +13,12 @@ export function isLegacyGameForSport(state: LegacyAuthorityState, sportId: Retir
 }
 
 export function isRetiredLegacyGame(state: LegacyAuthorityState): boolean {
-  return isLegacyGameForSport(state, 'basketball') || isLegacyGameForSport(state, 'baseball')
+  return isRetiredLegacySport(state.sport?.id) && isLegacyGameForSport(state, state.sport.id)
 }
 
 /** Preserve event authority before malformed stream/setup normalization can erase its markers. */
 export function retiredGameAuthorityForHydration(state: LegacyAuthorityState): GameState['gameDataAuthority'] {
-  const retiredSport = state.sport?.id === 'basketball' || state.sport?.id === 'baseball'
+  const retiredSport = isRetiredLegacySport(state.sport?.id)
   return (retiredSport && !isRetiredLegacyGame(state)) || state.gameDataAuthority === 'sport_events'
     ? 'sport_events' : null
 }
@@ -37,12 +41,12 @@ export function legacyRetiredGameBinding(
 }
 
 export function canFinalizeAggregateGame(state: LegacyAuthorityState): boolean {
-  return state.sport?.id !== 'basketball' && state.sport?.id !== 'baseball'
+  return !isRetiredLegacySport(state.sport?.id)
     && state.gameDataAuthority == null && state.eventStream == null && state.sportGameState == null
 }
 
 export function blocksRetiredLegacyMutation(state: LegacyAuthorityState, action: GameAction): boolean {
-  if (action.type === 'SET_SPORT' && ['basketball', 'baseball'].includes(action.sport.id)) return true
+  if (action.type === 'SET_SPORT' && isRetiredLegacySport(action.sport.id)) return true
   // Transport settlement, explicit replacement and reset must still preserve/drain saved facts.
   return isRetiredLegacyGame(state) && ![
     'HYDRATE_STATE', 'SET_CLOUD_SYNC_STATE', 'RESET_GAME', 'SET_SPORT',

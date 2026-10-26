@@ -129,7 +129,7 @@ beforeEach(() => {
 afterEach(() => { harness.cleanups.forEach(cleanup => cleanup()); resetCurrentAuthUserIdForTests(); vi.unstubAllGlobals() })
 
 describe('Cloud Games open lifetime', () => {
-  it.each([['basketball', 'active'], ['basketball', 'parked'], ['baseball', 'active'], ['baseball', 'parked']])(
+  it.each([['basketball', 'active'], ['basketball', 'parked'], ['baseball', 'active'], ['baseball', 'parked'], ['hockey', 'active'], ['hockey', 'parked']])(
     'preserves dirty %s %s history instead of loading an older cloud snapshot', async (sport, kind) => {
       harness.sportId = sport; harness.authority.mockResolvedValue('legacy')
       const local = { ...candidate(), notes: 'Unsynced local facts',
@@ -148,8 +148,8 @@ describe('Cloud Games open lifetime', () => {
       expect((localStorage as unknown as MemoryStorage).store).toEqual(before)
     }
   )
-  it('refuses a legacy Basketball open with incompatible event-bound local history', async () => {
-    harness.sportId = 'basketball'; harness.authority.mockResolvedValue('legacy')
+  it.each(['basketball', 'hockey'])('refuses a legacy %s open with incompatible event-bound local history', async sportId => {
+    harness.sportId = sportId; harness.authority.mockResolvedValue('legacy')
     harness.state = { ...candidate(), gameDataAuthority: 'sport_events',
       cloudSync: { ...createInitialState().cloudSync, gameId: 'cloud-a' } }
     await open(); await drain()

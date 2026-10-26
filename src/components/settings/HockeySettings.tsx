@@ -6,51 +6,20 @@ import { useSportPersonalSettings, type SportPersonalSettingsStatus } from '../.
 import { hockeySettingsFingerprint, hockeySettingsRules } from '../../lib/hockey/settings'
 import { hockeyPersonalSettingsAdapter } from '../../lib/hockey/settingsSync'
 import { createSettingsDraft, editSettingsDraft, syncSettingsDraft } from '../../lib/settingsDraft'
-import { getHockeyEventCreationPolicy } from '../../lib/sportAvailability'
 import HockeyRulesFields from './HockeyRulesFields'
 
 /**
- * Hockey settings. The event tracker opt-in (HKY-2E) is stored on this device and defaults
- * off; existing event games stay reachable whatever it is set to. The personal rules default
- * (HKY-5C) syncs with the account and applies to new games without a team.
+ * Personal rules sync with the account; rink orientation is device-local.
  */
 export default function HockeySettings() {
   const {
-    hockeyEventTrackerEnabled,
-    setHockeyEventTrackerEnabled,
     hockeyRinkFlippedByDefault,
     setHockeyRinkFlippedByDefault,
   } = useSettings()
-  const policy = getHockeyEventCreationPolicy(hockeyEventTrackerEnabled)
 
   return (
     <section className="card space-y-3">
       <h2 className="text-lg font-semibold text-content">🏒 Hockey settings</h2>
-      {/* HKY-6C: once released, every new game is an event game and the toggle is gone. */}
-      {policy.preferenceAvailable && (
-        <div className="space-y-2 border-y border-info-line bg-info px-3 py-3">
-          <div className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
-            <span id="hockey-event-tracker-label">New event tracker (preview)</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={hockeyEventTrackerEnabled}
-              aria-labelledby="hockey-event-tracker-label"
-              onClick={() => setHockeyEventTrackerEnabled(!hockeyEventTrackerEnabled)}
-              className={`relative h-7 w-12 shrink-0 rounded-full disabled:cursor-not-allowed disabled:bg-control-disabled ${
-                hockeyEventTrackerEnabled ? 'bg-accent' : 'bg-control'
-              }`}
-            >
-              <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full shadow transition-transform ${
-                hockeyEventTrackerEnabled ? 'translate-x-5 bg-accent-content' : 'bg-content'
-              }`} />
-            </button>
-          </div>
-          <p className="text-xs text-info-content">
-            New Hockey games use the rink tracker on this device.
-          </p>
-        </div>
-      )}
       <SettingSwitch
         id="hockey-rink-flipped"
         label="Start new games with the rink flipped"

@@ -3,7 +3,8 @@
 Status: approved product direction. Adoption is incremental; this document does
 not claim that every sport already implements the target. Basketball's compact
 layout merged in #491; event-only/legacy retirement merged in #506. Soccer/Hockey
-layout alignment is implemented for review, without retiring Hockey legacy authority. See
+layout alignment merged in #507; Hockey legacy retirement is implemented for review
+in the [cutover record](REGRESSION_TUI_2_HOCKEY_CUTOVER.md). See
 the [shared tracker plan](PLAN_TRACKER_UI_UNIFICATION.md).
 
 ## One tracker and shared layout
@@ -141,9 +142,9 @@ rules; a running recorder clock is not proof of what the rules permit.
 
 | Area | Current versus target |
 | --- | --- |
-| Soccer | TUI-2 compact navigation/clock and below-pitch modes/status implemented for review; see the [alignment record](REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md) |
+| Soccer | TUI-2 compact navigation/clock and below-pitch modes/status merged #507; see the [alignment record](REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md) |
 | Basketball | Compact layout merged #491; event-only creation and read-only legacy cutover merged #506, preserving recorded stats, exports and authorized old-data sync. Owner-only deployed checks remain pending |
-| Hockey | Released event-only new-game setup; TUI-2 side/filter/status and compact penalty context implemented for review. Legacy retirement remains the next authority slice |
+| Hockey | Released event-only new-game setup; TUI-2 layout merged #507. Legacy read-only retirement, atomic setup commit and creation-only rollback are implemented for review; see the [cutover](REGRESSION_TUI_2_HOCKEY_CUTOVER.md) |
 | Football | Generic grid only; shared layout follows FBE event foundations, not an immediate route switch |
 | Baseball/future sports | Baseball's own BSB-7D cutover merged #505; future sports follow their separate release plans. The four-sport audit itself grants no additional rollout |
 | Timing/replay | Separate architectural assessment, not part of the UI-only change |

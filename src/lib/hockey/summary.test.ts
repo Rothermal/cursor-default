@@ -128,7 +128,9 @@ describe('Hockey Summary routing (HKY-6A1)', () => {
     const local = clocklessGame()
     expect(isHockeySummaryRoute(local, new URLSearchParams())).toBe(true)
     expect(isHockeySummaryRoute(local, new URLSearchParams('gameId=g&sport=basketball'))).toBe(false)
-    expect(isHockeySummaryRoute({ ...local, sportGameState: null, gameDataAuthority: undefined }, new URLSearchParams())).toBe(false)
+    // A surviving stream marker keeps damaged setup on the fail-closed event path.
+    expect(isHockeySummaryRoute({ ...local, sportGameState: null, gameDataAuthority: undefined }, new URLSearchParams())).toBe(true)
+    expect(isHockeySummaryRoute({ ...local, eventStream: null, sportGameState: null, gameDataAuthority: null }, new URLSearchParams())).toBe(false)
     const empty = { gameDataAuthority: undefined, sport: null, sportGameState: null } as unknown as GameState
     expect(isHockeySummaryRoute(empty, new URLSearchParams('gameId=g&sport=hockey'))).toBe(true)
   })

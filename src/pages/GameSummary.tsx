@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
@@ -41,7 +42,7 @@ type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
 
 export default function GameSummary() {
   const navigate = useNavigate()
-  const { state, parkCurrentGame, parkingError, prepareActiveGameMutation } = useGame()
+  const { state, parkCurrentGame, parkingError, prepareActiveGameMutation, flushCloudSync } = useGame()
   const { user } = useAuth()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
   const {
@@ -77,6 +78,8 @@ export default function GameSummary() {
   const [settingPrimaryFor, setSettingPrimaryFor] = useState<string | null>(null)
   const [primaryError, setPrimaryError] = useState<string | null>(null)
   const [newGameError, setNewGameError] = useState<string | null>(null)
+  const [retryingLegacySync, setRetryingLegacySync] = useState(false)
+  const [legacySyncError, setLegacySyncError] = useState<string | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const legacyReadOnly = isRetiredLegacyGame(state)
@@ -642,7 +645,8 @@ export default function GameSummary() {
           <h2 className="font-semibold">Legacy {sport.name} / Read-only</h2>
           <p>{resolvedCloudReview && resolvedStats !== null ? 'Source: Resolved cloud statistics' : 'Source: Saved device snapshot'}</p>
           <p>Recorded stats are preserved. Tracking, corrections, recorder changes and finalization are retired.</p>
-          {!isFinalCloudGame && <p>This unfinished game is excluded from season and career totals. It will not be automatically finalized or converted.</p>}
+          {sport.id === 'hockey' ? <p>Legacy Hockey statistics remain separate from event-based season and career totals.</p>
+            : !isFinalCloudGame && <p>This unfinished game is excluded from season and career totals. It will not be automatically finalized or converted.</p>}
           <button type="button" className="btn-secondary" onClick={() => navigate('/settings/data')}>Local game export</button>
         </section>}
         {finalizeError && (
@@ -1213,6 +1217,16 @@ export default function GameSummary() {
           )}
           {legacyReadOnly && <>
             {state.cloudSync.lastError && <p role="alert" className="text-danger-content">{state.cloudSync.lastError}</p>}
+            {legacySyncError && <p role="alert" className="text-danger-content">{legacySyncError}</p>}
+            {gameId && !isFinalCloudGame && <button type="button" className="btn-secondary inline-flex w-full items-center justify-center gap-2"
+              disabled={retryingLegacySync} onClick={async () => {
+                setRetryingLegacySync(true); setLegacySyncError(null)
+                try {
+                  const result = await flushCloudSync()
+                  if (!result.ok) setLegacySyncError(result.reason)
+                } catch (caught) { setLegacySyncError(caught instanceof Error ? caught.message : 'Cloud sync failed. Your saved game is unchanged.') }
+                finally { setRetryingLegacySync(false) }
+              }}><RefreshCw size={16} className={retryingLegacySync ? 'animate-spin' : ''} />{retryingLegacySync ? 'Syncing...' : 'Retry sync'}</button>}
             <GameSyncStatus />
           </>}
         </div>

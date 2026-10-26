@@ -22,7 +22,7 @@ import { basketballSummaryPath } from '../lib/basketball/summary'
 import { hockeySummaryPath } from '../lib/hockey/summary'
 import { baseballSummaryPath } from '../lib/baseball/summary'
 import { legacyBaseballBinding } from '../lib/baseball/releasePolicy'
-import { isRetiredLegacyGame, legacyRetiredGameBinding } from '../lib/legacyGameRetirement'
+import { isRetiredLegacyGame, legacyRetiredGameBinding, isRetiredLegacySport } from '../lib/legacyGameRetirement'
 import { listParkedGameRecords } from '../lib/gameParking'
 import {
   createHockeyIndependentRecorderState,
@@ -436,6 +436,19 @@ export default function GameInfo() {
       const loadedTeam = teamRes.data as unknown as GameInfoTeamRow
       const membership = membershipRes.data as { role: string; accepted_at: string | null } | null
       const loadedSport = sports.find(item => item.id === loadedTeam.seasons.sport) ?? null
+      // Old team-bound grid rows predate games.sport_id; the team's season supplies context.
+      if (loadedGame.sport_id == null && loadedSport?.id === 'hockey') {
+        try {
+          const authority = await loadHockeyCloudDataAuthority(loadedGame.id)
+          if (cancelled) return
+          setHockeyDataAuthority(authority)
+        } catch (caught) {
+          if (cancelled) return
+          setError(caught instanceof Error ? caught.message : 'Hockey authority could not load')
+          setLoading(false)
+          return
+        }
+      }
       type TeamPlayerJoin = {
         players: GameInfoRosterPlayer
       }
@@ -632,7 +645,7 @@ export default function GameInfo() {
 
   const openFullGame = async () => {
     if (!game || !user || game.id !== gameId || !inspectionIsCurrent()) return
-    const retiredSport = sport?.id === 'baseball' || sport?.id === 'basketball'
+    const retiredSport = isRetiredLegacySport(sport?.id)
     const legacyInspectionIdentity = retiredSport ? captureAuthIdentity(user.id) : null
     const legacyInspectionCurrent = () => !retiredSport || Boolean(
       legacyInspectionIdentity && isCurrentAuthIdentity(legacyInspectionIdentity) && inspectionIsCurrent()
@@ -725,11 +738,30 @@ export default function GameInfo() {
       navigate('/game')
       return
     }
-    if (game.sport_id === 'hockey' && hockeyDataAuthority === 'sport_events') {
+    if (sport?.id === 'hockey' && hockeyDataAuthority === 'sport_events') {
+      if (!canTrackCurrentGame) {
+        navigate(hockeySummaryPath({ gameId: game.id, from: 'game-info', teamId: team?.id ?? fallbackTeamId }))
+        return
+      }
       await openHockeyEventGame(game, user.id)
       return
     }
+    if (sport?.id === 'hockey') {
+      if (hockeyDataAuthority !== 'legacy') { setError('Hockey authority is unavailable. Reload before opening this game.'); return }
+      try {
+        const binding = legacyRetiredGameBinding(activeStateRef.current, listParkedGameRecords(user.id), game.id, 'hockey')
+        if (binding) {
+          if (binding.kind === 'parked' && (!prepareActiveGameMutation('resume_commit') || !resumeParkedGame(binding.localGameId))) return
+          navigate('/summary')
+          return
+        }
+      } catch (caught) { setError(caught instanceof Error ? caught.message : 'Local history could not load.'); return }
+    }
     if (game.sport_id === 'baseball' && baseballDataAuthority === 'sport_events') {
+      if (!canTrackCurrentGame) {
+        navigate(baseballSummaryPath({ gameId: game.id, from: 'game-info', teamId: team?.id ?? fallbackTeamId }))
+        return
+      }
       await openBaseballEventGame(game, user.id)
       return
     }
@@ -1309,13 +1341,14 @@ export default function GameInfo() {
               </Link>
             )}
 
-            {((sport?.id === 'baseball' && baseballDataAuthority === 'legacy') || (sport?.id === 'basketball' && basketballDataAuthority === 'legacy')) && <section className="border-y border-info-line bg-info px-3 py-3 text-sm text-info-content">
+            {((sport?.id === 'baseball' && baseballDataAuthority === 'legacy') || (sport?.id === 'basketball' && basketballDataAuthority === 'legacy') || (sport?.id === 'hockey' && hockeyDataAuthority === 'legacy')) && <section className="border-y border-info-line bg-info px-3 py-3 text-sm text-info-content">
               <p className="font-semibold">Legacy {sport?.name} / Read-only</p>
               <p>Recorded stats remain available. Tracking, corrections and finalization are retired.</p>
-              {game.status !== 'final' && <p>This unfinished game is excluded from season and career totals.</p>}
+              {sport?.id === 'hockey' ? <p>Legacy Hockey statistics remain separate from event-based season and career totals.</p>
+                : game.status !== 'final' && <p>This unfinished game is excluded from season and career totals.</p>}
             </section>}
 
-            {sport?.id === 'soccer' || sport?.id === 'baseball' || sport?.id === 'basketball' ||
+            {sport?.id === 'soccer' || isRetiredLegacySport(sport?.id) ||
             basketballDataAuthority === 'sport_events' ||
             game.status === 'final' ||
             canTrackCurrentGame ? (
@@ -1327,13 +1360,13 @@ export default function GameInfo() {
               >
                 {openingGame
                   ? 'Opening...'
-                  : (sport?.id === 'baseball' && baseballDataAuthority === 'legacy') || (sport?.id === 'basketball' && basketballDataAuthority === 'legacy')
+                  : (sport?.id === 'baseball' && baseballDataAuthority === 'legacy') || (sport?.id === 'basketball' && basketballDataAuthority === 'legacy') || (sport?.id === 'hockey' && hockeyDataAuthority === 'legacy')
                     ? 'View legacy summary (read-only)'
                   : (hockeyDataAuthority === 'sport_events' || baseballDataAuthority === 'sport_events') && game.status === 'final'
                     ? 'Open recorded game (read-only)'
                     : game.status === 'final' ||
                         (sport?.id === 'soccer' && !canTrackGames(teamRole)) ||
-                        (basketballDataAuthority === 'sport_events' && !canTrackCurrentGame)
+                        ((basketballDataAuthority === 'sport_events' || hockeyDataAuthority === 'sport_events' || baseballDataAuthority === 'sport_events') && !canTrackCurrentGame)
                       ? 'View full summary'
                       : 'Open game'}
               </button>

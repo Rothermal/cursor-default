@@ -62,7 +62,7 @@ describe('BSB-7D route gates', () => {
   it('sends the event setup route to the page that applies the policy', () => {
     const app = source('src/App.tsx')
     const setupRoute = app.slice(app.indexOf('function GameSetupRoute()'), app.indexOf('function PlayerSetupRoute()'))
-    expect(setupRoute).toContain("eventsRequested: searchParams.get('events') === '1'")
+    expect(setupRoute).not.toContain('eventsRequested')
     expect(source('src/lib/gameSetupRoute.ts'))
       .toContain("if (sport === 'baseball') return 'baseball_events'")
     expect(setupRoute).toContain('<BaseballEventSetup key=')
@@ -129,8 +129,8 @@ describe('BSB-7D route gates', () => {
     ['const handleSaveOpponentName = async', 'const handleDeleteGame = async', '.update({ opponent_name: name })'],
   ])('pins the cloud rename authority refusal in %s', (start, end, mutation) => {
     const handler = section('src/pages/Games.tsx', start, end)
-    expect(handler).toContain("if (sportId === 'baseball' || sportId === 'basketball')")
-    expect(handler).toContain("sportId === 'baseball' ? loadBaseballCloudDataAuthority : loadBasketballCloudDataAuthority")
+    expect(handler).toContain('if (isRetiredLegacySport(sportId))')
+    expect(handler).toContain("sportId === 'baseball' ? loadBaseballCloudDataAuthority : sportId === 'hockey' ? loadHockeyCloudDataAuthority : loadBasketballCloudDataAuthority")
     expect(handler).toContain("if (authority !== 'sport_events')")
     expect(handler).toContain('games are read-only.')
     expect(handler.indexOf("if (authority !== 'sport_events')")).toBeLessThan(handler.indexOf(mutation))

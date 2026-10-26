@@ -2,8 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
-import { SettingsProvider, useSettings } from './context/SettingsContext'
-import { hockeyNewGamesUseEventTracker } from './lib/sportAvailability'
+import { SettingsProvider } from './context/SettingsContext'
 import { gameSetupRouteTarget, loadTeamSportId } from './lib/gameSetupRoute'
 import { gameSetupPath } from './lib/teamInfo'
 import { supabase } from './lib/supabase'
@@ -61,7 +60,6 @@ const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/Appea
 function GameSetupRoute() {
   const { state } = useGame()
   const { user } = useAuth()
-  const { hockeyEventTrackerEnabled } = useSettings()
   const [searchParams] = useSearchParams()
   const requestedSport = searchParams.get('sport')
   const teamId = searchParams.get('teamId')
@@ -82,13 +80,10 @@ function GameSetupRoute() {
     }
   }, [teamId, teamScope, user, attempt])
 
-  const hockeyNewGamesUseEvents = hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)
   const target = gameSetupRouteTarget({
     requestedSport,
-    eventsRequested: searchParams.get('events') === '1',
     teamId,
     activeSportId,
-    hockeyNewGamesUseEvents,
     teamSportId: teamSport?.scope === teamScope ? teamSport.sportId : undefined,
   })
   switch (target) {
@@ -112,6 +107,7 @@ function GameSetupRoute() {
         <Link className="btn-secondary inline-block" to="/sports">Back to Sports</Link>
       </main>
     default:
+      if (!requestedSport && !teamId && state.sport?.id === 'hockey') return <Navigate to={isLegacyGameForSport(state, 'hockey') ? '/summary' : '/game'} replace />
       if (!requestedSport && !teamId && isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
       return <GameSetup />
   }
@@ -120,6 +116,7 @@ function GameSetupRoute() {
 function PlayerSetupRoute() {
   const { state } = useGame()
   if (isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
+  if (state.sport?.id === 'hockey') return <Navigate to={isLegacyGameForSport(state, 'hockey') ? '/summary' : '/game'} replace />
   if (state.sport?.id === 'baseball') return <Navigate to={isLegacyBaseballGame(state) ? '/summary' : '/game'} replace />
   if (state.sport?.id !== 'soccer') return <PlayerSetup />
   return <SoccerPlayerSetup />
@@ -129,9 +126,8 @@ function GameTrackerRoute() {
   const { state } = useGame()
   if (isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
   // Hockey event games never fall through to the legacy stat grid.
-  if (state.sport?.id === 'hockey' && (state.sportGameState || state.eventStream)) {
-    return <HockeyGameTracker />
-  }
+  if (state.sport?.id === 'hockey') return isLegacyGameForSport(state, 'hockey')
+    ? <Navigate to="/summary" replace /> : <HockeyGameTracker />
   // Baseball event games never fall through to the legacy stat grid either.
   if (state.sport?.id === 'baseball') return isLegacyBaseballGame(state)
     ? <Navigate to="/summary" replace /> : <BaseballGameTracker />
@@ -144,6 +140,7 @@ function GameTrackerRoute() {
 function GameCheckoutRoute() {
   const { state } = useGame()
   if (isLegacyGameForSport(state, 'basketball')) return <Navigate to="/summary" replace />
+  if (state.sport?.id === 'hockey') return <Navigate to={isLegacyGameForSport(state, 'hockey') ? '/summary' : '/game'} replace />
   if (state.sport?.id === 'baseball') return <Navigate to={isLegacyBaseballGame(state) ? '/summary' : '/game'} replace />
   if (state.sport?.id !== 'soccer') return <GameCheckout />
   return <Navigate to="/players" replace />

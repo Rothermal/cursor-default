@@ -13,7 +13,6 @@ import { useBasketballTeamSettings } from '../hooks/useBasketballTeamSettings'
 import {
   getBasketballEventCreationPolicy,
   getSportAvailabilityPolicy,
-  hockeyNewGamesUseEventTracker,
 } from '../lib/sportAvailability'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 import {
@@ -100,7 +99,6 @@ export default function GameSetup() {
     basketballSettings,
     basketballSettingsSync,
     setBasketballSettingsPageActive,
-    hockeyEventTrackerEnabled,
   } = useSettings()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
@@ -359,8 +357,8 @@ export default function GameSetup() {
         return
       }
       // HKY-6C: a team-only link to a Hockey team opens the event setup instead.
-      if (requestedSport.id === 'hockey' && requestedTeamId && hockeyNewGamesUseEventTracker(hockeyEventTrackerEnabled)) {
-        navigate(`${gameSetupPath(requestedTeamId, 'hockey')}&events=1`, { replace: true })
+      if (requestedSport.id === 'hockey') {
+        navigate(`${gameSetupPath(requestedTeamId ?? '', 'hockey')}&events=1`, { replace: true })
         return
       }
 
@@ -392,7 +390,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-  }, [dispatch, hockeyEventTrackerEnabled, isCloudFlow, isSportEnabled, navigate, prepareActiveGameMutation, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
+  }, [dispatch, isCloudFlow, isSportEnabled, navigate, prepareActiveGameMutation, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -935,6 +933,7 @@ export default function GameSetup() {
   }
 
   const handleNext = async (forceCapabilityCheck = false) => {
+    if (sport?.id === 'hockey') { navigate('/setup?sport=hockey'); return }
     if (sport?.id === 'baseball') { navigate('/setup?sport=baseball'); return }
     if (!canProceed) return
     if (isCloudFlow && teamMode === 'existing' && !canTrackGames(selectedTeam?.accessRole ?? null)) {
