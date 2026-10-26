@@ -253,8 +253,9 @@ registration, cloud-game transport or old-game editing/retirement policy.
   without selection/count changes, explicit specialist clearing, position-first
   specialist ordering and two-way/multiple-specialist assignments.
 - Regression matrix `docs/REGRESSION_FBE_1_ROSTER_DEFAULTS.md`: owner/admin edit,
-  scorer/viewer read-only, two-way player, 8-player cap, inactive player cleanup,
-  other sports' Team Manage unchanged.
+  scorer/viewer read-only, two-way player, starter-capacity preset 8 and Custom
+  1-15 (not rules profiles), inactive player cleanup, other sports' Team Manage
+  unchanged.
 
 ---
 

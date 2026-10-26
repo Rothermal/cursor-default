@@ -204,7 +204,7 @@ Rule fields StatKeeper needs (not a rules engine; only what the projection uses)
 - flag-mode switches: kicking disabled, "tackle" labelled as "flag pull",
   no-run-zone warnings (display only).
 
-Football uses Basketball's **personal-or-team** authority
+The planned Football rules resolver uses Basketball's **personal-or-team** authority
 (`resolveBasketballSettingsHierarchy` in `src/lib/basketball/settings.ts`), the
 same model the Hockey plan chose, not Soccer's four-layer chain. A team game
 resolves `built-in profile -> team settings -> match overrides`. A personal
@@ -212,7 +212,10 @@ resolves `built-in profile -> team settings -> match overrides`. A personal
 A recorder's personal defaults never leak into a team game, so two recorders with
 different personal settings get identical rules for the same team. The complete
 resolved rules snapshot is frozen at game start. Existing Soccer and Basketball
-resolvers are unchanged.
+resolvers are unchanged. This is a later-phase target: FBE-1 team settings schema
+1 is defaults-only, so its team layer contributes no rules until a reviewed
+versioned extension adds them. Never infer match rules from the team starter
+capacity or apply personal defaults to fill that team rules layer.
 
 ### Periods and overtime
 
@@ -253,11 +256,15 @@ Detailed plan: [FBE-1](PLAN_FBE_1_ROSTER_POSITIONS_AND_UNITS.md).
   - then custom positions, then Unassigned.
 - Two-way players are normal (high school and youth). A player's default position
   is their primary position; unit membership is separate.
-- Team default starters are stored **per unit**: `offense` (up to players-per-side),
-  `defense` (same), and specialist role assignments (K, P, LS, H, KR, PR; each one
-  player or empty). A player may be in both offense and defense starters.
+- Team default starters are stored **per unit**: `offense` and `defense` each up
+  to the team's starter capacity (FBE-1: integer 1-15, default 11), plus specialist
+  role assignments (K, P, LS, H, KR, PR; each one player or empty). This editing
+  capacity is separate from the match rules' players per side. A player may be in
+  both offense and defense starters and hold multiple specialist roles.
 - New games snapshot positions, unit starters and specialists once into setup;
-  later edits in either direction do not rewrite each other.
+  later edits in either direction do not rewrite each other. Future FBE-3 setup
+  must explicitly review defaults that do not fit the match's effective size,
+  without silently trimming selections or writing changes back to the team.
 - Actor pickers order by position within the relevant unit: when the tracked team
   has the ball, offensive starters and offensive positions first; on defense,
   defensive starters first; for kicks, the specialist first. Everyone dressed stays
@@ -364,7 +371,10 @@ Detailed plan: [FBE-3](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md).
 Personal and team football settings reuse `user_sport_settings` /
 `team_sport_settings` (migration 048) with a strict football validator, revision
 CAS writes and metadata-only audit, as Soccer (SOC-6D) and Basketball (BKE-5B) do.
-Team settings carry rules profile + overrides + unit starter defaults. The
+FBE-1 team settings schema 1 carries only starter capacity, offense/defense
+starter defaults and the six specialist assignments. It has no rules-profile or
+override fields. The later rules/settings phases must add those fields through
+a reviewed versioned extension that preserves existing roster defaults. Their
 resolver follows the personal-or-team authority in §5; a test proves two recorders
 with different personal settings resolve identical rules for one team game.
 Device-only preferences (field orientation, detailed-by-default toggle) stay out
