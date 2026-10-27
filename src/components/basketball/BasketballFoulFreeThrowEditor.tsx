@@ -6,7 +6,7 @@ import {
   applyBasketballFoulFreeThrowChange,
   basketballFoulFreeThrowEditorOptions,
   basketballFoulParticipantOptions,
-  basketballResolvedPlayerOptions,
+  basketballFreeThrowShooterOptions,
   buildBasketballFoulFreeThrowEditDraft,
   buildBasketballHistoricalFoulFreeThrowDraft,
   previewBasketballFoulFreeThrowEdit,
@@ -117,7 +117,7 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
   const participantOptions = basketballFoulParticipantOptions(state, draft.teamSide)
   const drawnBySide: BasketballTeamSide = draft.teamSide === 'tracked' ? 'opponent' : 'tracked'
   const drawnByOptions = basketballFoulParticipantOptions(state, drawnBySide)
-  const shooterOptions = basketballResolvedPlayerOptions(state, draft.teamSide)
+  const shooterOptions = basketballFreeThrowShooterOptions(state, draft.teamSide)
   const { foulSources, tripOptions, positionOptions } = relationshipOptions
 
   const update = (changes: Partial<BasketballFoulFreeThrowDraft>) => {
@@ -135,7 +135,8 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
       update({ teamSide, sourceFoulEventId: null })
       return
     }
-    const shooter = basketballResolvedPlayerOptions(state, teamSide)[0]?.selection
+    const shooter = teamSide === 'opponent' ? { kind: 'team' as const }
+      : basketballFreeThrowShooterOptions(state, teamSide)[0]?.selection
     update({ teamSide, shooter: shooter ?? { kind: 'team' }, freeThrowTripId: null, tripAttemptNumber: null })
   }
 
@@ -427,7 +428,7 @@ function AttemptFields({
 }: {
   draft: BasketballFoulFreeThrowDraft
   update: (changes: Partial<BasketballFoulFreeThrowDraft>) => void
-  shooterOptions: ReturnType<typeof basketballResolvedPlayerOptions>
+  shooterOptions: ReturnType<typeof basketballFreeThrowShooterOptions>
   tripOptions: BasketballRelationshipOption[]
   positionOptions: number[]
 }) {

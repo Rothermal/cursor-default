@@ -51,6 +51,11 @@ Per-sport delivery is recorded below; these targets do not release every sport a
   side without individual credit, not a fabricated named unknown actor. Otherwise
   it is an unresolved selection. Sport adapters retain explicit distinctions among
   team offenses, unknown individuals and named staff.
+- Basketball's [LCF-2 follow-up](PLAN_LIVE_CAPTURE_FIELD_TEST_FOLLOWUP.md#lcf-2-unattributed-opponent-free-throws)
+  implements opponent standalone/awarded free throws with explicit Unattributed
+  team credit for review. Tracked free throws remain individual-required. Existing
+  named trip shooters retain their prefill; old attempts are never silently
+  reattributed. This does not expand unrelated sport/event eligibility.
 - An action explicitly launched from a player's in-game detail page may prefill that
   player, subject to eligibility. Merely visiting details must not install a global
   capture target; subsequent general surface capture still starts Unattributed.

@@ -3,6 +3,7 @@ import { AlertTriangle, Check, LocateFixed, MapPinOff, Pencil, X } from 'lucide-
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
 import { gameSideDisplayName } from '../../lib/display'
+import { basketballFreeThrowShooterOptions } from '../../lib/basketball/foulFreeThrowEditCommands'
 import type { ShotRecord } from '../../types'
 import {
   applyBasketballShotEdit,
@@ -72,7 +73,9 @@ export default function BasketballShotEditor({
   }, [onClose, placingLocation, preview])
 
   const shooterOptions = useMemo(
-    () => draft ? basketballShotActorOptions(state, draft.teamSide) : [],
+    () => draft ? draft.attempt === 'free_throw'
+      ? basketballFreeThrowShooterOptions(state, draft.teamSide)
+      : basketballShotActorOptions(state, draft.teamSide) : [],
     [draft, state]
   )
   const relationshipOptions = useMemo(
@@ -129,7 +132,8 @@ export default function BasketballShotEditor({
   }
 
   const selectSide = (teamSide: BasketballShotEditDraft['teamSide']) => {
-    const options = basketballShotActorOptions(state, teamSide)
+    const options = draft.attempt === 'free_throw'
+      ? basketballFreeThrowShooterOptions(state, teamSide) : basketballShotActorOptions(state, teamSide)
     const currentKey = basketballShotActorSelectionKey(draft.shooter, draft.teamSide)
     const nextShooter = options.find(option => option.key === currentKey)?.selection ?? options[0]?.selection
     if (!nextShooter) return

@@ -25,6 +25,8 @@ import type {
   BasketballTeamSide,
 } from './types'
 import { basketballRulesAllowOneAndOne } from './rules'
+import { TEAM_PLAYER_OPP_ID } from '../teamPlayers'
+import { isBasketballFreeThrowShooter } from './freeThrowActors'
 
 export type BasketballFoulOffender =
   | { kind: 'player'; playerId: string }
@@ -91,6 +93,7 @@ export interface BasketballFreeThrowAttemptStatus {
   attemptNumber: number
   made: boolean
   deleted: boolean
+  /** Capture target; the opponent team id represents explicit unattributed credit. */
   shooterPlayerId: string | null
 }
 
@@ -151,7 +154,8 @@ export function basketballFreeThrowTripStatuses(
               attemptNumber: event.payload.tripAttemptNumber!,
               made: event.payload.made,
               deleted: event.deletedAt !== null,
-              shooterPlayerId: shooter?.kind === 'player' ? shooter.playerId : null,
+              shooterPlayerId: shooter?.kind === 'player' ? shooter.playerId
+                : shooter?.kind === 'team' && event.teamSide === 'opponent' ? TEAM_PLAYER_OPP_ID : null,
             }
           }),
         ...progress,
@@ -264,15 +268,18 @@ export function captureBasketballFreeThrowAttempt(
   if (!shooterTarget.ok) return failure(state, shooterTarget.code, shooterTarget.message)
   if (
     shooterTarget.value.teamSide !== trip.teamSide ||
-    shooterTarget.value.selection.kind !== 'participant'
+    (shooterTarget.value.selection.kind !== 'participant' &&
+      !(trip.teamSide === 'opponent' && shooterTarget.value.selection.kind === 'team'))
   ) {
     return failure(state, 'invalid_actor', 'The free-throw shooter must belong to the awarded side.')
   }
-  const participant = guarded.context.sportState.projection.participants[
-    shooterTarget.value.selection.participantId
-  ]
-  if (!participant || participant.disqualified || participant.ejected) {
-    return failure(state, 'invalid_actor', 'The selected Basketball shooter is unavailable.')
+  if (shooterTarget.value.selection.kind === 'participant') {
+    const participant = guarded.context.sportState.projection.participants[
+      shooterTarget.value.selection.participantId
+    ]
+    if (!participant || participant.disqualified || participant.ejected) {
+      return failure(state, 'invalid_actor', 'The selected Basketball shooter is unavailable.')
+    }
   }
   const shooter = basketballActorForSelection(
     state,
@@ -280,7 +287,7 @@ export function captureBasketballFreeThrowAttempt(
     trip.teamSide,
     shooterTarget.value.selection
   )
-  if (!shooter.ok || shooter.value.kind !== 'player') {
+  if (!shooter.ok || !isBasketballFreeThrowShooter(trip.teamSide, shooter.value)) {
     return failure(
       state,
       shooter.ok ? 'invalid_actor' : shooter.code,

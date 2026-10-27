@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import BasketballQuickFreeThrowDialog from './BasketballQuickFreeThrowDialog'
+import BasketballFreeThrowTripDialog from './BasketballFreeThrowTripDialog'
+import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
 import CourtEventPopup from '../shot-chart/CourtEventPopup'
 import ActorSelect from '../ActorSelect'
 import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../../lib/teamPlayers'
@@ -15,6 +17,7 @@ vi.mock('react', async importOriginal => ({
     return [harness.slots[index], (value: unknown) => { harness.slots[index] = value }]
   },
   useRef: (current: unknown) => ({ current }),
+  useMemo: (factory: () => unknown) => factory(),
   useEffect: () => {},
 }))
 function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
@@ -23,16 +26,78 @@ function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   return [node as ReactElement<Record<string, unknown>>, ...elements(node.props.children)]
 }
 function button(tree: ReactNode, label: string) {
-  const found = elements(tree).find(element => element.type === 'button' && element.props.children === label)
+  const text = (node: ReactNode): string => Array.isArray(node) ? node.map(text).join('')
+    : typeof node === 'string' || typeof node === 'number' ? String(node)
+      : isValidElement<{ children?: ReactNode }>(node) ? text(node.props.children) : ''
+  const found = elements(tree).find(element => element.type === 'button' && text(element.props.children as ReactNode).trim() === label)
   if (!found) throw Error(`Missing ${label}`)
   return found.props as { disabled?: boolean; onClick: () => void }
 }
 beforeEach(() => { harness.slots = []; harness.cursor = 0 })
 
 describe('live attribution dialog review regressions', () => {
+  it('defaults an empty opponent standalone picker to valid Unattributed credit', () => {
+    const onRecord = vi.fn()
+    const tree = BasketballQuickFreeThrowDialog({ teamName: 'Away', teamSide: 'opponent', candidates: [], trips: [],
+      defaultPlayerId: null, error: null, onTrip: vi.fn(), onRecord, onClose: vi.fn() })
+    const select = elements(tree).find(element => element.type === ActorSelect)!
+    expect(select.props.value).toBe(TEAM_PLAYER_OPP_ID)
+    expect(select.props.emptyOption).toEqual({ value: TEAM_PLAYER_OPP_ID, label: 'Unattributed' })
+    expect(button(tree, 'Made').disabled).toBe(false)
+    button(tree, 'Made').onClick()
+    expect(onRecord).toHaveBeenCalledWith(TEAM_PLAYER_OPP_ID, true)
+  })
+
+  it('does not silently replace an unavailable explicit opponent shooter with team credit', () => {
+    const onRecord = vi.fn()
+    const props = { teamName: 'Away', teamSide: 'opponent' as const, candidates: [] as { value: string; label: string }[], trips: [],
+      defaultPlayerId: 'gone', error: null, onTrip: vi.fn(), onRecord, onClose: vi.fn() }
+    let tree = BasketballQuickFreeThrowDialog(props)
+    expect(button(tree, 'Made').disabled).toBe(true)
+    button(tree, 'Made').onClick()
+    expect(onRecord).not.toHaveBeenCalled()
+    const select = elements(tree).find(element => element.type === ActorSelect)!
+    ;(select.props.onChange as (id: string) => void)(TEAM_PLAYER_OPP_ID)
+    harness.cursor = 0
+    tree = BasketballQuickFreeThrowDialog(props)
+    button(tree, 'Miss').onClick()
+    expect(onRecord).toHaveBeenCalledWith(TEAM_PLAYER_OPP_ID, false)
+  })
+
+  it.each(['tracked', 'opponent'] as const)('applies the %s awarded-picker policy without requiring an opponent player', teamSide => {
+    const trip: BasketballFreeThrowTripStatus = { eventId: 'trip', teamSide, periodId: 'regulation-1', periodOrder: 1,
+      maximumAttempts: 2, oneAndOne: false, technical: false, possessionRetained: false,
+      sourceFoulEventId: null, attempts: [], nextAttemptNumber: 1, open: true, closedReason: null }
+    const onRecord = vi.fn()
+    const onAddParticipant = vi.fn()
+    const tree = BasketballFreeThrowTripDialog({ trip, teamName: 'Side', candidates: [], onRecord,
+      onAddParticipant, onRemove: vi.fn(), onClose: vi.fn() })
+    button(tree, 'Add player').onClick()
+    expect(onAddParticipant).toHaveBeenCalledOnce()
+    expect(onRecord).not.toHaveBeenCalled()
+    expect(button(tree, 'Made').disabled).toBe(teamSide === 'tracked')
+    button(tree, 'Made').onClick()
+    expect(onRecord.mock.calls).toEqual(teamSide === 'opponent' ? [[TEAM_PLAYER_OPP_ID, true]] : [])
+  })
+
+  it.each(['p1', TEAM_PLAYER_OPP_ID])('preserves an awarded trip shooter (%s) over a conflicting detail prefill', shooterPlayerId => {
+    const trip: BasketballFreeThrowTripStatus = { eventId: 'trip', teamSide: 'opponent', periodId: 'regulation-1', periodOrder: 1,
+      maximumAttempts: 2, oneAndOne: false, technical: false, possessionRetained: false,
+      sourceFoulEventId: null, attempts: [{ eventId: 'first', attemptNumber: 1, made: true, deleted: false, shooterPlayerId }],
+      nextAttemptNumber: 2, open: true, closedReason: null }
+    const onRecord = vi.fn()
+    const tree = BasketballFreeThrowTripDialog({ trip, teamName: 'Away', candidates: [{ playerId: 'p1', label: 'One' }],
+      suggestedPlayerId: shooterPlayerId === 'p1' ? TEAM_PLAYER_OPP_ID : 'p1', onRecord,
+      onAddParticipant: vi.fn(), onRemove: vi.fn(), onClose: vi.fn() })
+    const select = elements(tree).find(element => element.type === ActorSelect)!
+    expect(select.props.value).toBe(shooterPlayerId)
+    button(tree, 'Made').onClick()
+    expect(onRecord).toHaveBeenCalledWith(shooterPlayerId, true)
+  })
+
   it('blocks missing and stale standalone shooters without selecting a replacement', () => {
     const onRecord = vi.fn()
-    const props = { teamName: 'Home', candidates: [{ value: 'p1', label: 'One' }], trips: [],
+    const props = { teamName: 'Home', teamSide: 'tracked' as const, candidates: [{ value: 'p1', label: 'One' }], trips: [],
       defaultPlayerId: null, error: null, onTrip: vi.fn(), onRecord, onClose: vi.fn() }
     const render = (candidates = props.candidates) => { harness.cursor = 0; return BasketballQuickFreeThrowDialog({ ...props, candidates }) }
     let tree = render()

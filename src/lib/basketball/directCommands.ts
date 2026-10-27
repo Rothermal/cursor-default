@@ -14,6 +14,7 @@ import {
 } from './commands'
 import { createBasketballUuid } from './id'
 import { createBasketballStatEvent } from './statEvents'
+import { isBasketballFreeThrowShooter } from './freeThrowActors'
 import type {
   BasketballMatchEvent,
   BasketballScoreAdjustmentPayload,
@@ -133,7 +134,9 @@ export function captureBasketballDirectStat(
       actors: [actor.value],
     })
   } else if (isShotStat(options.statId)) {
-    if (target.value.selection.kind === 'team') {
+    const unattributedFreeThrow = target.value.teamSide === 'opponent' &&
+      (options.statId === 'ft' || options.statId === 'ft_miss')
+    if (target.value.selection.kind === 'team' && !unattributedFreeThrow) {
       return failure(state, 'invalid_actor', 'Direct Basketball shots require an individual player.')
     }
     const actor = basketballActorForSelection(
@@ -144,6 +147,9 @@ export function captureBasketballDirectStat(
     )
     if (!actor.ok) return failure(state, actor.code, actor.message)
     const shot = shotDescriptor(options.statId)
+    if (shot.attempt === 'free_throw' && !isBasketballFreeThrowShooter(target.value.teamSide, actor.value)) {
+      return failure(state, 'invalid_actor', 'Select a resolved player or an unattributed opponent for this free throw.')
+    }
     event = createBasketballStatEvent({
       ...common,
       eventType: 'basketball.shot',
