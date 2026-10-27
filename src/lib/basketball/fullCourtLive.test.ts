@@ -5,6 +5,7 @@ import { createInitialState } from '../gameReducer'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
+  addBasketballLateParticipant,
   captureBasketballCourtEvent,
   endBasketballPeriod,
   prepareBasketballGameStart,
@@ -130,6 +131,58 @@ function switched(state: GameState, seconds: number, eventId: string): GameState
 }
 
 describe('BKE-7B live full court', () => {
+  it.each([
+    { side: 'tracked' as const, value: 2 as const },
+    { side: 'tracked' as const, value: 3 as const },
+    { side: 'opponent' as const, value: 2 as const },
+    { side: 'opponent' as const, value: 3 as const },
+  ])('counts one $value-point shot, not linked assists/rebounds, for $side', ({ side, value }) => {
+    let state = started('left_to_right')
+    const shooterId = side === 'tracked' ? 'player-1' : id(801)
+    const assisterId = side === 'tracked' ? 'player-2' : id(802)
+    if (side === 'opponent') {
+      for (const [index, playerId] of [shooterId, assisterId].entries()) {
+        const added = addBasketballLateParticipant(state, {
+          recorderUserId: recorder, teamSide: side, displayName: `Opponent ${index + 1}`,
+          playerId, occurredAt: at(index + 1),
+        })
+        if (!added.ok) throw new Error(added.message)
+        state = added.state
+      }
+    }
+    const point = value === 3 ? { x: 0.5, y: 0.5 }
+      : { x: side === 'tracked' ? 0.95 : 0.05, y: 0.5 }
+    const scored = captureBasketballCourtEvent(state, {
+      recorderUserId: recorder, playerId: shooterId, fullCourtPoint: point,
+      event: { kind: 'shot', made: true, shotType: value === 3 ? '3pt' : '2pt', assistPlayerId: assisterId },
+      occurredAt: at(10), eventIds: [id(811), id(812)],
+    })
+    if (!scored.ok) throw new Error(scored.message)
+    expect(sport(scored.state).projection.score[side]).toBe(value)
+    expect(sport(scored.state).projection.sideStats[side][value === 3 ? '3pt' : '2pt']).toBe(1)
+    expect(scored.state.players.find(player => player.id === assisterId)?.stats.ast).toBe(1)
+    expect(scored.state.players.find(player => player.id === assisterId)?.stats[value === 3 ? '3pt' : '2pt']).toBe(0)
+    expect(scored.state.shotChart).toHaveLength(1)
+    expect(scored.state.eventStream!.events.slice(-2).map(event => (event as { eventType: string }).eventType))
+      .toEqual(['basketball.shot', 'basketball.assist'])
+
+    const missed = captureBasketballCourtEvent(scored.state, {
+      recorderUserId: recorder, playerId: shooterId, fullCourtPoint: point,
+      event: { kind: 'shot', made: false, shotType: value === 3 ? '3pt' : '2pt',
+        rebound: { statId: 'oreb', playerId: assisterId } },
+      occurredAt: at(11), eventIds: [id(813), id(814)],
+    })
+    if (!missed.ok) throw new Error(missed.message)
+    expect(sport(missed.state).projection.score[side]).toBe(value)
+    expect(sport(missed.state).projection.sideStats[side].oreb).toBe(1)
+    const undoMiss = undoLatestBasketballCourtCapture(missed.state)
+    if (!undoMiss.ok) throw new Error(undoMiss.message)
+    expect(sport(undoMiss.state).projection.score[side]).toBe(value)
+    const undoMake = undoLatestBasketballCourtCapture(undoMiss.state)
+    if (!undoMake.ok) throw new Error(undoMake.message)
+    expect(sport(undoMake.state).projection.score).toEqual({ tracked: 0, opponent: 0 })
+  })
+
   it('starts full court with the tip-off in the same command, and half court without one', () => {
     const full = started('right_to_left')
     expect(full.eventStream?.events.map(event => (event as { eventType: string }).eventType)).toEqual([

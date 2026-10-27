@@ -148,8 +148,8 @@ export function assertHealthyBasketballEventGame(
   ) {
     throw new Error('Basketball event game is not initialized')
   }
-  assertHealthyEventGame(state, 'basketball', rebuildEventGameState)
-  return sportState
+  return assertHealthyEventGame(state, 'basketball', rebuildEventGameState)
+    .sportGameState as BasketballSportGameState
 }
 
 function rebuildEventGameState(state: GameState) {

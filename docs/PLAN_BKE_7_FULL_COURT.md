@@ -7,6 +7,11 @@ switch at halftime, and the basket you tap tells the app which team shot.
 Status: approved (merged 2026-10-11, PR #483); built with the §7 recommendations. BKE-7A through
 BKE-7D are implemented; see §8.
 
+Owner field-test follow-up (2026-10-26):
+[LCF-3](PLAN_LIVE_CAPTURE_FIELD_TEST_FOLLOWUP.md#lcf-3-capture-first-gestures-and-focus-mode)
+plans short-tap capture over existing markers, long-press review and a focused
+landscape surface. It is not implemented by the BKE-7 delivery record below.
+
 ---
 
 ## 1. Goal
