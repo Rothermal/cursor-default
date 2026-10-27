@@ -1,7 +1,9 @@
 # Live Capture Field-Test Follow-Up
 
-Status: LCF-1 sync correction merged in #510. LCF-2 unattributed opponent free
-throws implemented for review on 2026-10-26; surface interaction/focus mode remains
+Status: LCF-1 participant binding merged in #510; a follow-up for first-upload
+revisions and pending-primary responses requires migration 081 and is implemented
+for review ([evidence and owner steps](REGRESSION_LCF_1_SYNC_RECOVERY.md)). LCF-2
+unattributed opponent free throws merged in #511; surface interaction/focus mode remains
 planned, not implemented. The scoring report remains open for a second game whose
 export is pending. Football development is paused while these owner-reported
 issues are addressed. This is not a clock/substitution redesign.
@@ -15,8 +17,8 @@ Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.
 
 | Package | Status | Scope and exit |
 | --- | --- | --- |
-| LCF-1: Late-player sync and scoring audit | Sync correction merged #510; second-game scoring investigation open | Bind replayed participant identities; first export verifies 17-17, not the separate reported scoring interaction |
-| LCF-2: Unattributed opponent free throws | Implemented for review | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
+| LCF-1: Late-player sync and scoring audit | Binding merged #510; revision/recorder recovery implemented for review, migration 081 required | The later 115-event export exposes a first-upload tombstone rejection; the other screen exposes nullable primary status. [Recovery evidence](REGRESSION_LCF_1_SYNC_RECOVERY.md). Separate second-game scoring investigation remains open |
+| LCF-2: Unattributed opponent free throws | Merged #511 | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
 | LCF-3: Capture-first gestures and focused surface | Requested target; interaction details below are recommendations | Short tap opens capture even over an existing marker; long press opens review; focused landscape layout with score and menu. Basketball first, then relevant sibling surfaces |
 
 These are cohesive feature PRs, not a new foundation/micro-phase ladder. Do not
@@ -44,7 +46,7 @@ needs its actor mapping. This explains why deleting shots is not a sync repair.
 Never solve this by dropping history, inventing a new player, or acknowledging an
 incomplete upload as synced.
 
-### Implemented correction
+### Participant-binding correction (#510)
 
 - Return the validated rebuilt state from `assertHealthyEventGame` and consume its
   sport state in every event-cloud adapter health wrapper.
@@ -54,8 +56,13 @@ incomplete upload as synced.
   remain setup-based. No new late/opponent identity model is introduced for them.
 - Keep corrupt-stream rejection, account cancellation, recorder independence,
   conflict handling, final-state policy and checkpoint ordering unchanged.
-- No SQL migration, authorization expansion, history rewrite or automatic cloud
-  operation against the supplied game is included.
+- The #510 correction includes no SQL migration, authorization expansion, history
+  rewrite or automatic cloud operation against the supplied game.
+
+The subsequent 115-event export exposes a separate first-upload revision gate,
+and the other game's screenshot exposes a nullable pending-primary response.
+Migration 081 addresses these shared server issues; see the
+[follow-up regression and operator steps](REGRESSION_LCF_1_SYNC_RECOVERY.md).
 
 ### Scoring audit
 
