@@ -841,7 +841,8 @@ export default function GameTracker() {
 
   const handleFreeThrowAttempt = (playerId: string, made: boolean) => {
     if (!selectedFreeThrowTrip) return
-    if (!freeThrowCandidates.some(candidate => candidate.playerId === playerId) ||
+    const unattributedOpponent = selectedFreeThrowTrip.teamSide === 'opponent' && playerId === TEAM_PLAYER_OPP_ID
+    if ((!unattributedOpponent && !freeThrowCandidates.some(candidate => candidate.playerId === playerId)) ||
         (activeFreeThrowTrip?.snapshot && activeFreeThrowTrip.snapshot !== JSON.stringify(selectedFreeThrowTrip))) {
       setFreeThrowError('The player or award changed. Close and reopen the free-throw trip.')
       return
@@ -881,14 +882,15 @@ export default function GameTracker() {
       setFreeThrowError('An awarded trip is available. Choose the award before recording.')
       return
     }
-    if (!playerId || isTeamPseudoPlayer({ id: playerId })) {
+    const unattributedOpponent = quickFreeThrow.side === 'opponent' && playerId === TEAM_PLAYER_OPP_ID
+    if (!playerId || (isTeamPseudoPlayer({ id: playerId }) && !unattributedOpponent)) {
       setFreeThrowError('Choose an eligible player to record a free throw.')
       return
     }
     const id = playerId
     const target = basketballCaptureTargetForPlayerId(state, id)
     if (!target.ok || target.value.teamSide !== quickFreeThrow.side ||
-        !basketballActorPlayers(state, players).some(player => player.id === id)) {
+        (!unattributedOpponent && !basketballActorPlayers(state, players).some(player => player.id === id))) {
       setFreeThrowError('Choose an eligible player for this team.')
       return
     }
@@ -2017,6 +2019,7 @@ export default function GameTracker() {
       {quickFreeThrow && <BasketballQuickFreeThrowDialog
         key={`${quickFreeThrow.side}:${quickFreeThrow.playerId ?? 'team'}`}
         teamName={quickFreeThrow.side === 'tracked' ? trackedTeamLabel : opponentTeamLabel}
+        teamSide={quickFreeThrow.side}
         defaultPlayerId={quickFreeThrow.playerId}
         candidates={foulCandidates.filter(candidate => candidate.live && candidate.teamSide === quickFreeThrow.side).map(candidate => ({ value: candidate.playerId, label: candidate.label }))}
         trips={basketballOpenTrips(state, basketballTripStatuses, quickFreeThrow.side)}

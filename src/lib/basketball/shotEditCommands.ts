@@ -29,6 +29,7 @@ import { createBasketballUuid } from './id'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballStatEvent } from './statEvents'
+import { isBasketballFreeThrowShooter } from './freeThrowActors'
 import type {
   BasketballAttackingDirection,
   BasketballAssistEvent,
@@ -845,6 +846,9 @@ function buildShotEditPlan(
   const location = shotDraftLocation(draft)
   if (!location.ok) return location
   const valueSource = shotValueSource(original, draft, location.value)
+  if (original.payload.attempt === 'free_throw' && !isBasketballFreeThrowShooter(draft.teamSide, shooter.value)) {
+    return commandFailure('invalid_actor', 'Select a resolved player or an unattributed opponent for this free throw.')
+  }
   const shotPayload = {
     ...original.payload,
     made: draft.made,

@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import ActorSelect, { type ActorOption } from '../ActorSelect'
 import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
+import type { BasketballTeamSide } from '../../lib/basketball/types'
+import { TEAM_PLAYER_OPP_ID } from '../../lib/teamPlayers'
 
-export default function BasketballQuickFreeThrowDialog({ teamName, candidates, trips, defaultPlayerId,
+export default function BasketballQuickFreeThrowDialog({ teamName, teamSide, candidates, trips, defaultPlayerId,
   error, onTrip, onRecord, onClose }: {
   teamName: string
+  teamSide: BasketballTeamSide
   candidates: ActorOption[]
   trips: BasketballFreeThrowTripStatus[]
   defaultPlayerId: string | null
@@ -14,8 +17,11 @@ export default function BasketballQuickFreeThrowDialog({ teamName, candidates, t
   onRecord: (playerId: string, made: boolean) => void
   onClose: () => void
 }) {
-  const [playerId, setPlayerId] = useState(candidates.some(candidate => candidate.value === defaultPlayerId) ? defaultPlayerId! : '')
-  const validShooter = !!playerId && candidates.some(candidate => candidate.value === playerId)
+  const preferred = defaultPlayerId ?? (teamSide === 'opponent' ? TEAM_PLAYER_OPP_ID : '')
+  const allowed = (id: string) => (teamSide === 'opponent' && id === TEAM_PLAYER_OPP_ID) ||
+    candidates.some(candidate => candidate.value === id)
+  const [playerId, setPlayerId] = useState(allowed(preferred) ? preferred : '')
+  const validShooter = !!playerId && allowed(playerId)
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
     window.addEventListener('keydown', escape)
@@ -28,7 +34,9 @@ export default function BasketballQuickFreeThrowDialog({ teamName, candidates, t
       {trips.length ? trips.map((trip, index) => <button key={trip.eventId} type="button" className="btn-secondary w-full" onClick={() => onTrip(trip)}>
         Award {index + 1}: attempt {trip.nextAttemptNumber} of {trip.maximumAttempts}{trip.oneAndOne ? ' (one-and-one)' : ''}
       </button>) : <>
-        <ActorSelect label="Shooter" value={playerId} options={candidates} onChange={setPlayerId} />
+        <ActorSelect label="Shooter" value={playerId} options={candidates} onChange={setPlayerId}
+          emptyOption={teamSide === 'opponent' ? { value: TEAM_PLAYER_OPP_ID, label: 'Unattributed' }
+            : { value: '', label: 'Choose a player' }} />
         {!validShooter && <p role="status" className="text-sm text-content-muted">Choose an eligible player to record a free throw.</p>}
         <div className="grid grid-cols-2 gap-2">
           <button type="button" disabled={!validShooter} className="btn-secondary" onClick={() => { if (validShooter) onRecord(playerId, false) }}>Miss</button>

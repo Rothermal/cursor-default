@@ -3,6 +3,7 @@ import { Check, Trash2, UserPlus, X } from 'lucide-react'
 import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
 import ActorSelect from '../ActorSelect'
 import { basketballTripShooter } from '../../lib/basketball/liveActors'
+import { TEAM_PLAYER_OPP_ID } from '../../lib/teamPlayers'
 
 export interface BasketballFreeThrowShooterCandidate {
   playerId: string
@@ -32,19 +33,24 @@ export default function BasketballFreeThrowTripDialog({
   onRemove,
   onClose,
 }: BasketballFreeThrowTripDialogProps) {
-  const prefill = basketballTripShooter(trip) ?? suggestedPlayerId
-  const initialPlayerId = candidates.some(candidate => candidate.playerId === prefill) ? prefill! : ''
+  const prefill = basketballTripShooter(trip) ?? suggestedPlayerId ??
+    (trip.teamSide === 'opponent' ? TEAM_PLAYER_OPP_ID : '')
+  const allowed = (id: string) => (trip.teamSide === 'opponent' && id === TEAM_PLAYER_OPP_ID) ||
+    candidates.some(candidate => candidate.playerId === id)
+  const initialPlayerId = allowed(prefill) ? prefill : ''
   const [playerId, setPlayerId] = useState(initialPlayerId)
+  const validShooter = !!playerId && allowed(playerId)
   const activeAttempts = useMemo(
     () => trip.attempts.filter(attempt => !attempt.deleted),
     [trip.attempts]
   )
 
   useEffect(() => {
-    if (!candidates.some(candidate => candidate.playerId === playerId)) {
+    if (playerId && !candidates.some(candidate => candidate.playerId === playerId) &&
+        !(trip.teamSide === 'opponent' && playerId === TEAM_PLAYER_OPP_ID)) {
       setPlayerId('')
     }
-  }, [candidates, playerId])
+  }, [candidates, playerId, trip.teamSide])
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -116,9 +122,11 @@ export default function BasketballFreeThrowTripDialog({
           )}
 
           <ActorSelect label="Shooter" value={playerId} onChange={setPlayerId}
-            options={candidates.map(candidate => ({ value: candidate.playerId, label: candidate.label }))} />
+            options={candidates.map(candidate => ({ value: candidate.playerId, label: candidate.label }))}
+            emptyOption={trip.teamSide === 'opponent' ? { value: TEAM_PLAYER_OPP_ID, label: 'Unattributed' }
+              : { value: '', label: 'Choose a player' }} />
 
-          {candidates.length === 0 && trip.open && (
+          {candidates.length === 0 && trip.open && trip.teamSide === 'tracked' && (
             <div className="space-y-2 rounded-lg border border-warning-line bg-warning px-3 py-3">
               <p className="text-sm text-warning-content">
                 Add an eligible {teamName} player before recording this trip.
@@ -143,11 +151,11 @@ export default function BasketballFreeThrowTripDialog({
           {errorMessage && <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">{errorMessage}</p>}
 
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => onRecord(playerId, false)} disabled={!trip.open || !playerId} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-danger px-4 py-2 text-sm font-bold text-danger-content active:scale-95 disabled:bg-control-disabled disabled:text-content-disabled">
+            <button type="button" onClick={() => { if (trip.open && validShooter) onRecord(playerId, false) }} disabled={!trip.open || !validShooter} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-danger px-4 py-2 text-sm font-bold text-danger-content active:scale-95 disabled:bg-control-disabled disabled:text-content-disabled">
               <X size={17} aria-hidden />
               Miss
             </button>
-            <button type="button" onClick={() => onRecord(playerId, true)} disabled={!trip.open || !playerId} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-bold text-success-content active:scale-95 disabled:bg-control-disabled disabled:text-content-disabled">
+            <button type="button" onClick={() => { if (trip.open && validShooter) onRecord(playerId, true) }} disabled={!trip.open || !validShooter} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-bold text-success-content active:scale-95 disabled:bg-control-disabled disabled:text-content-disabled">
               <Check size={17} aria-hidden />
               Made
             </button>

@@ -1,9 +1,10 @@
 # Live Capture Field-Test Follow-Up
 
-Status: Basketball sync fix and scoring audit implemented for review on
-2026-10-26; unattributed opponent free throws and surface interaction/focus mode
-remain planned, not implemented. Football development is paused while these
-owner-reported issues are addressed. This is not a clock/substitution redesign.
+Status: LCF-1 sync correction merged in #510. LCF-2 unattributed opponent free
+throws implemented for review on 2026-10-26; surface interaction/focus mode remains
+planned, not implemented. The scoring report remains open for a second game whose
+export is pending. Football development is paused while these owner-reported
+issues are addressed. This is not a clock/substitution redesign.
 
 Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.md),
 [Basketball attribution](PLAN_BASKETBALL_ATTRIBUTION_AND_ROSTER.md),
@@ -14,8 +15,8 @@ Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.
 
 | Package | Status | Scope and exit |
 | --- | --- | --- |
-| LCF-1: Late-player sync and scoring audit | Implemented for review | Bind replayed participant identities, reproduce the supplied failure, and verify shots with linked statistics without changing scoring rules |
-| LCF-2: Unattributed opponent free throws | Requested target; implementation next | Record standalone and awarded opponent free throws without creating a player, with coherent correction, projection and cloud review |
+| LCF-1: Late-player sync and scoring audit | Sync correction merged #510; second-game scoring investigation open | Bind replayed participant identities; first export verifies 17-17, not the separate reported scoring interaction |
+| LCF-2: Unattributed opponent free throws | Implemented for review | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
 | LCF-3: Capture-first gestures and focused surface | Requested target; interaction details below are recommendations | Short tap opens capture even over an existing marker; long press opens review; focused landscape layout with score and menu. Basketball first, then relevant sibling surfaces |
 
 These are cohesive feature PRs, not a new foundation/micro-phase ladder. Do not
@@ -65,9 +66,11 @@ The supplied stream replays to **17-17**:
 | Tracked | 3 | 4 | 2 | 3 + 8 + 6 = 17 |
 | Opponent | 0 | 7 | 1 | 0 + 14 + 3 = 17 |
 
-There are no assist events in this export. It therefore cannot establish what
-happened during a separate assisted-shot interaction. No scoring defect has been
-reproduced, and no speculative scoring change is made.
+There are no assist events in this export. On 2026-10-26 the owner clarified that
+the suspected scoring problem occurred in the **second game**, not this 17-17
+game. The second game's full export is pending once sync is available. Keep that
+report open: this audit cannot establish what happened there. No scoring defect
+has been reproduced, and no speculative scoring change is made.
 
 Source trace: `commands.ts` appends one shot and one separately linked assist or
 rebound in an atomic capture. `statProjection.ts` changes score only for a made
@@ -111,12 +114,13 @@ after capture; an export alone may not capture an unintended UI gesture.
 
 ## LCF-2: Unattributed Opponent Free Throws
 
-This intentionally changes the earlier BAR-2 individual-required policy; it is
-not just an empty-option label fix. The UI, live commands and historical editors
-currently require a resolved player for free throws. The underlying shot event
-can represent a team actor; audit every consumer before exposing that path.
+This intentionally changes the earlier BAR-2 opponent individual-required policy;
+it is not just an empty-option label fix. Quick and awarded capture and historical
+edit/add now accept an explicit opponent team shooter. Tracked free throws still
+require a resolved player. The existing version-1 shot event already represents
+team actors; no event schema change or Supabase migration is included.
 
-### Proposed implementation contract
+### Implemented contract
 
 - Opponent standalone free throws default to an explicit **Unattributed** choice
   on the selected opponent side. Made adds exactly one point and one team FTM/FTA;
@@ -140,10 +144,20 @@ can represent a team actor; audit every consumer before exposing that path.
 - Other sports do not have Basketball free throws. Reuse the principle of valid
   side-level attribution for opponent events, not the Basketball trip model.
 
+The UI-only opponent team target is serialized as `{ role: 'shooter', kind: 'team' }`
+with its display label, never as a player/participant identity. Existing player
+mapping, shared event transport and server shot-score policy already support this
+representation. Canonical parsing, summary attribution and aggregate replay tests
+cover its read path. Named trip shooters retain prefill priority; an explicit
+selection changes only the newly recorded attempt, not previous player credit.
+
 Acceptance: zero opponent players, made/miss standalone and awarded trips, named
 shooter continuity, multiple open trips, one-and-one, stale selection, Undo,
-remove/restore/edit, reload/park, cloud checkpoint/finalization and summary/season
-totals. Prove no tracked eligibility change and no fabricated participants.
+remove/restore/edit, normalized reload, cloud serialization and summary/canonical
+aggregate replay pass locally. The [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md)
+contains actual counts and the separate pending live sync/checkpoint/finalization,
+physical-mobile and installed-PWA checks. No tracked eligibility expansion or
+fabricated participants is permitted.
 
 ## LCF-3: Capture-First Gestures and Focus Mode
 

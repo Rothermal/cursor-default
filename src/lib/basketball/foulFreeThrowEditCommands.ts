@@ -27,6 +27,7 @@ import {
 } from './playLocations'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { basketballRulesAllowOneAndOne } from './rules'
+import { isBasketballFreeThrowShooter } from './freeThrowActors'
 import {
   basketballShotActorOptions,
   type BasketballShotActorOption,
@@ -161,6 +162,18 @@ export function basketballFoulParticipantOptions(
   side: BasketballTeamSide
 ): BasketballShotActorOption[] {
   return basketballResolvedPlayerOptions(state, side)
+}
+
+export function basketballFreeThrowShooterOptions(
+  state: GameState,
+  side: BasketballTeamSide
+): BasketballShotActorOption[] {
+  const players = basketballResolvedPlayerOptions(state, side)
+  const team = side === 'opponent'
+    ? basketballShotActorOptions(state, side).filter(option => option.selection.kind === 'team')
+      .map(option => ({ ...option, label: 'Unattributed' }))
+    : []
+  return [...players, ...team]
 }
 
 export function basketballFoulFreeThrowEditorOptions(
@@ -321,9 +334,10 @@ export function buildBasketballHistoricalFoulFreeThrowDraft(
   if (!period) return commandFailure('invalid_period', 'Start a Basketball period before adding an event.')
   const time = defaultBasketballHistoricalTime(prepared.value.state, period)
   if (!time.ok) return commandFailure('invalid_timestamp', time.message)
-  const defaultSide: BasketballTeamSide = 'tracked'
+  const defaultSide: BasketballTeamSide = eventType === 'basketball.free_throw_attempt' &&
+    basketballResolvedPlayerOptions(prepared.value.state, 'tracked').length === 0 ? 'opponent' : 'tracked'
   const participant = basketballFoulParticipantOptions(prepared.value.state, defaultSide)[0]?.selection
-  const shooter = basketballResolvedPlayerOptions(prepared.value.state, defaultSide)[0]?.selection
+  const shooter = basketballFreeThrowShooterOptions(prepared.value.state, defaultSide)[0]?.selection
   if (eventType === 'basketball.free_throw_attempt' && !shooter) {
     return commandFailure('invalid_actor', 'Add a resolved Basketball participant before adding a free throw.')
   }
@@ -646,7 +660,7 @@ function buildAttemptPlan(
     draft.shooter,
     { allowUnavailable: true }
   )
-  if (!shooter.ok || shooter.value.kind !== 'player') {
+  if (!shooter.ok || !isBasketballFreeThrowShooter(draft.teamSide, shooter.value)) {
     return commandFailure(
       shooter.ok ? 'invalid_actor' : shooter.code,
       shooter.ok ? 'Free throws require a resolved Basketball player.' : shooter.message
