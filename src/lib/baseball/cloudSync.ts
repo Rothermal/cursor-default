@@ -83,8 +83,8 @@ export function assertHealthyBaseballEventGame(state: GameState): BaseballSportG
   if (state.gameDataAuthority !== 'sport_events' || sportState?.sportId !== 'baseball') {
     throw new Error('Baseball event game is not initialized')
   }
-  assertHealthyEventGame(state, 'baseball', rebuildBaseballEventGame)
-  return sportState as BaseballSportGameState
+  return assertHealthyEventGame(state, 'baseball', rebuildBaseballEventGame)
+    .sportGameState as BaseballSportGameState
 }
 
 export const baseballEventCloudTransportAdapter: EventCloudTransportAdapter = {

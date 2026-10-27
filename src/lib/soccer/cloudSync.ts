@@ -126,8 +126,8 @@ export function assertHealthySoccerEventGame(state: GameState): SoccerSportGameS
   if (sportState?.sportId !== 'soccer') {
     throw new Error('Soccer event game is not initialized')
   }
-  assertHealthyEventGame(state, 'soccer', rebuildEventGameState)
-  return sportState
+  return assertHealthyEventGame(state, 'soccer', rebuildEventGameState)
+    .sportGameState as SoccerSportGameState
 }
 
 function rebuildEventGameState(state: GameState) {

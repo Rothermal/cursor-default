@@ -117,7 +117,7 @@ export function assertHealthyEventGame(
   state: GameState,
   sportId: string,
   rebuild: (state: GameState) => ProjectionRebuildResult<GameEvent>
-): void {
+): GameState {
   if (
     state.sport?.id !== sportId ||
     !state.gameInfo ||
@@ -138,6 +138,8 @@ export function assertHealthyEventGame(
     const first = rebuilt.inspection.diagnostics[0]
     throw new Error(first?.message ?? `${sportName(sportId)} event history needs attention before cloud sync`)
   }
+  // Parked snapshots reset derived state; callers must bind replayed identities.
+  return rebuilt.state
 }
 
 export async function syncEventGameToCloud({

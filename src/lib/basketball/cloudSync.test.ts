@@ -3,7 +3,8 @@ import { sports } from '../../config/sports'
 import type { GameEventSyncConflict, GameState, Player } from '../../types'
 import { eventCloudTransportAdapterForSport } from '../eventCloudTransportAdapters'
 import { resolveEventConflictInState } from '../gameEvents/eventConflictResolution'
-import { addGameEvent } from '../gameEvents/mutations'
+import { addGameEvent, applyGameEventMutations } from '../gameEvents/mutations'
+import { normalizeSportGameState } from '../sportGameState/state'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import type { GameEvent } from '../gameEvents/types'
 import { createInitialState } from '../gameReducer'
@@ -16,6 +17,7 @@ import {
 import { setBasketballClock, startBasketballClock } from './clockCommands'
 import type { BasketballAnchoredCloudAuthorizationDependencies } from './cloudAuthorization'
 import { createBasketballLineupEvent } from './lineupEvents'
+import { captureBasketballDirectStat } from './directCommands'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 import type { BasketballMatchParticipant } from './types'
 import {
@@ -350,6 +352,64 @@ describe('Basketball event cloud transport adapter', () => {
       source_player_id: 'player-1',
       snapshot: expect.objectContaining({ teamSide: 'tracked', addedDuringMatch: false }),
     }))
+  })
+
+  it.each([false, true])('binds a late opponent from a parked snapshot, including removed attempts: %s', async removed => {
+    const added = addBasketballLateParticipant(startedState(true), {
+      recorderUserId: 'user-1', teamSide: 'opponent', displayName: 'Late Opponent',
+      participantId: '70000000-0000-4000-8000-000000000222',
+      playerId: '70000000-0000-4000-8000-000000000223',
+      occurredAt: '2026-08-15T12:02:00.000Z',
+    })
+    if (!added.ok) throw new Error(added.message)
+    const shot = captureBasketballDirectStat(added.state, {
+      recorderUserId: 'user-1', playerId: '70000000-0000-4000-8000-000000000223',
+      statId: 'ft_miss', occurredAt: '2026-08-15T12:02:01.000Z',
+    })
+    if (!shot.ok) throw new Error(shot.message)
+    let source = shot.state
+    if (removed) {
+      const deleted = applyGameEventMutations(source, [{ type: 'delete', eventId: shot.eventIds[0] }],
+        '2026-08-15T12:02:02.000Z', gameEventRegistry, gameEventProjectors)
+      if (!deleted.ok) throw new Error(deleted.error.message)
+      source = deleted.state
+    }
+    const persisted = {
+      ...source,
+      cloudSync: { ...source.cloudSync, gameId: 'cloud-game-1' },
+      sportGameState: normalizeSportGameState(source.sportGameState),
+    }
+    expect(persisted.sportGameState?.sportId === 'basketball' &&
+      persisted.sportGameState.projection.participants['70000000-0000-4000-8000-000000000222'])
+      .toBeUndefined()
+    const { serializeGameEventForCloud } = await vi.importActual<typeof import('../gameEvents/cloud')>('../gameEvents/cloud')
+    cloudMock.upsert.mockImplementation(async (gameId, userId, event, map) => {
+      const serialized = serializeGameEventForCloud(gameId, userId, event, map)
+      return serialized.ok ? { ok: true, status: 'applied' } : {
+        ok: false, status: 'mapping_error', error: serialized.diagnostic.message,
+      }
+    })
+    cloudMock.rpc.mockImplementation(async (name, params) => name === 'bind_basketball_event_game_v5'
+      ? { data: { game_id: 'cloud-game-1', game_status: 'in_progress',
+          participant_id_map: Object.fromEntries(params.p_participants.map((participant: { client_player_id: string }) =>
+            [participant.client_player_id, `cloud-${participant.client_player_id}`])),
+        }, error: null }
+      : { data: '2026-08-15T12:03:00.000Z', error: null })
+
+    const synced = await syncBasketballEventGameToCloud({
+      state: persisted, userId: 'user-1', localGameId: 'local-1',
+    })
+    expect(cloudMock.rpc).toHaveBeenCalledWith('bind_basketball_event_game_v5', expect.objectContaining({
+      p_participants: expect.arrayContaining([expect.objectContaining({
+        client_player_id: '70000000-0000-4000-8000-000000000223', source_player_id: null,
+      })]),
+    }))
+    expect(synced.playerIdMap).toHaveProperty('70000000-0000-4000-8000-000000000223')
+    expect(cloudMock.upsert).toHaveBeenCalledTimes(source.eventStream!.events.length)
+    expect(cloudMock.rpc.mock.calls[cloudMock.rpc.mock.calls.length - 1]?.[0])
+      .toBe('confirm_game_event_stream_checkpoint')
+    expect(persisted.sportGameState?.sportId === 'basketball' &&
+      persisted.sportGameState.projection.status).toBe('not_started')
   })
 
   it('round-trips a healthy stream using only event transport contracts', async () => {

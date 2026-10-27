@@ -3,6 +3,7 @@ import type { GameState, SportConfig } from '../../types'
 import type { GameEvent } from '../gameEvents/types'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { createInitialState } from '../gameReducer'
+import { normalizeSportGameState } from '../sportGameState/state'
 import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import {
   addSoccerMatchParticipant,
@@ -324,6 +325,19 @@ describe('soccer event cloud sync helpers', () => {
       !('currentStatus' in participant.snapshot) &&
       !('currentRole' in participant.snapshot)
     )).toBe(true)
+  })
+
+  it('binds late resolved identities after parked-state normalization without mutating the snapshot', () => {
+    const source = lateResolvedShotState()
+    const persisted = { ...source, sportGameState: normalizeSportGameState(source.sportGameState) }
+    const before = structuredClone(persisted)
+    expect(soccerEventCloudTransportAdapter.prepare(persisted).participants).toContainEqual(
+      expect.objectContaining({
+        client_participant_id: 'participant-late', client_player_id: 'player-late',
+        snapshot: expect.objectContaining({ addedDuringMatch: true }),
+      })
+    )
+    expect(persisted).toEqual(before)
   })
 
   it('builds a deterministic revision checkpoint for a healthy existing game', () => {

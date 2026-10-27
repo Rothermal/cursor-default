@@ -3,6 +3,12 @@
 Status: Product Q&A complete. BAR-1 merged; owner confirmed migration 070 applied.
 BAR-2 merged. Post-merge setup/lineup follow-up is pending review and owner replay.
 
+Owner field-test follow-up (2026-10-26):
+[LCF-2](PLAN_LIVE_CAPTURE_FIELD_TEST_FOLLOWUP.md#lcf-2-unattributed-opponent-free-throws)
+requests unattributed opponent free throws without creating players. This is a
+planned change to BAR-2's individual-required policy below, not shipped behavior.
+Until that package lands, existing quick/trip commands still require a player.
+
 ## BAR-2 delivery record
 
 ### Post-merge field feedback
