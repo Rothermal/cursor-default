@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { Check, Trash2, UserPlus, X } from 'lucide-react'
 import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
 import ActorSelect from '../ActorSelect'
@@ -52,17 +53,13 @@ export default function BasketballFreeThrowTripDialog({
     }
   }, [candidates, playerId, trip.teamSide])
 
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  const dialogRef = useRef<HTMLElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-16 sm:items-center sm:p-4" onClick={onClose}>
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-free-throw-trip-title"

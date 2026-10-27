@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { X } from 'lucide-react'
 import ActorSelect, { type ActorOption } from '../ActorSelect'
 import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
@@ -22,13 +23,10 @@ export default function BasketballQuickFreeThrowDialog({ teamName, teamSide, can
     candidates.some(candidate => candidate.value === id)
   const [playerId, setPlayerId] = useState(allowed(preferred) ? preferred : '')
   const validShooter = !!playerId && allowed(playerId)
-  useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
-    window.addEventListener('keydown', escape)
-    return () => window.removeEventListener('keydown', escape)
-  }, [onClose])
+  const dialogRef = useRef<HTMLElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4" onClick={onClose}>
-    <section role="dialog" aria-modal="true" aria-label="Free throw" className="max-h-[90dvh] w-full max-w-sm space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-4" onClick={event => event.stopPropagation()}>
+    <section ref={dialogRef} role="dialog" aria-modal="true" aria-label="Free throw" className="max-h-[90dvh] w-full max-w-sm space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-4" onClick={event => event.stopPropagation()}>
       <header className="flex items-center justify-between gap-2"><h2 className="min-w-0 break-words font-semibold text-content">{teamName} - Free Throw</h2>
         <button type="button" className="shrink-0 p-2 text-content" aria-label="Close free throw" onClick={onClose}><X size={18} /></button></header>
       {trips.length ? trips.map((trip, index) => <button key={trip.eventId} type="button" className="btn-secondary w-full" onClick={() => onTrip(trip)}>

@@ -1,10 +1,12 @@
 # Live Capture Field-Test Follow-Up
 
-Status: LCF-1 participant binding merged in #510; a follow-up for first-upload
-revisions and pending-primary responses requires migration 081 and is implemented
-for review ([evidence and owner steps](REGRESSION_LCF_1_SYNC_RECOVERY.md)). LCF-2
-unattributed opponent free throws merged in #511; surface interaction/focus mode remains
-planned, not implemented. The scoring report remains open for a second game whose
+Status: LCF-1 participant binding merged in #510; first-upload revision and
+pending-primary recovery merged in #512. The owner confirmed migration 081 and
+successful record merging on 2026-10-27
+([evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md)). LCF-2
+unattributed opponent free throws merged in #511. LCF-3 Basketball capture-first
+gestures and focused court are implemented for review; sibling-sport adoption
+and physical-device/PWA checks remain follow-ups. The scoring report remains open for a second game whose
 export is pending. Football development is paused while these owner-reported
 issues are addressed. This is not a clock/substitution redesign.
 
@@ -17,9 +19,9 @@ Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.
 
 | Package | Status | Scope and exit |
 | --- | --- | --- |
-| LCF-1: Late-player sync and scoring audit | Binding merged #510; revision/recorder recovery implemented for review, migration 081 required | The later 115-event export exposes a first-upload tombstone rejection; the other screen exposes nullable primary status. [Recovery evidence](REGRESSION_LCF_1_SYNC_RECOVERY.md). Separate second-game scoring investigation remains open |
+| LCF-1: Late-player sync and scoring audit | Merged #510/#512; owner confirms 081 applied and records merged | [Recovery evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md). Separate second-game scoring investigation remains open |
 | LCF-2: Unattributed opponent free throws | Merged #511 | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
-| LCF-3: Capture-first gestures and focused surface | Requested target; interaction details below are recommendations | Short tap opens capture even over an existing marker; long press opens review; focused landscape layout with score and menu. Basketball first, then relevant sibling surfaces |
+| LCF-3: Capture-first gestures and focused surface | Basketball implemented for review | Short tap opens capture even over a marker; long press opens review; focused landscape layout with score and menu. [Verification and remaining sibling/device work](REGRESSION_LCF_3_CAPTURE_FOCUS.md) |
 
 These are cohesive feature PRs, not a new foundation/micro-phase ladder. Do not
 delay the confirmed sync fix behind the UI work. FBE-1 remains an approved plan;
@@ -116,8 +118,9 @@ after capture; an export alone may not capture an unintended UI gesture.
   complete checkpoint and subsequent reload. Do not import a duplicate recording
   or delete the original to work around mapping. If a different error appears,
   retain the new export and diagnose it separately.
-- Owner live Supabase replay, physical-mobile and installed-PWA checks remain
-  pending. Broader rollout gates do not change.
+- The owner subsequently confirmed migration 081 and successful record merging
+  after #512. Publication/cloud Summary, physical-mobile and installed-PWA checks
+  not explicitly confirmed remain pending. Broader rollout gates do not change.
 
 ## LCF-2: Unattributed Opponent Free Throws
 
@@ -171,6 +174,13 @@ physical-mobile and installed-PWA checks. No tracked eligibility expansion or
 fabricated participants is permitted.
 
 ## LCF-3: Capture-First Gestures and Focus Mode
+
+Basketball's writable full-court tracker now implements the contract below. The
+gesture recognizer and focus controller are shared-ready, but Soccer/Hockey have
+not adopted them in this PR. Existing half-court and read-only charts retain
+their prior activation behavior. No event, clock, lineup, score, schema, cloud
+authority or rollout policy changes. See the
+[LCF-3 regression record](REGRESSION_LCF_3_CAPTURE_FOCUS.md).
 
 ### Requested target and recommended details
 

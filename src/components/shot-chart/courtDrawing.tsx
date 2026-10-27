@@ -154,6 +154,7 @@ export function ShotMarker({ shot, pulse, tone, label, onActivate }: ShotMarkerP
     : tone === 'opponent' ? 'rgb(var(--court-opponent))' : 'rgb(var(--court-miss))'
   return (
     <g
+      data-shot-id={shot.id}
       className={pulse ? 'shot-marker-pulse' : undefined}
       role={onActivate ? 'button' : undefined}
       tabIndex={onActivate ? 0 : undefined}

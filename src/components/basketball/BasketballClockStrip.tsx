@@ -44,6 +44,7 @@ export default function BasketballClockStrip({
   onRequestedLineupOpened,
   boundaryReviewRequest = 0,
   compact = false,
+  focused = false,
   onAddParticipant,
   onState,
 }: {
@@ -57,6 +58,7 @@ export default function BasketballClockStrip({
   /** Incremented by the tracker to open boundary review, for example after a blocked End Period. */
   boundaryReviewRequest?: number
   compact?: boolean
+  focused?: boolean
   onAddParticipant?: (teamSide: BasketballTeamSide, launcher: HTMLButtonElement | null) => void
   onState: (state: GameState) => void
 }) {
@@ -398,16 +400,16 @@ export default function BasketballClockStrip({
 
   return (
     <>
-      <section className="sticky top-0 z-30 border-y border-line-strong bg-surface/95 shadow-sm backdrop-blur safe-top" aria-label="Basketball game clock">
-        <div className="mx-auto w-full max-w-lg px-3 py-2">
+      <section className={focused ? 'relative z-30 shrink-0 border-b border-line bg-surface' : 'sticky top-0 z-30 border-y border-line-strong bg-surface/95 shadow-sm backdrop-blur safe-top'} aria-label="Basketball game clock">
+        <div className={focused ? 'relative w-full px-2 py-1' : 'mx-auto w-full max-w-lg px-3 py-2'}>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-          <div className="min-w-0">
+          <div className={focused ? 'flex min-w-0 items-center gap-2 pl-9' : 'min-w-0'}>
             <div className="flex items-center gap-2 text-xs font-semibold text-content-muted">
               <Clock3 size={14} aria-hidden />
               <span className="truncate">{segment.label}</span>
               <span>{clock.running ? 'Running' : clock.expired ? 'Expired' : 'Paused'}</span>
             </div>
-            <p className="mt-0.5 tabular-nums text-3xl font-bold text-content" aria-live="off">
+            <p className={focused ? 'tabular-nums text-xl font-bold text-content' : 'mt-0.5 tabular-nums text-3xl font-bold text-content'} aria-live="off">
               {formatClockDisplay(display.displayMs, showTenths)}
             </p>
           </div>
@@ -415,7 +417,7 @@ export default function BasketballClockStrip({
             type="button"
             onClick={clock.running ? handlePause : handleStart}
             disabled={Boolean(unsafeMessage)}
-            className="flex h-14 min-w-28 items-center justify-center gap-2 rounded-md bg-accent px-4 text-base font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled"
+            className={focused ? 'flex h-8 items-center justify-center gap-1 rounded bg-accent px-3 text-xs font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled' : 'flex h-14 min-w-28 items-center justify-center gap-2 rounded-md bg-accent px-4 text-base font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled'}
           >
             {clock.running ? <Pause size={20} aria-hidden /> : <Play size={20} aria-hidden />}
             {clock.running ? 'Pause' : 'Start'}
@@ -429,10 +431,12 @@ export default function BasketballClockStrip({
           </button>
         )}
 
-        <details open={compact ? undefined : true} className="mt-1">
-          <summary className={compact ? 'flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold text-content-muted' : 'hidden'}>
-            <Settings2 size={14} aria-hidden /> Clock &amp; lineup
+        <details open={compact ? undefined : true} className={focused ? 'absolute left-0 top-1 z-40' : 'mt-1'}>
+          <summary aria-label={focused ? 'Clock and lineup options' : undefined} title={focused ? 'Clock and lineup options' : undefined}
+            className={focused ? 'grid h-8 w-8 cursor-pointer list-none place-items-center text-content marker:content-none' : compact ? 'flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold text-content-muted' : 'hidden'}>
+            <Settings2 size={14} aria-hidden /> {!focused && 'Clock & lineup'}
           </summary>
+        <div className={focused ? 'absolute left-1 top-full max-h-[65dvh] w-[min(26rem,calc(100vw-2rem))] overflow-y-auto rounded-md border border-line bg-surface p-3 shadow-xl' : undefined}>
         {currentFive.length > 0 && (
           <div className="mt-2 flex min-h-8 items-center gap-1 overflow-x-auto" aria-label="Current lineup">
             <Users size={15} className="mr-1 shrink-0 text-content-muted" aria-hidden />
@@ -530,6 +534,7 @@ export default function BasketballClockStrip({
           </div>
         )}
 
+        </div>
         </details>
         {(unsafeMessage || error) && <p role="alert" className="mt-2 text-sm font-semibold text-danger-content">{unsafeMessage ?? error}</p>}
         {notice && !unsafeMessage && <p role="status" className="mt-2 text-sm text-success-content">{notice}</p>}

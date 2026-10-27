@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { X } from 'lucide-react'
 import type { BasketballCourtCaptureUnit } from '../../lib/basketball/courtCorrections'
 
@@ -26,17 +27,8 @@ export default function BasketballRecentEventsPopup({
   const closeRef = useRef<HTMLButtonElement>(null)
   const recent = units.slice(0, visibleCount)
 
-  useEffect(() => {
-    closeRef.current?.focus()
-  }, [])
-
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  const dialogRef = useRef<HTMLElement>(null)
+  useModalFocus({ enabled: true, dialogRef, initialFocusRef: closeRef, onClose })
 
   return (
     <div
@@ -44,6 +36,7 @@ export default function BasketballRecentEventsPopup({
       onClick={onClose}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-recent-events-title"

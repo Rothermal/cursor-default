@@ -17,9 +17,10 @@ interface ScoreboardProps {
   eventScoreControls?: EventScoreControls
   compact?: boolean
   showSyncStatus?: boolean
+  focused?: boolean
 }
 
-export default function Scoreboard({ readOnly = false, eventScoreControls, compact = false, showSyncStatus = true }: ScoreboardProps) {
+export default function Scoreboard({ readOnly = false, eventScoreControls, compact = false, showSyncStatus = true, focused = false }: ScoreboardProps) {
   const { state, dispatch } = useGame()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, cloudSync } =
     state
@@ -30,6 +31,14 @@ export default function Scoreboard({ readOnly = false, eventScoreControls, compa
   const teamScore = getDisplayedHomeScore(sport, rosterPlayers, homeTeamScore, homeScoreAdjustment)
   const trackedLabel = gameSideDisplayName(gameInfo, 'tracked')
   const opponentLabel = gameSideDisplayName(gameInfo, 'opponent')
+
+  if (focused) return (
+    <div className="flex min-w-0 flex-1 items-center justify-center gap-2 text-content" aria-label="Game score">
+      <span className="min-w-0 flex-1 truncate text-right text-xs font-semibold" title={trackedLabel}>{trackedLabel}</span>
+      <span className="shrink-0 text-lg font-bold tabular-nums" aria-label={`${trackedLabel} ${teamScore}, ${opponentLabel} ${opponentScore}`}>{teamScore} : {opponentScore}</span>
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold" title={opponentLabel}>{opponentLabel}</span>
+    </div>
+  )
 
   return (
     <div className={compact ? 'border-b border-line bg-surface px-3 py-2 text-content' : 'rounded-lg border border-line bg-surface p-4 text-content shadow-sm'}>

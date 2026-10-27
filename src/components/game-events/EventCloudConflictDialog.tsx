@@ -1,5 +1,6 @@
 import { Cloud, Download, Laptop, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import type { GameEventSyncConflict } from '../../types'
 import type { GameEvent } from '../../lib/gameEvents/types'
 
@@ -19,11 +20,14 @@ export default function EventCloudConflictDialog({
   onClose,
 }: EventCloudConflictDialogProps) {
   const conflict = conflicts[0]
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: Boolean(conflict), dialogRef, onClose })
   if (!conflict) return null
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-overlay/50 sm:items-center" onClick={onClose}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="event-conflict-title"

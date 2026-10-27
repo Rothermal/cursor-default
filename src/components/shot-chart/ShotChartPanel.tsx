@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useGame } from '../../context/GameContext'
 import { useSettings } from '../../context/SettingsContext'
 import { useAuth } from '../../context/AuthContext'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, SlidersHorizontal } from 'lucide-react'
 import BasketballCourt from './BasketballCourt'
 import BasketballFullCourt from './BasketballFullCourt'
 import ShootingSummary from './ShootingSummary'
@@ -148,6 +148,7 @@ interface ShotChartPanelProps {
   captureDisabled?: boolean
   captureDisabledMessage?: string
   compact?: boolean
+  focused?: boolean
   surfaceActions?: ReactNode
   reviewControls?: ReactNode
   /** `fullCourtPoint` is the tapped full-court spot a foul keeps (BKE-7C). */
@@ -166,6 +167,7 @@ export default function ShotChartPanel({
   captureDisabledMessage,
   onAdministrative,
   compact = false,
+  focused = false,
   surfaceActions,
   reviewControls,
 }: ShotChartPanelProps) {
@@ -622,15 +624,16 @@ export default function ShotChartPanel({
   )
 
   return (
-    <div className="space-y-2">
+    <div className={focused ? 'relative flex min-h-0 flex-1 flex-col' : 'space-y-2'}>
       {!compact && <>{reviewControls}{chartHeader}</>}
-      <div className={compact ? 'overflow-hidden border border-line bg-surface' : 'rounded-xl bg-surface border border-line p-3 shadow-sm'}>
+      <div className={focused ? 'min-h-0 flex-1' : compact ? 'overflow-hidden border border-line bg-surface' : 'rounded-xl bg-surface border border-line p-3 shadow-sm'}>
         {fullCourtShots ? (
           <BasketballFullCourt
             shots={fullCourtShots}
             onCourtTap={eventCaptureOpen && !captureDisabled ? onFullCourtTap : undefined}
             onMarkerActivate={handleMarkerActivate}
-            className="w-full"
+            className={focused ? 'h-full w-full' : 'w-full'}
+            focused={focused}
             newlyPlacedShotId={pulseShotId}
             flipped={courtOrientation === 'flipped'}
             labels={fullCourtLabels}
@@ -649,8 +652,8 @@ export default function ShotChartPanel({
         />}
       </div>
 
-      {surfaceActions}
-      {compact && <>{chartHeader}{reviewControls}</>}
+      {!focused && surfaceActions}
+      {compact && !focused && <>{chartHeader}{reviewControls}</>}
 
       {captureDisabled && captureDisabledMessage && (
         <p role="status" className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm font-semibold text-warning-content">
@@ -664,8 +667,13 @@ export default function ShotChartPanel({
         </p>
       )}
 
-      <details open={compact ? undefined : true} className="border-b border-line py-2">
-        <summary className={compact ? 'min-h-9 cursor-pointer text-sm font-semibold text-content-muted' : 'hidden'}>Chart details &amp; tools</summary>
+      <details open={compact ? undefined : true} className={focused ? 'absolute bottom-1 right-1 z-20' : 'border-b border-line py-2'}>
+        <summary aria-label={focused ? 'Chart details and filters' : undefined} title={focused ? 'Chart details and filters' : undefined}
+          className={focused ? 'grid h-9 w-9 cursor-pointer list-none place-items-center rounded border border-line bg-surface text-content marker:content-none' : compact ? 'min-h-9 cursor-pointer text-sm font-semibold text-content-muted' : 'hidden'}>
+          {focused ? <SlidersHorizontal size={18} aria-hidden /> : 'Chart details & tools'}
+        </summary>
+      <div className={focused ? 'absolute bottom-full right-0 mb-1 max-h-[65dvh] w-[min(22rem,calc(100vw-2rem))] space-y-2 overflow-y-auto rounded-md border border-line bg-surface p-3 shadow-xl' : undefined}>
+      {focused && <>{chartHeader}{reviewControls}</>}
       <div className={compact ? 'border-y border-line bg-surface p-3' : 'rounded-xl bg-surface border border-line p-3 shadow-sm'}>
         <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
       </div>
@@ -711,6 +719,7 @@ export default function ShotChartPanel({
         Clear all chart shots
       </button>}
 
+      </div>
       </details>
 
       {pendingTap && (

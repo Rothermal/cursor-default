@@ -48,7 +48,7 @@ export default defineConfig(({ command }) => ({
         theme_color: '#35383e',
         background_color: '#f4f5f7',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'any',
         scope: '/cursor-default/',
         start_url: '/cursor-default/',
         icons: [

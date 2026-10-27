@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { lockBodyScroll } from '../../lib/bodyScrollLock'
 import { AlertTriangle, ArrowRightLeft, Check, ChevronDown, UserMinus, UserPlus, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import {
@@ -123,8 +124,7 @@ export default function BasketballLineupSheet({
 
   useEffect(() => {
     closeRef.current?.focus()
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll(document.body)
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -149,7 +149,7 @@ export default function BasketballLineupSheet({
     window.addEventListener('keydown', handleKey)
     return () => {
       window.removeEventListener('keydown', handleKey)
-      document.body.style.overflow = previousOverflow
+      releaseScroll()
     }
   }, [])
 

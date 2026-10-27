@@ -5,6 +5,7 @@ import { isTeamPseudoPlayer } from '../../lib/teamPlayers'
 import { sideOf } from '../../lib/shotChartViews'
 import ActorSelect from '../ActorSelect'
 import { assistCandidatesForMadeShot } from '../../lib/assistCandidates'
+import { useModalFocus } from '../../hooks/useModalFocus'
 
 const ARMING_DELAY_MS = 300
 const COURT_STAT_EVENTS = [
@@ -58,6 +59,8 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
   const [offensive, setOffensive] = useState<string | null>(null)
   const [defensive, setDefensive] = useState<string | null>(null)
   const openedAt = useRef(Date.now())
+  const dialogRef = useRef<HTMLElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose: onCancel })
   const armed = useRef(false)
   const selected = players.find(player => player.id === activePlayerId)
   const side = captureSide ?? (selected ? sideOf(selected) : 'home')
@@ -76,18 +79,13 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
     action()
   }
   useEffect(() => setValue(shotType), [shotType])
-  useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel() }
-    window.addEventListener('keydown', escape)
-    return () => window.removeEventListener('keydown', escape)
-  }, [onCancel])
   const shot = (made: boolean, extra: { assistPlayerId?: string; rebound?: CourtReboundChoice } = {}) =>
     onPick({ kind: 'shot', made, shotType: value, ...extra })
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/[0.4] px-4"
     onPointerDownCapture={() => { if (Date.now() - openedAt.current >= ARMING_DELAY_MS) armed.current = true }}
     onKeyDownCapture={event => { if (event.key === 'Enter' || event.key === ' ') armed.current = true }}
     onClick={() => guarded(onCancel)}>
-    <section role="dialog" aria-modal="true" aria-label="Record court event"
+    <section ref={dialogRef} role="dialog" aria-modal="true" aria-label="Record court event"
       className="max-h-[90dvh] w-full max-w-sm space-y-3 overflow-y-auto rounded-lg bg-surface p-4 shadow-xl"
       onClick={event => event.stopPropagation()}>
       {errorMessage && <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">{errorMessage}</p>}
