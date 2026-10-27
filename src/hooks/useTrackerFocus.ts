@@ -56,7 +56,7 @@ export function useTrackerFocus(enabled: boolean, rootRef: RefObject<HTMLDivElem
   }, [enabled, rootRef])
 
   useEffect(() => {
-    if (!enabled) { exit(); return }
+    if (!enabled) { setFocused(false); releaseBrowser(); return }
     const landscape = window.matchMedia('(orientation: landscape)')
     const phone = window.matchMedia(PHONE_LANDSCAPE_QUERY)
     const update = () => {
@@ -80,7 +80,7 @@ export function useTrackerFocus(enabled: boolean, rootRef: RefObject<HTMLDivElem
       phone.removeEventListener('change', update)
       screen.orientation?.removeEventListener('change', update)
     }
-  }, [enabled, exit, releaseBrowser])
+  }, [enabled, releaseBrowser])
 
   useEffect(() => {
     const changed = () => {

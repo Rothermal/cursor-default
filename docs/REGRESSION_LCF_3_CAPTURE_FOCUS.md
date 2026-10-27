@@ -43,9 +43,11 @@ Football remains paused. Existing clock/substitution command guards are unchange
 
 ## Automated Evidence
 
-- Full suite: **344 files / 3,547 tests passed**, including 11 new gesture cases
-  and three nested scroll-lock cases. TypeScript and production/PWA build pass;
-  existing large-bundle advisory remains. No new dependencies.
+- Full suite after PR review updates: **346 files / 3,562 tests passed**,
+  including 11 recognizer cases, three nested scroll-lock cases and 15 committed
+  DOM/hook cases. TypeScript and production/PWA build pass; existing large-bundle
+  advisory remains. No new runtime dependency; dev-only JSDOM runs the two new
+  interaction files within the normal `pnpm test`/CI command.
 - Source lint (`pnpm exec eslint . --ignore-pattern "qa.local/**"`) passes with
   zero errors and the three existing Fast Refresh warnings. Plain `pnpm lint`
   also traverses ignored local QA fixtures and reports two pre-existing unused
@@ -68,6 +70,30 @@ Football remains paused. Existing clock/substitution command guards are unchange
 The ignored local browser harness uses synthetic players and real tracker/projector
 commands under StrictMode/HashRouter with auth/cloud transport stubbed; no owner
 export or cloud game is used. Browser-emulated touch is not physical-device signoff.
+
+## PR Review Follow-Up
+
+Both notes on the initial #513 head were validated and addressed:
+
+- A team-role lookup starts with capture eligibility unavailable. The original
+  disabled branch called the same `exit()` as a user action, setting suppression
+  before permission finished loading. Passive disable now closes focus/releases
+  browser presentation without changing the explicit-exit preference. Access
+  checks themselves are unchanged. Explicit Exit/Back/menu behavior still
+  suppresses automatic entry until the documented orientation cycle.
+- `useTrackerFocus.test.ts` mounts the actual hook under StrictMode, including a
+  pending-access view without the tracker root. Seven tests cover delayed
+  eligibility, temporary loss/recovery, explicit exit persistence, rotation and
+  desktop/portrait-keyboard exclusions. The old disabled branch fails two cases.
+- `BasketballFullCourt.test.ts` mounts the actual component, gesture hook and
+  marker in JSDOM. Eight tests exercise DOM capture/bubble propagation, pointer
+  click suppression, hold/release, non-bubbling descendant scroll, cancellation,
+  second touch, keyboard/read-only activation and teardown. Only SVG layout is
+  stubbed to an identity transform; these do not replace real geometry/browser QA.
+- Mutation checks confirm these are effective regressions: removing court click
+  suppression fails five cases; removing the scroll listener fails one. Both
+  guards were restored unchanged, and the focused suite passes all 15 cases.
+  This closes the CI coverage gap; the existing browser matrix is retained.
 
 ## Owner Follow-Up
 
