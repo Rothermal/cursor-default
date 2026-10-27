@@ -69,8 +69,12 @@ describe('live attribution dialog review regressions', () => {
       maximumAttempts: 2, oneAndOne: false, technical: false, possessionRetained: false,
       sourceFoulEventId: null, attempts: [], nextAttemptNumber: 1, open: true, closedReason: null }
     const onRecord = vi.fn()
+    const onAddParticipant = vi.fn()
     const tree = BasketballFreeThrowTripDialog({ trip, teamName: 'Side', candidates: [], onRecord,
-      onAddParticipant: vi.fn(), onRemove: vi.fn(), onClose: vi.fn() })
+      onAddParticipant, onRemove: vi.fn(), onClose: vi.fn() })
+    button(tree, 'Add player').onClick()
+    expect(onAddParticipant).toHaveBeenCalledOnce()
+    expect(onRecord).not.toHaveBeenCalled()
     expect(button(tree, 'Made').disabled).toBe(teamSide === 'tracked')
     button(tree, 'Made').onClick()
     expect(onRecord.mock.calls).toEqual(teamSide === 'opponent' ? [[TEAM_PLAYER_OPP_ID, true]] : [])

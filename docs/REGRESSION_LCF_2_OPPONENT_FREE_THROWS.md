@@ -12,6 +12,9 @@ No migration, live cloud mutation, legacy conversion or rollout-gate change.
 - Player-detail entry and existing trip shooters preserve explicit named prefill.
   Unavailable named shooters require a new selection, never silent team credit.
   Explicitly changing the next attempt does not rewrite preceding attempts.
+- Empty-roster awarded trips retain Add player as an optional action on both
+  sides, with a required-player warning only for tracked attempts. The handoff
+  opens on the awarded side, not the side that committed the foul.
 - Tracked free throws still require eligible resolved players. Opponent named
   players retain eligibility checks. One-and-one closure, period boundaries,
   technical policy, consumed removed positions, stale awards and Undo remain checked.
@@ -22,8 +25,8 @@ No migration, live cloud mutation, legacy conversion or rollout-gate change.
 
 ## Observed Automated Evidence
 
-- Full suite: **340 files / 3,517 tests passed**. After correcting a test-only
-  TypeScript call signature, focused rerun: **2 files / 27 tests passed**.
+- Full suite after PR review fixes: **340 files / 3,520 tests passed**. Focused
+  command/dialog rerun: **2 files / 30 tests passed**.
 - `pnpm build` passes TypeScript and production bundling; Vite reports the existing
   large-chunk advisory. `pnpm lint --ignore-pattern 'qa.local/**'` passes with zero
   errors and the three existing Fast Refresh warnings. `git diff --check` passes.
@@ -33,15 +36,26 @@ No migration, live cloud mutation, legacy conversion or rollout-gate change.
   stale previews, empty-map serialization, summary attribution and canonical
   aggregate totals with no opponent player rows.
 - Actual GameTracker browser wiring, with synthetic local state and auth/cloud
-  disabled: **8 view combinations / 11 workflows passed**. Standalone and awarded
+  disabled: **8 view combinations / 12 workflows passed**. Standalone and awarded
   attempts were exercised at 390px and 1280px in Light/Dark; additional workflows
   cover tracked required selection, named-trip continuity plus explicit team
-  selection, and multiple open awards. No page errors or horizontal overflow.
+  selection, multiple open awards, and adding a named opponent from an automatically
+  opened trip after a tracked foul. No page errors or horizontal overflow.
   Mobile-dark awarded and desktop-light standalone screenshots were inspected.
 - Server source audit: shared event storage accepts actors without a player
   mapping; canonical identity substitution targets only `kind: 'player'`; the
   Basketball score policy totals made-shot values independently of actor kind.
   This is source evidence, not a live Supabase verification.
+
+## PR Review Follow-Up
+
+All three suggestions on #511 were validated and addressed. The existing generic
+shot-edit and live awarded-trip guards were correct; direct regressions now prove
+that tracked team credit is rejected while a resolved tracked shooter succeeds.
+The historical-add fallback is exercised with an unlinked tracked participant,
+including saving the opponent team attempt. The missing opponent Add player
+shortcut was reproduced in a failing dialog test, then restored without a blocking
+warning. Browser replay also exposed and verified the awarded-side add-form fix.
 
 ## Pending Owner Replay
 

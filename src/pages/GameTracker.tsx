@@ -2042,6 +2042,8 @@ export default function GameTracker() {
           errorMessage={freeThrowError}
           onRecord={handleFreeThrowAttempt}
           onAddParticipant={() => {
+            setWorkspaceSide(selectedFreeThrowTrip.teamSide)
+            setDetailPlayerId(null)
             dispatch({
               type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
               preferences: {

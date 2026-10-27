@@ -128,6 +128,10 @@ team actors; no event schema change or Supabase migration is included.
 - Permit the same team actor for opponent awarded attempts. Retain trip id,
   attempt number, one-and-one closure, consumed removed positions, technical
   exceptions, same-period checks and stale-dialog validation.
+- Empty-roster awarded trips keep an optional Add player shortcut on either side.
+  Only tracked trips require the player warning; opponent Unattributed capture
+  remains enabled. The add form starts on the awarded side, even when a foul on
+  the other side opened the trip.
 - Preserve a trip's existing explicit shooter. Do not silently convert a named
   attempt to team attribution or switch shooters. Make any permitted correction
   explicit and revalidate the complete trip/history. Unknown is not a real player.

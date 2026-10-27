@@ -126,11 +126,11 @@ export default function BasketballFreeThrowTripDialog({
             emptyOption={trip.teamSide === 'opponent' ? { value: TEAM_PLAYER_OPP_ID, label: 'Unattributed' }
               : { value: '', label: 'Choose a player' }} />
 
-          {candidates.length === 0 && trip.open && trip.teamSide === 'tracked' && (
-            <div className="space-y-2 rounded-lg border border-warning-line bg-warning px-3 py-3">
-              <p className="text-sm text-warning-content">
+          {candidates.length === 0 && trip.open && (
+            <div className={trip.teamSide === 'tracked' ? 'space-y-2 rounded-lg border border-warning-line bg-warning px-3 py-3' : undefined}>
+              {trip.teamSide === 'tracked' && <p className="text-sm text-warning-content">
                 Add an eligible {teamName} player before recording this trip.
-              </p>
+              </p>}
               <button
                 type="button"
                 onClick={onAddParticipant}

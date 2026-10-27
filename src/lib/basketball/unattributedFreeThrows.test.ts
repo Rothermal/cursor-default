@@ -97,6 +97,47 @@ describe('LCF-2 unattributed opponent free throws', () => {
       .toMatchObject({ ok: false, code: 'invalid_actor' })
   })
 
+  it('rejects tracked team credit through the generic free-throw shot editor', () => {
+    const captured = captureBasketballDirectStat(started(), {
+      recorderUserId: recorder, playerId: id(102), statId: 'ft', occurredAt: at(10), eventId: id(2),
+    })
+    if (!captured.ok) throw new Error(captured.message)
+    const state = captured.state
+    const draft = buildBasketballShotEditDraft(state, id(2))
+    if (!draft.ok) throw new Error(draft.message)
+    expect(draft.value.teamSide).toBe('tracked')
+    const before = structuredClone(state)
+    expect(previewBasketballShotEdit(state, { ...draft.value, shooter: { kind: 'team' } }, recorder, at(20)))
+      .toMatchObject({ ok: false, code: 'invalid_actor' })
+    expect(state).toEqual(before)
+    expect(sport(state).projection.participants[id(101)].stats.ft).toBe(1)
+    expect(sport(state).projection.teamActorStats.tracked.ft).toBe(0)
+  })
+
+  it('requires a resolved player for a live tracked awarded trip', () => {
+    const awarded = captureBasketballFoul(started(), {
+      recorderUserId: recorder, teamSide: 'opponent', offender: { kind: 'team' },
+      class: 'personal', context: 'shooting', occurredAt: at(1), eventIds: [id(3), id(4)],
+      freeThrows: { maximumAttempts: 2, oneAndOne: false, technical: false, possessionRetained: false },
+    })
+    if (!awarded.ok || !awarded.tripEventId) throw new Error('Tracked award failed')
+    const state = awarded.state
+    expect(basketballFreeThrowTripStatuses(state)[0].teamSide).toBe('tracked')
+    expect(captureBasketballFreeThrowAttempt(state, {
+      recorderUserId: recorder, shooterPlayerId: TEAM_PLAYER_HOME_ID,
+      tripEventId: awarded.tripEventId, made: true, occurredAt: at(2),
+    })).toMatchObject({ ok: false, state, code: 'invalid_actor' })
+    expect(sport(state).projection.score.tracked).toBe(0)
+    const recorded = captureBasketballFreeThrowAttempt(state, {
+      recorderUserId: recorder, shooterPlayerId: id(102), tripEventId: awarded.tripEventId,
+      made: true, occurredAt: at(2), eventId: id(5),
+    })
+    if (!recorded.ok) throw new Error(recorded.message)
+    expect(sport(recorded.state).projection.score.tracked).toBe(1)
+    expect(sport(recorded.state).projection.participants[id(101)].stats.ft).toBe(1)
+    expect(sport(recorded.state).projection.teamActorStats.tracked.ft).toBe(0)
+  })
+
   it('records and closes an awarded trip with explicit team credit and no fabricated shooter', () => {
     const initial = award()
     const first = attempt(initial.state, initial.tripEventId, true, 1)
@@ -185,6 +226,23 @@ describe('LCF-2 unattributed opponent free throws', () => {
     expect(applyBasketballFoulFreeThrowChange(applied.state, addPreview.value).ok).toBe(false)
     expect(basketballFreeThrowShooterOptions(state, 'opponent')).toMatchObject([{ label: 'Unattributed', selection: { kind: 'team' } }])
     expect(basketballFreeThrowShooterOptions(state, 'tracked').every(option => option.selection.kind === 'participant')).toBe(true)
+  })
+
+  it('defaults historical free-throw addition to opponent when tracked identities are unresolved', () => {
+    const state = structuredClone(started())
+    sport(state).setup.participants.forEach(participant => { participant.playerId = null })
+    const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
+    expect(rebuilt.inspection.complete).toBe(true)
+    expect(basketballFreeThrowShooterOptions(rebuilt.state, 'tracked')).toEqual([])
+    const draft = buildBasketballHistoricalFoulFreeThrowDraft(rebuilt.state, 'basketball.free_throw_attempt')
+    if (!draft.ok) throw new Error(draft.message)
+    expect(draft.value).toMatchObject({ teamSide: 'opponent', shooter: { kind: 'team' } })
+    const preview = previewBasketballHistoricalFoulFreeThrow(rebuilt.state, { ...draft.value, made: true }, recorder, at(20))
+    if (!preview.ok) throw new Error(preview.message)
+    const added = applyBasketballFoulFreeThrowChange(rebuilt.state, preview.value)
+    if (!added.ok) throw new Error(added.message)
+    expect(sport(added.state).projection.score).toEqual({ tracked: 0, opponent: 1 })
+    expect(sport(added.state).projection.teamActorStats.opponent.ft).toBe(1)
   })
 
   it('rejects tracked-team and named-unknown attribution in historical free throws', () => {
