@@ -252,10 +252,11 @@ begin
 end;
 $$;
 
+-- PUBLIC revocation alone does not remove direct Supabase-default anon grants.
 revoke all on function public.upsert_game_event_revisioned(
   uuid, uuid, text, text, integer, bigint, integer, text, integer, bigint,
   timestamptz, text, jsonb, jsonb, jsonb, timestamptz, timestamptz, timestamptz
-) from public;
+) from public, anon;
 grant execute on function public.upsert_game_event_revisioned(
   uuid, uuid, text, text, integer, bigint, integer, text, integer, bigint,
   timestamptz, text, jsonb, jsonb, jsonb, timestamptz, timestamptz, timestamptz

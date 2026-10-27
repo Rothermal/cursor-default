@@ -63,7 +63,8 @@ describe('migration 081 event sync and pending recorder recovery', () => {
   it('keeps the writer authenticated-only and the recorder core private', () => {
     const start = oldWriter.indexOf('revoke all on function public.upsert_game_event_revisioned(')
     const end = oldWriter.indexOf('revoke all on function public.get_baseball_release_capabilities()', start)
-    expect(sql.replace(/\n\n/g, '\n')).toContain(oldWriter.slice(start, end).trim().replace(/\n\n/g, '\n'))
+    expect(sql.replace(/\n\n/g, '\n')).toContain(oldWriter.slice(start, end).trim()
+      .replace(') from public;', ') from public, anon;').replace(/\n\n/g, '\n'))
     expect(sql).toContain('revoke all on function public.get_event_game_recorders(text, uuid)\n  from public, anon, authenticated;')
     expect(sql).not.toMatch(/grant .*get_event_game_recorders/)
   })

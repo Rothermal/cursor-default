@@ -40,6 +40,10 @@ rendering, independently of the user's team permissions.
 - Return `is_primary: false` and `primary_source: null` when no primary exists.
   Null team-role capability becomes false, never a permission grant. Fixed sport
   wrappers remain unchanged; the generic recorder reader stays private.
+- Explicitly revoke the writer's direct `anon` grant as well as PUBLIC access.
+  Hosted default privileges can grant EXECUTE directly to `anon`; replacing a
+  function or revoking only PUBLIC does not remove that grant. Authenticated
+  execution and the existing `auth.uid()` check remain unchanged.
 - No parser weakening, automatic primary selection policy change, artificial
   checkpoint, result publication, client schema or rollout change.
 - A stream still needs a complete current conflict-free checkpoint before it can
@@ -52,12 +56,16 @@ rendering, independently of the user's team permissions.
   Production build/TypeScript and PWA generation pass. Lint has zero errors and
   the three existing Fast Refresh warnings; staged diff checks pass. Vite's
   existing large-chunk advisory remains.
-- Isolated PGlite/Postgres execution: **33 scenarios passed**, including both
+- Isolated PGlite/Postgres execution: **34 scenarios passed**, including both
   failures against original functions, migration rerun, all six supported
   sport/setup combinations, edited and removed first uploads, absent/malformed/
   wrong-sport setup rejection, normal and selected primary states, stale/equal
   conflicts, immutable identity, auth/read/write denial, final audit timestamps,
   owner/admin versus scorer/viewer/missing-role capability, and grants.
+  The ACL fixture now gives new functions direct `anon`/`authenticated` grants:
+  the pre-review migration fails its anonymous-permission check in this setup;
+  the explicit revoke repairs it. This does not claim the live project's ACL
+  was inspected.
 - Private-export database replay seeded the 56 acknowledged events, reproduced
   the original rejection at sequence 57, then uploaded all 115 events with the
   repaired writer. Every revision and all four deletion markers were preserved.
@@ -77,6 +85,10 @@ rendering, independently of the user's team permissions.
 1. Apply migration 081 in Supabase SQL Editor. Then run the read-only
    [verification script](../supabase/scripts/verify_081_event_sync_recovery.sql);
    all five results should be true. Existing migration files are not modified.
+   If `writer_authenticated_only` is false, the expected function ACL is not in
+   place: confirm the latest 081 script, including its explicit `anon` revoke,
+   ran successfully. Do not grant anonymous access or weaken the check; retain
+   the result for diagnosis if it still fails.
 2. Retain the export and retry the existing Basketball game once. Do not import a
    duplicate recording, reset revisions, restore deleted attempts or clear storage.
    Check the 32-31 score remains and sync obtains a current checkpoint.
