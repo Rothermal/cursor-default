@@ -62,8 +62,8 @@ See `package.json` scripts. Standard commands:
 
 ### Gotchas
 
-- **Shared capture/focus (LCF-3):** Basketball merged #513; Soccer/Hockey adoption
-  is implemented for review. Writable full-court
+- **Shared capture/focus (LCF-3):** Basketball merged #513; Soccer/Hockey merged
+  #514. Baseball's assessed adaptation is implemented for review. Writable full-court
   taps open capture even over existing shots; a stationary 500 ms hold opens the
   existing deterministic overlap review. `useSurfaceGestures` cancels on movement,
   scroll, multi-touch, cancellation, resize and teardown; keyboard markers and
@@ -76,9 +76,12 @@ See `package.json` scripts. Standard commands:
   shots/plays, with a chooser for overlapping visible markers. `surfacePoint`
   excludes SVG letterboxing before sport-owned flip/direction conversion. Shared
   `TrackerFocusButton` and `TrackerSurfaceTools` contain presentation only. The PWA
-  manifest permits `any` orientation. Physical-device/PWA validation remains
+  manifest permits `any` orientation. Baseball keeps semantic short taps for
+  current runners/fielders and cancellable draft-location taps, with a two-pane
+  diamond/scoring layout rather than inventing live history markers or a clock.
+  Physical-device/PWA validation remains
   pending. See `docs/REGRESSION_LCF_3_CAPTURE_FOCUS.md` and
-  `docs/REGRESSION_LCF_3_SOCCER_HOCKEY.md`.
+  `docs/REGRESSION_LCF_3_SOCCER_HOCKEY.md` and `docs/REGRESSION_LCF_3_BASEBALL.md`.
 
 - **Tracker alignment (TUI-2 layout merged #507):** Soccer/Hockey share `TrackerSideSelector`, `TrackerDialog` with the existing modal-focus hook, and `EventCloudStatus`. Soccer moves capture modes below the pitch; Hockey seeds new shot/play/penalty/goalie forms from local side context, keeps faceoff outcomes explicit, filters only marker display, and opens full penalty details in a sheet with compact strength/count above the rink. Routine Hockey sync/enable controls are in the footer, outside the Game sheet. The layout pass changed no clock, event or authority policy. See `docs/REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md`.
 

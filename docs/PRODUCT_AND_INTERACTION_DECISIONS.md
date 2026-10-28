@@ -45,8 +45,12 @@ Per-sport delivery is recorded below; these targets do not release every sport a
   with optional browser fullscreen, not a second recorder or a game-state change.
   Basketball full-court adoption merged in #513
   ([LCF-3](REGRESSION_LCF_3_CAPTURE_FOCUS.md));
-  [Soccer/Hockey adoption](REGRESSION_LCF_3_SOCCER_HOCKEY.md) is implemented for
-  review. Baseball and Football are not changed by this gesture/focus work.
+  [Soccer/Hockey adoption](REGRESSION_LCF_3_SOCCER_HOCKEY.md) merged in #514.
+  [Baseball's focused adaptation](REGRESSION_LCF_3_BASEBALL.md) is implemented for
+  review: current runner/fielder controls keep their scoring meaning, optional
+  location taps remain unsaved drafts, and pitch/result controls stay beside the
+  diamond. Baseball does not gain historical live markers or a fake timer/team
+  selector. Football remains unchanged until its field/event foundations exist.
 - Keep team/opponent selection, labelled with team display names/nicknames.
 - Remove the global individual-player capture strip as each sport adopts this model.
   Choose attribution inside the event dialog; do not silently attribute from a

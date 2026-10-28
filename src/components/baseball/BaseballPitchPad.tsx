@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useSurfaceGestures } from '../../hooks/useSurfaceGestures'
+import { surfacePoint } from '../../lib/surfacePoint'
 import {
   BASEBALL_PITCH_PAD_MIN,
   BASEBALL_PITCH_PAD_SPAN,
@@ -23,6 +25,7 @@ interface BaseballPitchPadProps {
   runnersMoved?: { armed: boolean; onToggle: () => void }
   /** The current batter's hand, when known (BSB-4A): labels the batter's box. */
   batterHand?: BaseballBatHand | null
+  focused?: boolean
 }
 
 const V = 100
@@ -68,28 +71,38 @@ export default function BaseballPitchPad({
   disabledReason,
   runnersMoved,
   batterHand = null,
+  focused = false,
 }: BaseballPitchPadProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const pending = pendingLocation ? baseballPitchPadDisplay(pendingLocation) : null
   const disabled = !onResult
+  const svgRef = useRef<SVGSVGElement>(null)
+  const gestures = useSurfaceGestures({
+    enabled: showZone && !disabled,
+    onTap: point => {
+      const location = svgRef.current && surfacePoint(svgRef.current.getBoundingClientRect(), point, V, V)
+      if (location) onLocation(baseballPitchPadLocation(location.x, location.y))
+    },
+    onHold: () => {},
+  })
 
   return (
-    <section className="rounded-md border border-line bg-surface p-3" aria-label="Pitch pad">
-      <div className={showZone ? 'grid grid-cols-[minmax(0,9.5rem)_1fr] gap-3' : ''}>
+    <section className={`rounded-md border border-line bg-surface ${focused ? 'p-2' : 'p-3'}`} aria-label="Pitch pad">
+      <div className={showZone ? focused ? 'grid grid-cols-[minmax(0,5rem)_minmax(0,1fr)] gap-2' : 'grid grid-cols-[minmax(0,9.5rem)_1fr] gap-3' : ''}>
         {showZone && (
           <div className="space-y-1">
             <svg
+              ref={svgRef}
               viewBox={`0 0 ${V} ${V}`}
               className="block aspect-square w-full cursor-crosshair rounded-md bg-surface-muted"
               role="group"
               aria-label={pendingLocation ? 'Strike zone, catcher view. A pitch location is placed.' : 'Strike zone, catcher view. Tap to place the pitch.'}
-              onClick={event => {
-                const bounds = event.currentTarget.getBoundingClientRect()
-                onLocation(baseballPitchPadLocation(
-                  (event.clientX - bounds.left) / bounds.width,
-                  (event.clientY - bounds.top) / bounds.height
-                ))
-              }}
+              style={{ touchAction: 'auto' }}
+              {...gestures}
+              onClickCapture={!disabled ? event => {
+                if (event.detail !== 0) { event.preventDefault(); event.stopPropagation() }
+              } : undefined}
+              onContextMenu={!disabled ? event => event.preventDefault() : undefined}
             >
               <BaseballZoneShapes />
               {batterHand && (
@@ -135,7 +148,7 @@ export default function BaseballPitchPad({
               <button
                 key={entry.result}
                 type="button"
-                className={`${entry.result === 'in_play' ? 'btn-primary' : 'btn-secondary'} min-h-11 px-1 text-sm leading-tight`}
+                className={`${entry.result === 'in_play' ? 'btn-primary' : 'btn-secondary'} min-h-11 min-w-0 px-1 text-sm leading-tight`}
                 disabled={disabled}
                 onClick={() => onResult?.(entry.result)}
               >

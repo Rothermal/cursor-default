@@ -4,8 +4,8 @@ import { EventCloudMenuSection, EventCloudSyncAlerts } from '../game-events/Even
 import BaseballSetupLinkRecovery from './BaseballSetupLinkRecovery'
 
 /** Game menu section: sync status, and Enable cloud sync for a device game (BSB-6B, plan Q3). */
-export function BaseballCloudMenuSection({ state, onDone }: { state: GameState; onDone: () => void }) {
-  return <EventCloudMenuSection state={state} onDone={onDone} availability={baseballCloudEnableAvailability} />
+export function BaseballCloudMenuSection({ state, onDone, compact = false }: { state: GameState; onDone: () => void; compact?: boolean }) {
+  return <EventCloudMenuSection state={state} onDone={onDone} availability={baseballCloudEnableAvailability} compact={compact} />
 }
 
 /** Sync problems shown on the tracker: conflicts to review, or an error with Retry and Export. */
