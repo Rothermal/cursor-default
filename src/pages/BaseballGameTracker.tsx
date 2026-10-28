@@ -1,5 +1,5 @@
-import { ChevronLeft, Menu, X } from 'lucide-react'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { ChevronLeft, Menu } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BaseballCloudMenuSection, BaseballCloudSyncAlerts } from '../components/baseball/BaseballCloudSync'
 import BaseballCorrectionPreviewSheet from '../components/baseball/BaseballCorrectionPreviewSheet'
@@ -26,6 +26,12 @@ import BaseballRunnerResolution from '../components/baseball/BaseballRunnerResol
 import BaseballScoreboard from '../components/baseball/BaseballScoreboard'
 import BaseballSubstitutionSheet from '../components/baseball/BaseballSubstitutionSheet'
 import BaseballTimeline from '../components/baseball/BaseballTimeline'
+import TrackerDialog from '../components/TrackerDialog'
+import TrackerFocusButton from '../components/TrackerFocusButton'
+import TrackerSurfaceTools from '../components/TrackerSurfaceTools'
+import { useTrackerFocus } from '../hooks/useTrackerFocus'
+import { useTeamRole } from '../hooks/useTeamRole'
+import { canTrackGames } from '../lib/teamPermissions'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
@@ -571,6 +577,15 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
 
   const batterSlot = diamond.batter ? projection.opponentSlotDetails[diamond.batter.id] : undefined
   const canCapture = inProgress && projection.pendingEnd === null
+  const teamAccess = useTeamRole(state.cloudSync.teamId)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const canFocus = canCapture && tab === 'track' &&
+    (!state.cloudSync.teamId || (!teamAccess.loading && canTrackGames(teamAccess.role)))
+  const { focused, expand, exit } = useTrackerFocus(canFocus, rootRef)
+  const closeMenu = () => {
+    setMenuOpen(false)
+    if (focused) requestAnimationFrame(() => rootRef.current?.querySelector<HTMLButtonElement>('[data-tracker-focus-exit]')?.focus())
+  }
   const showRunnersMoved =
     Boolean(projection.bases.first || projection.bases.second || projection.bases.third) ||
     baseballDroppedThirdStrikeAvailable(sport)
@@ -585,16 +600,19 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
   const resultWinner = result?.winner === 'tie' ? 'Tie game' : result?.winner ? `${sideName(result.winner)} win` : null
 
   return (
-    <main className="max-w-2xl mx-auto px-4 pb-6 space-y-3">
+    <div ref={rootRef} className={focused ? 'tracker-focus flex flex-col bg-canvas text-content' : undefined}>
+    <main className={`tracker-main ${focused ? 'flex min-h-0 flex-1 flex-col' : 'max-w-2xl mx-auto px-4 pb-6 space-y-3'}`}>
       <BaseballScoreboard
+        focused={focused}
         view={baseballScoreboardView(sport, names)}
         lineScore={baseballLineScoreView(sport, names)}
-        leading={(
+        leading={focused ? <TrackerFocusButton focused surface="diamond" onExpand={() => void expand()} onExit={exit} /> : (
           <Link to="/sport/baseball" className="grid h-10 w-10 shrink-0 place-items-center text-content-muted" aria-label="Back to Baseball" title="Back to Baseball">
             <ChevronLeft size={22} />
           </Link>
         )}
-        trailing={(
+        trailing={focused ? <span className="h-9 w-9 shrink-0" aria-hidden="true" /> : (<>
+          {canFocus && <TrackerFocusButton focused={false} surface="diamond" onExpand={() => void expand()} onExit={exit} />}
           <button
             type="button"
             className="inline-flex h-10 shrink-0 items-center gap-1 rounded-md border border-line-strong px-3 text-sm font-semibold text-content"
@@ -603,8 +621,13 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           >
             <Menu size={18} aria-hidden="true" /> Game
           </button>
-        )}
+        </>)}
       />
+
+      {focused && <div className="tracker-team-context grid grid-cols-2 gap-2 border-b border-line bg-surface-muted text-xs text-content" aria-label="Team roles">
+        <p className="min-w-0 truncate" title={sideName(projection.battingSide)}>Batting: <strong>{sideName(projection.battingSide)}</strong></p>
+        <p className="min-w-0 truncate text-right" title={sideName(diamond.fieldingSide)}>Fielding: <strong>{sideName(diamond.fieldingSide)}</strong></p>
+      </div>}
 
       {error && (
         <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
@@ -635,7 +658,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
         </section>
       )}
 
-      {projection.status !== 'pregame' && (
+      {projection.status !== 'pregame' && !focused && (
         <div role="tablist" aria-label="Tracker views" className="grid grid-cols-3 gap-1 rounded-md border border-line p-1">
           {(['track', 'lineup', 'timeline'] as const).map(entry => (
             <button
@@ -838,8 +861,10 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               <button type="button" className="btn-secondary min-h-10 px-3" onClick={() => setTab('lineup')}>Lineup</button>
             </div>
           )}
-          <section aria-label="Diamond">
+          <div className={focused ? 'baseball-focus-grid' : 'space-y-3'}>
+          <section className={focused ? 'flex min-h-0 min-w-0 flex-col' : undefined} aria-label="Diamond">
             <BaseballDiamond
+              focused={focused}
               view={diamond}
               battingLabel={sideName(projection.battingSide)}
               fieldingLabel={sideName(diamond.fieldingSide)}
@@ -872,6 +897,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
             />
           </section>
 
+          <div className={focused ? 'baseball-focus-panel min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain p-1' : 'space-y-3'}>
           {inProgress && projection.pendingEnd && flow.step === 'idle' && (
             <section className="space-y-2 rounded-md border border-accent bg-surface p-3" aria-label="Game can end">
               <h2 className="font-bold text-content">{baseballPendingEndMessage(projection.pendingEnd)}</h2>
@@ -905,6 +931,7 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
           {inProgress && flow.step === 'idle' && (
             <>
               <BaseballPitchPad
+                focused={focused}
                 showZone={capturePreferences.trackPitchLocation}
                 pendingLocation={pitchLocation}
                 onLocation={setPitchLocation}
@@ -1094,6 +1121,17 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               )
           })()}
 
+          </div>
+          </div>
+          <TrackerSurfaceTools focused={focused}>
+          {focused && <div className="grid grid-cols-2 gap-2">
+            <MenuAction label="Game actions" onClick={() => setMenuOpen(true)} />
+            <MenuAction label="Lineup" onClick={() => { exit(); setTab('lineup') }} />
+            <MenuAction label="Timeline" onClick={() => { exit(); setTab('timeline') }} />
+            <MenuAction label="Summary" onClick={() => navigate(baseballSummaryPath(), { replace: true })} />
+            <MenuAction label="Cloud sync" onClick={() => { exit(); requestAnimationFrame(() => document.getElementById('baseball-cloud-footer')?.scrollIntoView()) }} />
+            <MenuAction label="Dashboard" onClick={() => navigate('/sport/baseball', { replace: true })} />
+          </div>}
           {flow.step === 'idle' && (
             <BaseballRecentPlays
               rows={baseballRecentPlays(state, names)}
@@ -1103,11 +1141,12 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
               onSelect={playId => setFlow({ step: 'play_detail', playId })}
             />
           )}
+          </TrackerSurfaceTools>
         </>
       )}
 
       {menuOpen && (
-        <GameMenu onClose={() => setMenuOpen(false)}>
+        <GameMenu onClose={closeMenu}>
           <Toggle
             label="Track pitch location"
             checked={capturePreferences.trackPitchLocation}
@@ -1149,43 +1188,23 @@ function BaseballTracker({ sport }: { sport: BaseballSportGameState }) {
             <MenuAction label="Reopen game" onClick={() => openFromMenu({ step: 'reopen', reason: '', error: null })} />
           )}
           {projection.status !== 'pregame' && (
-            <MenuAction label={inProgress ? 'Summary (in progress)' : 'Summary'} onClick={() => navigate(baseballSummaryPath())} />
+            <MenuAction label={inProgress ? 'Summary (in progress)' : 'Summary'} onClick={() => navigate(baseballSummaryPath(), { replace: focused })} />
           )}
-          <BaseballCloudMenuSection state={state} onDone={() => setMenuOpen(false)} />
+          <MenuAction label="Cloud sync" onClick={() => {
+            setMenuOpen(false)
+            if (focused) exit()
+            requestAnimationFrame(() => document.getElementById('baseball-cloud-footer')?.scrollIntoView())
+          }} />
         </GameMenu>
       )}
+      <div id="baseball-cloud-footer" className="shrink-0"><BaseballCloudMenuSection state={state} onDone={() => {}} compact={focused} /></div>
     </main>
+    </div>
   )
 }
 
 function GameMenu({ onClose, children }: { onClose: () => void; children: ReactNode }) {
-  const titleId = useId()
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface pb-[env(safe-area-inset-bottom)] sm:max-w-md sm:rounded-lg"
-        onClick={event => event.stopPropagation()}
-      >
-        <header className="flex min-h-14 items-center gap-3 border-b border-line px-4">
-          <h2 id={titleId} className="flex-1 font-bold text-content">Game</h2>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close" autoFocus>
-            <X size={20} />
-          </button>
-        </header>
-        <div className="space-y-2 p-4">{children}</div>
-      </div>
-    </div>
-  )
+  return <TrackerDialog title="Game" onClose={onClose}>{children}</TrackerDialog>
 }
 
 function MenuAction({ label, disabled, onClick }: { label: string; disabled?: boolean; onClick: () => void }) {

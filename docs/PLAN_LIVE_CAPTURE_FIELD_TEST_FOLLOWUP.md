@@ -5,8 +5,10 @@ pending-primary recovery merged in #512. The owner confirmed migration 081 and
 successful record merging on 2026-10-27
 ([evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md)). LCF-2
 unattributed opponent free throws merged in #511. LCF-3 Basketball capture-first
-gestures and focused court merged in #513; Soccer/Hockey adoption is implemented
-for review ([sibling verification](REGRESSION_LCF_3_SOCCER_HOCKEY.md)).
+gestures and focused court merged in #513; Soccer/Hockey adoption merged in #514
+([sibling verification](REGRESSION_LCF_3_SOCCER_HOCKEY.md)). Baseball's separate
+surface assessment and focused capture adaptation are implemented for review
+([Baseball evidence](REGRESSION_LCF_3_BASEBALL.md)).
 Physical-device/PWA checks remain follow-ups. The scoring report remains open for a second game whose
 export is pending. Football development is paused while these owner-reported
 issues are addressed. This is not a clock/substitution redesign.
@@ -22,7 +24,7 @@ Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.
 | --- | --- | --- |
 | LCF-1: Late-player sync and scoring audit | Merged #510/#512; owner confirms 081 applied and records merged | [Recovery evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md). Separate second-game scoring investigation remains open |
 | LCF-2: Unattributed opponent free throws | Merged #511 | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
-| LCF-3: Capture-first gestures and focused surface | Basketball merged #513; Soccer/Hockey implemented for review | Short tap opens capture even over a marker; long press opens review; focused landscape layout with score and menu. [Basketball evidence](REGRESSION_LCF_3_CAPTURE_FOCUS.md), [Soccer/Hockey evidence and remaining device work](REGRESSION_LCF_3_SOCCER_HOCKEY.md) |
+| LCF-3: Capture-first gestures and focused surface | Basketball merged #513; Soccer/Hockey merged #514; Baseball adaptation implemented for review | Shared cancellable location gestures and focused presentation, with sport-owned controls. [Basketball](REGRESSION_LCF_3_CAPTURE_FOCUS.md), [Soccer/Hockey](REGRESSION_LCF_3_SOCCER_HOCKEY.md), [Baseball assessment and verification](REGRESSION_LCF_3_BASEBALL.md). Physical-device/PWA checks remain pending |
 
 These are cohesive feature PRs, not a new foundation/micro-phase ladder. Do not
 delay the confirmed sync fix behind the UI work. FBE-1 remains an approved plan;
@@ -231,6 +233,38 @@ cohesive sibling pass if small; keep each sport's dialogs, eligibility and locat
 conversions. Baseball needs a separate review of play-location taps versus runner
 and fielder controls. Football consumes the contract when its field exists, not
 by altering today's generic grid. No per-sport legacy/new-UI toggles are introduced.
+
+### Baseball surface assessment (2026-10-28)
+
+The current live diamond has **no historical event markers**. It shows the current
+batter, runners and fielders; a pending spray point is an unsaved draft, not a
+recorded play to edit. The Summary spray/pitch charts already own historical
+review, and Recent Plays/Timeline remain the live history entry points.
+
+| Surface / control | Adaptation | Preserved authority |
+| --- | --- | --- |
+| Empty diamond during ball-in-play entry | Short stationary tap updates optional spray location; holds/cancelled gestures do nothing | Draft only until existing runner confirmation |
+| Current fielder | Short tap selects that fielder in the active sequence/resolution; keyboard activation remains direct | Do not treat it as a historical shot or change it to hold-to-edit |
+| Current runner | Short tap keeps runner-play/resolution behavior | Existing no-pitch play and checked runner rules |
+| Pitch pad | Short tap places the optional pitch location; result buttons stay separate | No guessed pitch result or event from a location tap |
+| Pending location | Another short tap may reuse the exact point; no jitter/replacement of history | Component/flow draft only |
+| Recorded play | Recent Plays and Timeline retain detail/correction | No new live spray-map or invented marker editor |
+
+Baseball's governing BSB-3 plan requires the diamond and pitch controls together.
+Focused landscape therefore uses a two-pane workspace: aspect-preserved diamond
+beside a scrollable pitch/in-play/runner panel, not an overlay covering the field.
+An explicit portrait fallback stacks the same panes. Inning, balls/strikes/outs,
+pitcher count/warnings and actual batting/fielding context replace a game clock or
+free team selector; do not invent either for Baseball.
+
+The shared Expand/Exit, auto-landscape, optional native fullscreen, Back/Escape and
+tools primitives remain presentation only. The current capture flow/draft survives
+layout changes. Line score and Game use accessible dialogs; routine cloud controls
+move to the footer, with confirmations/errors outside its hidden focus controls.
+Pregame, terminal/final, pending-ending and non-Track views do not enter focus.
+No Baseball event, scoring, runner, lineup, cloud or release policy is redesigned.
+Physical phone/PWA validation remains separate; see the
+[Baseball regression record](REGRESSION_LCF_3_BASEBALL.md).
 
 Acceptance includes repeated captures on the same spot, nearby/overlapping marker
 review, cancelled holds, no hold-plus-capture double action, flip/coordinate

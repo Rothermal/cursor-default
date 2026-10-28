@@ -1,5 +1,7 @@
 import { Pencil } from 'lucide-react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useSurfaceGestures } from '../../hooks/useSurfaceGestures'
+import { surfacePoint } from '../../lib/surfacePoint'
 import type { GameEventLocation } from '../../lib/gameEvents/types'
 import {
   BASEBALL_BASE_POINTS,
@@ -28,6 +30,7 @@ interface BaseballDiamondProps {
   pendingLocation?: { x: number; y: number } | null
   /** Shows a pencil on the batter card (opponent slot labels). */
   onEditBatter?: () => void
+  focused?: boolean
 }
 
 const S = 100
@@ -115,7 +118,24 @@ export default function BaseballDiamond({
   onFielder,
   pendingLocation = null,
   onEditBatter,
+  focused = false,
 }: BaseballDiamondProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const interactive = Boolean(onLocation || onRunner || onFielder)
+  const gestures = useSurfaceGestures({
+    enabled: interactive,
+    onTap: (point, target) => {
+      // These are current scoring controls, not historical event markers.
+      const control = target instanceof Element ? target.closest('[data-diamond-control]') : null
+      const base = control?.getAttribute('data-runner-base') as BaseballBase | null
+      const position = control?.getAttribute('data-fielder-position')
+      if (base && onRunner) { onRunner(base); return }
+      if (position && onFielder) { onFielder(Number(position)); return }
+      const location = svgRef.current && surfacePoint(svgRef.current.getBoundingClientRect(), point, S, S)
+      if (location) onLocation?.(baseballDiamondLocation(location.x, location.y))
+    },
+    onHold: () => {},
+  })
   const fieldingColor = view.fieldingSide === 'tracked' ? 'rgb(var(--diamond-tracked))' : 'rgb(var(--diamond-opponent))'
   const battingColor = view.fieldingSide === 'tracked' ? 'rgb(var(--diamond-opponent))' : 'rgb(var(--diamond-tracked))'
   const summary = [
@@ -124,20 +144,21 @@ export default function BaseballDiamond({
   ].filter(Boolean).join(' ')
 
   return (
-    <div className="space-y-2">
-      <div className="relative mx-auto aspect-square w-full max-w-[22rem]">
+    <div className={focused ? 'flex min-h-0 flex-1 flex-col' : 'space-y-2'}>
+      <div className={focused ? 'relative min-h-0 flex-1' : 'relative mx-auto aspect-square w-full max-w-[22rem]'}>
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${S} ${S}`}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ touchAction: 'auto' }}
           className={`block h-full w-full rounded-md ${onLocation ? 'cursor-crosshair' : ''}`}
           role="group"
           aria-label={`Baseball diamond. ${summary}`}
-          onClick={onLocation ? event => {
-            const bounds = event.currentTarget.getBoundingClientRect()
-            onLocation(baseballDiamondLocation(
-              (event.clientX - bounds.left) / bounds.width,
-              (event.clientY - bounds.top) / bounds.height
-            ))
+          {...gestures}
+          onClickCapture={interactive ? event => {
+            if (event.detail !== 0) { event.preventDefault(); event.stopPropagation() }
           } : undefined}
+          onContextMenu={interactive ? event => event.preventDefault() : undefined}
         >
           <BaseballFieldShapes />
 
@@ -147,6 +168,7 @@ export default function BaseballDiamond({
             return (
               <Target
                 key={fielder.position}
+                position={fielder.position}
                 label={`${fieldingLabel} fielder ${fielder.position}${fielder.name ? `, ${fielder.name}` : ''}`}
                 onSelect={onFielder ? () => onFielder(fielder.position) : undefined}
               >
@@ -168,6 +190,7 @@ export default function BaseballDiamond({
             return (
               <Target
                 key={`runner-${base}`}
+                base={base}
                 label={`Runner on ${base}: ${runner.name}`}
                 onSelect={onRunner ? () => onRunner(base) : undefined}
               >
@@ -202,7 +225,7 @@ export default function BaseballDiamond({
           )}
         </svg>
 
-        {view.batter && (
+        {view.batter && !focused && (
           <div
             className={`absolute bottom-1 left-1 flex max-w-[48%] items-center gap-1 rounded-md bg-surface/90 py-1 pl-2 text-left shadow-sm ${onEditBatter ? 'pr-0' : 'pointer-events-none pr-2'}`}
           >
@@ -226,6 +249,13 @@ export default function BaseballDiamond({
           </div>
         )}
       </div>
+      {view.batter && focused && (
+        <div className="flex min-h-8 shrink-0 items-center gap-1 px-1 text-xs text-content">
+          <span className="min-w-0 flex-1 truncate" title={view.batter.name}>Batting {ORDINALS[view.batter.slot - 1] ?? view.batter.slot}: {view.batter.name}</span>
+          {onEditBatter && <button type="button" className="grid h-9 w-9 shrink-0 place-items-center" onClick={onEditBatter}
+            aria-label={`Edit label for ${view.batter.name}`} title="Edit batter label"><Pencil size={16} /></button>}
+        </div>
+      )}
       {onLocationUnknown && (
         <button type="button" className="btn-secondary w-full" onClick={onLocationUnknown}>
           Location unknown
@@ -235,7 +265,7 @@ export default function BaseballDiamond({
   )
 }
 
-function Target({ label, onSelect, children }: { label: string; onSelect?: () => void; children: ReactNode }) {
+function Target({ label, onSelect, children, base, position }: { label: string; onSelect?: () => void; children: ReactNode; base?: BaseballBase; position?: number }) {
   if (!onSelect) {
     return <g role="img" aria-label={label}>{children}</g>
   }
@@ -247,6 +277,9 @@ function Target({ label, onSelect, children }: { label: string; onSelect?: () =>
   }
   return (
     <g
+      data-diamond-control=""
+      data-runner-base={base}
+      data-fielder-position={position}
       role="button"
       tabIndex={0}
       aria-label={label}

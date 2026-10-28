@@ -120,6 +120,22 @@
     text-overflow: ellipsis;
   }
 
+  .tracker-focus .baseball-focus-grid {
+    display: grid;
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 0.375rem;
+    padding: 0.25rem;
+  }
+
+  @media (orientation: portrait) {
+    .tracker-focus .baseball-focus-grid {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
   .btn-primary {
     @apply bg-accent text-accent-content hover:bg-accent-hover font-semibold py-3 px-6 rounded-xl
            active:scale-[0.97] transition-transform duration-75

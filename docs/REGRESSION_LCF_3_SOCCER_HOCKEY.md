@@ -1,6 +1,6 @@
 # LCF-3: Soccer and Hockey Capture / Focus
 
-Status: implemented for review on 2026-10-27, following merged Basketball #513.
+Status: merged in #514 on 2026-10-28, following merged Basketball #513.
 Plan: [Live capture follow-up](PLAN_LIVE_CAPTURE_FIELD_TEST_FOLLOWUP.md).
 Single-agent implementation/self-review, not independent agent review.
 No migration, new dependency, event/schema change or rollout-gate expansion.
