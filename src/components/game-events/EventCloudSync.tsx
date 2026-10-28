@@ -56,10 +56,11 @@ export function EventCloudStatus({ state }: { state: GameState }) {
  * Game menu section: sync status, and Enable cloud sync for a device game (Hockey HKY-5B,
  * Baseball BSB-6B). `availability` is the sport's own offer rule.
  */
-export function EventCloudMenuSection({ state, onDone, availability: availabilityFor }: {
+export function EventCloudMenuSection({ state, onDone, availability: availabilityFor, compact = false }: {
   state: GameState
   onDone: () => void
   availability: (state: GameState, userId: string | null) => EventCloudEnableAvailability
+  compact?: boolean
 }) {
   const { user } = useAuth()
   const { enableEventCloudSync } = useGame()
@@ -79,7 +80,8 @@ export function EventCloudMenuSection({ state, onDone, availability: availabilit
   }
 
   return (
-    <section className="space-y-2 border-t border-line pt-3" aria-label="Cloud sync">
+    <section className={compact ? 'shrink-0 space-y-2' : 'space-y-2 border-t border-line pt-3'} aria-label="Cloud sync">
+      <div className={compact ? 'hidden' : 'space-y-2'}>
       <EventCloudStatus state={state} />
       {availability.offer ? (
         <button type="button" className="btn-secondary w-full" disabled={busy} onClick={() => setConfirmOpen(true)}>
@@ -88,6 +90,7 @@ export function EventCloudMenuSection({ state, onDone, availability: availabilit
       ) : availability.reason ? (
         <p className="text-sm text-content-muted">{availability.reason}</p>
       ) : null}
+      </div>
       {error && <p role="alert" className="text-sm text-danger-content">{error}</p>}
       <ConfirmDialog
         open={confirmOpen}
@@ -97,7 +100,10 @@ export function EventCloudMenuSection({ state, onDone, availability: availabilit
         cancelLabel="Keep on this device"
         destructive={false}
         onConfirm={() => { void enable() }}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => {
+          setConfirmOpen(false)
+          if (compact) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.tracker-focus [data-tracker-focus-exit]')?.focus())
+        }}
       />
     </section>
   )

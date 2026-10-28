@@ -102,7 +102,7 @@ export function useTrackerFocus(enabled: boolean, rootRef: RefObject<HTMLDivElem
     window.addEventListener('popstate', back)
     const frame = requestAnimationFrame(() => {
       if (!root.querySelector('[role="dialog"][aria-modal="true"]')) {
-        root.querySelector<HTMLButtonElement>('[aria-label="Exit focused court"]')?.focus()
+        root.querySelector<HTMLButtonElement>('[data-tracker-focus-exit], [aria-label="Exit focused court"]')?.focus()
       }
     })
     const keydown = (event: KeyboardEvent) => {

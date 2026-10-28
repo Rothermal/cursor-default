@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { createHockeyUuid } from '../../lib/hockey/id'
 import {
   hockeyAvailableParticipants,
@@ -30,6 +31,8 @@ interface HockeyGoalieDialogProps {
 /** Goalie changes and pulls for either net (HKY-2B). New opponent goalies are added here. */
 export default function HockeyGoalieDialog({ sport, defaultSide = 'tracked', trackedLabel, opponentLabel, onSubmit, onClose }: HockeyGoalieDialogProps) {
   const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   const [side, setSide] = useState<HockeySide>(defaultSide)
   const [newLabel, setNewLabel] = useState('')
   const [newNumber, setNewNumber] = useState('')
@@ -63,6 +66,8 @@ export default function HockeyGoalieDialog({ sport, defaultSide = 'tracked', tra
     <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-md sm:rounded-lg"

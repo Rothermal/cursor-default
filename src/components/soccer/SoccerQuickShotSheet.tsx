@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { X } from 'lucide-react'
 import {
   buildSoccerShotInput,
@@ -68,6 +69,8 @@ function QuickShotSheet({
   onClose,
   onMoreDetails,
 }: SoccerQuickShotSheetProps & { draft: SoccerCaptureDraft }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   const projection = state.sportGameState?.sportId === 'soccer' ? state.sportGameState.projection : null
   const teamSide = draft.teamSide
   const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
@@ -172,6 +175,8 @@ function QuickShotSheet({
     <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="soccer-quick-shot-title"
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg"

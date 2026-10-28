@@ -1,5 +1,7 @@
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
+import { useSurfaceGestures } from '../../hooks/useSurfaceGestures'
+import { surfacePoint } from '../../lib/surfacePoint'
 import type { GameEventLocation } from '../../lib/gameEvents/types'
 import {
   HOCKEY_CREASE_RADIUS_FT,
@@ -58,6 +60,7 @@ interface HockeyRinkProps {
   opponentLabel?: string
   /** Extra SVG drawn over the rink in feet, such as the Summary's faceoff tallies. */
   overlay?: ReactNode
+  focused?: boolean
 }
 
 const L = HOCKEY_RINK_LENGTH_FT
@@ -90,17 +93,33 @@ export default function HockeyRink({
   trackedLabel = 'Tracked',
   opponentLabel = 'Opponent',
   overlay,
+  focused = false,
 }: HockeyRinkProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
   const interactive = Boolean(onLocation) && !disabled
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
     : oppositeHockeyDirection(trackedDirection)
   const displayDirection = flipped ? oppositeHockeyDirection(captureDirection) : captureDirection
   const goalHalf = goalLineHalfSpan()
+  const gestures = useSurfaceGestures({
+    enabled: interactive,
+    onTap: (point, target) => {
+      const position = svgRef.current && surfacePoint(svgRef.current.getBoundingClientRect(), point, L, W)
+      if (!position) return
+      const dot = target instanceof Element ? target.closest('[data-faceoff-target]')?.getAttribute('data-faceoff-target') : null
+      if (dot && onFaceoffDot) onFaceoffDot(dot as HockeyFaceoffDotId)
+      else onLocation?.(hockeyRinkLocation(position.x, position.y, flipped, captureDirection))
+    },
+    onHold: (_point, target) => {
+      const id = target instanceof Element ? target.closest('[data-rink-marker]')?.getAttribute('data-rink-marker') : null
+      if (id) onMarker?.(id)
+    },
+  })
 
   return (
-    <div>
-      <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
+    <div className={focused ? 'flex min-h-0 flex-1 flex-col' : undefined}>
+      {!focused && <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase text-content-muted">
           {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
           <span className="truncate">{captureSide === 'tracked' ? trackedLabel : opponentLabel} attack</span>
@@ -114,21 +133,22 @@ export default function HockeyRink({
         >
           <RefreshCw size={17} />
         </button>}
-      </div>
+      </div>}
 
-      <div className="relative aspect-[200/85] w-full">
+      <div className={`relative w-full ${focused ? 'min-h-0 flex-1' : 'aspect-[200/85]'}`}>
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${L} ${W}`}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ touchAction: 'auto' }}
           className={`block h-full w-full origin-center transition-transform motion-reduce:transition-none ${flipped ? 'rotate-180' : ''} ${disabled ? 'cursor-not-allowed' : interactive ? 'cursor-crosshair' : ''}`}
           role="group"
           aria-label="Hockey rink"
-          onClick={event => {
-            if (!interactive || !onLocation) return
-            const bounds = event.currentTarget.getBoundingClientRect()
-            const displayX = (event.clientX - bounds.left) / bounds.width
-            const displayY = (event.clientY - bounds.top) / bounds.height
-            onLocation(hockeyRinkLocation(displayX, displayY, flipped, captureDirection))
-          }}
+          {...gestures}
+          onClickCapture={interactive ? event => {
+            if (event.detail !== 0) { event.preventDefault(); event.stopPropagation() }
+          } : undefined}
+          onContextMenu={interactive ? event => event.preventDefault() : undefined}
         >
           <rect
             x="0.75" y="0.75" width={L - 1.5} height={W - 1.5}
@@ -268,6 +288,7 @@ function HockeyMarker({ marker, flipped, onSelect }: { marker: HockeyRinkMarker;
   const color = marker.teamSide === 'tracked' ? 'rgb(var(--rink-tracked))' : 'rgb(var(--rink-opponent))'
   return (
     <g
+      data-rink-marker={marker.id}
       role={onSelect ? 'button' : undefined}
       tabIndex={onSelect ? 0 : undefined}
       aria-label={marker.label}

@@ -25,6 +25,9 @@ import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import TrackerSideSelector from '../components/TrackerSideSelector'
 import TrackerDialog from '../components/TrackerDialog'
+import TrackerFocusButton from '../components/TrackerFocusButton'
+import TrackerSurfaceTools from '../components/TrackerSurfaceTools'
+import { useTrackerFocus } from '../hooks/useTrackerFocus'
 import { EventCloudStatus } from '../components/game-events/EventCloudSync'
 import SoccerField, {
   type SoccerFieldMarker,
@@ -275,6 +278,11 @@ export default function SoccerGameTracker() {
   const lifecycleAction = projection ? soccerLifecycleAction(projection) : { kind: 'none' as const }
   const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
   const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const canFocus = !invalidRoute && inspection.complete && mainTab === 'field' &&
+    projection?.status === 'in_progress' && state.cloudSync.gameStatus !== 'final' &&
+    (!state.cloudSync.teamId || (!teamAccess.loading && canTrackGames(teamAccess.role)))
+  const { focused, expand, exit } = useTrackerFocus(canFocus, rootRef)
 
   if (invalidRoute || !state.gameInfo || !soccerState || !projection || !clockValue) return null
 
@@ -289,7 +297,8 @@ export default function SoccerGameTracker() {
   const visibleParticipants = lineupTab === 'on_field' ? onField : bench
   const capturePreferences = soccerState.capturePreferences
   const fieldCaptureEnabled =
-    healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
+    healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal &&
+    (!state.cloudSync.teamId || (!teamAccess.loading && canTrackGames(teamAccess.role)))
   const substitutionActionEnabled =
     healthy &&
     (!state.cloudSync.teamId || (!teamAccess.loading && canTrackGames(teamAccess.role))) &&
@@ -471,11 +480,12 @@ export default function SoccerGameTracker() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-canvas pb-8" aria-busy={isApplying}>
+    <div ref={rootRef} className={focused ? 'tracker-focus flex flex-col bg-canvas' : 'min-h-screen overflow-x-clip bg-canvas pb-8'} aria-busy={isApplying}>
       {isApplying && <div className="fixed inset-0 z-[70] cursor-wait" aria-hidden="true" />}
-      <main className="mx-auto w-full min-w-0 max-w-2xl">
-      <header className="sticky top-0 z-20 border-b border-line bg-surface pt-[env(safe-area-inset-top)] text-content">
-        <div className="relative flex min-h-12 w-full min-w-0 items-center gap-1 px-3 py-1">
+      <main className="tracker-main mx-auto w-full min-w-0 max-w-2xl">
+      <header className={`shrink-0 border-b border-line bg-surface text-content ${focused ? 'tracker-heading relative' : 'sticky top-0 z-20 pt-[env(safe-area-inset-top)]'}`}>
+        {focused && <div className="absolute left-1 top-1"><TrackerFocusButton focused surface="field" onExpand={() => void expand()} onExit={exit} /></div>}
+        <div className={`relative min-h-12 w-full min-w-0 items-center gap-1 px-3 py-1 ${focused ? 'hidden' : 'flex'}`}>
           <button type="button" onClick={() => navigate(sportDashboardPath('soccer'))} className="h-9 w-9 grid place-items-center rounded-md bg-surface" aria-label="Back to soccer dashboard" title="Back">
             <ChevronLeft size={20} />
           </button>
@@ -490,31 +500,35 @@ export default function SoccerGameTracker() {
               <MoreHorizontal size={21} />
             </button>
           )}
+          {canFocus && <TrackerFocusButton focused={false} surface="field" onExpand={() => void expand()} onExit={exit} />}
         </div>
-        <section className="px-4 pb-3 pt-1 text-center" aria-label="Scoreboard">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+        <section className={focused ? 'px-11 py-1 text-center' : 'px-4 pb-3 pt-1 text-center'} aria-label="Scoreboard">
+          <div className={`grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center ${focused ? 'gap-1' : 'gap-3'}`}>
             <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-canvas" aria-label={`Open ${trackedLabel} scoring timeline`}>
               <p className="truncate text-xs font-semibold text-content-muted">{trackedLabel}</p>
-              <p className="text-4xl font-bold tabular-nums text-success-content">{state.homeTeamScore ?? 0}</p>
+              <p className={`${focused ? 'text-lg leading-none' : 'text-4xl'} font-bold tabular-nums text-success-content`}>{state.homeTeamScore ?? 0}</p>
             </button>
             <div className="min-w-24">
               <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase text-content-muted">
                 <span>{currentSegment?.label ?? (ended ? 'Final' : 'Break')}</span>
                 <span className={`h-2 w-2 rounded-full ${projection.clock.running ? 'bg-success' : 'bg-control'}`} />
               </div>
-              <div className="mt-1 flex min-h-9 items-baseline justify-center gap-1">
-                <p className="text-3xl font-bold text-content tabular-nums leading-none" aria-label="Game clock">{clockValue.primary}</p>
+              <div className={`flex items-center justify-center gap-1 ${focused ? '' : 'mt-1 min-h-9'}`}>
+                <p className={`${focused ? 'text-lg' : 'text-3xl'} font-bold text-content tabular-nums leading-none`} aria-label="Game clock">{clockValue.primary}</p>
                 {clockValue.overrun && <span className="text-sm font-bold text-warning-content tabular-nums">{clockValue.overrun}</span>}
+                {focused && <button type="button" onClick={primaryClockAction} disabled={isApplying} aria-label={projection.clock.running ? 'Pause Clock' : 'Start Clock'} title={projection.clock.running ? 'Pause Clock' : 'Start Clock'} className="grid h-8 w-8 place-items-center rounded bg-control disabled:text-content-disabled">
+                  {projection.clock.running ? <Pause size={17} /> : <Play size={17} />}
+                </button>}
               </div>
-              <p className="mt-1 text-[11px] font-medium text-content-muted">{projection.clock.running ? 'Running' : 'Stopped'}</p>
+              {!focused && <p className="mt-1 text-[11px] font-medium text-content-muted">{projection.clock.running ? 'Running' : 'Stopped'}</p>}
             </div>
             <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-canvas" aria-label={`Open ${opponentLabel} scoring timeline`}>
               <p className="truncate text-xs font-semibold text-content-muted">{opponentLabel}</p>
-              <p className="text-4xl font-bold tabular-nums text-content">{state.opponentScore}</p>
+              <p className={`${focused ? 'text-lg leading-none' : 'text-4xl'} font-bold tabular-nums text-content`}>{state.opponentScore}</p>
             </button>
           </div>
 
-          {!healthy ? (
+          {focused ? null : !healthy ? (
             <button type="button" onClick={() => setMainTab('timeline')} className="mt-5 w-full rounded-md border border-danger-line bg-danger px-4 py-3 text-sm font-bold text-danger-content">
               Review Timeline Issues
             </button>
@@ -606,7 +620,7 @@ export default function SoccerGameTracker() {
           </div>
         )}
 
-        <div className="px-4 py-3">
+        <div className={focused ? 'flex min-h-0 flex-1 flex-col' : 'px-4 py-3'}>
           {mainTab === 'field' && shootoutActive ? (
             <div className="space-y-6">
               <SoccerShootoutWorkspace
@@ -640,10 +654,13 @@ export default function SoccerGameTracker() {
               </section>
             </div>
           ) : mainTab === 'field' ? (
-            <div className="space-y-4">
+            <div className={focused ? 'flex min-h-0 flex-1 flex-col' : 'space-y-4'}>
+              <div className="tracker-team-context">
               <TrackerSideSelector side={capturePreferences.teamSide} labels={{ tracked: trackedLabel, opponent: opponentLabel }} onChange={setCaptureSide} />
+              </div>
 
               <SoccerField
+                focused={focused}
                 trackedDirection={projection.attackingDirection}
                 captureSide={capturePreferences.teamSide}
                 flipped={fieldFlipped}
@@ -678,6 +695,18 @@ export default function SoccerGameTracker() {
                 onCluster={restartArmed ? undefined : setClusterEventIds}
               />
 
+              <TrackerSurfaceTools focused={focused}>
+              {focused && <>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className="btn-secondary" onClick={() => { exit(); setMainTab('lineup') }}>Lineup</button>
+                  <button type="button" className="btn-secondary" onClick={() => { exit(); setMainTab('timeline') }}>Timeline</button>
+                  <button type="button" className="btn-secondary" onClick={() => navigate(soccerSummaryPath({ from: 'tracker' }), { replace: true })}>Summary</button>
+                  <button type="button" className="btn-secondary" onClick={() => setConfirmEndPeriod(true)}>End Period</button>
+                  <button type="button" className="btn-secondary" onClick={() => setFieldFlipped(value => !value)}>Flip field view</button>
+                  <button type="button" className="btn-secondary" onClick={() => { exit(); requestAnimationFrame(() => document.getElementById('soccer-cloud-footer')?.scrollIntoView()) }}>Sync / recorders</button>
+                  <button type="button" className="btn-secondary col-span-2" onClick={() => navigate(sportDashboardPath('soccer'), { replace: true })}>Dashboard</button>
+                </div>
+              </>}
               <div role="group" aria-label="Field capture">
                 <div className="grid grid-cols-3 rounded-md bg-control p-1">
                   <ModeButton active={capturePreferences.captureMode === 'shot'} label="Shot" onClick={() => setCaptureMode('shot')} />
@@ -817,6 +846,7 @@ export default function SoccerGameTracker() {
                   </div>
                 </div>
               </details>
+              </TrackerSurfaceTools>
             </div>
           ) : mainTab === 'lineup' ? (
             <>
@@ -864,6 +894,7 @@ export default function SoccerGameTracker() {
           )}
         </div>
 
+        <div id="soccer-cloud-footer" className={focused ? 'hidden' : undefined}>
         {state.cloudSync.gameId && (
           <button
             type="button"
@@ -892,6 +923,7 @@ export default function SoccerGameTracker() {
           </button>
         )}
         <div className="px-4"><EventCloudStatus state={state} /></div>
+        </div>
       </main>
 
       {actionsOpen && (
@@ -1242,14 +1274,11 @@ function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
 
 function ClusterSheet({ events, sourceLine, onSelect, onClose }: { events: GameEvent[]; sourceLine: (event: GameEvent) => string | null; onSelect: (event: GameEvent) => void; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}>
-      <div className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-content">Events at this location</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
+    <TrackerDialog title="Events at this location" onClose={onClose}>
         <div className="divide-y divide-line border-y border-line">
           {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-content">{markerLabel(event)}</span>{sourceLine(event) && <span className="block truncate text-xs text-content-muted">{sourceLine(event)}</span>}</span><span className="text-xs font-bold text-success-content">Edit</span></button>)}
         </div>
-      </div>
-    </div>
+    </TrackerDialog>
   )
 }
 

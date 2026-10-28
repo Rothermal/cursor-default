@@ -3,14 +3,14 @@ import { createSurfaceGesture, type SurfacePointer } from '../lib/surfaceGesture
 
 export function useSurfaceGestures({ enabled, onTap, onHold }: {
   enabled: boolean
-  onTap: (point: SurfacePointer) => void
+  onTap: (point: SurfacePointer, target: EventTarget | null) => void
   onHold: (point: SurfacePointer, target: EventTarget | null) => void
 }) {
   const callbacks = useRef({ onTap, onHold })
   callbacks.current = { onTap, onHold }
   const target = useRef<EventTarget | null>(null)
   const gesture = useMemo(() => createSurfaceGesture({
-    onTap: point => callbacks.current.onTap(point),
+    onTap: point => callbacks.current.onTap(point, target.current),
     onHold: point => callbacks.current.onHold(point, target.current),
   }), [])
 

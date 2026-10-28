@@ -43,8 +43,10 @@ Per-sport delivery is recorded below; these targets do not release every sport a
   existing marker; a stationary hold reviews markers/overlaps. Keyboard and
   read-only charts retain direct review. Focused landscape is presentation only,
   with optional browser fullscreen, not a second recorder or a game-state change.
-  Basketball full-court adoption is implemented for review in
-  [LCF-3](REGRESSION_LCF_3_CAPTURE_FOCUS.md); sibling sports are not yet migrated.
+  Basketball full-court adoption merged in #513
+  ([LCF-3](REGRESSION_LCF_3_CAPTURE_FOCUS.md));
+  [Soccer/Hockey adoption](REGRESSION_LCF_3_SOCCER_HOCKEY.md) is implemented for
+  review. Baseball and Football are not changed by this gesture/focus work.
 - Keep team/opponent selection, labelled with team display names/nicknames.
 - Remove the global individual-player capture strip as each sport adopts this model.
   Choose attribution inside the event dialog; do not silently attribute from a

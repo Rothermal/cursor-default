@@ -5,8 +5,9 @@ pending-primary recovery merged in #512. The owner confirmed migration 081 and
 successful record merging on 2026-10-27
 ([evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md)). LCF-2
 unattributed opponent free throws merged in #511. LCF-3 Basketball capture-first
-gestures and focused court are implemented for review; sibling-sport adoption
-and physical-device/PWA checks remain follow-ups. The scoring report remains open for a second game whose
+gestures and focused court merged in #513; Soccer/Hockey adoption is implemented
+for review ([sibling verification](REGRESSION_LCF_3_SOCCER_HOCKEY.md)).
+Physical-device/PWA checks remain follow-ups. The scoring report remains open for a second game whose
 export is pending. Football development is paused while these owner-reported
 issues are addressed. This is not a clock/substitution redesign.
 
@@ -21,7 +22,7 @@ Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.
 | --- | --- | --- |
 | LCF-1: Late-player sync and scoring audit | Merged #510/#512; owner confirms 081 applied and records merged | [Recovery evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md). Separate second-game scoring investigation remains open |
 | LCF-2: Unattributed opponent free throws | Merged #511 | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
-| LCF-3: Capture-first gestures and focused surface | Basketball implemented for review | Short tap opens capture even over a marker; long press opens review; focused landscape layout with score and menu. [Verification and remaining sibling/device work](REGRESSION_LCF_3_CAPTURE_FOCUS.md) |
+| LCF-3: Capture-first gestures and focused surface | Basketball merged #513; Soccer/Hockey implemented for review | Short tap opens capture even over a marker; long press opens review; focused landscape layout with score and menu. [Basketball evidence](REGRESSION_LCF_3_CAPTURE_FOCUS.md), [Soccer/Hockey evidence and remaining device work](REGRESSION_LCF_3_SOCCER_HOCKEY.md) |
 
 These are cohesive feature PRs, not a new foundation/micro-phase ladder. Do not
 delay the confirmed sync fix behind the UI work. FBE-1 remains an approved plan;
@@ -175,12 +176,14 @@ fabricated participants is permitted.
 
 ## LCF-3: Capture-First Gestures and Focus Mode
 
-Basketball's writable full-court tracker now implements the contract below. The
-gesture recognizer and focus controller are shared-ready, but Soccer/Hockey have
-not adopted them in this PR. Existing half-court and read-only charts retain
-their prior activation behavior. No event, clock, lineup, score, schema, cloud
-authority or rollout policy changes. See the
-[LCF-3 regression record](REGRESSION_LCF_3_CAPTURE_FOCUS.md).
+Basketball's writable full-court tracker implements the contract below in merged
+#513. Soccer/Hockey now adopt the same gesture recognizer and focus controller;
+sport-owned capture sheets, faceoff/restart shortcuts, review and canonical
+location conversions remain intact. Existing half-court and read-only charts
+retain their prior activation behavior. No event, clock, lineup, score, schema,
+cloud authority or rollout policy changes. See the
+[Basketball regression record](REGRESSION_LCF_3_CAPTURE_FOCUS.md) and
+[sibling regression record](REGRESSION_LCF_3_SOCCER_HOCKEY.md).
 
 ### Requested target and recommended details
 
@@ -211,9 +214,8 @@ authority or rollout policy changes. See the
   available; denial falls back to an in-app viewport-filling layout. Automatic
   layout changes must not depend on browser fullscreen permission. Do not rotate
   the entire UI with CSS to fake an orientation lock.
-- Current `vite.config.ts` sets PWA manifest orientation to `portrait`. Review a
-  rotation-permitting manifest value as part of this package; a media query alone
-  cannot establish the installed-PWA behavior. Check all setup/settings pages,
+- Merged #513 changes the PWA manifest orientation from `portrait` to `any`.
+  A media query alone cannot establish installed-PWA behavior. Check setup/settings pages,
   normal portrait navigation and existing installed apps after the manifest update.
 - Menus/dialogs must stay within the fullscreen subtree when real fullscreen is
   active; retain focus management, Escape/Back/Exit, safe areas and focus return.

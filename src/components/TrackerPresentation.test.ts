@@ -4,7 +4,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import TrackerSideSelector from './TrackerSideSelector'
 import { EventCloudStatus } from './game-events/EventCloudSync'
 import HockeyRink from './hockey/HockeyRink'
-import { hockeyRinkLocation } from '../lib/hockey/rinkGeometry'
 import { createInitialState, gameReducer } from '../lib/gameReducer'
 import { buildGameSyncFingerprint, withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
 import { sports } from '../config/sports'
@@ -30,13 +29,14 @@ function boundGame(sportId: string): GameState {
 
 describe('Shared tracker presentation', () => {
   it.each([['tracked', false], ['tracked', true], ['opponent', false], ['opponent', true]] as const)(
-    'preserves canonical Hockey tap mapping for %s / flipped=%s', (captureSide, flipped) => {
-      const onLocation = vi.fn()
-      const rink = elements(HockeyRink({ trackedDirection: 'left_to_right', captureSide, flipped, trapezoid: true, onLocation }))
-        .find(element => element.props['aria-label'] === 'Hockey rink')!
-      ;(rink.props.onClick as (event: unknown) => void)({ clientX: 70, clientY: 65,
-        currentTarget: { getBoundingClientRect: () => ({ left: 10, top: 5, width: 200, height: 100 }) } })
-      expect(onLocation).toHaveBeenCalledExactlyOnceWith(hockeyRinkLocation(0.3, 0.6, flipped, captureSide === 'tracked' ? 'left_to_right' : 'right_to_left'))
+    'renders Hockey side context for %s / flipped=%s', (captureSide, flipped) => {
+      // Actual tap/hold coordinates are exercised through the DOM in TrackerSurfaceGestures.test.
+      const markup = renderToStaticMarkup(createElement(HockeyRink, {
+        trackedDirection: 'left_to_right', captureSide, flipped, trapezoid: true,
+        trackedLabel: 'Home', opponentLabel: 'Away', onLocation: vi.fn(),
+      }))
+      expect(markup).toContain(`${captureSide === 'tracked' ? 'Home' : 'Away'} attack`)
+      expect(markup.includes('rotate-180')).toBe(flipped)
     }
   )
   it('exposes full team names, pressed state and explicit side callbacks', () => {

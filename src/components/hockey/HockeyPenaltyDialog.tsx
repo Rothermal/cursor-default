@@ -1,5 +1,6 @@
 import { Plus, Trash2, X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import {
   HOCKEY_INFRACTION_LABELS,
   HOCKEY_INFRACTIONS,
@@ -76,6 +77,8 @@ export default function HockeyPenaltyDialog({
   onClose,
 }: HockeyPenaltyDialogProps) {
   const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   const editing = initial !== undefined
   const [rows, setRows] = useState<PenaltyRow[]>(() =>
     initial ? initial.penalties.map((penalty, index) => storedRow(index, penalty, sport)) : [newRow(0, defaultSide)]
@@ -137,6 +140,8 @@ export default function HockeyPenaltyDialog({
     <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-md sm:rounded-lg"
