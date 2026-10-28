@@ -1,5 +1,6 @@
 import { MapPin, MapPinOff, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import type {
   GameEventActor,
   GameEventLocation,
@@ -114,6 +115,8 @@ export default function SoccerIncidentCaptureDialog({
   onApply,
   onClose,
 }: SoccerIncidentCaptureDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: Boolean(draft), dialogRef, onClose })
   const initializationDraft = useStableSoccerCorrectionDraft(draft)
   const sportState = state.sportGameState?.sportId === 'soccer' ? state.sportGameState : null
   const projection = sportState?.projection ?? null
@@ -517,7 +520,7 @@ export default function SoccerIncidentCaptureDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby="soccer-incident-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="soccer-incident-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
             <h2 id="soccer-incident-title" className="font-bold text-content">{dialogTitle(draft.kind, mode)}</h2>

@@ -1,5 +1,6 @@
 import { Pencil, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
 import {
   isSoccerScoringEvent,
@@ -41,6 +42,8 @@ export default function SoccerScoreTimelineDialog({
   onEditAttacking,
   onClose,
 }: SoccerScoreTimelineDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: open, dialogRef, onClose })
   const [editing, setEditing] = useState<SoccerScoreAdjustmentEvent | 'new' | null>(null)
   const scoringEvents = useMemo(
     () => [...inspection.activeEvents].reverse().filter(isSoccerScoringEvent),
@@ -59,7 +62,7 @@ export default function SoccerScoreTimelineDialog({
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby="soccer-score-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="soccer-score-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
             <h2 id="soccer-score-title" className="font-bold text-content">Scoring Timeline</h2>

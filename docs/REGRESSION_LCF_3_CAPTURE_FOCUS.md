@@ -1,7 +1,9 @@
 # LCF-3: Basketball Capture and Focus
 
-Status: implemented for review on 2026-10-27. No Supabase migration. Physical-touch
+Status: merged in #513 on 2026-10-27. No Supabase migration. Physical-touch
 and installed-PWA checks below are not claimed by desktop browser automation.
+Soccer/Hockey adoption is recorded separately in the
+[sibling regression record](REGRESSION_LCF_3_SOCCER_HOCKEY.md).
 
 ## Implemented Contract
 

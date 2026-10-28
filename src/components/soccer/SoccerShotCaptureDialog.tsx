@@ -1,7 +1,8 @@
 import { MapPin, MapPinOff, Plus, X } from 'lucide-react'
 import { SoccerShotDetailsEditor } from './SoccerShotDetails'
 import { soccerScoringDirection, shotDetailDraft } from '../../lib/soccer/shotDetails'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import type { GameEventActor, GameEventLocation } from '../../lib/gameEvents/types'
 import {
   inspectSoccerHistory,
@@ -87,6 +88,8 @@ export default function SoccerShotCaptureDialog({
   onApply,
   onClose,
 }: SoccerShotCaptureDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: Boolean(draft), dialogRef, onClose })
   const initializationDraft = useStableSoccerCorrectionDraft(draft)
   const sportState = state.sportGameState?.sportId === 'soccer' ? state.sportGameState : null
   const projection = sportState?.projection ?? null
@@ -390,6 +393,8 @@ export default function SoccerShotCaptureDialog({
     <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="soccer-capture-title"
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg"

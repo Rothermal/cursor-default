@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import {
   activeHockeyTimelineFilterCount,
   DEFAULT_HOCKEY_TIMELINE_FILTERS,
@@ -241,6 +242,8 @@ export function HockeyTimelineDetail({
   onClose: () => void
 }) {
   const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   const removable = canRemoveHockeyEvents(row.events)
   const editable = !row.removed && hockeyCorrectionInput(row.events) !== null
   const movable = editable && row.events.some(event => isPlaceableHockeyEventType(event.eventType))
@@ -248,6 +251,8 @@ export function HockeyTimelineDetail({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-md sm:rounded-lg"

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import type { GameState } from '../../types'
 import {
   addHockeyEvents,
@@ -851,10 +852,14 @@ function ShootoutAttemptEdit({
 
 function EditSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface pb-[env(safe-area-inset-bottom)] sm:max-w-md sm:rounded-lg"

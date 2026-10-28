@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { X } from 'lucide-react'
 import SoccerLineupManager from './SoccerLineupManager'
 import type { GameState } from '../../types'
@@ -325,9 +326,11 @@ function EndMatchForm({ state, options, onApply }: FormProps) {
 }
 
 function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   return (
     <div className="fixed inset-0 z-50 bg-overlay/[0.45] flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} className="bg-surface w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-lg shadow-xl" onClick={event => event.stopPropagation()}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className="bg-surface w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-lg shadow-xl" onClick={event => event.stopPropagation()}>
         <header className="sticky top-0 bg-surface border-b border-line px-4 py-3 flex items-center gap-3 z-10">
           <h2 className="font-bold text-content flex-1">{title}</h2>
           <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button>

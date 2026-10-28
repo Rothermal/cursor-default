@@ -1,4 +1,7 @@
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react'
+import { useRef } from 'react'
+import { useSurfaceGestures } from '../../hooks/useSurfaceGestures'
+import { surfacePoint } from '../../lib/surfacePoint'
 import type { GameEventLocation } from '../../lib/gameEvents/types'
 import type { SoccerAttackingDirection, SoccerTeamSide } from '../../lib/soccer'
 import type { SoccerFieldReviewFamily } from '../../lib/soccer/summaryField'
@@ -35,6 +38,7 @@ interface SoccerFieldProps {
   activeCaptureLabel?: string
   trackedLabel?: string
   opponentLabel?: string
+  focused?: boolean
 }
 
 export default function SoccerField({
@@ -52,15 +56,33 @@ export default function SoccerField({
   activeCaptureLabel,
   trackedLabel = 'Tracked',
   opponentLabel = 'Opponent',
+  focused = false,
 }: SoccerFieldProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
     : oppositeDirection(trackedDirection)
   const displayDirection = flipped ? oppositeDirection(captureDirection) : captureDirection
+  const clusters = clusterSoccerMarkerPoints(markers)
+  const interactive = !disabled && presentation === 'capture'
+  const gestures = useSurfaceGestures({
+    enabled: interactive,
+    onTap: point => {
+      const position = svgRef.current && surfacePoint(svgRef.current.getBoundingClientRect(), point, 100, 64)
+      if (position) onLocation(soccerFieldLocation(position.x, position.y, flipped, captureDirection))
+    },
+    onHold: (_point, target) => {
+      const id = target instanceof Element ? target.closest('[data-field-marker]')?.getAttribute('data-field-marker') : null
+      const cluster = clusters.find(items => items[0].id === id)
+      if (!cluster) return
+      if (cluster.length === 1) onMarker?.(cluster[0].id)
+      else onCluster?.(cluster.map(marker => marker.id))
+    },
+  })
 
   return (
-    <div>
-      {presentation === 'capture' && (
+    <div className={focused ? 'flex min-h-0 flex-1 flex-col' : undefined}>
+      {presentation === 'capture' && !focused && (
         <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase text-content-muted">
             {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
@@ -80,19 +102,20 @@ export default function SoccerField({
         </div>
       )}
 
-      <div className={`relative aspect-[100/64] w-full overflow-hidden rounded-md border-2 border-pitch-line bg-pitch-surface shadow-sm ${activeCaptureLabel ? 'ring-4 ring-warning-line ring-offset-2 ring-offset-surface' : ''}`}>
+      <div className={`relative ${focused ? 'min-h-0 flex-1' : 'aspect-[100/64]'} w-full overflow-hidden ${focused ? '' : 'rounded-md border-2 border-pitch-line bg-pitch-surface shadow-sm'} ${activeCaptureLabel ? focused ? 'ring-2 ring-inset ring-warning-line' : 'ring-4 ring-warning-line ring-offset-2 ring-offset-surface' : ''}`}>
         <svg
+          ref={svgRef}
           viewBox="0 0 100 64"
+          preserveAspectRatio="xMidYMid meet"
+          style={{ touchAction: 'auto' }}
           className={`block h-full w-full origin-center transition-transform motion-reduce:transition-none ${flipped ? 'rotate-180' : ''} ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
           role="group"
           aria-label={activeCaptureLabel ? `Soccer field, ${activeCaptureLabel} armed` : 'Soccer field'}
-          onClick={event => {
-            if (disabled) return
-            const bounds = event.currentTarget.getBoundingClientRect()
-            const displayX = (event.clientX - bounds.left) / bounds.width
-            const displayY = (event.clientY - bounds.top) / bounds.height
-            onLocation(soccerFieldLocation(displayX, displayY, flipped, captureDirection))
-          }}
+          {...gestures}
+          onClickCapture={interactive ? event => {
+            if (event.detail !== 0) { event.preventDefault(); event.stopPropagation() }
+          } : undefined}
+          onContextMenu={interactive ? event => event.preventDefault() : undefined}
         >
           <rect x="0" y="0" width="100" height="64" fill="rgb(var(--pitch-surface))" />
           <rect x="2" y="2" width="96" height="60" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.65" />
@@ -116,7 +139,7 @@ export default function SoccerField({
           <path d="M98 60.8 A1.2 1.2 0 0 1 96.8 62" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.45" />
           <rect x="98" y={SOCCER_DIAGRAM_GOAL_TOP} width="1.7" height={SOCCER_DIAGRAM.goalWidth} fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.5" />
 
-          {clusterSoccerMarkerPoints(markers).map(cluster => cluster.length === 1 ? (
+          {clusters.map(cluster => cluster.length === 1 ? (
             <SoccerMarker
               key={cluster[0].id}
               marker={cluster[0]}
@@ -138,7 +161,7 @@ export default function SoccerField({
           </div>
         )}
       </div>
-      {markers.length > 0 && (
+      {markers.length > 0 && !focused && (
         <MarkerLegend families={legendFamilies} trackedLabel={trackedLabel} opponentLabel={opponentLabel} />
       )}
     </div>
@@ -209,6 +232,7 @@ function SoccerMarker({
   }
   return (
     <g
+      data-field-marker={marker.id}
       role={onSelect ? 'button' : undefined}
       tabIndex={onSelect ? 0 : undefined}
       aria-label={marker.label}
@@ -268,7 +292,7 @@ function SoccerMarkerCluster({
   const x = markers.reduce((total, marker) => total + marker.x, 0) / markers.length * 100
   const y = markers.reduce((total, marker) => total + marker.y, 0) / markers.length * 64
   return (
-    <g role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} aria-label={`${markers.length} events at this location`} className={onSelect ? 'cursor-pointer outline-none' : undefined} onClick={onSelect ? event => { event.stopPropagation(); onSelect() } : undefined} onKeyDown={event => { if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); event.stopPropagation(); onSelect() }}>
+    <g data-field-marker={markers[0].id} role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} aria-label={`${markers.length} events at this location`} className={onSelect ? 'cursor-pointer outline-none' : undefined} onClick={onSelect ? event => { event.stopPropagation(); onSelect() } : undefined} onKeyDown={event => { if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); event.stopPropagation(); onSelect() }}>
       <circle cx={x} cy={y} r="4.2" fill="rgb(var(--pitch-ink))" stroke="rgb(var(--pitch-line))" strokeWidth="0.65" />
       <text x={x} y={y + 1.35} transform={uprightMarkerGlyphTransform(flipped, x, y)} textAnchor="middle" fill="rgb(var(--pitch-line))" fontSize="4" fontWeight="700">{markers.length}</text>
     </g>

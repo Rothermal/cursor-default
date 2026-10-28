@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { RotateCcw, Undo2, X } from 'lucide-react'
 import {
   deleteSoccerHistoryEvent,
@@ -42,6 +43,8 @@ function RecentEventsSheet({
   onOpenTimeline,
   onClose,
 }: SoccerRecentEventsSheetProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   const [undone, setUndone] = useState<GameEvent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
@@ -79,6 +82,8 @@ function RecentEventsSheet({
     <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="soccer-recent-events-title"
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg"

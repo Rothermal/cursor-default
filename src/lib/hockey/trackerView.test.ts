@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hockeyTrackerMarkers, type HockeyTrackerFilters } from './trackerView'
+import { hockeyTrackerMarkerIds, hockeyTrackerMarkers, type HockeyTrackerFilters } from './trackerView'
 import { recordHockeyPlay, recordHockeyShot } from './captureCommands'
 import { endHockeyPeriod, startHockeyGame, startNextHockeyPeriod } from './live'
 import { CLOCKLESS, ctx, expectOk, hockeySetup, initializedHockeyGame } from './testFixtures'
@@ -20,6 +20,20 @@ function fixture() {
 }
 
 describe('Hockey tracker marker display filters', () => {
+  it('reviews exact stacks and nearby shots/plays in stable id order without changing locations', () => {
+    const markers = [
+      { id: 'b', x: 0.5, y: 0.5, teamSide: 'tracked' as const, kind: 'saved' as const, label: 'Shot' },
+      { id: 'a', x: 0.5, y: 0.5, teamSide: 'opponent' as const, kind: 'event' as const, label: 'Play' },
+      { id: 'c', x: 0.52, y: 0.5, teamSide: 'tracked' as const, kind: 'missed' as const, label: 'Nearby' },
+      { id: 'd', x: 0.8, y: 0.5, teamSide: 'tracked' as const, kind: 'missed' as const, label: 'Farther' },
+    ]
+    const before = JSON.stringify(markers)
+    expect(hockeyTrackerMarkerIds(markers, 'b')).toEqual(['a', 'b', 'c'])
+    expect(hockeyTrackerMarkerIds([...markers].reverse(), 'b')).toEqual(['a', 'b', 'c'])
+    expect(hockeyTrackerMarkerIds(markers, 'missing')).toEqual([])
+    expect(hockeyTrackerMarkerIds(markers.slice(0, 1), 'b')).toEqual(['b'])
+    expect(JSON.stringify(markers)).toBe(before)
+  })
   it.each([
     [{ family: 'all', side: 'all', scope: 'match' }, 4],
     [{ family: 'shots', side: 'all', scope: 'match' }, 3],

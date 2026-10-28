@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import HockeyLocationField from './HockeyLocationField'
 import { ActorField, Choices, Group } from './hockeyFields'
 import {
@@ -84,6 +85,8 @@ export default function HockeyShotDialog({
   onClose,
 }: HockeyShotDialogProps) {
   const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
   const { setup, projection } = sport
   const editing = initial !== undefined
   const [side, setSide] = useState<HockeySide>(initial?.side ?? draft.side)
@@ -168,6 +171,8 @@ export default function HockeyShotDialog({
     <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg"

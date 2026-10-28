@@ -62,7 +62,8 @@ See `package.json` scripts. Standard commands:
 
 ### Gotchas
 
-- **Basketball capture/focus (LCF-3, implemented for review):** Writable full-court
+- **Shared capture/focus (LCF-3):** Basketball merged #513; Soccer/Hockey adoption
+  is implemented for review. Writable full-court
   taps open capture even over existing shots; a stationary 500 ms hold opens the
   existing deterministic overlap review. `useSurfaceGestures` cancels on movement,
   scroll, multi-touch, cancellation, resize and teardown; keyboard markers and
@@ -70,9 +71,14 @@ See `package.json` scripts. Standard commands:
   auto phone-landscape and explicit Expand/Exit, optional native fullscreen and
   orientation lock, same-URL Back handling and no gameplay dispatches. Dialogs
   stay under the fullscreen tracker root; nested dialogs/focus share a counted
-  scroll lock. The PWA manifest permits `any` orientation. Soccer/Hockey adoption
-  and real-device/PWA validation remain separate follow-ups. See
-  `docs/REGRESSION_LCF_3_CAPTURE_FOCUS.md`.
+  scroll lock. Soccer preserves one-shot Restart and modes; Hockey preserves
+  explicit faceoff dots and uses existing Timeline detail/correction for held
+  shots/plays, with a chooser for overlapping visible markers. `surfacePoint`
+  excludes SVG letterboxing before sport-owned flip/direction conversion. Shared
+  `TrackerFocusButton` and `TrackerSurfaceTools` contain presentation only. The PWA
+  manifest permits `any` orientation. Physical-device/PWA validation remains
+  pending. See `docs/REGRESSION_LCF_3_CAPTURE_FOCUS.md` and
+  `docs/REGRESSION_LCF_3_SOCCER_HOCKEY.md`.
 
 - **Tracker alignment (TUI-2 layout merged #507):** Soccer/Hockey share `TrackerSideSelector`, `TrackerDialog` with the existing modal-focus hook, and `EventCloudStatus`. Soccer moves capture modes below the pitch; Hockey seeds new shot/play/penalty/goalie forms from local side context, keeps faceoff outcomes explicit, filters only marker display, and opens full penalty details in a sheet with compact strength/count above the rink. Routine Hockey sync/enable controls are in the footer, outside the Game sheet. The layout pass changed no clock, event or authority policy. See `docs/REGRESSION_TUI_2_SOCCER_HOCKEY_LAYOUT.md`.
 
