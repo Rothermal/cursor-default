@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { RotateCcw, X } from 'lucide-react'
 
 interface BasketballReopenDialogProps {
@@ -16,19 +17,15 @@ export default function BasketballReopenDialog({
 }: BasketballReopenDialogProps) {
   const [reason, setReason] = useState('')
 
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  const dialogRef = useRef<HTMLElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
 
   const trimmedReason = reason.trim()
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-12 sm:items-center sm:p-4" onClick={onClose}>
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-reopen-title"

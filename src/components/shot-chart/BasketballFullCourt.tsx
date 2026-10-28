@@ -5,6 +5,7 @@
  * Taps report the canonical point as 0..1 each way; the flip only turns the drawing.
  */
 import type { ShotRecord } from '../../types'
+import { useRef } from 'react'
 import { BASELINE_Y, COURT_WIDTH, FT_CIRCLE_RADIUS } from './courtGeometry'
 import { FULL_COURT_LENGTH } from '../../lib/basketball/fullCourtGeometry'
 import {
@@ -14,7 +15,8 @@ import {
   LINE_WIDTH,
   ShotMarker,
 } from './courtDrawing'
-import { useCourtTapHandlers } from './courtTap'
+import { clientPointToCourt } from './courtTap'
+import { useSurfaceGestures } from '../../hooks/useSurfaceGestures'
 
 /** Half-court feet to the left end: rim-relative `(x, y)` → full-court feet. */
 const LEFT_END_TRANSFORM = `matrix(0 -1 1 0 ${-BASELINE_Y} ${COURT_WIDTH / 2})`
@@ -52,6 +54,7 @@ interface BasketballFullCourtProps {
     point: { x: number; y: number } | null
   ) => void
   className?: string
+  focused?: boolean
   newlyPlacedShotId?: string | null
   emptyHint?: string | boolean
   markerTone?: (shot: ShotRecord) => 'tracked' | 'opponent' | null
@@ -69,6 +72,7 @@ export default function BasketballFullCourt({
   onCourtTap,
   onMarkerActivate,
   className,
+  focused = false,
   newlyPlacedShotId = null,
   emptyHint,
   markerTone,
@@ -78,24 +82,34 @@ export default function BasketballFullCourt({
   plays = [],
   onPlayActivate,
 }: BasketballFullCourtProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
   const courtTransform = flipped ? `rotate(180 ${CENTER_X} ${CENTER_Y})` : undefined
   const canonicalFeet = (point: { x: number; y: number }) => flipped
     ? { x: FULL_COURT_LENGTH - point.x, y: COURT_WIDTH - point.y }
     : point
-  const tapHandlers = useCourtTapHandlers(onCourtTap ? point => {
-    const feet = canonicalFeet(point)
-    onCourtTap({
-      x: clamp(feet.x / FULL_COURT_LENGTH),
-      y: clamp(feet.y / COURT_WIDTH),
-    })
-  } : undefined)
+  const gestures = useSurfaceGestures({
+    enabled: Boolean(onCourtTap),
+    onTap: point => {
+      const svgPoint = svgRef.current && clientPointToCourt(svgRef.current, point.clientX, point.clientY)
+      if (!svgPoint || svgPoint.x < -PADDING || svgPoint.x > FULL_COURT_LENGTH + PADDING ||
+        svgPoint.y < -PADDING || svgPoint.y > COURT_WIDTH + PADDING) return
+      const feet = canonicalFeet(svgPoint)
+      onCourtTap?.({ x: clamp(feet.x / FULL_COURT_LENGTH), y: clamp(feet.y / COURT_WIDTH) })
+    },
+    onHold: (point, target) => {
+      const marker = target instanceof Element ? target.closest<SVGGElement>('[data-shot-id]') : null
+      const shot = shots.find(candidate => candidate.id === marker?.dataset.shotId)
+      const svgPoint = svgRef.current && clientPointToCourt(svgRef.current, point.clientX, point.clientY)
+      if (marker && shot) onMarkerActivate?.(shot, marker, svgPoint ? canonicalFeet(svgPoint) : null)
+    },
+  })
   // What the viewer sees on each side after the flip.
   const shownLeft = flipped ? labels?.right : labels?.left
   const shownRight = flipped ? labels?.left : labels?.right
 
   return (
     <div className={className}>
-      {labels && (shownLeft || shownRight) && (
+      {!focused && labels && (shownLeft || shownRight) && (
         <div className="mb-1 grid grid-cols-2 gap-2 text-xs font-bold text-content-muted">
           <span className="relative min-w-0 truncate text-left" title={shownLeft ? `${shownLeft} attacking the left basket` : undefined}>
             {shownLeft && <><span aria-hidden="true">← </span>{shownLeft}<span className="sr-only"> attacking the left basket</span></>}
@@ -106,9 +120,16 @@ export default function BasketballFullCourt({
         </div>
       )}
       <svg
+        ref={svgRef}
+        aria-label="Basketball court"
         viewBox={`${-PADDING} ${-PADDING} ${FULL_COURT_LENGTH + PADDING * 2} ${COURT_WIDTH + PADDING * 2}`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ width: '100%', height: 'auto', display: 'block' }}
+        style={{ width: '100%', height: focused ? '100%' : 'auto', display: 'block', touchAction: 'auto' }}
+        {...gestures}
+        onClickCapture={onCourtTap ? event => {
+          if (event.detail !== 0) { event.preventDefault(); event.stopPropagation() }
+        } : undefined}
+        onContextMenu={onCourtTap ? event => event.preventDefault() : undefined}
       >
         <g transform={courtTransform}>
           <rect
@@ -135,8 +156,7 @@ export default function BasketballFullCourt({
             width={FULL_COURT_LENGTH + PADDING * 2}
             height={COURT_WIDTH + PADDING * 2}
             fill="transparent"
-            {...tapHandlers}
-            style={{ touchAction: 'pan-y', cursor: 'crosshair' }}
+            style={{ cursor: 'crosshair' }}
           />
         )}
 

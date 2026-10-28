@@ -22,7 +22,7 @@ export function clientPointToCourt(
   clientX: number,
   clientY: number
 ): { x: number; y: number } | null {
-  const svg = element.ownerSVGElement
+  const svg = element.ownerSVGElement ?? (element.tagName.toLowerCase() === 'svg' ? element as SVGSVGElement : null)
   if (!svg) return null
   const pt = svg.createSVGPoint()
   pt.x = clientX

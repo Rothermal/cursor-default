@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import { ShieldAlert, X } from 'lucide-react'
 import ActorSelect from '../ActorSelect'
 import type {
@@ -111,13 +112,8 @@ export default function BasketballFoulDialog({
   const committingTeamName = teamSide === 'tracked' ? trackedTeamName : opponentName
   const drawnByTeamName = oppositeSide === 'tracked' ? trackedTeamName : opponentName
 
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  const dialogRef = useRef<HTMLElement>(null)
+  useModalFocus({ enabled: true, dialogRef, onClose })
 
   const derivedTechnical = advanced ? technical : foulClass === 'technical'
   const valid = offenderSelection === 'staff' ? benchStaff && staffLabel.trim().length > 0
@@ -177,6 +173,7 @@ export default function BasketballFoulDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-12 sm:items-center sm:p-4" onClick={onClose}>
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-foul-title"

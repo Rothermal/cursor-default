@@ -1,8 +1,10 @@
 # LCF-1: Revision and Pending-Primary Recovery
 
-Status: implementation for review on 2026-10-27. Requires manual migration
-`081_event_sync_revision_and_recorder_recovery.sql` after merge. No production
-migration, game mutation, import or sync was performed during development.
+Status: merged in #512. On 2026-10-27 the owner confirmed migration 081 was
+performed and the affected records could finally merge. This confirms that
+recovery outcome, not every finalization, second-device or installed-PWA check.
+No production migration, game mutation, import or sync was performed by the agent
+during development.
 
 ## Reports and Causes
 
@@ -81,6 +83,10 @@ rendering, independently of the user's team permissions.
   pending rows for all four sports and retain strict rejection of nullable flags.
 
 ## Owner Verification After Merge
+
+Owner confirmation above supersedes the migration-pending status. Keep the
+following operator steps as reference; checks not specifically confirmed remain
+pending, including publication/cloud Summary and the separate scoring report.
 
 1. Apply migration 081 in Supabase SQL Editor. Then run the read-only
    [verification script](../supabase/scripts/verify_081_event_sync_recovery.sql);

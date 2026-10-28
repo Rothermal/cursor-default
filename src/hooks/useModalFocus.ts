@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { lockBodyScroll } from '../lib/bodyScrollLock'
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -26,11 +27,10 @@ export function useModalFocus({
 
   useEffect(() => {
     if (!enabled) return
-    const previouslyFocused = document.activeElement instanceof HTMLElement
+    const previouslyFocused = document.activeElement instanceof HTMLElement || document.activeElement instanceof SVGElement
       ? document.activeElement
       : null
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll(document.body)
 
     const focusFirst = () => {
       const dialog = dialogRef.current
@@ -72,7 +72,7 @@ export function useModalFocus({
     return () => {
       window.cancelAnimationFrame(frame)
       window.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = previousOverflow
+      releaseScroll()
       window.requestAnimationFrame(() => {
         if (previouslyFocused?.isConnected) previouslyFocused.focus()
       })
