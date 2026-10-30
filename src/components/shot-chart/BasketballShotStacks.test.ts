@@ -48,13 +48,13 @@ function fixture() {
   return state
 }
 
-describe('Basketball counted stack review and existing edit flow', () => {
+describe('Basketball full-court capture and counted stack review', () => {
   let root: Root
   let container: HTMLDivElement
   let source: BasketballSummarySource
-  const render = (summary = false) => act(() => root.render(createElement(StrictMode, null, summary
+  const render = (summary = false, capturePlayerId: string | null = TEAM_PLAYER_HOME_ID) => act(() => root.render(createElement(StrictMode, null, summary
     ? createElement(BasketballShotReview, { source })
-    : createElement(ShotChartPanel, { selection: { kind: 'all' }, onSelectPlayer: vi.fn(), capturePlayerId: TEAM_PLAYER_HOME_ID }))))
+    : createElement(ShotChartPanel, { selection: { kind: 'all' }, onSelectPlayer: vi.fn(), capturePlayerId }))))
   function button(text: string | RegExp, parent: ParentNode = container) {
     const found = [...parent.querySelectorAll<HTMLButtonElement>('button')].find(element =>
       typeof text === 'string' ? element.textContent?.trim() === text : text.test(element.textContent ?? ''))
@@ -62,6 +62,25 @@ describe('Basketball counted stack review and existing edit flow', () => {
     return found
   }
   const click = (element: Element) => act(() => element.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })))
+  function guardedClick(element: Element) {
+    act(() => element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+    click(element)
+  }
+  function tapCourt(x: number) {
+    const svg = container.querySelector('svg[aria-label="Basketball court"]')!
+    Object.defineProperties(svg, {
+      createSVGPoint: { configurable: true, value: () => ({
+        x: 0, y: 0, matrixTransform() { return { x: this.x, y: this.y } },
+      }) },
+      getScreenCTM: { configurable: true, value: () => ({ inverse: () => ({}) }) },
+    })
+    for (const type of ['pointerdown', 'pointerup']) {
+      const event = new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: 25 })
+      Object.defineProperties(event, { pointerId: { value: 1 }, isPrimary: { value: true } })
+      act(() => svg.dispatchEvent(event))
+    }
+    return container.querySelector<HTMLElement>('[role="dialog"]')
+  }
   function openStack() {
     const marker = container.querySelector('[data-shot-count="2"]')!
     expect(marker).not.toBeNull()
@@ -153,6 +172,66 @@ describe('Basketball counted stack review and existing edit flow', () => {
     click(button('Cancel'))
     expect(container.querySelector('[role="dialog"]')).toBeNull()
     expect(document.activeElement).toBe(marker)
+    expect(harness.dispatch).not.toHaveBeenCalled()
+  })
+  it.each([
+    { playerId: TEAM_PLAYER_HOME_ID, team: 'Aces', x: 4 },
+    { playerId: TEAM_PLAYER_HOME_ID, team: 'Aces', x: 88 },
+    { playerId: TEAM_PLAYER_OPP_ID, team: 'Bears', x: 4 },
+    { playerId: TEAM_PLAYER_OPP_ID, team: 'Bears', x: 88 },
+  ])('uses the main team anywhere on court: %j', ({ playerId, team, x }) => {
+    render(false, playerId)
+    const before = buildGameSyncFingerprint(harness.state)
+    const dialog = tapCourt(x)!
+    expect(button(team, dialog).getAttribute('aria-pressed')).toBe('true')
+    expect(dialog.querySelector('select')?.value).toBe(playerId)
+    expect(dialog.textContent).not.toContain('Backcourt shot')
+    expect(harness.dispatch).not.toHaveBeenCalled()
+    expect(buildGameSyncFingerprint(harness.state)).toBe(before)
+  })
+  it.each([
+    { playerId: TEAM_PLAYER_HOME_ID, x: 4, stat: 'Steal', side: 'tracked', type: 'basketball.steal' },
+    { playerId: TEAM_PLAYER_OPP_ID, x: 88, stat: 'Def Reb', side: 'opponent', type: 'basketball.rebound' },
+  ])('logs a defensive play for the selected team without a shot warning: %j', ({ playerId, x, stat, side, type }) => {
+    render(false, playerId)
+    const dialog = tapCourt(x)!
+    expect(dialog.textContent).not.toContain('Backcourt shot')
+    guardedClick(button(stat, dialog))
+    expect(harness.dispatch).toHaveBeenCalledTimes(1)
+    const saved = harness.dispatch.mock.calls[0][0].state as GameState
+    expect(saved.eventStream?.events[saved.eventStream.events.length - 1]).toMatchObject({
+      eventType: type, teamSide: side, location: { x: x / 94, y: 0.5 },
+    })
+  })
+  it('allows an event-only team override without a warning or changing the next default', () => {
+    render()
+    let dialog = tapCourt(88)!
+    guardedClick(button('Bears', dialog))
+    dialog = container.querySelector<HTMLElement>('[role="dialog"]')!
+    expect(button('Bears', dialog).getAttribute('aria-pressed')).toBe('true')
+    expect(dialog.textContent).not.toContain('Backcourt shot')
+    guardedClick(button('Steal', dialog))
+    const saved = harness.dispatch.mock.calls[0][0].state as GameState
+    expect(saved.eventStream?.events[saved.eventStream.events.length - 1]).toMatchObject({ eventType: 'basketball.steal', teamSide: 'opponent' })
+    dialog = tapCourt(88)!
+    expect(button('Aces', dialog).getAttribute('aria-pressed')).toBe('true')
+    expect(dialog.querySelector('select')?.value).toBe(TEAM_PLAYER_HOME_ID)
+  })
+  it('still records a backcourt shot against the selected team\'s actual basket', () => {
+    render()
+    const dialog = tapCourt(4)!
+    expect(button('3PT', dialog).getAttribute('aria-pressed')).toBe('true')
+    guardedClick(button('Made', dialog))
+    guardedClick(button('Save made shot'))
+    const saved = harness.dispatch.mock.calls[0][0].state as GameState
+    expect(saved.eventStream?.events[saved.eventStream.events.length - 1]).toMatchObject({
+      eventType: 'basketball.shot', teamSide: 'tracked', payload: { made: true, value: 3 },
+      location: { x: 4 / 94, y: 0.5, attackingDirection: 'left_to_right' },
+    })
+  })
+  it('does not infer a team from the tapped half when no main capture target is available', () => {
+    render(false, null)
+    expect(tapCourt(4)).toBeNull()
     expect(harness.dispatch).not.toHaveBeenCalled()
   })
 })

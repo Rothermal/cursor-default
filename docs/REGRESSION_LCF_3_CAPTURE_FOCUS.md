@@ -133,7 +133,7 @@ contracts. Browser automation is not proof of physical-device support.
 
 ## Counted Shot Stacks Follow-Up (2026-10-30)
 
-Status: implemented for review. No migration or event/score/authority changes.
+Status: merged in #516. No migration or event/score/authority changes.
 
 - The live full court and full-court Summary replace overlapping visible shots
   with a numbered stack. Singles retain their made-dot/missed-cross appearance.
@@ -200,3 +200,46 @@ change. Physical-device and live-cloud checks remain unclaimed.
 After this fix, the full suite passes **354 files / 3,657 tests**. TypeScript,
 configured production/PWA build and source lint pass (three existing warnings).
 The main asset is 3,056,789 bytes with 88,939 bytes below the unchanged PWA limit.
+
+## Selected-Team Capture Follow-Up (2026-10-30)
+
+Status: implemented for review, following the owner's live-game feedback. No
+migration, event schema, scoring, clock, lineup, cloud or rollout-policy change.
+
+- General full-court capture inherits the main-screen team on either half, with
+  Unattributed as before. The tap supplies only the location, never an inferred
+  side. Without an available capture target, the panel does not guess another team.
+- The sheet's team control remains an explicit per-event override. It updates that
+  event's actor options and shot-value suggestion, but the next capture uses the
+  main-screen team again. Review filters still do not determine attribution.
+- The backcourt warning and its Switch/Keep controls are removed, along with the
+  old empty-court hint telling the recorder to tap an attacking end. Steal/defensive
+  rebound capture is not treated as a shot. Actual backcourt shots still use the
+  selected side's current attacking direction and normal 2PT/3PT geometry.
+- Actions -> Court ends retains explicit Switch ends, automatic halftime switching
+  is unchanged, and historical shot editing keeps its stored-basket rules.
+
+Nine new committed DOM tests cover both teams on both halves, side-correct Steal
+and Def Reb capture, a one-event override followed by the original default, a valid
+backcourt three and no-target handling. Seven fail against the old behavior; all
+pass after the change. The focused suite passes (4 files / 51 tests).
+
+Chromium/Playwright: **14 workflows and 8 screenshots passed** across Light/Dark,
+390x844, 844x390, 568x320 and 1280x800. Real tracker/command fixtures verify both
+teams on both halves, correct side/location and unchanged score for defensive
+plays, per-event override/reset, a flipped backcourt three, filter isolation and
+the reachable/enabled Actions Switch ends control. Auth/cloud transport is stubbed;
+no owner data or live Supabase writes were used. TypeScript and configured
+production/PWA build pass; the main asset is 3,055,058 bytes, with 90,670 bytes
+below the unchanged precache limit. Source lint has zero errors and the three
+existing Fast Refresh warnings.
+
+Final full suite: **354 files / 3,666 tests passed**. The original stacked-shot
+capture/edit/Summary browser matrix also passes again (13 workflows / 16
+screenshots), for **27 workflows / 24 screenshots** across both browser runs.
+
+Owner smoke check after deployment: select either team above the court, tap both
+ends, and check the selected team/Unattributed with no warning. Save a steal or
+defensive rebound, then try a one-event team override and reopen capture. Confirm
+the main default remains and Switch ends is still available in Actions. Physical
+phone/PWA and live-cloud validation remain unclaimed.

@@ -50,7 +50,6 @@ export default function BasketballPlaySpotSection({
             markerLabel={() => 'Court spot'}
             flipped={flipped}
             className="w-full"
-            emptyHint="Tap to place"
           />
           <button
             type="button"

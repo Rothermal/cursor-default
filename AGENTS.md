@@ -70,7 +70,10 @@ See `package.json` scripts. Standard commands:
   read-only charts retain review activation. Basketball's counted-stack follow-up
   adds visible counts and exact displayed-group selection on the live full court
   and full-court Summary; existing checked Edit remains behind shot detail.
-  Counts/filtering never change stored locations. `useTrackerFocus` owns device-local
+  Counts/filtering never change stored locations. Full-court capture defaults to
+  the main workspace team on either half; a popup team override is event-local.
+  The backcourt prompt is removed; explicit Switch ends stays in Actions.
+  `useTrackerFocus` owns device-local
   auto phone-landscape and explicit Expand/Exit, optional native fullscreen and
   orientation lock, same-URL Back handling and no gameplay dispatches. Dialogs
   stay under the fullscreen tracker root; nested dialogs/focus share a counted

@@ -59,7 +59,6 @@ interface BasketballFullCourtProps {
   className?: string
   focused?: boolean
   newlyPlacedShotId?: string | null
-  emptyHint?: string | boolean
   markerTone?: (shot: ShotRecord) => 'tracked' | 'opponent' | null
   markerLabel?: (shot: ShotRecord) => string
   /** Team names shown on the half each attacks, with an arrow toward its basket. */
@@ -78,7 +77,6 @@ export default function BasketballFullCourt({
   className,
   focused = false,
   newlyPlacedShotId = null,
-  emptyHint,
   markerTone,
   markerLabel,
   labels,
@@ -233,24 +231,6 @@ export default function BasketballFullCourt({
             </g>
           )
         })}
-
-        {onCourtTap && shots.length === 0 && emptyHint && (
-          <g pointerEvents="none" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
-            <text
-              x={CENTER_X}
-              y={CENTER_Y - 9}
-              textAnchor="middle"
-              fill="rgb(var(--court-hint))"
-              stroke={COURT_BG}
-              strokeWidth={1.2}
-              paintOrder="stroke"
-              fontSize="2.2"
-              fontWeight="600"
-            >
-              Tap the end a team shoots at
-            </text>
-          </g>
-        )}
       </svg>
     </div>
   )

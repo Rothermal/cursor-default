@@ -5,6 +5,11 @@ not establish live Supabase, installed PWA or owner sign-off; those are listed s
 
 No migration, no event schema bump and no setup or rules change in any slice.
 
+The original delivery checks below are historical. The 2026-10-30
+[selected-team capture follow-up](REGRESSION_LCF_3_CAPTURE_FOCUS.md#selected-team-capture-follow-up-2026-10-30)
+supersedes tapped-half team inference and the backcourt popup prompt; explicit
+Switch ends and shot geometry remain unchanged.
+
 ## Automated
 
 | Slice | Area | Cases | Result |
