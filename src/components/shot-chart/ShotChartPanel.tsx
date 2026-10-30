@@ -34,17 +34,11 @@ import {
   captureBasketballCourtEvent,
   hasStartedBasketballEventGame,
   setBasketballCourtOrientation,
-  switchBasketballEnds,
 } from '../../lib/basketball/commands'
-import {
-  basketballDirectionTowardTap,
-  basketballShotFeet,
-  isBasketballBeyondHalfCourt,
-} from '../../lib/basketball/fullCourtGeometry'
+import { basketballShotFeet } from '../../lib/basketball/fullCourtGeometry'
 import {
   basketballFullCourtShotLocations,
   basketballFullCourtShotRecords,
-  basketballSideAttacking,
   basketballSideDirection,
   isBasketballFullCourtGame,
 } from '../../lib/basketball/fullCourtView'
@@ -86,8 +80,6 @@ interface PendingCourtTap {
   side: 'home' | 'opponent'
   /** Full court only: the canonical tap, 0..1 each way. */
   fullCourtPoint?: { x: number; y: number }
-  /** Full court only: the recorder kept a backcourt shot, so the prompt stays closed. */
-  backcourtKept?: boolean
 }
 
 /** A full-court tap's location for a side, stamped with that side's current basket. */
@@ -280,17 +272,14 @@ export default function ShotChartPanel({
     [capturePlayerId, dispatch, effectivePlayerId, isEventBasketball, state, players]
   )
 
-  // Full court: the tapped half picks the team shooting at that basket (BKE-7 §3.3).
+  // The main workspace chooses attribution; the tap supplies only the location.
   const onFullCourtTap = useCallback(
     (point: { x: number; y: number }) => {
-      const attacking = basketballSideAttacking(state, basketballDirectionTowardTap(point.x))
-      if (!attacking) return
-      const side = attacking === 'opponent' ? 'opponent' : 'home'
       const effective = players.find(candidate => candidate.id === effectivePlayerId)
-      const playerId = effective && sideOf(effective) === side
-        ? effective.id
-        : side === 'opponent' ? TEAM_PLAYER_OPP_ID : TEAM_PLAYER_HOME_ID
-      if (!players.some(candidate => candidate.id === playerId)) return
+      if (!effective) return
+      const side = sideOf(effective)
+      const location = fullCourtTapLocation(state, point, side)
+      if (!location) return
       try {
         navigator.vibrate?.(10)
       } catch {
@@ -300,8 +289,8 @@ export default function ShotChartPanel({
         x: 0,
         y: 0,
         fullCourtPoint: point,
-        shotType: fullCourtShotType(fullCourtTapLocation(state, point, side)),
-        playerId,
+        shotType: fullCourtShotType(location),
+        playerId: effective.id,
         side,
       })
       setCaptureError(null)
@@ -317,25 +306,10 @@ export default function ShotChartPanel({
         side,
         playerId: side === 'opponent' ? TEAM_PLAYER_OPP_ID : TEAM_PLAYER_HOME_ID,
         shotType: fullCourtShotType(fullCourtTapLocation(state, prev.fullCourtPoint, side)),
-        backcourtKept: false,
       }
     })
     setCaptureError(null)
   }, [state])
-
-  const handlePopupSwitchEnds = useCallback(() => {
-    const result = switchBasketballEnds(state, { recorderUserId: user?.id ?? null })
-    if (!result.ok) {
-      setCaptureError(result.message)
-      return
-    }
-    setCaptureError(null)
-    dispatch({ type: 'HYDRATE_STATE', state: result.state })
-    // The same team now shoots at the near basket; its value is measured from there.
-    setPendingTap(prev => prev?.fullCourtPoint
-      ? { ...prev, shotType: fullCourtShotType(fullCourtTapLocation(result.state, prev.fullCourtPoint, prev.side)) }
-      : prev)
-  }, [dispatch, state, user?.id])
 
   const handlePopupSelectPlayer = useCallback(
     (playerId: string) => {
@@ -479,14 +453,6 @@ export default function ShotChartPanel({
   const fullCourtShots = useMemo(
     () => fullCourtLocations ? basketballFullCourtShotRecords(visibleShots, fullCourtLocations) : null,
     [fullCourtLocations, visibleShots]
-  )
-  const pendingFullCourtLocation = pendingTap?.fullCourtPoint
-    ? fullCourtTapLocation(state, pendingTap.fullCourtPoint, pendingTap.side)
-    : null
-  const pendingBackcourt = Boolean(
-    pendingFullCourtLocation &&
-    !pendingTap?.backcourtKept &&
-    isBasketballBeyondHalfCourt(pendingFullCourtLocation)
   )
   const trackedDirection = fullCourt ? basketballSideDirection(state, 'tracked') : null
   const trackedName = gameSideDisplayName(state.gameInfo, 'tracked')
@@ -641,7 +607,6 @@ export default function ShotChartPanel({
             newlyPlacedShotId={pulseShotId}
             flipped={courtOrientation === 'flipped'}
             labels={fullCourtLabels}
-            emptyHint={eventCaptureOpen && !captureDisabled}
           />
         ) : <BasketballCourt
           shots={visibleShots}
@@ -755,10 +720,6 @@ export default function ShotChartPanel({
             { side: 'opponent', label: opponentName },
           ] : undefined}
           onSelectSide={pendingTap.fullCourtPoint ? handlePopupSelectSide : undefined}
-          backcourtPrompt={pendingBackcourt ? {
-            onSwitchEnds: handlePopupSwitchEnds,
-            onKeep: () => setPendingTap(prev => prev ? { ...prev, backcourtKept: true } : prev),
-          } : null}
           reboundPromptAfterMissEnabled={basketballSettings.capture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
           errorMessage={captureError}

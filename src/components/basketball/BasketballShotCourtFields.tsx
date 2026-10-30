@@ -34,7 +34,6 @@ export function BasketballFullCourtPlacement({
       onCourtTap={onPoint}
       flipped={flipped}
       className="w-full"
-      emptyHint
     />
   )
 }
