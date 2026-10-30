@@ -63,11 +63,14 @@ See `package.json` scripts. Standard commands:
 ### Gotchas
 
 - **Shared capture/focus (LCF-3):** Basketball merged #513; Soccer/Hockey merged
-  #514. Baseball's assessed adaptation is implemented for review. Writable full-court
+  #514; Baseball merged #515. Writable full-court
   taps open capture even over existing shots; a stationary 500 ms hold opens the
   existing deterministic overlap review. `useSurfaceGestures` cancels on movement,
   scroll, multi-touch, cancellation, resize and teardown; keyboard markers and
-  read-only charts retain review activation. `useTrackerFocus` owns device-local
+  read-only charts retain review activation. Basketball's counted-stack follow-up
+  adds visible counts and exact displayed-group selection on the live full court
+  and full-court Summary; existing checked Edit remains behind shot detail.
+  Counts/filtering never change stored locations. `useTrackerFocus` owns device-local
   auto phone-landscape and explicit Expand/Exit, optional native fullscreen and
   orientation lock, same-URL Back handling and no gameplay dispatches. Dialogs
   stay under the fullscreen tracker root; nested dialogs/focus share a counted

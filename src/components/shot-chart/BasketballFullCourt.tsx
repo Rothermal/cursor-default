@@ -17,12 +17,13 @@ import {
 } from './courtDrawing'
 import { clientPointToCourt } from './courtTap'
 import { useSurfaceGestures } from '../../hooks/useSurfaceGestures'
+import { BASKETBALL_MARKER_HIT_RADIUS_FEET, clusterBasketballShotMarkers } from '../../lib/basketball/timeline'
 
 /** Half-court feet to the left end: rim-relative `(x, y)` → full-court feet. */
 const LEFT_END_TRANSFORM = `matrix(0 -1 1 0 ${-BASELINE_Y} ${COURT_WIDTH / 2})`
 /** The right end is the left end turned half a turn about the court's center. */
 const RIGHT_END_TRANSFORM = `matrix(0 1 -1 0 ${FULL_COURT_LENGTH + BASELINE_Y} ${COURT_WIDTH / 2})`
-const PADDING = 2
+const PADDING = 3
 const CENTER_X = FULL_COURT_LENGTH / 2
 const CENTER_Y = COURT_WIDTH / 2
 
@@ -53,6 +54,8 @@ interface BasketballFullCourtProps {
     marker: SVGGElement,
     point: { x: number; y: number } | null
   ) => void
+  /** Every visible shot in the numbered stack, already in stable review order. */
+  onClusterActivate?: (shots: ShotRecord[], marker: SVGGElement) => void
   className?: string
   focused?: boolean
   newlyPlacedShotId?: string | null
@@ -71,6 +74,7 @@ export default function BasketballFullCourt({
   shots,
   onCourtTap,
   onMarkerActivate,
+  onClusterActivate,
   className,
   focused = false,
   newlyPlacedShotId = null,
@@ -83,6 +87,8 @@ export default function BasketballFullCourt({
   onPlayActivate,
 }: BasketballFullCourtProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  // Callers with only individual activation retain their existing review contract.
+  const clusters = onMarkerActivate && !onClusterActivate ? shots.map(shot => [shot]) : clusterBasketballShotMarkers(shots)
   const courtTransform = flipped ? `rotate(180 ${CENTER_X} ${CENTER_Y})` : undefined
   const canonicalFeet = (point: { x: number; y: number }) => flipped
     ? { x: FULL_COURT_LENGTH - point.x, y: COURT_WIDTH - point.y }
@@ -98,9 +104,11 @@ export default function BasketballFullCourt({
     },
     onHold: (point, target) => {
       const marker = target instanceof Element ? target.closest<SVGGElement>('[data-shot-id]') : null
-      const shot = shots.find(candidate => candidate.id === marker?.dataset.shotId)
+      const cluster = clusters.find(items => items[0].id === marker?.dataset.shotId)
       const svgPoint = svgRef.current && clientPointToCourt(svgRef.current, point.clientX, point.clientY)
-      if (marker && shot) onMarkerActivate?.(shot, marker, svgPoint ? canonicalFeet(svgPoint) : null)
+      if (!marker || !cluster) return
+      if (cluster.length > 1 && onClusterActivate) onClusterActivate(cluster, marker)
+      else onMarkerActivate?.(cluster[0], marker, svgPoint ? canonicalFeet(svgPoint) : null)
     },
   })
   // What the viewer sees on each side after the flip.
@@ -161,13 +169,23 @@ export default function BasketballFullCourt({
         )}
 
         <g transform={courtTransform}>
-          {shots.map(shot => (
+          {clusters.map(cluster => cluster.length > 1 ? (
+            <ShotStackMarker
+              key={cluster.map(shot => shot.id).join(':')}
+              shots={cluster}
+              flipped={flipped}
+              pulse={cluster.some(shot => shot.id === newlyPlacedShotId)}
+              tone={markerTone && cluster.every(shot => markerTone(shot) === markerTone(cluster[0]))
+                ? markerTone(cluster[0]) : null}
+              onActivate={onClusterActivate}
+            />
+          ) : (
             <ShotMarker
-              key={shot.id}
-              shot={shot}
-              pulse={shot.id === newlyPlacedShotId}
-              tone={markerTone?.(shot) ?? null}
-              label={markerLabel?.(shot) ?? `View ${shot.made ? 'made' : 'missed'} shot detail`}
+              key={cluster[0].id}
+              shot={cluster[0]}
+              pulse={cluster[0].id === newlyPlacedShotId}
+              tone={markerTone?.(cluster[0]) ?? null}
+              label={markerLabel?.(cluster[0]) ?? `View ${cluster[0].made ? 'made' : 'missed'} shot detail`}
               onActivate={onMarkerActivate ? (activated, marker, point) => onMarkerActivate(
                 activated,
                 marker,
@@ -233,6 +251,39 @@ export default function BasketballFullCourt({
         )}
       </svg>
     </div>
+  )
+}
+
+function ShotStackMarker({ shots, flipped, pulse, tone, onActivate }: {
+  shots: ShotRecord[]
+  flipped: boolean
+  pulse: boolean
+  tone: 'tracked' | 'opponent' | null
+  onActivate?: (shots: ShotRecord[], marker: SVGGElement) => void
+}) {
+  const x = shots.reduce((sum, shot) => sum + shot.x, 0) / shots.length
+  const y = shots.reduce((sum, shot) => sum + shot.y, 0) / shots.length
+  const ink = tone === 'tracked' ? 'rgb(var(--court-tracked))'
+    : tone === 'opponent' ? 'rgb(var(--court-opponent))' : LINE_COLOR
+  return (
+    <g data-shot-id={shots[0].id} data-shot-count={shots.length}
+      role={onActivate ? 'button' : undefined} tabIndex={onActivate ? 0 : undefined}
+      aria-label={`${shots.length} shots at this location`}
+      className={pulse ? 'shot-marker-pulse' : undefined}
+      style={onActivate ? { cursor: 'pointer' } : undefined}
+      onClick={onActivate ? event => { event.stopPropagation(); onActivate(shots, event.currentTarget) } : undefined}
+      onKeyDown={onActivate ? event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        event.stopPropagation()
+        onActivate(shots, event.currentTarget)
+      } : undefined}>
+      <circle cx={x} cy={y} r={BASKETBALL_MARKER_HIT_RADIUS_FEET} fill={COURT_BG} stroke={ink} strokeWidth={0.35} />
+      <text x={x} y={y} transform={flipped ? `rotate(180 ${x} ${y})` : undefined}
+        textAnchor="middle" dominantBaseline="central" fontSize={Math.min(3, 6 / String(shots.length).length)}
+        fontWeight="700" fill={LINE_COLOR} pointerEvents="none"
+        style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{shots.length}</text>
+    </g>
   )
 }
 

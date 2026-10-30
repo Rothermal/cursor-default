@@ -405,6 +405,22 @@ export function legacyBasketballShotDetail(
   }
 }
 
+/** Bounded, display-only stacks; nearby chains cannot swallow a whole court. */
+export function clusterBasketballShotMarkers(shots: ShotRecord[]): ShotRecord[][] {
+  const ordered = [...shots].sort((left, right) =>
+    left.x - right.x || left.y - right.y || left.id.localeCompare(right.id)
+  )
+  const clusters: ShotRecord[][] = []
+  for (const shot of ordered) {
+    const cluster = clusters.find(items => items.every(item =>
+      Math.hypot(item.x - shot.x, item.y - shot.y) <= BASKETBALL_MARKER_HIT_RADIUS_FEET
+    ))
+    if (cluster) cluster.push(shot)
+    else clusters.push([shot])
+  }
+  return clusters.map(cluster => cluster.sort(compareMarkerChoices))
+}
+
 export function basketballMarkerChoicesAtPoint(
   shots: ShotRecord[],
   selectedShotId: string,

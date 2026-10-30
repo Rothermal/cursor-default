@@ -7,8 +7,9 @@ successful record merging on 2026-10-27
 unattributed opponent free throws merged in #511. LCF-3 Basketball capture-first
 gestures and focused court merged in #513; Soccer/Hockey adoption merged in #514
 ([sibling verification](REGRESSION_LCF_3_SOCCER_HOCKEY.md)). Baseball's separate
-surface assessment and focused capture adaptation are implemented for review
-([Baseball evidence](REGRESSION_LCF_3_BASEBALL.md)).
+surface assessment and focused capture adaptation merged in #515
+([Baseball evidence](REGRESSION_LCF_3_BASEBALL.md)). Basketball counted shot stacks
+are implemented for review in the [LCF-3 follow-up record](REGRESSION_LCF_3_CAPTURE_FOCUS.md#counted-shot-stacks-follow-up-2026-10-30).
 Physical-device/PWA checks remain follow-ups. The scoring report remains open for a second game whose
 export is pending. Football development is paused while these owner-reported
 issues are addressed. This is not a clock/substitution redesign.
@@ -24,7 +25,7 @@ Related direction: [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.
 | --- | --- | --- |
 | LCF-1: Late-player sync and scoring audit | Merged #510/#512; owner confirms 081 applied and records merged | [Recovery evidence and remaining checks](REGRESSION_LCF_1_SYNC_RECOVERY.md). Separate second-game scoring investigation remains open |
 | LCF-2: Unattributed opponent free throws | Merged #511 | Standalone and awarded opponent attempts use explicit team credit without creating a player; local verification and pending owner checks are in the [regression record](REGRESSION_LCF_2_OPPONENT_FREE_THROWS.md) |
-| LCF-3: Capture-first gestures and focused surface | Basketball merged #513; Soccer/Hockey merged #514; Baseball adaptation implemented for review | Shared cancellable location gestures and focused presentation, with sport-owned controls. [Basketball](REGRESSION_LCF_3_CAPTURE_FOCUS.md), [Soccer/Hockey](REGRESSION_LCF_3_SOCCER_HOCKEY.md), [Baseball assessment and verification](REGRESSION_LCF_3_BASEBALL.md). Physical-device/PWA checks remain pending |
+| LCF-3: Capture-first gestures and focused surface | Basketball merged #513; Soccer/Hockey merged #514; Baseball merged #515; Basketball counted-stack follow-up implemented for review | Shared cancellable location gestures and focused presentation, with sport-owned controls. [Basketball and stack follow-up](REGRESSION_LCF_3_CAPTURE_FOCUS.md), [Soccer/Hockey](REGRESSION_LCF_3_SOCCER_HOCKEY.md), [Baseball assessment and verification](REGRESSION_LCF_3_BASEBALL.md). Physical-device/PWA checks remain pending |
 
 These are cohesive feature PRs, not a new foundation/micro-phase ladder. Do not
 delay the confirmed sync fix behind the UI work. FBE-1 remains an approved plan;

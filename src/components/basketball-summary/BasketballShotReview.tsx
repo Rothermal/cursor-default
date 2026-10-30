@@ -267,6 +267,13 @@ export default function BasketballShotReview({ source }: Props) {
             flipped={flipped}
             labels={{ left: opponentName, right: trackedName }}
             onMarkerActivate={activateMarker}
+            onClusterActivate={(shots, element) => {
+              rememberFocus(element)
+              setOverlapChoices(shots.flatMap(shot => {
+                const resolved = shotById.get(shot.id)
+                return resolved ? [resolved] : []
+              }))
+            }}
             markerTone={markerTone}
             markerLabel={markerLabel}
             className="w-full"
