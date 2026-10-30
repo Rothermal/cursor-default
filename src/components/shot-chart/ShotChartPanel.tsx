@@ -632,6 +632,10 @@ export default function ShotChartPanel({
             shots={fullCourtShots}
             onCourtTap={eventCaptureOpen && !captureDisabled ? onFullCourtTap : undefined}
             onMarkerActivate={handleMarkerActivate}
+            onClusterActivate={(shots, marker) => {
+              overlapOriginRef.current = marker
+              setOverlapChoices(shots)
+            }}
             className={focused ? 'h-full w-full' : 'w-full'}
             focused={focused}
             newlyPlacedShotId={pulseShotId}

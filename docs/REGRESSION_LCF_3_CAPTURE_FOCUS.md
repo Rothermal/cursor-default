@@ -130,3 +130,73 @@ The implementation keeps browser APIs optional, following the current
 [orientation lock](https://developer.mozilla.org/en-US/docs/Web/API/ScreenOrientation/lock)
 and [manifest orientation](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/orientation)
 contracts. Browser automation is not proof of physical-device support.
+
+## Counted Shot Stacks Follow-Up (2026-10-30)
+
+Status: implemented for review. No migration or event/score/authority changes.
+
+- The live full court and full-court Summary replace overlapping visible shots
+  with a numbered stack. Singles retain their made-dot/missed-cross appearance.
+  Counts use the current display filters, not hidden shots or linked assists.
+- Grouping is deterministic in canonical full-court feet, within the existing
+  2.1-foot marker tolerance. Every pair in a stack must fit that tolerance, so a
+  chain of neighboring shots cannot combine into a court-wide stack. Rendering
+  uses the group's mean position without changing any stored event location.
+- A writable short tap still captures at the actual tapped point. A 500 ms hold,
+  or keyboard Enter/Space, opens every shot in that displayed stack, newest first.
+  Read-only Summary uses a short click for the same chooser. The count stays
+  upright when the view is flipped; padding keeps baseline/corner badges visible.
+- The existing **Select shot -> Shot detail -> Edit** flow was already present.
+  Stack activation now supplies the exact displayed group instead of rerunning
+  nearest-point selection, which could omit members of a nearby stack. Rows retain
+  shot ordinals, shooters, results and values. Checked corrections and existing
+  read-only/terminal restrictions are unchanged; no new editor is introduced.
+- Half-court charts and placement/play-map consumers retain their existing
+  individual-marker contracts. This follow-up changes no Soccer/Hockey gestures.
+
+Browser evidence: **13 workflows passed**, with **16 screenshots** across
+Light/Dark and 390x844, 844x390, 568x320 and 1280x800 viewports. Checked exact
+stacked capture/count increases, complete choice lists, selected-shot-only saving,
+moving one shot out of a stack, unchanged review fingerprints, local Summary Edit
+and read-only Summary filtering. Synthetic fixtures use real checked commands
+with auth/cloud transport stubbed, not owner game data or live Supabase.
+
+Initial automated checks: **354 files / 3,653 tests passed**, including 24 new tests for
+grouping, gesture/keyboard wiring, exact stack choice, selected-shot-only saving,
+Summary filters/authority, focus return and boundary/large-count rendering.
+TypeScript and configured production/PWA build pass. Source lint has zero errors
+and the three existing Fast Refresh warnings; review-tooling checks pass (22).
+The existing PWA asset budget is unchanged. Physical-device/installed-PWA and
+live-cloud checks remain post-deployment owner validation, not claimed signoff.
+
+Owner smoke check after deployment:
+
+1. Save two or more Basketball shots at the same spot. Check the count, then add
+   another with a short tap; it should increase without changing earlier shots.
+2. Hold the count, choose a shot by number/player/result, then Edit. Move or change
+   only that shot; check the resulting count and the other shots' unchanged facts.
+3. Filter by player/result in Summary and flip the court. Check visible counts,
+   upright numbers and read-only review. Repeat on a phone/installed PWA when able.
+
+### PR #516 Review Follow-Up
+
+The adjacent-single finding is valid and fixed. Shots at x=20/22/24 ft form a
+two-shot stack drawn at x=21 and a single at x=24. A press on the single's hit
+circle at x=22.8 previously selected the hidden x=22 stack member; x=23 could
+open a chooser. Four new real-component DOM cases failed before the fix, covering
+live hold and read-only click in standard/flipped views.
+
+Cluster-mode single activation now passes an exact selection, like a one-member
+displayed group, without nearest-point reselection against hidden stored points.
+Both hold and read-only click follow this rule. Callers without cluster handling
+retain their original nearest-point review contract, and short-tap capture is
+unchanged. The focused suite passes (4 files / 48 tests).
+
+Eight additional Chromium checks with eight screenshots confirm actual browser
+hit targets at both x=22.8 and x=23 in live/read-only and standard/flipped views.
+Every case opens only Field goal #3, with no chooser, extra capture or fingerprint
+change. Physical-device and live-cloud checks remain unclaimed.
+
+After this fix, the full suite passes **354 files / 3,657 tests**. TypeScript,
+configured production/PWA build and source lint pass (three existing warnings).
+The main asset is 3,056,789 bytes with 88,939 bytes below the unchanged PWA limit.
