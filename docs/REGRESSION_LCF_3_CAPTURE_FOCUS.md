@@ -161,7 +161,7 @@ moving one shot out of a stack, unchanged review fingerprints, local Summary Edi
 and read-only Summary filtering. Synthetic fixtures use real checked commands
 with auth/cloud transport stubbed, not owner game data or live Supabase.
 
-Automated checks: **354 files / 3,653 tests passed**, including 24 new tests for
+Initial automated checks: **354 files / 3,653 tests passed**, including 24 new tests for
 grouping, gesture/keyboard wiring, exact stack choice, selected-shot-only saving,
 Summary filters/authority, focus return and boundary/large-count rendering.
 TypeScript and configured production/PWA build pass. Source lint has zero errors
@@ -177,3 +177,26 @@ Owner smoke check after deployment:
    only that shot; check the resulting count and the other shots' unchanged facts.
 3. Filter by player/result in Summary and flip the court. Check visible counts,
    upright numbers and read-only review. Repeat on a phone/installed PWA when able.
+
+### PR #516 Review Follow-Up
+
+The adjacent-single finding is valid and fixed. Shots at x=20/22/24 ft form a
+two-shot stack drawn at x=21 and a single at x=24. A press on the single's hit
+circle at x=22.8 previously selected the hidden x=22 stack member; x=23 could
+open a chooser. Four new real-component DOM cases failed before the fix, covering
+live hold and read-only click in standard/flipped views.
+
+Cluster-mode single activation now passes an exact selection, like a one-member
+displayed group, without nearest-point reselection against hidden stored points.
+Both hold and read-only click follow this rule. Callers without cluster handling
+retain their original nearest-point review contract, and short-tap capture is
+unchanged. The focused suite passes (4 files / 48 tests).
+
+Eight additional Chromium checks with eight screenshots confirm actual browser
+hit targets at both x=22.8 and x=23 in live/read-only and standard/flipped views.
+Every case opens only Field goal #3, with no chooser, extra capture or fingerprint
+change. Physical-device and live-cloud checks remain unclaimed.
+
+After this fix, the full suite passes **354 files / 3,657 tests**. TypeScript,
+configured production/PWA build and source lint pass (three existing warnings).
+The main asset is 3,056,789 bytes with 88,939 bytes below the unchanged PWA limit.

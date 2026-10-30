@@ -88,6 +88,7 @@ export default function BasketballFullCourt({
 }: BasketballFullCourtProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   // Callers with only individual activation retain their existing review contract.
+  // Clustered charts select the displayed group, including singles, not hidden stored points.
   const clusters = onMarkerActivate && !onClusterActivate ? shots.map(shot => [shot]) : clusterBasketballShotMarkers(shots)
   const courtTransform = flipped ? `rotate(180 ${CENTER_X} ${CENTER_Y})` : undefined
   const canonicalFeet = (point: { x: number; y: number }) => flipped
@@ -108,7 +109,8 @@ export default function BasketballFullCourt({
       const svgPoint = svgRef.current && clientPointToCourt(svgRef.current, point.clientX, point.clientY)
       if (!marker || !cluster) return
       if (cluster.length > 1 && onClusterActivate) onClusterActivate(cluster, marker)
-      else onMarkerActivate?.(cluster[0], marker, svgPoint ? canonicalFeet(svgPoint) : null)
+      else onMarkerActivate?.(cluster[0], marker,
+        !onClusterActivate && svgPoint ? canonicalFeet(svgPoint) : null)
     },
   })
   // What the viewer sees on each side after the flip.
@@ -189,7 +191,7 @@ export default function BasketballFullCourt({
               onActivate={onMarkerActivate ? (activated, marker, point) => onMarkerActivate(
                 activated,
                 marker,
-                point ? canonicalFeet(point) : null
+                !onClusterActivate && point ? canonicalFeet(point) : null
               ) : undefined}
             />
           ))}

@@ -3,6 +3,7 @@ import { act, createElement, StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShotRecord } from '../../types'
+import { resolveBasketballMarkerActivation } from '../../lib/basketball/timeline'
 import BasketballFullCourt from './BasketballFullCourt'
 
 const shot: ShotRecord = {
@@ -32,14 +33,14 @@ describe('Basketball full-court gesture wiring', () => {
     })
     marker = container.querySelector<SVGGElement>('[data-shot-id]')!
   }
-  function pointer(type: string, pointerId = 1, isPrimary = true) {
-    const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: 50, clientY: 25 })
+  function pointer(type: string, pointerId = 1, isPrimary = true, point = { x: 50, y: 25 }) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: point.x, clientY: point.y })
     Object.defineProperties(event, { pointerId: { value: pointerId }, isPrimary: { value: isPrimary } })
     act(() => marker.dispatchEvent(event))
   }
-  function click() {
+  function click(point = { x: 50, y: 25 }) {
     act(() => marker.dispatchEvent(new MouseEvent('click', {
-      bubbles: true, cancelable: true, detail: 1, clientX: 50, clientY: 25,
+      bubbles: true, cancelable: true, detail: 1, clientX: point.x, clientY: point.y,
     })))
   }
   const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms))
@@ -230,5 +231,28 @@ describe('Basketball full-court gesture wiring', () => {
     expect(marker.textContent).toBe('1000')
     expect(Number(marker.querySelector('text')!.getAttribute('font-size'))).toBe(1.5)
     expect(container.querySelectorAll('[data-shot-id]')).toHaveLength(1)
+  })
+  it.each([
+    { writable: true, flipped: false }, { writable: true, flipped: true },
+    { writable: false, flipped: false }, { writable: false, flipped: true },
+  ])('selects the visible single beside a stack: %j', ({ writable, flipped }) => {
+    const shots = [20, 22, 24].map((x, i) => ({ ...shot, id: `near-${i}`, x }))
+    review.mockImplementation((selected, _marker, point) =>
+      resolveBasketballMarkerActivation(shots, selected.id, point))
+    render(writable, shots, flipped, true)
+    expect(container.querySelector('[data-shot-count="2"]')).not.toBeNull()
+    marker = container.querySelector<SVGGElement>('[data-shot-id="near-2"]')!
+    // The single is painted above the stack here, although a hidden member is nearer.
+    const point = { x: flipped ? 94 - 22.8 : 22.8, y: 25 }
+    if (writable) {
+      pointer('pointerdown', 1, true, point)
+      advance(500)
+      pointer('pointerup', 1, true, point)
+    }
+    click(point)
+    expect(review).toHaveBeenCalledTimes(1)
+    expect(review.mock.results[0].value).toMatchObject({ kind: 'detail', shot: { id: 'near-2' } })
+    expect(clusterReview).not.toHaveBeenCalled()
+    expect(capture).not.toHaveBeenCalled()
   })
 })
