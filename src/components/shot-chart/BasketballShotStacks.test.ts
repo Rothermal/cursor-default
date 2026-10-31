@@ -175,16 +175,17 @@ describe('Basketball full-court capture and counted stack review', () => {
     expect(harness.dispatch).not.toHaveBeenCalled()
   })
   it.each([
-    { playerId: TEAM_PLAYER_HOME_ID, team: 'Aces', x: 4 },
-    { playerId: TEAM_PLAYER_HOME_ID, team: 'Aces', x: 88 },
-    { playerId: TEAM_PLAYER_OPP_ID, team: 'Bears', x: 4 },
-    { playerId: TEAM_PLAYER_OPP_ID, team: 'Bears', x: 88 },
-  ])('uses the main team anywhere on court: %j', ({ playerId, team, x }) => {
+    { playerId: TEAM_PLAYER_HOME_ID, team: 'Aces', x: 4, value: '3PT' },
+    { playerId: TEAM_PLAYER_HOME_ID, team: 'Aces', x: 88, value: '2PT' },
+    { playerId: TEAM_PLAYER_OPP_ID, team: 'Bears', x: 4, value: '2PT' },
+    { playerId: TEAM_PLAYER_OPP_ID, team: 'Bears', x: 88, value: '3PT' },
+  ])('uses the main team and its basket anywhere on court: %j', ({ playerId, team, x, value }) => {
     render(false, playerId)
     const before = buildGameSyncFingerprint(harness.state)
     const dialog = tapCourt(x)!
     expect(button(team, dialog).getAttribute('aria-pressed')).toBe('true')
     expect(dialog.querySelector('select')?.value).toBe(playerId)
+    expect(button(value, dialog).getAttribute('aria-pressed')).toBe('true')
     expect(dialog.textContent).not.toContain('Backcourt shot')
     expect(harness.dispatch).not.toHaveBeenCalled()
     expect(buildGameSyncFingerprint(harness.state)).toBe(before)
@@ -233,5 +234,17 @@ describe('Basketball full-court capture and counted stack review', () => {
     render(false, null)
     expect(tapCourt(4)).toBeNull()
     expect(harness.dispatch).not.toHaveBeenCalled()
+  })
+  it('defaults and saves an opponent layup as two points against the opponent basket', () => {
+    render(false, TEAM_PLAYER_OPP_ID)
+    const dialog = tapCourt(4)!
+    expect(button('2PT', dialog).getAttribute('aria-pressed')).toBe('true')
+    guardedClick(button('Made', dialog))
+    expect(harness.dispatch).toHaveBeenCalledTimes(1)
+    const saved = harness.dispatch.mock.calls[0][0].state as GameState
+    expect(saved.eventStream?.events[saved.eventStream.events.length - 1]).toMatchObject({
+      eventType: 'basketball.shot', teamSide: 'opponent', payload: { made: true, value: 2 },
+      location: { x: 4 / 94, y: 0.5, attackingDirection: 'right_to_left' },
+    })
   })
 })

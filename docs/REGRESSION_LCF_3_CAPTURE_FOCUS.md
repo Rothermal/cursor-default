@@ -234,7 +234,7 @@ production/PWA build pass; the main asset is 3,055,058 bytes, with 90,670 bytes
 below the unchanged precache limit. Source lint has zero errors and the three
 existing Fast Refresh warnings.
 
-Final full suite: **354 files / 3,666 tests passed**. The original stacked-shot
+Initial full suite: **354 files / 3,666 tests passed**. The original stacked-shot
 capture/edit/Summary browser matrix also passes again (13 workflows / 16
 screenshots), for **27 workflows / 24 screenshots** across both browser runs.
 
@@ -243,3 +243,28 @@ ends, and check the selected team/Unattributed with no warning. Save a steal or
 defensive rebound, then try a one-event team override and reopen capture. Confirm
 the main default remains and Switch ends is still available in Actions. Physical
 phone/PWA and live-cloud validation remain unclaimed.
+
+### PR #517 Review Follow-Up (2026-10-31)
+
+Both review notes are addressed without changing the selected-team capture policy:
+
+- The opponent-value coverage gap was valid, not an observed defect in the current
+  implementation. The four team/half DOM cases now assert the 2PT/3PT chip as well
+  as attribution. A new opponent layup test verifies a made shot is saved as two
+  points against the opponent's actual basket. Temporarily forcing all suggestions
+  to use the home basket now fails three tests; that mutation was restored. The
+  focused suite passes (4 files / 52 tests).
+- `basketballDirectionTowardTap` had no callers, and `basketballSideAttacking` was
+  test-only after removal of tapped-half inference. Both obsolete helpers are
+  removed. The direction test now uses the production basket-display API while
+  retaining Switch ends, halftime, period-break and half-court guards. No source
+  references to either removed export remain.
+
+Updated verification: **354 files / 3,667 tests passed**; TypeScript, configured
+production/PWA build and source lint pass (three existing Fast Refresh warnings).
+The main asset remains 3,055,058 bytes under the unchanged precache limit.
+**29 browser workflows / 26 screenshots passed**, including explicit chip checks
+for both teams on both halves, saved opponent two- and three-point shots and the
+existing stacked-shot/edit/Summary workflows. Auth/cloud transport is stubbed.
+
+Physical-device, installed-PWA and live-cloud validation remain unclaimed.
