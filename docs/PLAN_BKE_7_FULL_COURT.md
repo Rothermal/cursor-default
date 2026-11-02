@@ -1,11 +1,16 @@
 # Plan: BKE-7 Full Court and Attacking Direction
 
 Moves the Basketball Event tracker from a half-court drawing to a horizontal full court,
-the way Soccer's pitch and Hockey's rink work: each team attacks one basket, the ends
-switch at halftime, and the basket you tap tells the app which team shot.
+the way Soccer's pitch and Hockey's rink work: each team attacks one basket and the
+ends switch at halftime. Capture keeps the selected team, independent of tap location.
 
 Status: approved (merged 2026-10-11, PR #483); built with the §7 recommendations. BKE-7A through
 BKE-7D are implemented; see §8.
+
+Owner update (2026-10-30): selected-team capture and removal of the backcourt
+warning are implemented for review. Section 3.3 supersedes the original tapped-half
+team inference and popup prompt in the historical BKE-7B delivery notes. See the
+[LCF-3 follow-up record](REGRESSION_LCF_3_CAPTURE_FOCUS.md#selected-team-capture-follow-up-2026-10-30).
 
 Owner field-test follow-up (2026-10-26):
 [LCF-3](PLAN_LIVE_CAPTURE_FIELD_TEST_FOLLOWUP.md#lcf-3-capture-first-gestures-and-focus-mode)
@@ -22,7 +27,7 @@ BKE-7 exits when a new Basketball Event game is tracked and reviewed on a full c
   an attacking arrow, and a display-only 180-degree flip,
 - the tracked team's attacking direction chosen at tip-off, switched automatically at
   halftime, kept for overtime, and changeable with **Switch ends**,
-- a tap on a half preselects the team attacking that basket; the shot's value and zone are
+- a court tap keeps the main workspace's selected team; the shot's value and zone are
   measured from that team's basket, so a backcourt heave is a real three,
 - shots stored with the shooting side's attacking direction, and old half-court shots
   still replaying with identical totals,
@@ -100,7 +105,7 @@ server's finalization rejects shots with any other schema version.
   regulation-segment list (4 quarters, 2 halves), the projection flips the direction.
   Odd segment counts never flip on their own. Overtime keeps the second-half direction
   (NFHS, NCAA, FIBA and NBA all do this).
-- **Switch ends** (Actions menu, and the backcourt prompt in §3.3) appends a
+- **Switch ends** (Actions -> Court ends) appends a
   `switch_ends` event. It applies from that point forward. It is one capture unit, so
   quick Undo and Timeline Remove/Restore handle it, and removing it changes no stored
   shot.
@@ -108,11 +113,13 @@ server's finalization rejects shots with any other schema version.
 
 ### 3.3 Capture
 
-- Tapping a half preselects the team attacking that basket in the popup. The recorder can
-  still switch teams. The tapped point is never moved.
-- A shot whose point is in its own team's backcourt gets a one-line prompt in the popup:
-  "Backcourt shot. Are the ends right?" with **Switch ends** or **Keep as a backcourt
-  shot**. This catches a wrong tip-off direction on the first shot.
+- The popup starts with the main workspace's selected team, regardless of the tapped
+  half. The recorder can explicitly switch teams for that event; the next capture
+  starts from the main workspace again. The tapped point is never moved.
+- No backcourt warning or inferred team switch interrupts the general event sheet:
+  the recorder may be logging a steal or defensive rebound, not a shot. Actual
+  backcourt shots remain valid. Changing basket ends stays an explicit operation
+  through Actions -> Court ends, never a consequence of opening capture.
 - The 2PT/3PT chip still defaults from the point, measured from that team's basket.
 - Live capture always uses the current direction, which is never ambiguous. Shots
   added or edited afterwards follow §3.4.
@@ -185,8 +192,9 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   half-court Event games keep `BasketballCourt`.
 - Tip-off direction choice ("<Team> shoots first at: Left basket / Right basket") on the
   opening-lineup step and every other Event start path, default right.
-- Tapped half preselects the team, backcourt prompt, Switch ends in Actions, shot
-  commands stamp the direction.
+- Original BKE-7B used tapped-half team selection and a backcourt prompt; the
+  2026-10-30 update in §3.3 supersedes those defaults. Switch ends remains in
+  Actions; shot commands still stamp the direction.
 - Shot detail, Timeline shot edit and recorded-later shot add on the full court, with
   the §3.4 Shot at control, preselection only for unambiguous periods, and stamp
   preservation on edit.
@@ -312,7 +320,8 @@ beyond the midcourt line does not fit on the 47 ft half-court drawing.
   `courtDrawing.tsx`, team labels with arrows, flip as a half turn, tap-vs-scroll from the
   shared `courtTap.ts`). `ShotChartPanel` uses it only for full-court games; the legacy
   tracker and half-court Event games keep `BasketballCourt`.
-- Capture: the tapped half picks the team attacking that basket (the active player stays
+- Original capture (superseded by the 2026-10-30 update in §3.3): the tapped half picks
+  the team attacking that basket (the active player stays
   when on that team, else the team row). The popup's Team control can change it; choosing
   the team whose basket is far from the tap shows "Backcourt shot. Are the ends right?"
   with Switch ends or Keep as a backcourt shot. `captureBasketballCourtEvent` takes a

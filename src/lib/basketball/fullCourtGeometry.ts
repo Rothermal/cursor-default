@@ -71,7 +71,6 @@ export function isBasketballBeyondHalfCourt(
   return basketballShotFeet(location).y > HALFCOURT_Y
 }
 
-/** The basket nearer a full-court tap: the right one for `x > 0.5`. */
 /**
  * The basket a direction aims at as the recorder sees it: the canonical basket, or the
  * other one while the court is shown flipped. Labels only; stored directions never change.
@@ -82,10 +81,6 @@ export function basketballShownBasket(
 ): 'left' | 'right' {
   const right = direction === 'left_to_right'
   return right !== (orientation === 'flipped') ? 'right' : 'left'
-}
-
-export function basketballDirectionTowardTap(x: number): BasketballAttackingDirection {
-  return x > 0.5 ? 'left_to_right' : 'right_to_left'
 }
 
 function clamp(value: number): number {

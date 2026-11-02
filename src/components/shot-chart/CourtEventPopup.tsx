@@ -36,11 +36,9 @@ interface CourtEventPopupProps {
   onAdministrative?: (kind: 'foul' | 'free_throw') => void
   /** Event games log a turnover from the court too (BKE-7C). */
   turnoverAvailable?: boolean
-  /** Full court: both teams, so the recorder can change the team the tapped half chose. */
+  /** Full court: explicit per-event override of the main workspace's selected team. */
   sideOptions?: Array<{ side: 'home' | 'opponent'; label: string }>
   onSelectSide?: (side: 'home' | 'opponent') => void
-  /** Full court: the shot is in its team's backcourt (BKE-7 §3.3). */
-  backcourtPrompt?: { onSwitchEnds: () => void; onKeep: () => void } | null
   onPick: (event: CourtEvent) => void
   onCancel: () => void
 }
@@ -51,7 +49,7 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
   playerLabels,
   captureSide, onSelectPlayer, reboundPromptAfterMissEnabled = false, shotType,
   onShotTypeChange, errorMessage, shotDisabledMessage, onAdministrative, sideOptions, onSelectSide,
-  backcourtPrompt, turnoverAvailable = false, onPick, onCancel,
+  turnoverAvailable = false, onPick, onCancel,
 }: CourtEventPopupProps) {
   const [value, setValue] = useState(shotType)
   const [step, setStep] = useState<'event' | 'assist' | 'rebound'>('event')
@@ -94,13 +92,6 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
           aria-pressed={side === option.side}
           className={`min-h-10 min-w-0 truncate rounded px-2 text-sm font-bold disabled:text-content-disabled ${side === option.side ? 'bg-surface text-content' : 'text-content-subtle'}`}
           onClick={() => guarded(() => onSelectSide(option.side))}>{option.label}</button>)}
-      </div>}
-      {backcourtPrompt && step === 'event' && <div role="status" className="space-y-2 rounded-lg border border-warning-line bg-warning px-3 py-2">
-        <p className="text-sm font-semibold text-warning-content">Backcourt shot. Are the ends right?</p>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn-secondary min-h-10 text-sm" onClick={() => guarded(backcourtPrompt.onSwitchEnds)}>Switch ends</button>
-          <button type="button" className="btn-secondary min-h-10 text-sm" onClick={() => guarded(backcourtPrompt.onKeep)}>Keep as a backcourt shot</button>
-        </div>
       </div>}
       <ActorSelect label="Log for" value={activePlayerId} options={options(sidePlayers)}
         emptyOption={unattributed(sidePlayers)} disabled={step !== 'event'} onChange={onSelectPlayer} />

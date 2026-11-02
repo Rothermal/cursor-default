@@ -52,6 +52,12 @@ Per-sport delivery is recorded below; these targets do not release every sport a
   diamond. Baseball does not gain historical live markers or a fake timer/team
   selector. Football remains unchanged until its field/event foundations exist.
 - Keep team/opponent selection, labelled with team display names/nicknames.
+- Basketball full-court capture starts with that main-screen team selection on
+  either half. The event sheet may override the side for one event without changing
+  the next default. A tap supplies location, not team identity. The general sheet
+  has no backcourt-shot warning; shot geometry still uses the selected side's
+  actual basket, and Switch ends remains explicit. See the
+  [capture follow-up](REGRESSION_LCF_3_CAPTURE_FOCUS.md#selected-team-capture-follow-up-2026-10-30).
 - Remove the global individual-player capture strip as each sport adopts this model.
   Choose attribution inside the event dialog; do not silently attribute from a
   hidden global selection. Team/unknown attribution is available only where valid.

@@ -34,16 +34,6 @@ export function basketballShownCourtEnds(
   return { tracked: shown, opponent: shown === 'right' ? 'left' : 'right' }
 }
 
-/** The side attacking the basket a full-court direction points at. */
-export function basketballSideAttacking(
-  state: GameState,
-  direction: BasketballAttackingDirection
-): BasketballTeamSide | null {
-  const tracked = basketballSideDirection(state, 'tracked')
-  if (!tracked) return null
-  return tracked === direction ? 'tracked' : 'opponent'
-}
-
 /** Stored full-court locations of active located field goals, by event id. */
 export function basketballFullCourtShotLocations(state: GameState): Map<string, GameEventLocation> {
   const locations = new Map<string, GameEventLocation>()

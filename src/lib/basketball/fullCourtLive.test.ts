@@ -19,7 +19,6 @@ import {
   basketballFullCourtShotLocations,
   basketballFullCourtShotRecords,
   basketballShownCourtEnds,
-  basketballSideAttacking,
   isBasketballFullCourtGame,
 } from './fullCourtView'
 import {
@@ -224,12 +223,11 @@ describe('BKE-7B live full court', () => {
       .toBeCloseTo(state.shotChart.find(record => record.id === id(201))!.y, 0)
   })
 
-  it('picks the side attacking a basket and follows Switch ends and halftime', () => {
+  it('shows each side\'s basket and follows Switch ends and halftime', () => {
     let state = started('left_to_right')
-    expect(basketballSideAttacking(state, 'left_to_right')).toBe('tracked')
-    expect(basketballSideAttacking(state, 'right_to_left')).toBe('opponent')
+    expect(basketballShownCourtEnds(state)).toEqual({ tracked: 'right', opponent: 'left' })
     state = switched(state, 5, id(301))
-    expect(basketballSideAttacking(state, 'left_to_right')).toBe('opponent')
+    expect(basketballShownCourtEnds(state)).toEqual({ tracked: 'left', opponent: 'right' })
 
     const ended = endBasketballPeriod(state, { recorderUserId: recorder, occurredAt: at(60), eventId: id(302) })
     if (!ended.ok) throw new Error(ended.message)
