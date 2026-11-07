@@ -64,6 +64,22 @@ describe('event conflict recovery fingerprint', () => {
     ).toHaveLength(2)
   })
 
+  it('settles the sync base from the uploaded snapshot after every upload', () => {
+    const context = readFileSync(
+      resolve(process.cwd(), 'src/context/GameContext.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    expect(context).toContain(`eventSyncBase: settledEventSyncBase({
+            latestState,
+            snapshotState: snapshot,
+            syncedState: 'syncedState' in synced ? synced.syncedState : localUnchanged ? syncedPayloadState : null,
+            localUnchanged,
+            recoveryUnchanged,
+          }),`)
+    expect(context).toContain(`const recoveryUnchanged =
+          eventConflictRecoveryFingerprint(latestState) === snapshotRecoveryFingerprint`)
+  })
+
   it('ignores ordinary sync status but detects conflict recovery changes', () => {
     const source = state()
     const statusOnly: GameState = {

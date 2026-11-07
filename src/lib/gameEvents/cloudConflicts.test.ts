@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { GameEventSyncBaseEntry, GameState } from '../../types'
 import {
+  gameEventSyncBase,
   gameEventSyncFingerprint,
   isTimestampOnlyConflict,
   mergeSameRecorderEventStreams,
@@ -93,26 +95,44 @@ describe('same-recorder merge', () => {
 })
 
 describe('sync base after an upload', () => {
-  const withBase = (base: Record<string, { revision: number; fingerprint: string }>) =>
-    ({ cloudSync: { eventSyncBase: base } }) as never
+  const gameState = (events: GameEvent[], base: Record<string, GameEventSyncBaseEntry> = {}) =>
+    ({ eventStream: stream(...events), cloudSync: { eventSyncBase: base } }) as unknown as GameState
+  const y1 = event({ id: '20000000-0000-4000-8000-000000000001', sequence: 1 })
+  const y2 = event({ ...y1, revision: 2, updatedAt: '2026-11-07T17:55:00.000Z', payload: { periodId: 'regulation-4', note: 'device B' } })
+  const x1 = event({ id: '20000000-0000-4000-8000-000000000002', sequence: 2 })
+  const x2 = event({ ...x1, revision: 2, updatedAt: '2026-11-07T17:56:00.000Z', payload: { periodId: 'regulation-4', note: 'edited mid-upload' } })
+  const z1 = event({ id: '20000000-0000-4000-8000-000000000003', sequence: 3 })
 
-  it('keeps the uploaded copies as the base when the game changed mid-upload', () => {
-    const latest = withBase({ old: { revision: 1, fingerprint: 'old' } })
-    const synced = withBase({ old: { revision: 1, fingerprint: 'old' }, uploaded: { revision: 1, fingerprint: 'up' } })
-    expect(settledEventSyncBase(latest, synced, false, true)).toEqual({
-      old: { revision: 1, fingerprint: 'old' },
-      uploaded: { revision: 1, fingerprint: 'up' },
+  it('adopts the uploaded copy as base but pulls a cloud edit again after an overlapping upload', () => {
+    // Device A syncs Y (base r1) and new X while device B already uploaded Y r2.
+    const snapshot = gameState([y1, x1], gameEventSyncBase(stream(y1)))
+    const merge = mergeSameRecorderEventStreams(snapshot.eventStream!, stream(y2), snapshot.cloudSync.eventSyncBase!)
+    expect(merge.conflicts).toEqual([])
+    const synced = gameState(merge.eventStream.events as GameEvent[], gameEventSyncBase(merge.eventStream))
+    // During the upload A edits X and records Z, so it keeps its own state.
+    const latest = gameState([y1, x2, z1], snapshot.cloudSync.eventSyncBase)
+    const base = settledEventSyncBase({
+      latestState: latest, snapshotState: snapshot, syncedState: synced,
+      localUnchanged: false, recoveryUnchanged: true,
     })
+    expect(base[y1.id].revision).toBe(1)
+    expect(base[x1.id].revision).toBe(1)
+
+    const next = mergeSameRecorderEventStreams(latest.eventStream!, stream(y2, x1), base)
+    expect(next.conflicts).toEqual([])
+    const byId = new Map((next.eventStream.events as GameEvent[]).map(item => [item.id, item]))
+    expect(byId.get(y1.id)).toMatchObject({ revision: 2, payload: { note: 'device B' } })
+    expect(byId.get(x1.id)).toMatchObject({ revision: 2, payload: { note: 'edited mid-upload' } })
   })
 
-  it('keeps the device base when a conflict was resolved mid-upload', () => {
-    const latest = withBase({ resolved: { revision: 2, fingerprint: 'remote' } })
-    const synced = withBase({ resolved: { revision: 1, fingerprint: 'local' } })
-    expect(settledEventSyncBase(latest, synced, false, false)).toEqual({
-      resolved: { revision: 2, fingerprint: 'remote' },
-    })
-    expect(settledEventSyncBase(latest, null, false, true)).toEqual({
-      resolved: { revision: 2, fingerprint: 'remote' },
-    })
+  it('keeps the device base when a conflict was resolved mid-upload or no synced state exists', () => {
+    const latest = gameState([y1], { [y1.id]: { revision: 2, fingerprint: 'remote' } })
+    const synced = gameState([y1], gameEventSyncBase(stream(y1)))
+    for (const syncedState of [synced, null]) {
+      expect(settledEventSyncBase({
+        latestState: latest, snapshotState: synced, syncedState,
+        localUnchanged: false, recoveryUnchanged: syncedState === null,
+      })).toEqual({ [y1.id]: { revision: 2, fingerprint: 'remote' } })
+    }
   })
 })

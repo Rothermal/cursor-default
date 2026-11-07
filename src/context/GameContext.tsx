@@ -1088,12 +1088,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
             tournamentSyncWarning: synced.syncedState.cloudSync.tournamentSyncWarning ?? null,
           } : {}),
           lastSyncedGameFingerprint: buildGameSyncFingerprint(syncedPayloadState),
-          eventSyncBase: settledEventSyncBase(
+          eventSyncBase: settledEventSyncBase({
             latestState,
-            'syncedState' in synced ? synced.syncedState : localUnchanged ? syncedPayloadState : null,
+            snapshotState: snapshot,
+            syncedState: 'syncedState' in synced ? synced.syncedState : localUnchanged ? syncedPayloadState : null,
             localUnchanged,
-            recoveryUnchanged
-          ),
+            recoveryUnchanged,
+          }),
           eventConflicts: localUnchanged
             ? syncedPayloadState.cloudSync.eventConflicts ?? []
             : latestState.cloudSync.eventConflicts ?? [],
