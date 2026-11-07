@@ -65,6 +65,7 @@ import { sideOf } from '../../lib/shotChartViews'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
+import { basketballLiveChartPeriod, basketballShotsInPeriod, type BasketballLiveShotScope } from '../../lib/basketball/liveShotChartPeriod'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
@@ -132,6 +133,8 @@ function shotLabelFromLogEntry(
 interface ShotChartPanelProps {
   /** Display-only filter, independent of capture attribution. */
   selection: ShotChartSelection
+  /** Event basketball: show only the current period's shots (default) or the whole game's. */
+  periodScope?: BasketballLiveShotScope
   /** Same action as the sticky player strip; used by F6's in-popup player switch. */
   onSelectPlayer: (playerId: string) => void
   /** Explicit workspace target; popup attribution stays local to this capture. */
@@ -153,6 +156,7 @@ interface ShotChartPanelProps {
 
 export default function ShotChartPanel({
   selection,
+  periodScope = 'period',
   onSelectPlayer,
   capturePlayerId,
   captureDisabled = false,
@@ -444,10 +448,12 @@ export default function ShotChartPanel({
   const canUndoEventShot = eventCaptureOpen && Boolean(eventCaptureUnits[0]?.containsLocatedFieldGoal)
 
   // What the court + zone summary display (F2); recording is unaffected by the filter.
-  const visibleShots = useMemo(
-    () => shotsForSelection(shotChart, players, selection),
-    [shotChart, players, selection]
-  )
+  const livePeriod = isEventBasketball && periodScope === 'period' ? basketballLiveChartPeriod(state) : null
+  const livePeriodId = livePeriod?.id ?? null
+  const visibleShots = useMemo(() => {
+    const selected = shotsForSelection(shotChart, players, selection)
+    return livePeriodId ? basketballShotsInPeriod(state, selected, livePeriodId) : selected
+  }, [shotChart, players, selection, livePeriodId, state])
 
   // Full court: the same shots in full-court feet, for drawing and overlap checks.
   const fullCourtShots = useMemo(
@@ -572,7 +578,7 @@ export default function ShotChartPanel({
   const chartHeader = (
       <div className="flex items-center justify-between gap-2 px-1">
         <p className="text-sm font-semibold text-content-muted truncate">
-          Shot chart — {shotViewLabel(selection, players)}
+          Shot chart — {shotViewLabel(selection, players)}{livePeriod ? ` · ${livePeriod.label}` : ''}
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <p className="text-sm font-bold text-content">{shootingLine(visibleShots)}</p>

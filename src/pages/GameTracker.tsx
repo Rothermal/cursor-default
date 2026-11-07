@@ -23,6 +23,7 @@ import TrackerOptionsMenu from '../components/TrackerOptionsMenu'
 import StatButton from '../components/StatButton'
 import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
 import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
+import type { BasketballLiveShotScope } from '../lib/basketball/liveShotChartPeriod'
 import RecentEventsPopup from '../components/RecentEventsPopup'
 import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
 import BasketballLifecycleControls from '../components/basketball/BasketballLifecycleControls'
@@ -291,6 +292,7 @@ export default function GameTracker() {
   const [workspaceSide, setWorkspaceSide] = useState<'tracked' | 'opponent'>('tracked')
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null)
   const [courtReviewPlayerId, setCourtReviewPlayerId] = useState('all')
+  const [courtPeriodScope, setCourtPeriodScope] = useState<BasketballLiveShotScope>('period')
   const basketballTrackTabRef = useRef<HTMLButtonElement>(null)
   const basketballTimelineTabRef = useRef<HTMLButtonElement>(null)
   const trackerRootRef = useRef<HTMLDivElement>(null)
@@ -1457,9 +1459,19 @@ export default function GameTracker() {
                     {players.map(player => <option key={player.id} value={player.id}>{shotViewLabel({ kind: 'player', playerId: player.id }, players)}</option>)}
                   </select>
                 </label>
+                {isBasketballEventMode && (
+                  <label className="mt-2 flex items-center gap-2 text-sm text-content-muted">
+                    Period
+                    <select aria-label="Shot chart period" value={courtPeriodScope} onChange={event => setCourtPeriodScope(event.target.value as BasketballLiveShotScope)} className="min-h-10 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-content">
+                      <option value="period">Current period</option>
+                      <option value="game">Whole game</option>
+                    </select>
+                  </label>
+                )}
               </details>
             )}
             selection={shotChartSelection}
+            periodScope={courtPeriodScope}
             onSelectPlayer={handleSelectPlayer}
             capturePlayerId={workspaceTeamPlayer?.id ?? null}
             onAdministrative={isBasketballEventMode ? (kind, side, fullCourtPoint) => {
