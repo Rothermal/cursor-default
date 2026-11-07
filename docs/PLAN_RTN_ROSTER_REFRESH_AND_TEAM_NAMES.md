@@ -1,6 +1,18 @@
 # RTN: Roster Refresh, Team Nicknames and Saved Opponents
 
-Status: Proposed planning PR. Waiting for owner review; no runtime code yet.
+Status: Proposed planning PR, waiting for owner review. RTN-0 (code splitting)
+was approved by Mark on 2026-11-07 ahead of the rest and is implemented in the
+same PR; RTN-1 onward wait for plan approval.
+
+RTN-0 result: every routed page except Auth, the access gate and the dev-only
+shot-chart preview is `React.lazy` in `App.tsx`, behind `RouteChunkBoundary`
+(Suspense plus a Reload prompt if a page chunk fails to load). Local build: the
+app chunk went from 2,839,939 bytes (90.3% of the limit) to 904,726 bytes
+(28.8%); the largest page chunk is 227,201 bytes; total precache 2,928.83 KiB
+over 136 entries (was 2,883.37 KiB over 15). Typecheck clean, lint 0 errors and
+the 3 known warnings, 355 test files / 3,669 tests pass. Production-build smoke
+test in Chromium opened 14 routes with no page errors, and setup and Settings
+pages reloaded offline from the service-worker cache.
 
 Owner request (2026-11-07): "Basketball first but should apply to all sports.
 Need an option to refresh player metadata, numbers, positions during a game. The
