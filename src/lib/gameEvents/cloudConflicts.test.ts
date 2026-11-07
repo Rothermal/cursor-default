@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canKeepLocalWithoutReview,
   gameEventSyncFingerprint,
   mergeSameRecorderEventStreams,
   preferLocalMergeConflicts,
 } from './cloudConflicts'
+import { canonicalGameEventStreamForFingerprint } from './stream'
 import type { GameEvent, GameEventStream } from './types'
 
 function event(overrides: Partial<GameEvent> = {}): GameEvent {
@@ -44,6 +46,36 @@ describe('same-recorder merge', () => {
     const merge = mergeSameRecorderEventStreams(stream(local), stream(remote), {})
     expect(merge.conflicts).toEqual([])
     expect(merge.eventStream.events[0]).toEqual(local)
+  })
+
+  it('matches a sync base saved with the cloud spelling before the upgrade', () => {
+    const cloudSpelled = event({
+      occurredAt: '2026-11-07T17:49:45.11+00:00',
+      createdAt: '2026-11-07T17:49:45.11+00:00',
+      updatedAt: '2026-11-07T17:49:45.11+00:00',
+    })
+    // The pre-upgrade fingerprint kept timestamps exactly as stored.
+    const legacyFingerprint = JSON.stringify(
+      canonicalGameEventStreamForFingerprint(stream(cloudSpelled))!.events[0]
+    )
+    const remoteEdit = event({
+      revision: 2,
+      updatedAt: '2026-11-07T17:55:00+00:00',
+      payload: { periodId: 'regulation-4', note: 'edited elsewhere' },
+    })
+    const merge = mergeSameRecorderEventStreams(stream(cloudSpelled), stream(remoteEdit), {
+      [cloudSpelled.id]: { revision: 1, fingerprint: legacyFingerprint },
+    })
+    expect(merge.conflicts).toEqual([])
+    expect(merge.eventStream.events[0]).toMatchObject({ revision: 2, payload: { note: 'edited elsewhere' } })
+  })
+
+  it('keeps local without review only for the same event or a later local revision', () => {
+    const base = event()
+    expect(canKeepLocalWithoutReview(base, event({ updatedAt: '2026-11-07T17:49:45.11+00:00' }))).toBe(true)
+    expect(canKeepLocalWithoutReview(event({ revision: 2, payload: { note: 'a' } }), base)).toBe(true)
+    expect(canKeepLocalWithoutReview(event({ payload: { note: 'a' } }), base)).toBe(false)
+    expect(canKeepLocalWithoutReview(base, event({ revision: 2, payload: { note: 'b' } }))).toBe(false)
   })
 
   it('keeps the local event above both revisions for a sole recorder', () => {

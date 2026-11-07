@@ -11,6 +11,7 @@ import {
   upsertGameEventForRecorder,
 } from './cloud'
 import {
+  canKeepLocalWithoutReview,
   EVENT_CONFLICT_REVIEW_REQUIRED,
   gameEventSyncBase,
   mergeSameRecorderEventStreams,
@@ -152,7 +153,11 @@ export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<S
   if (!supabase) throw new Error('Supabase client not configured')
   if ((input.state.cloudSync.eventConflicts?.length ?? 0) > 0) {
     const gameId = input.state.cloudSync.gameId
-    const sole = gameId ? await isSoleEventRecorder(adapter.sportId, gameId, userId) : false
+    const keepable = (input.state.cloudSync.eventConflicts ?? []).every(conflict =>
+      canKeepLocalWithoutReview(conflict.localEvent, conflict.remoteEvent))
+    const sole = gameId && keepable
+      ? await isSoleEventRecorder(adapter.sportId, gameId, userId)
+      : false
     assertCurrent?.()
     if (!sole) {
       throw adapter.createRecoveryError(
@@ -244,12 +249,17 @@ export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<S
     remote.eventStream,
     Object.keys(storedBase).length > 0 ? storedBase : fallbackBase
   )
-  if (merge.conflicts.length > 0) {
+  const keepable = merge.conflicts.filter(conflict =>
+    canKeepLocalWithoutReview(conflict.localEvent, conflict.remoteEvent))
+  if (keepable.length > 0) {
     const sole = await isSoleEventRecorder(adapter.sportId, binding.game_id, userId)
     assertCurrent?.()
     if (sole) {
-      merge.eventStream = preferLocalMergeConflicts(merge, new Date().toISOString())
-      merge.conflicts = []
+      merge.eventStream = preferLocalMergeConflicts(
+        { ...merge, conflicts: keepable },
+        new Date().toISOString()
+      )
+      merge.conflicts = merge.conflicts.filter(conflict => !keepable.includes(conflict))
     }
   }
   const mergedCandidate: GameState = {
@@ -411,7 +421,7 @@ export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<S
 
 /**
  * True when nobody but this user has recorded events for the game. A sole recorder is the
- * source of truth, so its own competing revisions resolve to this device without review.
+ * source of truth: conflicts that `canKeepLocalWithoutReview` allows resolve to this device.
  */
 export async function isSoleEventRecorder(
   sportId: string,
@@ -428,10 +438,11 @@ export async function isSoleEventRecorder(
     return false
   }
   if (!Array.isArray(data)) return false
+  // Team scorers see other recorders with a redacted (null) count: unknown is not zero.
   return data.every(row => {
     if (!row || typeof row !== 'object') return false
     const value = row as { recorder_user_id?: unknown; event_count?: unknown }
-    return value.recorder_user_id === userId || Number(value.event_count ?? 0) === 0
+    return value.recorder_user_id === userId || value.event_count === 0
   })
 }
 

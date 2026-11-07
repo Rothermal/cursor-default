@@ -96,8 +96,9 @@ export function mergeSameRecorderEventStreams(
     }
 
     const previous = base[eventId]
-    const localMatchesBase = previous?.fingerprint === localFingerprint
-    const remoteMatchesBase = previous?.fingerprint === remoteFingerprint
+    const baseFingerprint = previous ? normalizeStoredSyncFingerprint(previous.fingerprint) : undefined
+    const localMatchesBase = baseFingerprint === localFingerprint
+    const remoteMatchesBase = baseFingerprint === remoteFingerprint
     if (localMatchesBase && !remoteMatchesBase) {
       merged.push(cloneEvent(remoteEvent))
     } else if (remoteMatchesBase && !localMatchesBase) {
@@ -117,6 +118,33 @@ export function mergeSameRecorderEventStreams(
     eventStream: { version: localStream.version, events: merged },
     conflicts,
   }
+}
+
+/**
+ * Sync bases saved before timestamps were normalized keep the cloud's `+00:00` spelling.
+ * Re-reads one under the current rules so an unchanged event still matches its base.
+ */
+export function normalizeStoredSyncFingerprint(fingerprint: string): string {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(fingerprint)
+  } catch {
+    return fingerprint
+  }
+  if (!isGameEventEnvelope(parsed)) return fingerprint
+  return gameEventSyncFingerprint(parsed)
+}
+
+/**
+ * True when a sole recorder's conflict can keep this device's copy without review: both copies
+ * are the same event (only timestamp spelling differs), or this device's copy is a later
+ * revision than the cloud's. One device only ever moves its own revisions forward, so a cloud
+ * copy at the same or a later revision with different content came from another device signed
+ * in to the same account, and still needs review.
+ */
+export function canKeepLocalWithoutReview(localEvent: GameEvent, remoteEvent: GameEvent): boolean {
+  return gameEventSyncFingerprint(localEvent) === gameEventSyncFingerprint(remoteEvent) ||
+    localEvent.revision > remoteEvent.revision
 }
 
 /**

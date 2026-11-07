@@ -140,22 +140,28 @@ describe('event transport account lifetime', () => {
       name === 'upsert_game_event_revisioned' && (args as { p_id: string }).p_id === firstEvent.id)
     expect((upload![1] as { p_revision: number }).p_revision).toBe(firstEvent.revision + 1)
   })
-  it('still asks for review when another recorder has events', async () => {
+  it.each([
+    ['another recorder has events', [{ recorder_user_id: 'recorder-b', event_count: 4 }], 2, 1],
+    ['another recorder\'s count is redacted', [{ recorder_user_id: 'recorder-b', event_count: null }], 2, 1],
+    ['the cloud copy is a same-revision edit from another device', [], 1, 1],
+    ['the cloud copy is a later revision from another device', [], 1, 2],
+  ])('still asks for review when %s', async (_label, others, localRevision, remoteRevision) => {
     const state = fixture()
     const firstEvent = state.eventStream!.events[0]
     if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
     const rpc = cloud.rpc.getMockImplementation()!
     cloud.rpc.mockImplementation((name: string, args: unknown) =>
       name === 'get_baseball_game_recorders'
-        ? Promise.resolve({ data: [
-          { recorder_user_id: 'recorder-a', event_count: 2 },
-          { recorder_user_id: 'recorder-b', event_count: 4 },
-        ], error: null })
+        ? Promise.resolve({ data: [{ recorder_user_id: 'recorder-a', event_count: null }, ...others], error: null })
         : rpc(name, args))
+    const local = { ...firstEvent, revision: localRevision }
+    state.eventStream = { ...state.eventStream!, events: state.eventStream!.events.map(event =>
+      isGameEventEnvelope(event) && event.id === firstEvent.id ? local : event) }
     state.cloudSync.gameId = 'cloud-1'
     state.cloudSync.eventConflicts = [{
       conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
-      localEvent: firstEvent, remoteEvent: { ...firstEvent, revision: 2 },
+      localEvent: local,
+      remoteEvent: { ...firstEvent, revision: remoteRevision, payload: { ...firstEvent.payload, other: 'device' } },
     }]
     await expect(syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' }))
       .rejects.toThrow('Resolve the event sync conflicts')
