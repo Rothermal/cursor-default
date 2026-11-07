@@ -1,3 +1,4 @@
+import { EVENT_CONFLICT_REVIEW_REQUIRED } from './gameEvents/cloudConflicts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../types'
 import { activeCloudSyncStateAction } from './cloudSyncState'
@@ -778,6 +779,12 @@ describe('gameParking', () => {
     expect(activeState.notes).toBe('remote merge adopted')
     expect(activeState.cloudSync.eventConflicts).toHaveLength(1)
     expect(hasDirtyParkedGames('user-1')).toBe(true)
+    // One retry lets a sole recorder resolve to this device; a review-required failure pauses.
+    expect(listDirtyParkedGameRecords('user-1')).toHaveLength(1)
+    saveParkedGameRecordState(summary.localGameId, activeState, 'user-1', {
+      dirty: true,
+      lastError: EVENT_CONFLICT_REVIEW_REQUIRED,
+    })
     expect(listDirtyParkedGameRecords('user-1')).toEqual([])
 
     const resolvedState: GameState = {

@@ -11,10 +11,13 @@ import {
   upsertGameEventForRecorder,
 } from './cloud'
 import {
+  EVENT_CONFLICT_REVIEW_REQUIRED,
   gameEventSyncBase,
   mergeSameRecorderEventStreams,
+  preferLocalMergeConflicts,
   type RemoteConflictRevisionPolicy,
 } from './cloudConflicts'
+import { resolveEventConflictInState } from './eventConflictResolution'
 import { isGameEventEnvelope } from './envelope'
 import type { ProjectionRebuildResult } from './projection'
 import type { GameEventRegistry } from './registry'
@@ -142,23 +145,24 @@ export function assertHealthyEventGame(
   return rebuilt.state
 }
 
-export async function syncEventGameToCloud({
-  state,
-  userId,
-  localGameId,
-  adapter,
-  validateBinding,
-  assertCurrent,
-}: SyncEventGameInput): Promise<SyncEventGameResult> {
+export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<SyncEventGameResult> {
+  const { userId, localGameId, adapter, validateBinding, assertCurrent } = input
+  let state = input.state
   assertCurrent?.()
   if (!supabase) throw new Error('Supabase client not configured')
-  const prepared = adapter.prepare(state)
-  if ((state.cloudSync.eventConflicts?.length ?? 0) > 0) {
-    throw adapter.createRecoveryError(
-      'Resolve the event sync conflicts before retrying cloud sync.',
-      state
-    )
+  if ((input.state.cloudSync.eventConflicts?.length ?? 0) > 0) {
+    const gameId = input.state.cloudSync.gameId
+    const sole = gameId ? await isSoleEventRecorder(adapter.sportId, gameId, userId) : false
+    assertCurrent?.()
+    if (!sole) {
+      throw adapter.createRecoveryError(
+        EVENT_CONFLICT_REVIEW_REQUIRED,
+        input.state
+      )
+    }
+    state = keepLocalForStoredConflicts(input.state, adapter)
   }
+  const prepared = adapter.prepare(state)
 
   assertCurrent?.()
   const { data: bindingData, error: bindingError } = await supabase.rpc(
@@ -240,6 +244,14 @@ export async function syncEventGameToCloud({
     remote.eventStream,
     Object.keys(storedBase).length > 0 ? storedBase : fallbackBase
   )
+  if (merge.conflicts.length > 0) {
+    const sole = await isSoleEventRecorder(adapter.sportId, binding.game_id, userId)
+    assertCurrent?.()
+    if (sole) {
+      merge.eventStream = preferLocalMergeConflicts(merge, new Date().toISOString())
+      merge.conflicts = []
+    }
+  }
   const mergedCandidate: GameState = {
     ...state,
     players: mergeCloudParticipantPlayers(state.players, binding.participants ?? []),
@@ -395,6 +407,46 @@ export async function syncEventGameToCloud({
     syncedAt: checkpointData,
     syncedState,
   }
+}
+
+/**
+ * True when nobody but this user has recorded events for the game. A sole recorder is the
+ * source of truth, so its own competing revisions resolve to this device without review.
+ */
+export async function isSoleEventRecorder(
+  sportId: string,
+  gameId: string,
+  userId: string
+): Promise<boolean> {
+  if (!supabase) return false
+  let data: unknown
+  try {
+    const result = await supabase.rpc(`get_${sportId}_game_recorders`, { p_game_id: gameId })
+    if (result.error) return false
+    data = result.data
+  } catch {
+    return false
+  }
+  if (!Array.isArray(data)) return false
+  return data.every(row => {
+    if (!row || typeof row !== 'object') return false
+    const value = row as { recorder_user_id?: unknown; event_count?: unknown }
+    return value.recorder_user_id === userId || Number(value.event_count ?? 0) === 0
+  })
+}
+
+function keepLocalForStoredConflicts(
+  state: GameState,
+  adapter: EventCloudTransportAdapter
+): GameState {
+  const now = new Date().toISOString()
+  let next = state
+  for (const conflict of state.cloudSync.eventConflicts ?? []) {
+    const resolved = resolveEventConflictInState(next, conflict.eventId, 'local', adapter, now)
+    if (!resolved.ok) throw adapter.createRecoveryError(resolved.reason, state)
+    next = resolved.state
+  }
+  return next
 }
 
 async function freezeGameSideNickname(

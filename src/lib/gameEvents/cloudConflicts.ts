@@ -21,10 +21,32 @@ export interface SameRecorderMergeResult {
   conflicts: SameRecorderMergeConflict[]
 }
 
+/** Sync stops on this until someone reviews the conflicts; background retries skip it. */
+export const EVENT_CONFLICT_REVIEW_REQUIRED = 'Resolve the event sync conflicts before retrying cloud sync.'
+
 export type RemoteConflictRevisionPolicy = 'preserve' | 'advance'
 
+const SYNC_TIMESTAMP_FIELDS = ['occurredAt', 'createdAt', 'updatedAt', 'deletedAt'] as const
+
+/**
+ * The cloud returns timestamps as `+00:00` with trimmed milliseconds, the device writes `Z`.
+ * Both name the same instant, so the merge compares instants, not spellings.
+ */
+function normalizeSyncTimestamp(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : value
+}
+
 export function gameEventSyncFingerprint(event: GameEvent): string {
-  const canonical = canonicalGameEventStreamForFingerprint({ version: 1, events: [event] })
+  const normalized: Record<string, unknown> = { ...event }
+  for (const field of SYNC_TIMESTAMP_FIELDS) {
+    if (field in normalized) normalized[field] = normalizeSyncTimestamp(normalized[field])
+  }
+  const canonical = canonicalGameEventStreamForFingerprint({
+    version: 1,
+    events: [normalized as unknown as GameEvent],
+  })
   return JSON.stringify(canonical?.events[0] ?? null)
 }
 
@@ -94,6 +116,27 @@ export function mergeSameRecorderEventStreams(
   return {
     eventStream: { version: localStream.version, events: merged },
     conflicts,
+  }
+}
+
+/**
+ * A sole recorder's device is the source of truth: each competing revision keeps the local
+ * event, re-issued one revision above both copies so the cloud accepts it. No review needed.
+ */
+export function preferLocalMergeConflicts(
+  merge: SameRecorderMergeResult,
+  now: string
+): GameEventStream {
+  const winners = new Map(merge.conflicts.map(conflict => [conflict.eventId, {
+    ...cloneEvent(conflict.localEvent),
+    revision: Math.max(conflict.localEvent.revision, conflict.remoteEvent.revision) + 1,
+    updatedAt: now,
+  }]))
+  return {
+    ...merge.eventStream,
+    events: merge.eventStream.events.map(rawEvent =>
+      isGameEventEnvelope(rawEvent) ? winners.get(rawEvent.id) ?? rawEvent : rawEvent
+    ),
   }
 }
 

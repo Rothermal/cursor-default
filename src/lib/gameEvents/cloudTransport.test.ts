@@ -116,6 +116,51 @@ describe('event transport account lifetime', () => {
       expect(cloud.calls).toHaveLength(callCount)
     }
   )
+  it('keeps a sole recorder\'s stored conflicts on this device without review', async () => {
+    const state = fixture()
+    const firstEvent = state.eventStream!.events[0]
+    if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
+    const recorders = vi.fn(async () => ({ data: [{ recorder_user_id: 'recorder-a', event_count: 2 }], error: null }))
+    const rpc = cloud.rpc.getMockImplementation()!
+    cloud.rpc.mockImplementation((name: string, args: unknown) =>
+      name === 'get_baseball_game_recorders' ? recorders() : rpc(name, args))
+    state.cloudSync.gameId = 'cloud-1'
+    state.cloudSync.eventConflicts = [{
+      conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
+      localEvent: firstEvent,
+      remoteEvent: { ...firstEvent, updatedAt: firstEvent.updatedAt.replace('Z', '+00:00') },
+    }]
+    const result = await syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' })
+    expect(recorders).toHaveBeenCalledOnce()
+    expect(result.syncedState.cloudSync.eventConflicts).toEqual([])
+    expect(cloud.rpc).toHaveBeenCalledWith('resolve_game_event_conflict', expect.objectContaining({
+      p_conflict_id: 'conflict-1', p_resolution: 'local',
+    }))
+    const upload = cloud.rpc.mock.calls.find(([name, args]) =>
+      name === 'upsert_game_event_revisioned' && (args as { p_id: string }).p_id === firstEvent.id)
+    expect((upload![1] as { p_revision: number }).p_revision).toBe(firstEvent.revision + 1)
+  })
+  it('still asks for review when another recorder has events', async () => {
+    const state = fixture()
+    const firstEvent = state.eventStream!.events[0]
+    if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
+    const rpc = cloud.rpc.getMockImplementation()!
+    cloud.rpc.mockImplementation((name: string, args: unknown) =>
+      name === 'get_baseball_game_recorders'
+        ? Promise.resolve({ data: [
+          { recorder_user_id: 'recorder-a', event_count: 2 },
+          { recorder_user_id: 'recorder-b', event_count: 4 },
+        ], error: null })
+        : rpc(name, args))
+    state.cloudSync.gameId = 'cloud-1'
+    state.cloudSync.eventConflicts = [{
+      conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
+      localEvent: firstEvent, remoteEvent: { ...firstEvent, revision: 2 },
+    }]
+    await expect(syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' }))
+      .rejects.toThrow('Resolve the event sync conflicts')
+    expect(cloud.rpc.mock.calls.some(([name]) => name === 'upsert_game_event_revisioned')).toBe(false)
+  })
   it('checks after an asynchronous binding validator before reading or writing more data', async () => {
     const validateBinding = vi.fn(async () => { await cloud.gate!.promise })
     const pending = syncBaseballEventGameToCloud({ state: fixture(), userId: 'recorder-a', localGameId: 'local-1', validateBinding,
