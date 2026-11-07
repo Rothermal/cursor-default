@@ -256,3 +256,47 @@ describe('Basketball full-court gesture wiring', () => {
     expect(capture).not.toHaveBeenCalled()
   })
 })
+
+describe('Basketball focused court direction', () => {
+  let root: Root
+  let container: HTMLDivElement
+  beforeEach(() => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    container.remove()
+    vi.unstubAllGlobals()
+  })
+  function render(focused: boolean, flipped = false, labels = { left: 'Eagles', right: 'Hawks' }) {
+    act(() => root.render(createElement(BasketballFullCourt, { shots: [], focused, flipped, labels })))
+  }
+  const shown = (side: string) => container.querySelector(`[data-court-direction] [data-direction="${side}"]`)
+
+  it('draws each team toward its basket on the focused court', () => {
+    render(true)
+    expect(shown('left')?.textContent).toBe('Eagles attacking the left basket← Eagles')
+    expect(shown('right')?.textContent).toBe('Hawks attacking the right basketHawks →')
+    expect(container.querySelector('.grid-cols-2')).toBeNull()
+  })
+  it('follows the flipped view and a switch of ends', () => {
+    render(true, true)
+    expect(shown('left')?.textContent).toContain('← Hawks')
+    expect(shown('right')?.textContent).toContain('Eagles →')
+    render(true, true, { left: 'Hawks', right: 'Eagles' })
+    expect(shown('left')?.textContent).toContain('← Eagles')
+    expect(shown('right')?.textContent).toContain('Hawks →')
+  })
+  it('keeps the card labels outside the focused court', () => {
+    render(false)
+    expect(container.querySelector('[data-court-direction]')).toBeNull()
+    expect(container.textContent).toContain('Eagles')
+  })
+  it('shortens long team names', () => {
+    render(true, false, { left: 'A very long school team name', right: 'Hawks' })
+    expect(shown('left')?.textContent).toContain('← A very long schoo…')
+  })
+})
