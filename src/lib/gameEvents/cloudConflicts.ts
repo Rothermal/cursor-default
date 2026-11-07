@@ -14,6 +14,8 @@ export interface SameRecorderMergeConflict {
   eventId: string
   localEvent: GameEvent
   remoteEvent: GameEvent
+  /** False when this device kept no confirmed sync base for the event. */
+  hasBase?: boolean
 }
 
 export interface SameRecorderMergeResult {
@@ -109,6 +111,7 @@ export function mergeSameRecorderEventStreams(
         eventId,
         localEvent: cloneEvent(localEvent),
         remoteEvent: cloneEvent(remoteEvent),
+        hasBase: previous !== undefined,
       })
     }
   }
@@ -136,15 +139,20 @@ export function normalizeStoredSyncFingerprint(fingerprint: string): string {
 }
 
 /**
- * True when a sole recorder's conflict can keep this device's copy without review: both copies
- * are the same event (only timestamp spelling differs), or this device's copy is a later
- * revision than the cloud's. One device only ever moves its own revisions forward, so a cloud
- * copy at the same or a later revision with different content came from another device signed
- * in to the same account, and still needs review.
+ * True when a sole recorder's conflict can keep this device's copy without review:
+ * - both copies are the same event (only timestamp spelling differs), or
+ * - this device kept no confirmed base for the event (an edit landed while it was uploading)
+ *   and holds the later revision, so the cloud copy is its own earlier upload.
+ * When both copies changed after a confirmed base, another device on the account made a
+ * competing edit, so the conflict still needs review.
  */
-export function canKeepLocalWithoutReview(localEvent: GameEvent, remoteEvent: GameEvent): boolean {
-  return gameEventSyncFingerprint(localEvent) === gameEventSyncFingerprint(remoteEvent) ||
-    localEvent.revision > remoteEvent.revision
+export function canKeepLocalWithoutReview(
+  localEvent: GameEvent,
+  remoteEvent: GameEvent,
+  hasBase: boolean
+): boolean {
+  if (gameEventSyncFingerprint(localEvent) === gameEventSyncFingerprint(remoteEvent)) return true
+  return !hasBase && localEvent.revision > remoteEvent.revision
 }
 
 /**

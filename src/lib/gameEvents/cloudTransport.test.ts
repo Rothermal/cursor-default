@@ -145,7 +145,8 @@ describe('event transport account lifetime', () => {
     ['another recorder\'s count is redacted', [{ recorder_user_id: 'recorder-b', event_count: null }], 2, 1],
     ['the cloud copy is a same-revision edit from another device', [], 1, 1],
     ['the cloud copy is a later revision from another device', [], 1, 2],
-  ])('still asks for review when %s', async (_label, others, localRevision, remoteRevision) => {
+    ['both devices edited after a confirmed base', [], 3, 2, true],
+  ])('still asks for review when %s', async (_label, others, localRevision, remoteRevision, confirmedBase = false) => {
     const state = fixture()
     const firstEvent = state.eventStream!.events[0]
     if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
@@ -158,6 +159,7 @@ describe('event transport account lifetime', () => {
     state.eventStream = { ...state.eventStream!, events: state.eventStream!.events.map(event =>
       isGameEventEnvelope(event) && event.id === firstEvent.id ? local : event) }
     state.cloudSync.gameId = 'cloud-1'
+    if (confirmedBase) state.cloudSync.eventSyncBase = { [firstEvent.id]: { revision: 1, fingerprint: 'confirmed' } }
     state.cloudSync.eventConflicts = [{
       conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
       localEvent: local,

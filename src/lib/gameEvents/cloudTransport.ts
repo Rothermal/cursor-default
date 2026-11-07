@@ -153,8 +153,9 @@ export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<S
   if (!supabase) throw new Error('Supabase client not configured')
   if ((input.state.cloudSync.eventConflicts?.length ?? 0) > 0) {
     const gameId = input.state.cloudSync.gameId
+    const storedBase = input.state.cloudSync.eventSyncBase ?? {}
     const keepable = (input.state.cloudSync.eventConflicts ?? []).every(conflict =>
-      canKeepLocalWithoutReview(conflict.localEvent, conflict.remoteEvent))
+      canKeepLocalWithoutReview(conflict.localEvent, conflict.remoteEvent, conflict.eventId in storedBase))
     const sole = gameId && keepable
       ? await isSoleEventRecorder(adapter.sportId, gameId, userId)
       : false
@@ -250,7 +251,7 @@ export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<S
     Object.keys(storedBase).length > 0 ? storedBase : fallbackBase
   )
   const keepable = merge.conflicts.filter(conflict =>
-    canKeepLocalWithoutReview(conflict.localEvent, conflict.remoteEvent))
+    canKeepLocalWithoutReview(conflict.localEvent, conflict.remoteEvent, conflict.hasBase !== false))
   if (keepable.length > 0) {
     const sole = await isSoleEventRecorder(adapter.sportId, binding.game_id, userId)
     assertCurrent?.()
