@@ -116,14 +116,14 @@ describe('event transport account lifetime', () => {
       expect(cloud.calls).toHaveLength(callCount)
     }
   )
-  it('keeps a sole recorder\'s stored conflicts on this device without review', async () => {
+  it('clears a stored timestamp-only conflict and uploads the current local event', async () => {
     const state = fixture()
-    const firstEvent = state.eventStream!.events[0]
+    const firstEvent = state.eventStream!.events.find(event => isGameEventEnvelope(event) && event.eventType.endsWith('pitch'))
     if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
-    const recorders = vi.fn(async () => ({ data: [{ recorder_user_id: 'recorder-a', event_count: 2 }], error: null }))
-    const rpc = cloud.rpc.getMockImplementation()!
-    cloud.rpc.mockImplementation((name: string, args: unknown) =>
-      name === 'get_baseball_game_recorders' ? recorders() : rpc(name, args))
+    // The conflict was saved with two spellings of revision 1; the device has edited since.
+    const current = { ...firstEvent, revision: 3, payload: { ...firstEvent.payload, result: 'called_strike' } }
+    state.eventStream = { ...state.eventStream!, events: state.eventStream!.events.map(event =>
+      isGameEventEnvelope(event) && event.id === firstEvent.id ? current : event) }
     state.cloudSync.gameId = 'cloud-1'
     state.cloudSync.eventConflicts = [{
       conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
@@ -131,44 +131,31 @@ describe('event transport account lifetime', () => {
       remoteEvent: { ...firstEvent, updatedAt: firstEvent.updatedAt.replace('Z', '+00:00') },
     }]
     const result = await syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' })
-    expect(recorders).toHaveBeenCalledOnce()
     expect(result.syncedState.cloudSync.eventConflicts).toEqual([])
     expect(cloud.rpc).toHaveBeenCalledWith('resolve_game_event_conflict', expect.objectContaining({
       p_conflict_id: 'conflict-1', p_resolution: 'local',
     }))
     const upload = cloud.rpc.mock.calls.find(([name, args]) =>
       name === 'upsert_game_event_revisioned' && (args as { p_id: string }).p_id === firstEvent.id)
-    expect((upload![1] as { p_revision: number }).p_revision).toBe(firstEvent.revision + 1)
+    expect(upload![1]).toMatchObject({ p_revision: 3, p_payload: expect.objectContaining({ result: 'called_strike' }) })
   })
-  it.each([
-    ['another recorder has events', [{ recorder_user_id: 'recorder-b', event_count: 4 }], 2, 1],
-    ['another recorder\'s count is redacted', [{ recorder_user_id: 'recorder-b', event_count: null }], 2, 1],
-    ['the cloud copy is a same-revision edit from another device', [], 1, 1],
-    ['the cloud copy is a later revision from another device', [], 1, 2],
-    ['both devices edited after a confirmed base', [], 3, 2, true],
-  ])('still asks for review when %s', async (_label, others, localRevision, remoteRevision, confirmedBase = false) => {
-    const state = fixture()
-    const firstEvent = state.eventStream!.events[0]
-    if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
-    const rpc = cloud.rpc.getMockImplementation()!
-    cloud.rpc.mockImplementation((name: string, args: unknown) =>
-      name === 'get_baseball_game_recorders'
-        ? Promise.resolve({ data: [{ recorder_user_id: 'recorder-a', event_count: null }, ...others], error: null })
-        : rpc(name, args))
-    const local = { ...firstEvent, revision: localRevision }
-    state.eventStream = { ...state.eventStream!, events: state.eventStream!.events.map(event =>
-      isGameEventEnvelope(event) && event.id === firstEvent.id ? local : event) }
-    state.cloudSync.gameId = 'cloud-1'
-    if (confirmedBase) state.cloudSync.eventSyncBase = { [firstEvent.id]: { revision: 1, fingerprint: 'confirmed' } }
-    state.cloudSync.eventConflicts = [{
-      conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
-      localEvent: local,
-      remoteEvent: { ...firstEvent, revision: remoteRevision, payload: { ...firstEvent.payload, other: 'device' } },
-    }]
-    await expect(syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' }))
-      .rejects.toThrow('Resolve the event sync conflicts')
-    expect(cloud.rpc.mock.calls.some(([name]) => name === 'upsert_game_event_revisioned')).toBe(false)
-  })
+  it.each([[1, 1], [3, 2], [1, 2]])(
+    'still asks for review of a stored conflict with different content (local r%i, cloud r%i)',
+    async (localRevision, remoteRevision) => {
+      const state = fixture()
+      const firstEvent = state.eventStream!.events[0]
+      if (!isGameEventEnvelope(firstEvent)) throw new Error('Missing fixture event')
+      state.cloudSync.gameId = 'cloud-1'
+      state.cloudSync.eventConflicts = [{
+        conflictId: 'conflict-1', eventId: firstEvent.id, detectedAt: '2026-10-18T12:00:03.000Z',
+        localEvent: { ...firstEvent, revision: localRevision },
+        remoteEvent: { ...firstEvent, revision: remoteRevision, payload: { ...firstEvent.payload, other: 'device' } },
+      }]
+      await expect(syncBaseballEventGameToCloud({ state, userId: 'recorder-a', localGameId: 'local-1' }))
+        .rejects.toThrow('Resolve the event sync conflicts')
+      expect(cloud.rpc.mock.calls.some(([name]) => name === 'upsert_game_event_revisioned')).toBe(false)
+    }
+  )
   it('checks after an asynchronous binding validator before reading or writing more data', async () => {
     const validateBinding = vi.fn(async () => { await cloud.gate!.promise })
     const pending = syncBaseballEventGameToCloud({ state: fixture(), userId: 'recorder-a', localGameId: 'local-1', validateBinding,

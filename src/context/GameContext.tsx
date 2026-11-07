@@ -59,6 +59,7 @@ import {
 import {
   eventConflictRecoveryFingerprint,
   resolveEventConflictInState,
+  settledEventSyncBase,
 } from '../lib/gameEvents/eventConflictResolution'
 import {
   deletedSourcePlayerRecoverySettlementPatch,
@@ -1057,9 +1058,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
 
         const syncedPayloadState = 'syncedState' in synced ? synced.syncedState : snapshot
-        const localUnchanged =
-          buildGameSyncFingerprint(latestState) === snapshotFingerprint &&
+        const recoveryUnchanged =
           eventConflictRecoveryFingerprint(latestState) === snapshotRecoveryFingerprint
+        const localUnchanged =
+          buildGameSyncFingerprint(latestState) === snapshotFingerprint && recoveryUnchanged
         const payloadState =
           'syncedState' in synced && localUnchanged ? synced.syncedState : latestState
         const cloudSyncPatch: Partial<CloudSyncState> = {
@@ -1086,9 +1088,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
             tournamentSyncWarning: synced.syncedState.cloudSync.tournamentSyncWarning ?? null,
           } : {}),
           lastSyncedGameFingerprint: buildGameSyncFingerprint(syncedPayloadState),
-          eventSyncBase: localUnchanged
-            ? syncedPayloadState.cloudSync.eventSyncBase ?? {}
-            : latestState.cloudSync.eventSyncBase ?? {},
+          eventSyncBase: settledEventSyncBase(
+            latestState,
+            'syncedState' in synced ? synced.syncedState : localUnchanged ? syncedPayloadState : null,
+            localUnchanged,
+            recoveryUnchanged
+          ),
           eventConflicts: localUnchanged
             ? syncedPayloadState.cloudSync.eventConflicts ?? []
             : latestState.cloudSync.eventConflicts ?? [],

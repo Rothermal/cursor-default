@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canKeepLocalWithoutReview,
   gameEventSyncFingerprint,
+  isTimestampOnlyConflict,
   mergeSameRecorderEventStreams,
-  preferLocalMergeConflicts,
 } from './cloudConflicts'
 import { canonicalGameEventStreamForFingerprint } from './stream'
+import { settledEventSyncBase } from './eventConflictResolution'
 import type { GameEvent, GameEventStream } from './types'
 
 function event(overrides: Partial<GameEvent> = {}): GameEvent {
@@ -70,37 +70,49 @@ describe('same-recorder merge', () => {
     expect(merge.eventStream.events[0]).toMatchObject({ revision: 2, payload: { note: 'edited elsewhere' } })
   })
 
-  it('keeps local without review only for the same event or its own unconfirmed upload', () => {
-    const base = event()
-    expect(canKeepLocalWithoutReview(base, event({ updatedAt: '2026-11-07T17:49:45.11+00:00' }), true)).toBe(true)
-    // No confirmed base: the cloud copy is this device's own earlier upload.
-    expect(canKeepLocalWithoutReview(event({ revision: 2, payload: { note: 'a' } }), base, false)).toBe(true)
-    expect(canKeepLocalWithoutReview(event({ payload: { note: 'a' } }), base, false)).toBe(false)
-    expect(canKeepLocalWithoutReview(base, event({ revision: 2, payload: { note: 'b' } }), false)).toBe(false)
-  })
-
-  it('reviews divergent edits from a shared base even when this device is further ahead', () => {
+  it('reviews divergent edits even when one device is further ahead', () => {
     const shared = event()
     const local = event({ revision: 3, payload: { periodId: 'regulation-4', moved: true } })
     const remote = event({ revision: 2, payload: { periodId: 'regulation-4', note: 'corrected' } })
-    const merge = mergeSameRecorderEventStreams(stream(local), stream(remote), {
-      [shared.id]: { revision: 1, fingerprint: gameEventSyncFingerprint(shared) },
-    })
-    expect(merge.conflicts).toHaveLength(1)
-    expect(merge.conflicts[0].hasBase).toBe(true)
-    expect(canKeepLocalWithoutReview(local, remote, true)).toBe(false)
+    for (const base of [{}, { [shared.id]: { revision: 1, fingerprint: gameEventSyncFingerprint(shared) } }]) {
+      expect(mergeSameRecorderEventStreams(stream(local), stream(remote), base).conflicts).toHaveLength(1)
+    }
   })
 
-  it('keeps the local event above both revisions for a sole recorder', () => {
-    const local = event({ revision: 2, payload: { periodId: 'regulation-4', note: 'local' } })
-    const remote = event({ revision: 3, payload: { periodId: 'regulation-4', note: 'remote' } })
-    const merge = mergeSameRecorderEventStreams(stream(local), stream(remote), {})
-    expect(merge.conflicts).toHaveLength(1)
-    const [kept] = preferLocalMergeConflicts(merge, '2026-11-07T18:00:00.000Z').events as GameEvent[]
-    expect(kept).toMatchObject({
-      revision: 4,
-      updatedAt: '2026-11-07T18:00:00.000Z',
-      payload: { note: 'local' },
+  it('recognizes a stored conflict that differs only in timestamp spelling', () => {
+    const local = event()
+    expect(isTimestampOnlyConflict({
+      localEvent: local,
+      remoteEvent: event({ updatedAt: '2026-11-07T17:49:45.11+00:00' }),
+    })).toBe(true)
+    expect(isTimestampOnlyConflict({
+      localEvent: local,
+      remoteEvent: event({ payload: { periodId: 'regulation-4', note: 'b' } }),
+    })).toBe(false)
+  })
+})
+
+describe('sync base after an upload', () => {
+  const withBase = (base: Record<string, { revision: number; fingerprint: string }>) =>
+    ({ cloudSync: { eventSyncBase: base } }) as never
+
+  it('keeps the uploaded copies as the base when the game changed mid-upload', () => {
+    const latest = withBase({ old: { revision: 1, fingerprint: 'old' } })
+    const synced = withBase({ old: { revision: 1, fingerprint: 'old' }, uploaded: { revision: 1, fingerprint: 'up' } })
+    expect(settledEventSyncBase(latest, synced, false, true)).toEqual({
+      old: { revision: 1, fingerprint: 'old' },
+      uploaded: { revision: 1, fingerprint: 'up' },
+    })
+  })
+
+  it('keeps the device base when a conflict was resolved mid-upload', () => {
+    const latest = withBase({ resolved: { revision: 2, fingerprint: 'remote' } })
+    const synced = withBase({ resolved: { revision: 1, fingerprint: 'local' } })
+    expect(settledEventSyncBase(latest, synced, false, false)).toEqual({
+      resolved: { revision: 2, fingerprint: 'remote' },
+    })
+    expect(settledEventSyncBase(latest, null, false, true)).toEqual({
+      resolved: { revision: 2, fingerprint: 'remote' },
     })
   })
 })

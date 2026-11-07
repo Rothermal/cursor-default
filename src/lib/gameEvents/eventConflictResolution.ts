@@ -1,4 +1,4 @@
-import type { GameState } from '../../types'
+import type { GameEventSyncBaseEntry, GameState } from '../../types'
 import {
   applyGameEventConflictResolution,
   gameEventSyncFingerprint,
@@ -30,6 +30,25 @@ export function eventConflictRecoveryFingerprint(state: GameState): string {
     ))
 
   return JSON.stringify({ eventSyncBase, eventConflicts, pending })
+}
+
+/**
+ * The sync base to keep after an upload. When the game changed during the upload, the uploaded
+ * copies are still the common version with the cloud, so they become the base for those events;
+ * otherwise an edit made mid-upload would look like a conflict with the device's own upload.
+ * A conflict resolved during the upload keeps the device's base, which the resolution set.
+ */
+export function settledEventSyncBase(
+  latestState: GameState,
+  syncedState: GameState | null,
+  localUnchanged: boolean,
+  recoveryUnchanged: boolean
+): Record<string, GameEventSyncBaseEntry> {
+  const latest = latestState.cloudSync.eventSyncBase ?? {}
+  if (!syncedState) return latest
+  const synced = syncedState.cloudSync.eventSyncBase ?? {}
+  if (localUnchanged) return synced
+  return recoveryUnchanged ? { ...latest, ...synced } : latest
 }
 
 export function resolveEventConflictInState(

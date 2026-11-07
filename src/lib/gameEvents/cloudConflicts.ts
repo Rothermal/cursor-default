@@ -14,8 +14,6 @@ export interface SameRecorderMergeConflict {
   eventId: string
   localEvent: GameEvent
   remoteEvent: GameEvent
-  /** False when this device kept no confirmed sync base for the event. */
-  hasBase?: boolean
 }
 
 export interface SameRecorderMergeResult {
@@ -111,7 +109,6 @@ export function mergeSameRecorderEventStreams(
         eventId,
         localEvent: cloneEvent(localEvent),
         remoteEvent: cloneEvent(remoteEvent),
-        hasBase: previous !== undefined,
       })
     }
   }
@@ -138,42 +135,11 @@ export function normalizeStoredSyncFingerprint(fingerprint: string): string {
   return gameEventSyncFingerprint(parsed)
 }
 
-/**
- * True when a sole recorder's conflict can keep this device's copy without review:
- * - both copies are the same event (only timestamp spelling differs), or
- * - this device kept no confirmed base for the event (an edit landed while it was uploading)
- *   and holds the later revision, so the cloud copy is its own earlier upload.
- * When both copies changed after a confirmed base, another device on the account made a
- * competing edit, so the conflict still needs review.
- */
-export function canKeepLocalWithoutReview(
-  localEvent: GameEvent,
-  remoteEvent: GameEvent,
-  hasBase: boolean
+/** True when a stored conflict's two copies are the same event in different timestamp spellings. */
+export function isTimestampOnlyConflict(
+  conflict: Pick<GameEventSyncConflict, 'localEvent' | 'remoteEvent'>
 ): boolean {
-  if (gameEventSyncFingerprint(localEvent) === gameEventSyncFingerprint(remoteEvent)) return true
-  return !hasBase && localEvent.revision > remoteEvent.revision
-}
-
-/**
- * A sole recorder's device is the source of truth: each competing revision keeps the local
- * event, re-issued one revision above both copies so the cloud accepts it. No review needed.
- */
-export function preferLocalMergeConflicts(
-  merge: SameRecorderMergeResult,
-  now: string
-): GameEventStream {
-  const winners = new Map(merge.conflicts.map(conflict => [conflict.eventId, {
-    ...cloneEvent(conflict.localEvent),
-    revision: Math.max(conflict.localEvent.revision, conflict.remoteEvent.revision) + 1,
-    updatedAt: now,
-  }]))
-  return {
-    ...merge.eventStream,
-    events: merge.eventStream.events.map(rawEvent =>
-      isGameEventEnvelope(rawEvent) ? winners.get(rawEvent.id) ?? rawEvent : rawEvent
-    ),
-  }
+  return gameEventSyncFingerprint(conflict.localEvent) === gameEventSyncFingerprint(conflict.remoteEvent)
 }
 
 export function applyGameEventConflictResolution(

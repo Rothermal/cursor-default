@@ -727,7 +727,7 @@ export function listDirtyParkedGameRecords(
       // A final Baseball binding retains unsynced debt, but cannot upload until reopened.
       if (isHeldBaseballFinal(record.gameState)) return false
       if (eventCloudPolicyForState(record.gameState) === 'local_only') return false
-      // One retry lets a sole recorder's conflicts resolve to this device; after that, the
+      // One retry clears conflicts that differ only in timestamp spelling; after that, the
       // conflicts wait for review.
       if (
         (record.gameState.cloudSync.eventConflicts?.length ?? 0) > 0 &&
