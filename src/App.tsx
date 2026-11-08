@@ -11,50 +11,54 @@ import { isLegacyBaseballGame } from './lib/baseball/releasePolicy'
 import { isLegacyGameForSport } from './lib/legacyGameRetirement'
 import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
-import SportSelect from './pages/SportSelect'
-import SportDashboard from './pages/SportDashboard'
-import GameSetup from './pages/GameSetup'
-import PlayerSetup from './pages/PlayerSetup'
-import GameTracker from './pages/GameTracker'
-import GameCheckout from './pages/GameCheckout'
-import GameSummary from './pages/GameSummary'
-import Admin from './pages/Admin'
-import TeamsList from './pages/TeamsList'
-import TeamManage from './pages/TeamManage'
-import TeamInfo from './pages/TeamInfo'
-import TeamRoster from './pages/TeamRoster'
-import TeamSchedule from './pages/TeamSchedule'
-import SeasonInfo from './pages/SeasonInfo'
-import GameInfo from './pages/GameInfo'
-import Games from './pages/Games'
-import Leaderboard from './pages/Leaderboard'
-import PlayerProfile from './pages/PlayerProfile'
-import CareerStats from './pages/CareerStats'
-import TeamStats from './pages/TeamStats'
-import TournamentStats from './pages/TournamentStats'
-import ShotChart from './pages/ShotChart'
 import ShotChartPreview from './pages/ShotChartPreview'
-import TeamInvite from './pages/TeamInvite'
 import AppAccessGate from './pages/AppAccessGate'
 import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
-import SoccerGameSetup from './pages/SoccerGameSetup'
-import SoccerPlayerSetup from './pages/SoccerPlayerSetup'
-import SoccerGameTracker from './pages/SoccerGameTracker'
-import SoccerCloudReview from './pages/SoccerCloudReview'
-import SoccerSummary from './pages/SoccerSummary'
 import { isSoccerSummaryRoute } from './lib/soccer/summary'
-import BasketballSummary from './pages/BasketballSummary'
 import { isBasketballSummaryRoute } from './lib/basketball/summary'
-import BaseballSummary from './pages/BaseballSummary'
-import BaseballCloudSummaryRoute from './pages/BaseballCloudSummaryRoute'
-import HockeySummary from './pages/HockeySummary'
 import { isBaseballSummaryRoute } from './lib/baseball/summary'
 import { isHockeySummaryRoute } from './lib/hockey/summary'
 import PwaStatus from './components/PwaStatus'
-import HockeyGameSetup from './pages/HockeyGameSetup'
-import HockeyGameTracker from './pages/HockeyGameTracker'
-import BaseballEventSetup from './pages/BaseballEventSetup'
-import BaseballGameTracker from './pages/BaseballGameTracker'
+import RouteChunkBoundary from './components/RouteChunkBoundary'
+
+// Route-level code splitting (RTN-0): each page is its own precached chunk so
+// no single asset approaches the PWA precache limit.
+const SportSelect = lazy(() => import('./pages/SportSelect'))
+const SportDashboard = lazy(() => import('./pages/SportDashboard'))
+const GameSetup = lazy(() => import('./pages/GameSetup'))
+const PlayerSetup = lazy(() => import('./pages/PlayerSetup'))
+const GameTracker = lazy(() => import('./pages/GameTracker'))
+const GameCheckout = lazy(() => import('./pages/GameCheckout'))
+const GameSummary = lazy(() => import('./pages/GameSummary'))
+const Admin = lazy(() => import('./pages/Admin'))
+const TeamsList = lazy(() => import('./pages/TeamsList'))
+const TeamManage = lazy(() => import('./pages/TeamManage'))
+const TeamInfo = lazy(() => import('./pages/TeamInfo'))
+const TeamRoster = lazy(() => import('./pages/TeamRoster'))
+const TeamSchedule = lazy(() => import('./pages/TeamSchedule'))
+const SeasonInfo = lazy(() => import('./pages/SeasonInfo'))
+const GameInfo = lazy(() => import('./pages/GameInfo'))
+const Games = lazy(() => import('./pages/Games'))
+const Leaderboard = lazy(() => import('./pages/Leaderboard'))
+const PlayerProfile = lazy(() => import('./pages/PlayerProfile'))
+const CareerStats = lazy(() => import('./pages/CareerStats'))
+const TeamStats = lazy(() => import('./pages/TeamStats'))
+const TournamentStats = lazy(() => import('./pages/TournamentStats'))
+const ShotChart = lazy(() => import('./pages/ShotChart'))
+const TeamInvite = lazy(() => import('./pages/TeamInvite'))
+const SoccerGameSetup = lazy(() => import('./pages/SoccerGameSetup'))
+const SoccerPlayerSetup = lazy(() => import('./pages/SoccerPlayerSetup'))
+const SoccerGameTracker = lazy(() => import('./pages/SoccerGameTracker'))
+const SoccerCloudReview = lazy(() => import('./pages/SoccerCloudReview'))
+const SoccerSummary = lazy(() => import('./pages/SoccerSummary'))
+const BasketballSummary = lazy(() => import('./pages/BasketballSummary'))
+const BaseballSummary = lazy(() => import('./pages/BaseballSummary'))
+const BaseballCloudSummaryRoute = lazy(() => import('./pages/BaseballCloudSummaryRoute'))
+const HockeySummary = lazy(() => import('./pages/HockeySummary'))
+const HockeyGameSetup = lazy(() => import('./pages/HockeyGameSetup'))
+const HockeyGameTracker = lazy(() => import('./pages/HockeyGameTracker'))
+const BaseballEventSetup = lazy(() => import('./pages/BaseballEventSetup'))
+const BaseballGameTracker = lazy(() => import('./pages/BaseballGameTracker'))
 const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/AppearancePreview')) : null
 
 function GameSetupRoute() {
@@ -211,10 +215,12 @@ function AppRoutes() {
 
   if (isConfigured && !user) {
     return (
-      <Routes>
-        <Route path="/invite/:token" element={<TeamInvite />} />
-        <Route path="*" element={<Auth />} />
-      </Routes>
+      <RouteChunkBoundary>
+        <Routes>
+          <Route path="/invite/:token" element={<TeamInvite />} />
+          <Route path="*" element={<Auth />} />
+        </Routes>
+      </RouteChunkBoundary>
     )
   }
 
@@ -244,6 +250,7 @@ function AppRoutes() {
       <GameProvider>
         <PwaStatus />
         <AppShell>
+          <RouteChunkBoundary>
           <Routes>
             <Route path="/" element={<SportSelect />} />
             <Route path="/sports" element={<SportSelect />} />
@@ -282,6 +289,7 @@ function AppRoutes() {
               <Route path="/dev/shot-chart" element={<ShotChartPreview />} />
             )}
           </Routes>
+          </RouteChunkBoundary>
         </AppShell>
       </GameProvider>
     </SettingsProvider>
