@@ -1,4 +1,4 @@
-import type { GameState } from '../../types'
+import type { GameEventSyncBaseEntry, GameState } from '../../types'
 import {
   applyGameEventConflictResolution,
   gameEventSyncFingerprint,
@@ -30,6 +30,40 @@ export function eventConflictRecoveryFingerprint(state: GameState): string {
     ))
 
   return JSON.stringify({ eventSyncBase, eventConflicts, pending })
+}
+
+/**
+ * The sync base to keep after an upload.
+ * - Nothing changed during the upload: the synced base, as before.
+ * - The game changed during the upload: for each event this device uploaded from its own copy
+ *   (the snapshot's event matches the synced copy), the uploaded copy is now the common version
+ *   with the cloud, so it becomes the base. Otherwise an edit made mid-upload would look like a
+ *   conflict with the device's own upload. Events the merge took from the cloud keep the old
+ *   base, because the device kept its old copy and must pull the cloud's copy again next sync.
+ * - A conflict was resolved during the upload: the device's base, which the resolution set.
+ */
+export function settledEventSyncBase(input: {
+  latestState: GameState
+  snapshotState: GameState
+  syncedState: GameState | null
+  localUnchanged: boolean
+  recoveryUnchanged: boolean
+}): Record<string, GameEventSyncBaseEntry> {
+  const { latestState, snapshotState, syncedState, localUnchanged, recoveryUnchanged } = input
+  const latest = latestState.cloudSync.eventSyncBase ?? {}
+  if (!syncedState) return latest
+  const synced = syncedState.cloudSync.eventSyncBase ?? {}
+  if (localUnchanged) return synced
+  if (!recoveryUnchanged) return latest
+  const uploaded: Record<string, GameEventSyncBaseEntry> = {}
+  for (const rawEvent of snapshotState.eventStream?.events ?? []) {
+    if (!isGameEventEnvelope(rawEvent)) continue
+    const entry = synced[rawEvent.id]
+    if (entry && entry.fingerprint === gameEventSyncFingerprint(rawEvent)) {
+      uploaded[rawEvent.id] = entry
+    }
+  }
+  return { ...latest, ...uploaded }
 }
 
 export function resolveEventConflictInState(
