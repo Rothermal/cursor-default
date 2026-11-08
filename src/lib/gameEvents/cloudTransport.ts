@@ -396,25 +396,29 @@ export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<S
 /**
  * Drops stored conflicts whose two copies are the same event, and queues their server rows
  * to close. The current local event stays as it is; the cloud copy becomes its sync base, so a
- * later local edit still uploads and an unchanged event stays put.
+ * later local edit still uploads and an unchanged event stays put. A base confirmed by a later
+ * upload is kept: the conflict's copy is older than it.
  */
-function clearTimestampOnlyConflicts(state: GameState): GameState {
+export function clearTimestampOnlyConflicts(state: GameState): GameState {
   const conflicts = state.cloudSync.eventConflicts ?? []
   const cleared = conflicts.filter(isTimestampOnlyConflict)
   if (cleared.length === 0) return state
   const remaining = conflicts.filter(conflict => !cleared.includes(conflict))
   const clearedIds = new Set(cleared.map(conflict => conflict.conflictId))
+  const base = { ...(state.cloudSync.eventSyncBase ?? {}) }
+  for (const conflict of cleared) {
+    const confirmed = base[conflict.eventId]
+    if (confirmed && confirmed.revision >= conflict.remoteEvent.revision) continue
+    base[conflict.eventId] = {
+      revision: conflict.remoteEvent.revision,
+      fingerprint: gameEventSyncFingerprint(conflict.remoteEvent),
+    }
+  }
   return {
     ...state,
     cloudSync: {
       ...state.cloudSync,
-      eventSyncBase: {
-        ...(state.cloudSync.eventSyncBase ?? {}),
-        ...Object.fromEntries(cleared.map(conflict => [conflict.eventId, {
-          revision: conflict.remoteEvent.revision,
-          fingerprint: gameEventSyncFingerprint(conflict.remoteEvent),
-        }])),
-      },
+      eventSyncBase: base,
       eventConflicts: remaining,
       pendingEventConflictResolutions: [
         ...(state.cloudSync.pendingEventConflictResolutions ?? []).filter(

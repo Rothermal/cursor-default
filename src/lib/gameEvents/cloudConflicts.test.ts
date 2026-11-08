@@ -7,6 +7,7 @@ import {
   mergeSameRecorderEventStreams,
 } from './cloudConflicts'
 import { canonicalGameEventStreamForFingerprint } from './stream'
+import { clearTimestampOnlyConflicts } from './cloudTransport'
 import { settledEventSyncBase } from './eventConflictResolution'
 import type { GameEvent, GameEventStream } from './types'
 
@@ -134,5 +135,32 @@ describe('sync base after an upload', () => {
         localUnchanged: false, recoveryUnchanged: syncedState === null,
       })).toEqual({ [y1.id]: { revision: 2, fingerprint: 'remote' } })
     }
+  })
+})
+
+describe('leftover timestamp-only conflict after an overlapping upload', () => {
+  it('keeps the newer confirmed base, so the next edit syncs without conflict', () => {
+    const r1 = event()
+    const r3 = event({ revision: 3, updatedAt: '2026-11-07T18:00:00.000Z', payload: { periodId: 'regulation-4', note: 'r3' } })
+    const r4 = event({ revision: 4, updatedAt: '2026-11-07T18:01:00.000Z', payload: { periodId: 'regulation-4', note: 'r4' } })
+    // The sync that cleared the conflict uploaded r3; the edit to r4 overlapped it, so the
+    // stored conflict survived while r3 became the confirmed base.
+    const state = {
+      eventStream: stream(r4),
+      cloudSync: {
+        eventSyncBase: gameEventSyncBase(stream(r3)),
+        eventConflicts: [{
+          conflictId: 'conflict-1', eventId: r1.id, detectedAt: '2026-11-07T17:49:54.000Z',
+          localEvent: r1, remoteEvent: event({ updatedAt: '2026-11-07T17:49:45.11+00:00' }),
+        }],
+        pendingEventConflictResolutions: [],
+      },
+    } as unknown as GameState
+    const cleared = clearTimestampOnlyConflicts(state)
+    expect(cleared.cloudSync.eventConflicts).toEqual([])
+    expect(cleared.cloudSync.eventSyncBase![r1.id].revision).toBe(3)
+    const merge = mergeSameRecorderEventStreams(stream(r4), stream(r3), cleared.cloudSync.eventSyncBase!)
+    expect(merge.conflicts).toEqual([])
+    expect(merge.eventStream.events[0]).toMatchObject({ revision: 4 })
   })
 })
