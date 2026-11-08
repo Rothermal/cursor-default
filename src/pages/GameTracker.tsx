@@ -48,6 +48,7 @@ import BasketballRecorderStatus from '../components/basketball/BasketballRecorde
 import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
 import BasketballClockStrip from '../components/basketball/BasketballClockStrip'
 import BasketballWorkspaceRoster from '../components/basketball/BasketballWorkspaceRoster'
+import { BasketballParticipantEditButton, BasketballRosterRefreshButton } from '../components/basketball/BasketballRosterTools'
 import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
@@ -1394,6 +1395,9 @@ export default function GameTracker() {
               window.requestAnimationFrame(() => document.getElementById('basketball-player-detail-title')?.focus())
             }} onManage={launcher => setRequestedLineup({ side: workspaceSide, launcher })}
             onAdd={launcher => { setLateParticipantReturnSide(workspaceSide); setLateParticipantReturnLauncher(launcher); setShowAddPlayer(true) }}
+            actions={isBasketballEventMode && workspaceSide === 'tracked'
+              ? <BasketballRosterRefreshButton state={state} teamName={trackedTeamLabel} onState={next => { setLifecycleError(null); dispatch({ type: 'HYDRATE_STATE', state: next }) }} />
+              : undefined}
           />}
           {basketballWorkspace === 'lineup' && detailPlayerId && (
             <div className="py-3">
@@ -1407,6 +1411,7 @@ export default function GameTracker() {
               <h2 id="basketball-player-detail-title" tabIndex={-1} className="break-words text-lg font-bold text-content">#{activePlayer.number || '?'} {activePlayer.name}</h2>
               <p className="text-sm text-content-muted">{formatCompactGameStatLine(sport, activePlayer.stats)}</p>
               {unavailableMessage && <p className="mt-2 text-sm text-warning-content">{unavailableMessage}</p>}
+              {isBasketballEventMode && <BasketballParticipantEditButton state={state} playerId={detailPlayerId} onState={next => { setLifecycleError(null); dispatch({ type: 'HYDRATE_STATE', state: next }) }} />}
             </div>
           )}
         </div>

@@ -3,11 +3,13 @@ import type { GameEvent, GameEventPeriod, JsonObject } from '../gameEvents/types
 import type { GameEventDefinition } from '../gameEvents/registry'
 import { createBasketballUuid } from './id'
 import { isBasketballMatchParticipant } from './state'
+import { BASKETBALL_POSITION_MAX_LENGTH } from './positions'
 import type {
   BasketballLifecycleEvent,
   BasketballMatchEndedPayload,
   BasketballMatchReopenedPayload,
   BasketballMatchRosterAddedPayload,
+  BasketballParticipantDetailsUpdatedPayload,
   BasketballParticipantResolvedPayload,
   BasketballPeriodPayload,
 } from './types'
@@ -23,6 +25,7 @@ export type BasketballLifecyclePayloadByType = {
   'basketball.period_ended': BasketballPeriodPayload
   'basketball.match_roster_added': BasketballMatchRosterAddedPayload
   'basketball.participant_resolved': BasketballParticipantResolvedPayload
+  'basketball.participant_details_updated': BasketballParticipantDetailsUpdatedPayload
   'basketball.match_ended': BasketballMatchEndedPayload
   'basketball.match_reopened': BasketballMatchReopenedPayload
 }
@@ -71,6 +74,7 @@ export const basketballLifecycleEventDefinitions: GameEventDefinition<GameEvent>
   lifecycleDefinition('basketball.period_ended', validatePeriodPayload),
   lifecycleDefinition('basketball.match_roster_added', validateRosterAddedPayload),
   lifecycleDefinition('basketball.participant_resolved', validateParticipantResolvedPayload),
+  lifecycleDefinition('basketball.participant_details_updated', validateParticipantDetailsUpdatedPayload),
   lifecycleDefinition('basketball.match_ended', validateMatchEndedPayload),
   lifecycleDefinition('basketball.match_reopened', validateMatchReopenedPayload),
 ]
@@ -121,6 +125,7 @@ function validateRosterAddedPayload(payload: JsonObject): boolean {
     isBasketballMatchParticipant(payload.participant) &&
     (payload.destination === 'bench' || payload.destination === 'dnp') &&
     payload.participant.initialStatus === payload.destination &&
+    (payload.fromRoster === undefined || payload.fromRoster === true) &&
     validCaptureCommandId(payload.captureCommandId)
 }
 
@@ -131,6 +136,20 @@ function validateParticipantResolvedPayload(payload: JsonObject): boolean {
     isNonEmptyString(payload.displayName) &&
     (payload.number === null || typeof payload.number === 'string') &&
     validCaptureCommandId(payload.captureCommandId)
+}
+
+function validateParticipantDetailsUpdatedPayload(payload: JsonObject): boolean {
+  return isPlainObject(payload) &&
+    isNonEmptyString(payload.participantId) &&
+    isOptionalTrimmedLabel(payload.number, BASKETBALL_POSITION_MAX_LENGTH) &&
+    isOptionalTrimmedLabel(payload.position, BASKETBALL_POSITION_MAX_LENGTH) &&
+    (payload.source === 'roster_refresh' || payload.source === 'manual') &&
+    validCaptureCommandId(payload.captureCommandId)
+}
+
+function isOptionalTrimmedLabel(value: unknown, maxLength: number): boolean {
+  return value === null ||
+    (typeof value === 'string' && value.length > 0 && value === value.trim() && value.length <= maxLength)
 }
 
 function validateMatchEndedPayload(payload: JsonObject): boolean {

@@ -470,7 +470,7 @@ function buildCaptureUnit(
     captureCommandId,
     eventIds: events.map(event => event.id),
     events,
-    who: captureUnitActorLabel(state.players, primary),
+    who: captureUnitActorLabel(state, primary),
     what: captureUnitLabel(state, events, shot),
     containsLocatedFieldGoal: Boolean(shot),
     kind: boundary ? 'boundary' : 'capture',
@@ -478,9 +478,16 @@ function buildCaptureUnit(
   }
 }
 
-function captureUnitActorLabel(players: Player[], event: BasketballMatchEvent): string {
+function captureUnitActorLabel(state: GameState, event: BasketballMatchEvent): string {
+  const players = state.players
   if (event.eventType === 'basketball.match_roster_added') {
     return event.payload.participant.displayName
+  }
+  if (event.eventType === 'basketball.participant_details_updated') {
+    const participant = state.sportGameState?.sportId === 'basketball'
+      ? state.sportGameState.projection.participants[event.payload.participantId]
+      : undefined
+    return participant?.displayName ?? 'Roster'
   }
   if (
     event.eventType === 'basketball.period_started' ||
@@ -536,6 +543,12 @@ function captureUnitLabel(
         ? state.gameInfo?.teamName || 'tracked team'
         : state.gameInfo?.opponentName || 'opponent'} roster`
     case 'basketball.participant_resolved': return 'Participant identity updated'
+    case 'basketball.participant_details_updated': {
+      const payload = events[0].payload
+      const count = events.length
+      if (count > 1) return `Roster refresh: ${count} players updated`
+      return `Now ${payload.number ? `#${payload.number}` : 'no number'}, ${payload.position ?? 'no position'}`
+    }
     case 'basketball.match_ended': {
       const reason = events[0].payload.reason
       return reason === 'completed'
