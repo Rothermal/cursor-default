@@ -21,10 +21,32 @@ export interface SameRecorderMergeResult {
   conflicts: SameRecorderMergeConflict[]
 }
 
+/** Sync stops on this until someone reviews the conflicts; background retries skip it. */
+export const EVENT_CONFLICT_REVIEW_REQUIRED = 'Resolve the event sync conflicts before retrying cloud sync.'
+
 export type RemoteConflictRevisionPolicy = 'preserve' | 'advance'
 
+const SYNC_TIMESTAMP_FIELDS = ['occurredAt', 'createdAt', 'updatedAt', 'deletedAt'] as const
+
+/**
+ * The cloud returns timestamps as `+00:00` with trimmed milliseconds, the device writes `Z`.
+ * Both name the same instant, so the merge compares instants, not spellings.
+ */
+function normalizeSyncTimestamp(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : value
+}
+
 export function gameEventSyncFingerprint(event: GameEvent): string {
-  const canonical = canonicalGameEventStreamForFingerprint({ version: 1, events: [event] })
+  const normalized: Record<string, unknown> = { ...event }
+  for (const field of SYNC_TIMESTAMP_FIELDS) {
+    if (field in normalized) normalized[field] = normalizeSyncTimestamp(normalized[field])
+  }
+  const canonical = canonicalGameEventStreamForFingerprint({
+    version: 1,
+    events: [normalized as unknown as GameEvent],
+  })
   return JSON.stringify(canonical?.events[0] ?? null)
 }
 
@@ -74,8 +96,9 @@ export function mergeSameRecorderEventStreams(
     }
 
     const previous = base[eventId]
-    const localMatchesBase = previous?.fingerprint === localFingerprint
-    const remoteMatchesBase = previous?.fingerprint === remoteFingerprint
+    const baseFingerprint = previous ? normalizeStoredSyncFingerprint(previous.fingerprint) : undefined
+    const localMatchesBase = baseFingerprint === localFingerprint
+    const remoteMatchesBase = baseFingerprint === remoteFingerprint
     if (localMatchesBase && !remoteMatchesBase) {
       merged.push(cloneEvent(remoteEvent))
     } else if (remoteMatchesBase && !localMatchesBase) {
@@ -95,6 +118,28 @@ export function mergeSameRecorderEventStreams(
     eventStream: { version: localStream.version, events: merged },
     conflicts,
   }
+}
+
+/**
+ * Sync bases saved before timestamps were normalized keep the cloud's `+00:00` spelling.
+ * Re-reads one under the current rules so an unchanged event still matches its base.
+ */
+export function normalizeStoredSyncFingerprint(fingerprint: string): string {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(fingerprint)
+  } catch {
+    return fingerprint
+  }
+  if (!isGameEventEnvelope(parsed)) return fingerprint
+  return gameEventSyncFingerprint(parsed)
+}
+
+/** True when a stored conflict's two copies are the same event in different timestamp spellings. */
+export function isTimestampOnlyConflict(
+  conflict: Pick<GameEventSyncConflict, 'localEvent' | 'remoteEvent'>
+): boolean {
+  return gameEventSyncFingerprint(conflict.localEvent) === gameEventSyncFingerprint(conflict.remoteEvent)
 }
 
 export function applyGameEventConflictResolution(

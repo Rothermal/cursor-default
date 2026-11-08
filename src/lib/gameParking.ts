@@ -12,6 +12,7 @@ import {
   PENDING_SYNC_KEY,
 } from './gameStorageKeys'
 import { normalizeGameEventStream } from './gameEvents/stream'
+import { EVENT_CONFLICT_REVIEW_REQUIRED } from './gameEvents/cloudConflicts'
 import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
 import { BASEBALL_NEW_GAME_CREATION_ENABLED, isLegacyBaseballGame } from './baseball/releasePolicy'
@@ -726,7 +727,12 @@ export function listDirtyParkedGameRecords(
       // A final Baseball binding retains unsynced debt, but cannot upload until reopened.
       if (isHeldBaseballFinal(record.gameState)) return false
       if (eventCloudPolicyForState(record.gameState) === 'local_only') return false
-      if ((record.gameState.cloudSync.eventConflicts?.length ?? 0) > 0) return false
+      // One retry clears conflicts that differ only in timestamp spelling; after that, the
+      // conflicts wait for review.
+      if (
+        (record.gameState.cloudSync.eventConflicts?.length ?? 0) > 0 &&
+        record.sync.lastError === EVENT_CONFLICT_REVIEW_REQUIRED
+      ) return false
       if (!record.sync.nextAttemptAt) return true
       const nextMs = Date.parse(record.sync.nextAttemptAt)
       return Number.isNaN(nextMs) || nextMs <= nowMs
