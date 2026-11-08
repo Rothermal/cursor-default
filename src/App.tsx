@@ -46,6 +46,7 @@ const TeamStats = lazy(() => import('./pages/TeamStats'))
 const TournamentStats = lazy(() => import('./pages/TournamentStats'))
 const ShotChart = lazy(() => import('./pages/ShotChart'))
 const TeamInvite = lazy(() => import('./pages/TeamInvite'))
+const SavedOpponents = lazy(() => import('./pages/SavedOpponents'))
 const SoccerGameSetup = lazy(() => import('./pages/SoccerGameSetup'))
 const SoccerPlayerSetup = lazy(() => import('./pages/SoccerPlayerSetup'))
 const SoccerGameTracker = lazy(() => import('./pages/SoccerGameTracker'))
@@ -278,6 +279,7 @@ function AppRoutes() {
             <Route path="/team/season" element={<SeasonInfo />} />
             <Route path="/game-info" element={<GameInfo />} />
             <Route path="/games" element={<Games />} />
+            <Route path="/opponents" element={<SavedOpponents />} />
             <Route path="/soccer/review" element={<SoccerCloudReview />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/player" element={<PlayerProfile />} />

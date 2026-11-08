@@ -22,6 +22,10 @@ export function sportGamesPath(sportId: string): string {
   return `/games?sport=${encodeURIComponent(sportId)}`
 }
 
+export function sportOpponentsPath(sportId: string): string {
+  return `/opponents?sport=${encodeURIComponent(sportId)}`
+}
+
 export function sportLeaderboardPath(sportId: string): string {
   return `/leaderboard?sport=${encodeURIComponent(sportId)}`
 }

@@ -4,6 +4,9 @@ import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
 import { useSettings } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
+import OpponentPicker from '../components/opponents/OpponentPicker'
+import { useSavedOpponents } from '../hooks/useSavedOpponents'
+import { createOpponentTeam, normalizeOpponentLabel, opponentSaveCandidate, updateOpponentTeam } from '../lib/opponentTeams'
 import { supabase } from '../lib/supabase'
 import { gameSetupPath, teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
@@ -132,6 +135,8 @@ export default function GameSetup() {
   const isBasketballSetup = sport?.id === 'basketball'
   const sportHomePath = sport ? sportDashboardPath(sport.id) : '/'
   const isCloudFlow = Boolean(isConfigured && user && supabase)
+  const [saveOpponent, setSaveOpponent] = useState(true)
+  const [saveTeamNickname, setSaveTeamNickname] = useState(false)
   const basketballAuthority = 'sport_events' as const
   const [basketballDisplayFlipped, setBasketballDisplayFlipped] = useState(
     matchingInitialBasketballDraft?.display.defaultCourtFlipped ??
@@ -523,6 +528,36 @@ export default function GameSetup() {
     [teams, selectedTeamId]
   )
   const mayManageSelectedTeam = canManageTeam(selectedTeam?.accessRole ?? null)
+  const savedOpponents = useSavedOpponents(sport?.id ?? null, isCloudFlow)
+  const teamNicknameDiffers = teamMode === 'existing' && selectedTeam !== null &&
+    normalizeOpponentLabel(teamNickname) !== normalizeOpponentLabel(selectedTeam.nickname)
+  const offerTeamNicknameSave = isCloudFlow && mayManageSelectedTeam && teamNicknameDiffers
+
+  /** RTN-1: best-effort label saves after setup commits; never blocks the game. */
+  const persistSetupLabels = () => {
+    const client = supabase
+    if (!client || !isCloudFlow || !sport) return
+    const candidate = opponentSaveCandidate(savedOpponents.opponents, opponentName, opponentNickname)
+    if (saveOpponent && candidate) {
+      const nickname = normalizeOpponentLabel(opponentNickname)
+      const write = candidate.kind === 'new'
+        ? createOpponentTeam(client, sport.id, opponentName, nickname)
+        : updateOpponentTeam(client, candidate.opponent.id, candidate.opponent.name, nickname)
+      void write.catch((error: unknown) => {
+        console.warn('[StatKeeper] Saved opponent could not be stored', error instanceof Error ? error.message : error)
+      })
+    }
+    if (saveTeamNickname && offerTeamNicknameSave && selectedTeam) {
+      void client
+        .from('teams')
+        .update({ nickname: normalizeOpponentLabel(teamNickname) })
+        .eq('id', selectedTeam.id)
+        .then(({ error }) => {
+          if (error) console.warn('[StatKeeper] Team nickname could not be saved', error.message)
+          else setTeams(prev => prev.map(team => team.id === selectedTeam.id ? { ...team, nickname: normalizeOpponentLabel(teamNickname) } : team))
+        })
+    }
+  }
   const selectedNewTeamSeasonRow = useMemo(
     () => seasonsForNewTeam.find(s => s.id === selectedNewTeamSeasonId) ?? null,
     [seasonsForNewTeam, selectedNewTeamSeasonId]
@@ -1225,6 +1260,7 @@ export default function GameSetup() {
         setSetupError(saved.error)
         return
       }
+      persistSetupLabels()
       navigate('/players')
       return
     }
@@ -1250,6 +1286,7 @@ export default function GameSetup() {
         date,
       },
     })
+    persistSetupLabels()
     navigate('/players')
   }
 
@@ -1509,6 +1546,16 @@ export default function GameSetup() {
               maxLength={100}
               className="input-field"
             />
+            {offerTeamNicknameSave && (
+              <label className="mt-2 flex items-center gap-2 text-sm text-content-muted">
+                <input
+                  type="checkbox"
+                  checked={saveTeamNickname}
+                  onChange={e => setSaveTeamNickname(e.target.checked)}
+                />
+                Save as the team's nickname
+              </label>
+            )}
           </div>
 
           {isBasketballSetup && staleLegacyDraft && <section role="alert" className="space-y-3 border-y border-warning-line bg-warning px-3 py-3 text-sm text-warning-content">
@@ -1588,32 +1635,16 @@ export default function GameSetup() {
             </p>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-content-muted mb-1">
-              Opponent *
-            </label>
-            <input
-              type="text"
-              value={opponentName}
-              onChange={e => setOpponentName(e.target.value)}
-              placeholder="e.g., Tigers"
-              className="input-field"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-content-muted mb-1">
-              Opponent Nickname
-            </label>
-            <input
-              type="text"
-              value={opponentNickname}
-              onChange={e => setOpponentNickname(e.target.value)}
-              placeholder="Optional short label"
-              maxLength={100}
-              className="input-field"
-            />
-          </div>
+          <OpponentPicker
+            name={opponentName}
+            nickname={opponentNickname}
+            onNameChange={setOpponentName}
+            onNicknameChange={setOpponentNickname}
+            opponents={savedOpponents.opponents}
+            savedAvailable={isCloudFlow && !savedOpponents.error}
+            saveOpponent={saveOpponent}
+            onSaveOpponentChange={setSaveOpponent}
+          />
 
           <div>
             <label className="block text-sm font-medium text-content-muted mb-1">
