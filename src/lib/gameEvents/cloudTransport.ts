@@ -11,7 +11,10 @@ import {
   upsertGameEventForRecorder,
 } from './cloud'
 import {
+  EVENT_CONFLICT_REVIEW_REQUIRED,
   gameEventSyncBase,
+  gameEventSyncFingerprint,
+  isTimestampOnlyConflict,
   mergeSameRecorderEventStreams,
   type RemoteConflictRevisionPolicy,
 } from './cloudConflicts'
@@ -142,22 +145,15 @@ export function assertHealthyEventGame(
   return rebuilt.state
 }
 
-export async function syncEventGameToCloud({
-  state,
-  userId,
-  localGameId,
-  adapter,
-  validateBinding,
-  assertCurrent,
-}: SyncEventGameInput): Promise<SyncEventGameResult> {
+export async function syncEventGameToCloud(input: SyncEventGameInput): Promise<SyncEventGameResult> {
+  const { userId, localGameId, adapter, validateBinding, assertCurrent } = input
   assertCurrent?.()
   if (!supabase) throw new Error('Supabase client not configured')
+  // Conflicts saved before timestamps were normalized may be the same event in two spellings.
+  const state = clearTimestampOnlyConflicts(input.state)
   const prepared = adapter.prepare(state)
   if ((state.cloudSync.eventConflicts?.length ?? 0) > 0) {
-    throw adapter.createRecoveryError(
-      'Resolve the event sync conflicts before retrying cloud sync.',
-      state
-    )
+    throw adapter.createRecoveryError(EVENT_CONFLICT_REVIEW_REQUIRED, state)
   }
 
   assertCurrent?.()
@@ -394,6 +390,47 @@ export async function syncEventGameToCloud({
     playerIdMap: binding.participant_id_map,
     syncedAt: checkpointData,
     syncedState,
+  }
+}
+
+/**
+ * Drops stored conflicts whose two copies are the same event, and queues their server rows
+ * to close. The current local event stays as it is; the cloud copy becomes its sync base, so a
+ * later local edit still uploads and an unchanged event stays put. A base confirmed by a later
+ * upload is kept: the conflict's copy is older than it.
+ */
+export function clearTimestampOnlyConflicts(state: GameState): GameState {
+  const conflicts = state.cloudSync.eventConflicts ?? []
+  const cleared = conflicts.filter(isTimestampOnlyConflict)
+  if (cleared.length === 0) return state
+  const remaining = conflicts.filter(conflict => !cleared.includes(conflict))
+  const clearedIds = new Set(cleared.map(conflict => conflict.conflictId))
+  const base = { ...(state.cloudSync.eventSyncBase ?? {}) }
+  for (const conflict of cleared) {
+    const confirmed = base[conflict.eventId]
+    if (confirmed && confirmed.revision >= conflict.remoteEvent.revision) continue
+    base[conflict.eventId] = {
+      revision: conflict.remoteEvent.revision,
+      fingerprint: gameEventSyncFingerprint(conflict.remoteEvent),
+    }
+  }
+  return {
+    ...state,
+    cloudSync: {
+      ...state.cloudSync,
+      eventSyncBase: base,
+      eventConflicts: remaining,
+      pendingEventConflictResolutions: [
+        ...(state.cloudSync.pendingEventConflictResolutions ?? []).filter(
+          pending => !clearedIds.has(pending.conflictId)
+        ),
+        ...cleared.map(conflict => ({
+          conflictId: conflict.conflictId,
+          eventId: conflict.eventId,
+          resolution: 'local' as const,
+        })),
+      ],
+    },
   }
 }
 
