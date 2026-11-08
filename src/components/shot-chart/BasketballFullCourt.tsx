@@ -195,6 +195,10 @@ export default function BasketballFullCourt({
           ))}
         </g>
 
+        {focused && labels && (shownLeft || shownRight) && (
+          <FocusedDirectionLabels left={shownLeft ?? null} right={shownRight ?? null} />
+        )}
+
         {/* Drawn upright after the flip so the letters stay readable. */}
         {plays.map(play => {
           const shown = flipped ? { x: FULL_COURT_LENGTH - play.x, y: COURT_WIDTH - play.y } : play
@@ -233,6 +237,45 @@ export default function BasketballFullCourt({
         })}
       </svg>
     </div>
+  )
+}
+
+const DIRECTION_LABEL_MAX = 18
+
+/**
+ * Focused (full-screen) court: the card labels are hidden, so each team's direction is
+ * drawn on the floor along the top sideline, either side of half court, with an arrow
+ * toward the basket it attacks. Drawn after the flip so it reads left/right as shown.
+ */
+function FocusedDirectionLabels({ left, right }: { left: string | null; right: string | null }) {
+  const short = (name: string) => name.length > DIRECTION_LABEL_MAX
+    ? `${name.slice(0, DIRECTION_LABEL_MAX - 1)}…` : name
+  const textProps = {
+    y: 3.4,
+    fontSize: 2.3,
+    fontWeight: 700,
+    fill: LINE_COLOR,
+    stroke: COURT_BG,
+    strokeWidth: 0.6,
+    paintOrder: 'stroke',
+    pointerEvents: 'none',
+    style: { fontFamily: 'ui-sans-serif, system-ui, sans-serif' },
+  } as const
+  return (
+    <g data-court-direction="" opacity={0.85}>
+      {left && (
+        <text {...textProps} x={CENTER_X - 2} textAnchor="end" data-direction="left">
+          <title>{`${left} attacking the left basket`}</title>
+          {`← ${short(left)}`}
+        </text>
+      )}
+      {right && (
+        <text {...textProps} x={CENTER_X + 2} textAnchor="start" data-direction="right">
+          <title>{`${right} attacking the right basket`}</title>
+          {`${short(right)} →`}
+        </text>
+      )}
+    </g>
   )
 }
 
