@@ -61,7 +61,7 @@ describe('RTN-1 saved opponents', () => {
 })
 
 describe('migration 082 saved opponents', () => {
-  const sql = readFileSync('supabase/migrations/082_saved_opponents_and_game_labels.sql', 'utf8').toLowerCase()
+  const sql = readFileSync('supabase/migrations/082_saved_opponents_and_game_labels.sql', 'utf8').replace(/\r\n/g, '\n').toLowerCase()
 
   it('scopes saved opponents to the owner and sport with unique active names', () => {
     expect(sql).toContain('create table if not exists public.opponent_teams')
@@ -93,7 +93,7 @@ describe('migration 082 saved opponents', () => {
   })
 
   it('keeps the rest of the 055 trigger body unchanged', () => {
-    const original = readFileSync('supabase/migrations/055_event_platform_finalization_recovery.sql', 'utf8')
+    const original = readFileSync('supabase/migrations/055_event_platform_finalization_recovery.sql', 'utf8').replace(/\r\n/g, '\n')
     const start = original.indexOf('create or replace function public.enforce_game_identity_and_final_state()')
     const end = original.indexOf('$$;', start) + 3
     const tail = original.slice(original.indexOf("    if old.status = 'final' then", start), end).toLowerCase()
