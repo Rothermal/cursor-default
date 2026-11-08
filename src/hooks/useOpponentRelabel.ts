@@ -1,24 +1,26 @@
 import { useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
-import { relabelParkedCloudGameCopies } from '../lib/opponentLocalGames'
-import { normalizeOpponentLabel, setGameOpponentLabels } from '../lib/opponentTeams'
+import { relabelOpponentEverywhere } from '../lib/opponentLocalGames'
+import { setGameOpponentLabels } from '../lib/opponentTeams'
 import { supabase } from '../lib/supabase'
 
 /** Relabel one cloud game's opponent on the server and on every copy on this device. */
 export function useOpponentRelabel() {
   const { user } = useAuth()
-  const { state, dispatch, activeLocalGameId } = useGame()
-  const ownerId = user?.id ?? null
+  const { dispatch } = useGame()
+  const userId = user?.id ?? null
   return useCallback(async (cloudGameId: string, name: string, nickname: string | null) => {
-    if (!supabase) throw new Error('Cloud is not configured.')
-    await setGameOpponentLabels(supabase, cloudGameId, name, nickname)
-    relabelParkedCloudGameCopies(ownerId, cloudGameId, activeLocalGameId, name, nickname)
-    if (state.cloudSync.gameId === cloudGameId && state.gameInfo) {
-      dispatch({
-        type: 'SET_GAME_INFO',
-        gameInfo: { ...state.gameInfo, opponentName: name.trim(), opponentNickname: normalizeOpponentLabel(nickname) },
-      })
-    }
-  }, [activeLocalGameId, dispatch, ownerId, state.cloudSync.gameId, state.gameInfo])
+    const client = supabase
+    if (!client || !userId) throw new Error('Sign in with cloud sync to rename an opponent.')
+    const outcome = await relabelOpponentEverywhere({
+      userId,
+      cloudGameId,
+      name,
+      nickname,
+      writeServer: (gameId, label, nick) => setGameOpponentLabels(client, gameId, label, nick),
+      dispatch,
+    })
+    if (outcome === 'account_changed') throw new Error('The signed-in account changed before this device was updated.')
+  }, [dispatch, userId])
 }

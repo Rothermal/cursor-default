@@ -170,10 +170,11 @@ begin
   end if;
   select * into v_game from public.games game where game.id = p_game_id for update;
   if not found then raise exception 'Game not found'; end if;
-  if not (
+  -- Fail closed: current_team_role is NULL for non-members, and NOT NULL is not true.
+  if (
     v_game.created_by = v_user_id
     or (v_game.team_id is not null and public.current_team_role(v_game.team_id) in ('owner', 'admin'))
-  ) then
+  ) is not true then
     raise exception 'Only the game creator or a team owner/admin can rename the opponent';
   end if;
   perform set_config('statkeeper.opponent_label_game_id', p_game_id::text, true);

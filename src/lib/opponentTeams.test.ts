@@ -78,6 +78,8 @@ describe('migration 082 saved opponents', () => {
     expect(sql).toContain("(to_jsonb(new) - 'opponent_name' - 'opponent_nickname' - 'updated_at')")
     expect(sql).toContain("raise exception 'final games are immutable; use correction/admin actions'")
     expect(sql).toContain('v_game.created_by = v_user_id')
+    // current_team_role is null for non-members; the check must fail closed.
+    expect(sql).toContain("in ('owner', 'admin'))\n  ) is not true then\n    raise exception 'only the game creator")
     expect(sql).toContain("public.current_team_role(v_game.team_id) in ('owner', 'admin')")
     expect(sql).toContain('grant execute on function public.set_game_opponent_labels(uuid, text, text) to authenticated')
   })

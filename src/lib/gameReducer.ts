@@ -152,6 +152,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             : state.cloudSync,
       }
 
+    case 'SET_OPPONENT_LABELS':
+      if (!state.gameInfo || state.cloudSync.gameId !== action.cloudGameId) return state
+      return {
+        ...state,
+        gameInfo: { ...state.gameInfo, opponentName: action.opponentName, opponentNickname: action.opponentNickname },
+      }
+
     case 'ADD_PLAYER':
       return { ...state, players: [...state.players, action.player] }
 
