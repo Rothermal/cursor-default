@@ -88,8 +88,13 @@ One neutral model, one dialog, one event shape per sport.
   that trigger with one narrow allowance: inside `set_game_opponent_labels`,
   only `opponent_name`, `opponent_nickname` and `updated_at` may change, on
   any game status. The RPC is limited to the game's creator or a team
-  owner/admin. Device copies bound to the game are relabeled too, because the
-  creator's binding re-sends the header on the next sync.
+  owner/admin. The RPC also stamps `games.opponent_labels_edited_at`; after
+  that, the trigger keeps the relabeled opponent on every ordinary write, so a
+  sync from an older copy (another device, or the creator while an admin
+  renamed it) cannot put the old name back. Device copies on the editing
+  device are relabeled too; a copy that was in sync stays in sync, so a final
+  copy does not turn "unsynced". Other devices show the old name locally until
+  they reopen the game from the cloud.
 - Setup: the Opponent field becomes a picker (type to filter saved opponents,
   pick one to fill name and nickname, or type a new name). A new name shows
   "Save opponent for future games" (checked by default).
@@ -158,11 +163,15 @@ Recommended answers are in bold. Mark accepted all six on 2026-11-08.
 - Game Info: Edit on the Opponent tile, final games included.
 - RTN-0 follow-up: `RouteChunkBoundary.test.ts` covers loading to success and
   failed chunk to Reload to recovery on navigation.
-- Checks: typecheck clean; lint 0 errors / 3 known warnings; 359 files / 3,694
+- Review fixes: the relabel RPC fails closed for non-members; local settlement
+  is guarded by the auth identity and keyed by cloud game id; in-sync copies keep
+  their synced fingerprint; relabeled games are locked against header resends.
+- Checks: typecheck clean; lint 0 errors / 3 known warnings; 360 files / 3,705
   tests; build passes, app chunk 905,737 bytes. Local-mode Chromium smoke
   (390 px): setup shows the picker without save controls, Saved Opponents shows
   the sign-in note, dashboard shows the button, no page errors.
 - Pending owner checks (need 082 applied): save a new opponent at setup, pick it
   in a second game, change its nickname, rename it and update past games
   (including a final game), Game Info edit on a final game, team nickname
-  save-back, and a parked copy keeping the new name after it syncs.
+  save-back, a parked final copy staying deletable after a rename, a team admin's
+  rename surviving the creator's next sync, and a non-member being refused.

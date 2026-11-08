@@ -1,21 +1,16 @@
-import type { GameAction, GameState } from '../types'
+import type { GameAction } from '../types'
 import { captureAuthIdentity, isCurrentAuthIdentity } from './authIdentity'
 import { getActiveLocalGameId, listParkedGameRecords, saveParkedGameRecordState } from './gameParking'
+import { withOpponentLabels } from './opponentLabels'
 import { normalizeOpponentLabel } from './opponentTeams'
 
-/** The same game with new opponent labels; other gameInfo fields and the binding are kept. */
-export function withOpponentLabels(state: GameState, name: string, nickname: string | null): GameState {
-  if (!state.gameInfo) return state
-  return {
-    ...state,
-    gameInfo: { ...state.gameInfo, opponentName: name.trim(), opponentNickname: normalizeOpponentLabel(nickname) },
-  }
-}
+export { withOpponentLabels }
+
 
 /**
- * Keep device copies of a relabeled cloud game in step, so a later sync from an
- * old copy does not write the previous opponent name back (game headers are
- * re-sent by the creator's binding). The active game is left to the caller,
+ * Keep device copies of a relabeled cloud game in step, so they show the new name.
+ * (Migration 082 also stops ordinary syncs from overwriting a relabeled game's
+ * opponent on the server.) The active game is left to the caller,
  * which must dispatch SET_OPPONENT_LABELS so GameContext does not overwrite storage.
  */
 export function relabelParkedCloudGameCopies(

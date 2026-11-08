@@ -2,6 +2,12 @@
 -- Games keep their own opponent_name / opponent_nickname snapshot; nothing here
 -- links a game to a saved opponent, so history changes only on explicit edits.
 
+-- Set by set_game_opponent_labels. Once set, only that RPC may change the
+-- game's opponent labels: the creator's binding re-sends its local header on
+-- every sync, which would otherwise undo a rename made by an admin or on
+-- another device.
+alter table public.games add column if not exists opponent_labels_edited_at timestamptz;
+
 create table if not exists public.opponent_teams (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
@@ -61,7 +67,7 @@ create trigger touch_opponent_teams_updated_at
 
 grant select, insert, update, delete on public.opponent_teams to authenticated;
 
--- Same body as migration 055, plus the narrow opponent-label allowance at the top.
+-- Same body as migration 055, plus the opponent-label allowance and lock at the top.
 create or replace function public.enforce_game_identity_and_final_state()
 returns trigger
 language plpgsql
@@ -73,9 +79,16 @@ begin
     -- RTN-1: set_game_opponent_labels may relabel the opponent on any game,
     -- final included. Only the two label columns (and updated_at) may differ.
     if coalesce(current_setting('statkeeper.opponent_label_game_id', true), '') = old.id::text
-       and (to_jsonb(new) - 'opponent_name' - 'opponent_nickname' - 'updated_at')
-         = (to_jsonb(old) - 'opponent_name' - 'opponent_nickname' - 'updated_at') then
+       and (to_jsonb(new) - 'opponent_name' - 'opponent_nickname' - 'opponent_labels_edited_at' - 'updated_at')
+         = (to_jsonb(old) - 'opponent_name' - 'opponent_nickname' - 'opponent_labels_edited_at' - 'updated_at') then
       return new;
+    end if;
+    -- After a relabel, ordinary writes keep the relabeled opponent (no error, so a
+    -- sync from an older device copy still succeeds for everything else).
+    if old.opponent_labels_edited_at is not null then
+      new.opponent_name := old.opponent_name;
+      new.opponent_nickname := old.opponent_nickname;
+      new.opponent_labels_edited_at := old.opponent_labels_edited_at;
     end if;
     if old.status = 'final' then
       if not (
@@ -179,7 +192,7 @@ begin
   end if;
   perform set_config('statkeeper.opponent_label_game_id', p_game_id::text, true);
   update public.games
-  set opponent_name = v_name, opponent_nickname = v_nickname
+  set opponent_name = v_name, opponent_nickname = v_nickname, opponent_labels_edited_at = now()
   where id = p_game_id;
   perform set_config('statkeeper.opponent_label_game_id', '', true);
 end;

@@ -5,6 +5,8 @@ import type { GameAction, GameState } from '../types'
 import { resetCurrentAuthUserIdForTests, setCurrentAuthUserId } from './authIdentity'
 import { listParkedGameRecords, saveParkedGameRecordState } from './gameParking'
 import { createInitialState, gameReducer } from './gameReducer'
+import { shouldBlockDiscardUnsyncedGame, withLastSyncedGameFingerprint } from './gameSyncFingerprint'
+import { withOpponentLabels } from './opponentLabels'
 import { relabelOpponentEverywhere } from './opponentLocalGames'
 
 function boundGame(cloudGameId: string, team: string, opponent: string): GameState {
@@ -73,5 +75,31 @@ describe('RTN-1 opponent relabel settlement', () => {
     const applied = gameReducer(gameB, { type: 'SET_OPPONENT_LABELS', cloudGameId: 'g2', opponentName: 'Renamed B', opponentNickname: 'RB' })
     expect(applied.gameInfo).toMatchObject({ teamName: 'B team', opponentName: 'Renamed B', opponentNickname: 'RB' })
     expect(applied.cloudSync).toBe(gameB.cloudSync)
+  })
+
+  it('keeps an in-sync final copy in sync and droppable after a relabel', async () => {
+    setCurrentAuthUserId('user-a')
+    const base = boundGame('g1', 'Us', 'Old')
+    const final = withLastSyncedGameFingerprint({ ...base, cloudSync: { ...base.cloudSync, gameStatus: 'final' } })
+    expect(shouldBlockDiscardUnsyncedGame(final, false)).toBe(false)
+    saveParkedGameRecordState('local-final', final, 'user-a')
+    await relabelOpponentEverywhere({
+      userId: 'user-a', cloudGameId: 'g1', name: 'New', nickname: null,
+      writeServer: async () => {}, dispatch: () => {},
+    })
+    const record = listParkedGameRecords('user-a').find(item => item.localGameId === 'local-final')!
+    expect(record.gameState.gameInfo?.opponentName).toBe('New')
+    expect(shouldBlockDiscardUnsyncedGame(record.gameState, false)).toBe(false)
+    // The active copy goes through the reducer and keeps the same guarantee.
+    const active = gameReducer(final, { type: 'SET_OPPONENT_LABELS', cloudGameId: 'g1', opponentName: 'New', opponentNickname: null })
+    expect(shouldBlockDiscardUnsyncedGame(active, false)).toBe(false)
+  })
+
+  it('keeps unsynced work on a copy that was already ahead', () => {
+    const synced = withLastSyncedGameFingerprint(boundGame('g1', 'Us', 'Old'))
+    const ahead = { ...synced, notes: 'unsynced note' }
+    const next = withOpponentLabels(ahead, 'New', null)
+    expect(next.cloudSync.lastSyncedGameFingerprint).toBe(synced.cloudSync.lastSyncedGameFingerprint)
+    expect(shouldBlockDiscardUnsyncedGame({ ...next, cloudSync: { ...next.cloudSync, gameStatus: 'final' } }, false)).toBe(true)
   })
 })

@@ -75,13 +75,21 @@ describe('migration 082 saved opponents', () => {
 
   it('allows only the two opponent label columns to change through the relabel rpc', () => {
     expect(sql).toContain("current_setting('statkeeper.opponent_label_game_id', true), '') = old.id::text")
-    expect(sql).toContain("(to_jsonb(new) - 'opponent_name' - 'opponent_nickname' - 'updated_at')")
+    expect(sql).toContain("(to_jsonb(new) - 'opponent_name' - 'opponent_nickname' - 'opponent_labels_edited_at' - 'updated_at')")
+    expect(sql).toContain('opponent_labels_edited_at = now()')
     expect(sql).toContain("raise exception 'final games are immutable; use correction/admin actions'")
     expect(sql).toContain('v_game.created_by = v_user_id')
     // current_team_role is null for non-members; the check must fail closed.
     expect(sql).toContain("in ('owner', 'admin'))\n  ) is not true then\n    raise exception 'only the game creator")
     expect(sql).toContain("public.current_team_role(v_game.team_id) in ('owner', 'admin')")
     expect(sql).toContain('grant execute on function public.set_game_opponent_labels(uuid, text, text) to authenticated')
+  })
+
+  it('keeps a relabeled opponent when an older device copy syncs its header', () => {
+    expect(sql).toContain('add column if not exists opponent_labels_edited_at timestamptz')
+    expect(sql).toContain(`if old.opponent_labels_edited_at is not null then
+      new.opponent_name := old.opponent_name;
+      new.opponent_nickname := old.opponent_nickname;`)
   })
 
   it('keeps the rest of the 055 trigger body unchanged', () => {
