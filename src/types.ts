@@ -252,6 +252,8 @@ export interface CloudSyncState {
 export type GameAction =
   | { type: 'SET_SPORT'; sport: SportConfig }
   | { type: 'SET_GAME_INFO'; gameInfo: GameInfo }
+  /** RTN-1: relabel the opponent only when the active game is still bound to this cloud game. */
+  | { type: 'SET_OPPONENT_LABELS'; cloudGameId: string; opponentName: string; opponentNickname: string | null }
   | { type: 'SET_PLAYERS'; players: Player[] }
   | { type: 'HYDRATE_STATE'; state: GameState }
   | { type: 'ADD_PLAYER'; player: Player }

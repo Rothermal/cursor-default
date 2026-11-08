@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import ResultBadge from '../components/team-info/ResultBadge'
+import GameOpponentEditor from '../components/opponents/GameOpponentEditor'
 import BasketballFinalizationPanel from '../components/basketball/BasketballFinalizationPanel'
 import BasketballRecorderManager from '../components/basketball/BasketballRecorderManager'
 import HockeyFinalizationPanel from '../components/hockey/HockeyFinalizationPanel'
@@ -72,6 +73,7 @@ interface GameInfoGameRow extends TeamInfoGame {
   tracked_team_name: string
   game_date: string
   opponent_name: string
+  opponent_nickname?: string | null
   tournament_name: string | null
   tournament_id: string | null
   notes: string | null
@@ -322,7 +324,7 @@ export default function GameInfo() {
       const { data: gameData, error: gameError } = await supabaseClient
         .from('games')
         .select(
-          'id,team_id,created_by,tracked_team_name,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id,notes,sport_id'
+          'id,team_id,created_by,tracked_team_name,game_date,opponent_name,opponent_nickname,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id,notes,sport_id'
         )
         .eq('id', gameId)
         .single()
@@ -1045,12 +1047,16 @@ export default function GameInfo() {
                   </p>
                   <p className="font-semibold text-content">{trackedTeamName}</p>
                 </div>
-                <div className="rounded-lg bg-surface-muted px-3 py-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">
-                    Opponent
-                  </p>
-                  <p className="font-semibold text-content">{game.opponent_name}</p>
-                </div>
+                <GameOpponentEditor
+                  key={game.id}
+                  gameId={game.id}
+                  name={game.opponent_name}
+                  nickname={game.opponent_nickname ?? null}
+                  canEdit={Boolean(userId && (game.created_by === userId || (game.team_id && canManageTeam(teamRole))))}
+                  onSaved={(name, nickname) => setGame(current => current && current.id === game.id
+                    ? { ...current, opponent_name: name, opponent_nickname: nickname }
+                    : current)}
+                />
               </div>
               {game.tournament_name && (
                 <p className="text-sm text-content-muted">{game.tournament_name}</p>

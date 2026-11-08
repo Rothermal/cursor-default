@@ -1,18 +1,8 @@
 # RTN: Roster Refresh, Team Nicknames and Saved Opponents
 
-Status: Proposed planning PR, waiting for owner review. RTN-0 (code splitting)
-was approved by Mark on 2026-11-07 ahead of the rest and is implemented in the
-same PR; RTN-1 onward wait for plan approval.
-
-RTN-0 result: every routed page except Auth, the access gate and the dev-only
-shot-chart preview is `React.lazy` in `App.tsx`, behind `RouteChunkBoundary`
-(Suspense plus a Reload prompt if a page chunk fails to load). Local build: the
-app chunk went from 2,839,939 bytes (90.3% of the limit) to 904,726 bytes
-(28.8%); the largest page chunk is 227,201 bytes; total precache 2,928.83 KiB
-over 136 entries (was 2,883.37 KiB over 15). Typecheck clean, lint 0 errors and
-the 3 known warnings, 355 test files / 3,669 tests pass. Production-build smoke
-test in Chromium opened 14 routes with no page errors, and setup and Settings
-pages reloaded offline from the service-worker cache.
+Status: Plan and RTN-0 merged in #518 (2026-11-08). Mark accepted all six
+recommended answers on 2026-11-08 (section 4). RTN-1 is implemented for review;
+migration 082 is not yet applied. RTN-2 onward follow.
 
 Owner request (2026-11-07): "Basketball first but should apply to all sports.
 Need an option to refresh player metadata, numbers, positions during a game. The
@@ -90,9 +80,21 @@ One neutral model, one dialog, one event shape per sport.
   (`id`, `owner_id`, `sport_id`, `name`, `nickname`, `created_at`,
   `updated_at`, `archived_at`), unique on owner + sport + lower(trim(name)) for
   unarchived rows, with the same 1..100 length checks as 066 and owner-only RLS.
-- `games` gets nullable `opponent_team_id uuid references opponent_teams on
-  delete set null`. The game keeps its `opponent_name` / `opponent_nickname`
-  snapshot, so history never silently changes.
+- No link column on `games` (changed during RTN-1): each game keeps its
+  `opponent_name` / `opponent_nickname` snapshot, so history never silently
+  changes. The rename prompt finds past games by your account, the sport and a
+  case-insensitive match on the old name.
+- Final games are immutable (trigger from 035/055). Migration 082 re-creates
+  that trigger with one narrow allowance: inside `set_game_opponent_labels`,
+  only `opponent_name`, `opponent_nickname` and `updated_at` may change, on
+  any game status. The RPC is limited to the game's creator or a team
+  owner/admin. The RPC also stamps `games.opponent_labels_edited_at`; after
+  that, the trigger keeps the relabeled opponent on every ordinary write, so a
+  sync from an older copy (another device, or the creator while an admin
+  renamed it) cannot put the old name back. Device copies on the editing
+  device are relabeled too; a copy that was in sync stays in sync, so a final
+  copy does not turn "unsynced". Other devices show the old name locally until
+  they reopen the game from the cloud.
 - Setup: the Opponent field becomes a picker (type to filter saved opponents,
   pick one to fill name and nickname, or type a new name). A new name shows
   "Save opponent for future games" (checked by default).
@@ -125,7 +127,7 @@ Each sport keeps its notes inside its own AGENTS.md marker slot.
 
 ## 4. Questions for Mark
 
-Recommended answers are in bold.
+Recommended answers are in bold. Mark accepted all six on 2026-11-08.
 
 1. **Saved opponent scope.** Should the opponent list be **per sport for your
    account (reused across seasons and teams)**, or per team/season?
@@ -142,3 +144,34 @@ Recommended answers are in bold.
    update, or never update?
 6. **Bundle split first.** OK to do **RTN-0 first** even though it has no visible
    feature?
+
+## 5. RTN-1 delivery record
+
+- Migration `082_saved_opponents_and_game_labels.sql`: `opponent_teams`
+  (owner-only RLS, unique active name per owner and sport, archive instead of
+  delete) and `set_game_opponent_labels`. Not yet applied.
+- `src/lib/opponentTeams.ts` (parse, filter, save candidate, CRUD, relabel RPC),
+  `src/lib/opponentLocalGames.ts` and `src/hooks/useOpponentRelabel.ts` (server
+  plus every device copy), `src/hooks/useSavedOpponents.ts`.
+- Basketball setup (`GameSetup.tsx`): `OpponentPicker` filters saved opponents
+  and fills the nickname; "Save opponent for future games" (checked by default)
+  or "Update the saved nickname"; "Save as the team's nickname" (unchecked by
+  default, managers only). Saves run after setup commits and never block start.
+  Hidden in local-only mode.
+- Sport dashboard > Saved Opponents (`/opponents?sport=`): add, edit, remove;
+  a rename or nickname change asks "Update N past games?".
+- Game Info: Edit on the Opponent tile, final games included.
+- RTN-0 follow-up: `RouteChunkBoundary.test.ts` covers loading to success and
+  failed chunk to Reload to recovery on navigation.
+- Review fixes: the relabel RPC fails closed for non-members; local settlement
+  is guarded by the auth identity and keyed by cloud game id; in-sync copies keep
+  their synced fingerprint; relabeled games are locked against header resends.
+- Checks: typecheck clean; lint 0 errors / 3 known warnings; 360 files / 3,705
+  tests; build passes, app chunk 905,737 bytes. Local-mode Chromium smoke
+  (390 px): setup shows the picker without save controls, Saved Opponents shows
+  the sign-in note, dashboard shows the button, no page errors.
+- Pending owner checks (need 082 applied): save a new opponent at setup, pick it
+  in a second game, change its nickname, rename it and update past games
+  (including a final game), Game Info edit on a final game, team nickname
+  save-back, a parked final copy staying deletable after a rename, a team admin's
+  rename surviving the creator's next sync, and a non-member being refused.

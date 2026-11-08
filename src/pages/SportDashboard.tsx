@@ -14,6 +14,7 @@ import {
   routeForResumedGame,
   sportGamesPath,
   sportLeaderboardPath,
+  sportOpponentsPath,
   sportTeamsPath,
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
@@ -392,6 +393,14 @@ export default function SportDashboard() {
               className="btn-secondary py-3 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
             >
               Season Stats
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(sportOpponentsPath(sport.id))}
+              disabled={!isConfigured}
+              className="btn-secondary py-3 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
+            >
+              Saved Opponents
             </button>
           </div>
           {!isConfigured && (

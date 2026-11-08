@@ -1,4 +1,5 @@
 import { preserveSoccerEventDetailChanges } from './soccer/shotDetails'
+import { withOpponentLabels } from './opponentLabels'
 import type {
   ActionLogEntry,
   CloudSyncState,
@@ -151,6 +152,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               }
             : state.cloudSync,
       }
+
+    case 'SET_OPPONENT_LABELS':
+      if (!state.gameInfo || state.cloudSync.gameId !== action.cloudGameId) return state
+      return withOpponentLabels(state, action.opponentName, action.opponentNickname)
 
     case 'ADD_PLAYER':
       return { ...state, players: [...state.players, action.player] }
