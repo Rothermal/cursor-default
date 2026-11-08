@@ -113,7 +113,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [penaltyDetailsOpen, setPenaltyDetailsOpen] = useState(false)
   const [captureSide, setCaptureSide] = useState<HockeySide>('tracked')
-  const [markerFilters, setMarkerFilters] = useState<HockeyTrackerFilters>({ family: 'all', side: 'all', scope: 'match' })
+  const [markerFilters, setMarkerFilters] = useState<HockeyTrackerFilters>({ family: 'all', side: 'all', scope: 'current' })
   const [tap, setTap] = useState<GameEventLocation | null>(null)
   const [faceoffDot, setFaceoffDot] = useState<HockeyFaceoffDotId | null>(null)
   const [playDraft, setPlayDraft] = useState<HockeyPlayDraft | null>(null)
@@ -563,7 +563,7 @@ function HockeyTracker({ sport }: { sport: HockeySportGameState }) {
             </label>
             <label className="text-xs font-semibold text-content-muted">Period
               <select aria-label="Marker period" className="input-field mt-1" value={markerFilters.scope} onChange={event => setMarkerFilters(value => ({ ...value, scope: event.target.value as HockeyTrackerFilters['scope'] }))}>
-                <option value="match">Whole game</option><option value="current">Current / latest period</option>
+                <option value="current">Current / latest period</option><option value="match">Whole game</option>
               </select>
             </label>
           </div>
