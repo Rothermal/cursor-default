@@ -111,7 +111,7 @@ export default function BasketballEventDetailDialog({
 function detailHeading(review: BasketballTimelineEventReview): string {
   if (review.event.eventType === 'basketball.period_started' || review.event.eventType === 'basketball.period_ended') return 'Period control'
   if (review.event.eventType === 'basketball.match_ended' || review.event.eventType === 'basketball.match_reopened') return 'Game control'
-  if (review.event.eventType === 'basketball.match_roster_added' || review.event.eventType === 'basketball.participant_resolved') return 'Roster change'
+  if (review.event.eventType === 'basketball.match_roster_added' || review.event.eventType === 'basketball.participant_resolved' || review.event.eventType === 'basketball.participant_details_updated') return 'Roster change'
   if (review.event.eventType === 'basketball.foul') return 'Foul ruling'
   if (review.event.eventType === 'basketball.free_throw_trip') return 'Award'
   if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
@@ -136,6 +136,11 @@ function detailValue(
   }
   if (event.eventType === 'basketball.participant_resolved') {
     return `Identity updated to ${event.payload.displayName}`
+  }
+  if (event.eventType === 'basketball.participant_details_updated') {
+    const number = event.payload.number ? `#${event.payload.number}` : 'no number'
+    const source = event.payload.source === 'roster_refresh' ? ' (from team roster)' : ''
+    return `${participantLabel(event.payload.participantId)} now ${number}, ${event.payload.position ?? 'no position'}${source}`
   }
   if (event.eventType === 'basketball.match_ended') {
     return event.payload.reason.replace(/_/g, ' ')

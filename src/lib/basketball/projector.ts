@@ -342,6 +342,8 @@ function applyLifecycleEvent(
       return applyRosterAdded(projection, sportState, event)
     case 'basketball.participant_resolved':
       return applyParticipantResolved(projection, sportState, event)
+    case 'basketball.participant_details_updated':
+      return applyParticipantDetailsUpdated(projection, sportState, event)
     case 'basketball.match_ended':
       return applyMatchEnded(projection, sportState, event)
     case 'basketball.match_reopened':
@@ -440,6 +442,25 @@ function applyParticipantResolved(
   participant.playerId = event.payload.playerId
   participant.displayName = event.payload.displayName
   participant.number = event.payload.number
+  return null
+}
+
+/** RTN-2: later events win, so every view shows the participant's current number. */
+function applyParticipantDetailsUpdated(
+  projection: BasketballMatchProjection,
+  sportState: BasketballSportGameState,
+  event: Extract<BasketballLifecycleEvent, { eventType: 'basketball.participant_details_updated' }>
+): string | null {
+  // RTN-2: a "Correct records" reopen keeps the match ended but may still fix
+  // numbers and positions in the final period; everything else needs a live moment.
+  const momentError = projection.status === 'ended' && projection.reopenMode === 'correct_records'
+    ? validateCurrentPeriod(projection, sportState, event)
+    : validateActiveMoment(projection, sportState, event)
+  if (momentError) return momentError
+  const participant = projection.participants[event.payload.participantId]
+  if (!participant) return 'Basketball participant details reference an unknown participant.'
+  participant.number = event.payload.number
+  participant.position = event.payload.position
   return null
 }
 

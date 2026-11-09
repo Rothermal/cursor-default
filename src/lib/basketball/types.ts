@@ -536,6 +536,8 @@ export interface BasketballPeriodPayload extends BasketballCapturePayload {
 export interface BasketballMatchRosterAddedPayload extends BasketballCapturePayload {
   participant: BasketballMatchParticipant
   destination: 'bench' | 'dnp'
+  // RTN-2: an optional `fromRoster: true` key marks a late add picked from the
+  // team roster (playerId is the roster player id), so cloud sync keeps the link.
 }
 
 export interface BasketballParticipantResolvedPayload extends BasketballCapturePayload {
@@ -543,6 +545,14 @@ export interface BasketballParticipantResolvedPayload extends BasketballCaptureP
   playerId: string
   displayName: string
   number: string | null
+}
+
+/** RTN-2: a participant's number or position changed during the game (roster refresh or manual edit). */
+export interface BasketballParticipantDetailsUpdatedPayload extends BasketballCapturePayload {
+  participantId: string
+  number: string | null
+  position: string | null
+  source: 'roster_refresh' | 'manual'
 }
 
 export interface BasketballMatchEndedPayload extends BasketballCapturePayload {
@@ -728,6 +738,10 @@ export type BasketballParticipantResolvedEvent = BasketballLifecycleGameEvent<
   BasketballParticipantResolvedPayload,
   'basketball.participant_resolved'
 >
+export type BasketballParticipantDetailsUpdatedEvent = BasketballLifecycleGameEvent<
+  BasketballParticipantDetailsUpdatedPayload,
+  'basketball.participant_details_updated'
+>
 export type BasketballMatchEndedEvent = BasketballLifecycleGameEvent<
   BasketballMatchEndedPayload,
   'basketball.match_ended'
@@ -742,6 +756,7 @@ export type BasketballLifecycleEvent =
   | BasketballPeriodEndedEvent
   | BasketballMatchRosterAddedEvent
   | BasketballParticipantResolvedEvent
+  | BasketballParticipantDetailsUpdatedEvent
   | BasketballMatchEndedEvent
   | BasketballMatchReopenedEvent
 

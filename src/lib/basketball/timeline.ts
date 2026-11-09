@@ -527,6 +527,12 @@ function participantReviewMetadata(
           label: participantLabel(event.payload.displayName, event.payload.number),
         })
       }
+    } else if (event.eventType === 'basketball.participant_details_updated') {
+      const participant = participants.get(event.payload.participantId)
+      const name = sportState.projection.participants[event.payload.participantId]?.displayName
+      if (participant && name) {
+        participants.set(participant.id, { ...participant, label: participantLabel(name, event.payload.number) })
+      }
     }
   }
   for (const event of [...activeEvents, ...deletedEvents]) {
@@ -714,6 +720,7 @@ function isRecordedLaterEligible(event: BasketballMatchEvent): boolean {
     event.eventType !== 'basketball.period_ended' &&
     event.eventType !== 'basketball.match_roster_added' &&
     event.eventType !== 'basketball.participant_resolved' &&
+    event.eventType !== 'basketball.participant_details_updated' &&
     event.eventType !== 'basketball.match_ended' &&
     event.eventType !== 'basketball.match_reopened' &&
     event.eventType !== 'basketball.clock_started' &&
@@ -737,6 +744,11 @@ function groupTitle(
   return additions.length > 0 ? `${primary.title} + ${additions.join(' + ')}` : primary.title
 }
 
+function participantDetailsTitle(payload: { number: string | null; position: string | null; source: string }): string {
+  const parts = [payload.number ? `#${payload.number}` : 'no number', payload.position ?? 'no position']
+  return `${payload.source === 'roster_refresh' ? 'Roster refresh' : 'Roster change'}: now ${parts.join(', ')}`
+}
+
 function eventTitle(
   state: GameState,
   event: BasketballMatchEvent
@@ -746,6 +758,7 @@ function eventTitle(
     case 'basketball.period_ended': return `${periodLabel(state, event.payload.periodId)} ended`
     case 'basketball.match_roster_added': return `Added to ${event.payload.destination === 'bench' ? 'bench' : 'DNP list'}`
     case 'basketball.participant_resolved': return 'Participant identity updated'
+    case 'basketball.participant_details_updated': return participantDetailsTitle(event.payload)
     case 'basketball.match_ended': return event.payload.reason === 'completed'
       ? 'Game completed'
       : event.payload.reason === 'suspended' ? 'Game suspended' : 'Game abandoned'
@@ -823,6 +836,7 @@ function familiesForEvent(event: BasketballMatchEvent): BasketballTimelineFamily
   if (
     event.eventType === 'basketball.match_roster_added' ||
     event.eventType === 'basketball.participant_resolved' ||
+    event.eventType === 'basketball.participant_details_updated' ||
     event.eventType === 'basketball.ejection' ||
     event.eventType === 'basketball.timeout' ||
     event.eventType === 'basketball.minutes_adjustment' ||
@@ -888,6 +902,12 @@ function actorLabel(state: GameState, event: BasketballMatchEvent): string {
   if (event.eventType === 'basketball.participant_resolved') {
     return participantLabel(event.payload.displayName, event.payload.number)
   }
+  if (event.eventType === 'basketball.participant_details_updated') {
+    const participant = state.sportGameState?.sportId === 'basketball'
+      ? state.sportGameState.projection.participants[event.payload.participantId]
+      : undefined
+    return participant ? participant.displayName : 'Unknown participant'
+  }
   if (
     event.eventType === 'basketball.period_started' ||
     event.eventType === 'basketball.period_ended' ||
@@ -923,6 +943,7 @@ function participantIdsForEvent(state: GameState, event: BasketballMatchEvent): 
   const ids = new Set<string>()
   if (event.eventType === 'basketball.match_roster_added') ids.add(event.payload.participant.id)
   if (event.eventType === 'basketball.participant_resolved') ids.add(event.payload.participantId)
+  if (event.eventType === 'basketball.participant_details_updated') ids.add(event.payload.participantId)
   if (event.eventType === 'basketball.substitution' || event.eventType === 'basketball.lineup_confirmed') {
     event.payload.participantIds.forEach(id => ids.add(id))
   }

@@ -1,6 +1,6 @@
 import { resolveTeamStatsConfig } from '../../config/teamStatsDefaults'
 import type { GameState, Player } from '../../types'
-import { isValidBasketballPosition } from './positions'
+import { BASKETBALL_POSITION_MAX_LENGTH, isValidBasketballPosition } from './positions'
 import { SPORT_EVENTS_AUTHORITY } from '../gameEvents/authority'
 import { isPlainObject } from '../gameEvents/envelope'
 import {
@@ -135,6 +135,23 @@ export interface BasketballLateParticipantOptions {
   eventId?: string
   participantId?: string
   playerId?: string
+  /** RTN-2: the player comes from the team roster (playerId is the roster player id). */
+  fromRoster?: boolean
+  position?: string | null
+  captureCommandId?: string
+}
+
+export interface BasketballParticipantDetailsChange {
+  participantId: string
+  number: string | null
+  position: string | null
+}
+
+export interface BasketballParticipantDetailsOptions {
+  recorderUserId: string | null
+  changes: BasketballParticipantDetailsChange[]
+  source: 'roster_refresh' | 'manual'
+  occurredAt?: string
   captureCommandId?: string
 }
 
@@ -666,8 +683,14 @@ export function addBasketballLateParticipant(
     number,
     teamSide: options.teamSide,
     initialStatus: 'bench',
-    position: null,
+    position: options.position?.trim() || null,
     captain: false,
+  }
+  if (options.fromRoster && (!options.playerId || options.teamSide !== 'tracked')) {
+    return failure(state, 'invalid_participant', 'Roster players join the tracked team with their roster id.')
+  }
+  if (!isValidBasketballPosition(participant.position)) {
+    return failure(state, 'invalid_participant', 'That Basketball position is too long.')
   }
   const candidate = withBasketballCapturePreferences(
     { ...state, players: [...state.players, player], activePlayerId: playerId },
@@ -680,6 +703,7 @@ export function addBasketballLateParticipant(
     payload: {
       participant,
       destination: 'bench',
+      ...(options.fromRoster ? { fromRoster: true as const } : {}),
       captureCommandId: options.captureCommandId ?? createBasketballCaptureCommandId(),
     },
     recorderUserId: options.recorderUserId,
@@ -693,6 +717,80 @@ export function addBasketballLateParticipant(
     candidate,
     event,
     'Basketball participant addition did not produce a complete event projection.'
+  )
+}
+
+/**
+ * RTN-2: record new numbers and/or positions for game participants. Setup stays
+ * immutable; each change is a `participant_details_updated` event, and every
+ * change from one command shares a captureCommandId so it undoes together.
+ * Changes that match the participant's current details are skipped.
+ */
+export function updateBasketballParticipantDetails(
+  state: GameState,
+  options: BasketballParticipantDetailsOptions
+): BasketballStateCommandResult {
+  if (isFinalBasketballCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
+  }
+  const correcting = state.sportGameState?.sportId === 'basketball' &&
+    state.sportGameState.projection.status === 'ended' &&
+    state.sportGameState.projection.reopenMode === 'correct_records'
+  // "Correct records" keeps the game ended; the change lands in the final period.
+  const context = correcting
+    ? getBasketballTerminalLifecycleContext(state, options.recorderUserId, options.occurredAt)
+    : getBasketballLifecycleContext(state, options.recorderUserId, options.occurredAt)
+  if (!context.ok) return { ...context, state }
+  const participants = context.value.sportState.projection.participants
+  const seen = new Set<string>()
+  const changes: BasketballParticipantDetailsChange[] = []
+  for (const change of options.changes) {
+    const participant = participants[change.participantId]
+    if (!participant) {
+      return failure(state, 'invalid_participant', 'That Basketball participant is not in this game.')
+    }
+    if (seen.has(change.participantId)) {
+      return failure(state, 'invalid_participant', 'Each participant can change only once per update.')
+    }
+    seen.add(change.participantId)
+    const number = change.number?.trim() || null
+    const position = change.position?.trim() || null
+    if ((number?.length ?? 0) > BASKETBALL_POSITION_MAX_LENGTH || (position?.length ?? 0) > BASKETBALL_POSITION_MAX_LENGTH) {
+      return failure(state, 'invalid_participant', `Number and position must be at most ${BASKETBALL_POSITION_MAX_LENGTH} characters.`)
+    }
+    if (number === (participant.number ?? null) && position === (participant.position ?? null)) continue
+    changes.push({ participantId: change.participantId, number, position })
+  }
+  if (changes.length === 0) {
+    return failure(state, 'command_failed', 'Nothing changed.')
+  }
+
+  const numbersByPlayerId = new Map<string, string>()
+  for (const change of changes) {
+    const playerId = participants[change.participantId]?.playerId
+    if (playerId) numbersByPlayerId.set(playerId, change.number ?? '')
+  }
+  const candidate: GameState = {
+    ...state,
+    players: state.players.map(player =>
+      numbersByPlayerId.has(player.id) ? { ...player, number: numbersByPlayerId.get(player.id) ?? '' } : player
+    ),
+  }
+  const captureCommandId = options.captureCommandId ?? createBasketballCaptureCommandId()
+  const events = changes.map((change, index) => createBasketballLifecycleEvent({
+    eventType: 'basketball.participant_details_updated',
+    payload: { ...change, source: options.source, captureCommandId },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence + index,
+    period: context.value.period,
+    elapsedMs: lifecycleElapsedMs(context.value),
+    occurredAt: context.value.occurredAt,
+  }))
+  return appendBasketballLifecycleEvents(
+    state,
+    candidate,
+    events,
+    'Basketball roster change did not produce a complete event projection.'
   )
 }
 

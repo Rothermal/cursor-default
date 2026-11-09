@@ -1,11 +1,14 @@
+import type { ReactNode } from 'react'
 import { Plus, Users } from 'lucide-react'
 import type { GameState } from '../../types'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
 import { isTeamPseudoPlayer } from '../../lib/teamPlayers'
 import { formatCompactGameStatLine } from '../../lib/statDisplay'
 
-export default function BasketballWorkspaceRoster({ state, side, canAdd, onAdd, onManage, onOpen }: {
+export default function BasketballWorkspaceRoster({ state, side, canAdd, onAdd, onManage, onOpen, actions }: {
   state: GameState
+  /** RTN-2: extra actions after Add Player, such as Refresh from Roster. */
+  actions?: ReactNode
   side: BasketballTeamSide
   canAdd: boolean
   onAdd: (launcher: HTMLButtonElement) => void
@@ -27,6 +30,7 @@ export default function BasketballWorkspaceRoster({ state, side, canAdd, onAdd, 
       <button type="button" className="btn-secondary flex min-h-11 items-center gap-2 px-3" disabled={!canAdd} onClick={event => onAdd(event.currentTarget)}>
         <Plus size={16} aria-hidden /> Add Player
       </button>
+      {actions}
     </div>
     {players.length === 0 && <p className="py-4 text-sm text-content-muted">No individual players.</p>}
     <div className="grid gap-2">

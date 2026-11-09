@@ -1,8 +1,9 @@
 # RTN: Roster Refresh, Team Nicknames and Saved Opponents
 
 Status: Plan and RTN-0 merged in #518 (2026-11-08). Mark accepted all six
-recommended answers on 2026-11-08 (section 4). RTN-1 is implemented for review;
-migration 082 is not yet applied. RTN-2 onward follow.
+recommended answers on 2026-11-08 (section 4). RTN-1 merged in #522 (Mark applies
+migration 082). RTN-2 (Basketball roster refresh) is
+implemented for review (section 6). RTN-3 follows.
 
 Owner request (2026-11-07): "Basketball first but should apply to all sports.
 Need an option to refresh player metadata, numbers, positions during a game. The
@@ -175,3 +176,58 @@ Recommended answers are in bold. Mark accepted all six on 2026-11-08.
   (including a final game), Game Info edit on a final game, team nickname
   save-back, a parked final copy staying deletable after a rename, a team admin's
   rename surviving the creator's next sync, and a non-member being refused.
+
+## 6. RTN-2 delivery record
+
+- Event `basketball.participant_details_updated` (neutral lifecycle event,
+  payload `{ participantId, number, position, source, captureCommandId }`, event
+  schema unchanged, no migration). The projector sets the participant's current
+  number and position; it needs an open period, like a late add.
+- Command `updateBasketballParticipantDetails` (`commands.ts`): one event per
+  changed participant. A refresh gives every change and every roster addition
+  one captureCommandId, so one Undo reverts the whole refresh (the capture strip
+  shows "Roster: Roster refresh: 2 updated, 1 added"). No-op changes are
+  skipped; finalized cloud games are refused ("Reopen ... first").
+- Finished games: after Reopen > Correct records the game stays ended and the
+  tracker shows only the Timeline, so a "Numbers and positions" panel above it
+  lists every player with Edit, plus Refresh from Roster (changes only; adding
+  players needs Resume game). The command uses the terminal context and the
+  projector accepts the event in the final period while the reopen mode is
+  `correct_records`; live capture stays locked and republish readiness is
+  unchanged (the server's terminal checks only read end and reopen events).
+- Display: Summary, box score, leaders and lineup labels read the projected
+  participant, and tracker rows read `players[]` (reconciled from the
+  projection), so the current number shows everywhere. The Timeline shows the
+  event as "Roster refresh: now #21, PG" or "Roster change: ...".
+- Cloud: participant rows keep the setup number, because recovery checks the
+  rows against the immutable setup; the change replays from the uploaded event.
+  Late adds picked from the roster carry `fromRoster: true` on
+  `match_roster_added`, so they keep `source_player_id` (covers #428).
+  Free-text late adds are unchanged.
+- Shared, sport neutral: `src/lib/rosterRefresh.ts` (diff: updates, additions,
+  unmatched), `src/lib/teamRosterSnapshot.ts` (roster load and the "Also update
+  team roster" write), `src/components/roster-refresh/RosterRefreshDialog.tsx`
+  and `ParticipantDetailsDialog.tsx`. Basketball wiring:
+  `src/lib/basketball/rosterRefresh.ts` and
+  `src/components/basketball/BasketballRosterTools.tsx`.
+- Tracker: Lineup tab, tracked side, shows "Refresh from Roster" for cloud team
+  games while the game is open. Changes are checked by default; roster players
+  not in the game are unchecked by default and need a paused clock. Players no
+  longer on the roster are listed and kept. The player detail view has "Edit
+  number / position" for either team, with "Also update team roster"
+  (unchecked, team managers only, tracked roster players only). A final game,
+  or one reopened with Resume game not yet chosen, shows "Reopen the game to
+  refresh ...".
+- A late add with a later details change can't be removed from the Timeline,
+  like one with later stats.
+- Not browser-tested: the refresh needs a signed-in team game.
+- Checks: typecheck clean; lint 0 errors / 3 known warnings; 362 files / 3,717
+  tests (new `src/lib/rosterRefresh.test.ts`,
+  `src/lib/basketball/rosterRefresh.test.ts`, Correct records cases in
+  `reopenHandoff.test.ts`); build passes, app chunk 914,455 bytes.
+- Pending owner checks (signed in, team game): refresh after changing a number
+  in Team Manage mid-game; add a roster player from the dialog and confirm the
+  game syncs; per-player edit with "Also update team roster"; Undo a refresh
+  that also added a player; reopen a final game with Correct records, fix a
+  number in "Numbers and positions", republish; confirm Summary and Timeline
+  show the new number.

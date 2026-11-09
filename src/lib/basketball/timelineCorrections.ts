@@ -386,7 +386,8 @@ function validateRemovalAvailability(
   const dependent = [...activeEvents, ...deletedEvents].find(candidate =>
     !removingIds.has(candidate.id) && (
       candidate.actors.some(actor => actor.participantId === participantId) ||
-      (candidate.eventType === 'basketball.participant_resolved' &&
+      ((candidate.eventType === 'basketball.participant_resolved' ||
+        candidate.eventType === 'basketball.participant_details_updated') &&
         candidate.payload.participantId === participantId)
     )
   )

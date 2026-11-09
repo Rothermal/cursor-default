@@ -12,6 +12,16 @@ import { applyBasketballReopenHandoff, type BasketballReopenHandoff } from './re
 import { buildBasketballHistoricalShotDraft } from './shotEditCommands'
 import { basketballLineupCorrectionDraft } from './lineupCorrectionCommands'
 import { basketballTimelineCorrectionsEnabled } from './timeline'
+import { basketballCloudParticipants } from './cloudSync'
+import { getBasketballCommandContext, updateBasketballParticipantDetails } from './commands'
+import { rebuildGameEventProjection } from '../gameEvents/projection'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
+import {
+  applyBasketballRosterRefresh,
+  basketballDetailsEditMode,
+  basketballRosterRefreshParticipants,
+} from './rosterRefresh'
+import { diffGameRoster } from '../rosterRefresh'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 const recorderId = 'aggregate-recorder'
@@ -65,6 +75,60 @@ describe('BKE-6D4 anchored finalization and reopen handoff', () => {
       typeof event === 'object' && event !== null &&
       'eventType' in event && event.eventType === 'basketball.match_reopened'
     ))).toHaveLength(1)
+  })
+
+  it('RTN-2: fixes a number and position under Correct records without resuming the game', () => {
+    const final = authorityState()
+    expect(basketballDetailsEditMode(final)).toBe('reopen')
+    const applied = applyBasketballReopenHandoff(final, recorderId, 'anchored-game-1', handoff('correct_records'))
+    if (!applied.ok || applied.state.sportGameState?.sportId !== 'basketball') throw new Error('reopen failed')
+    const state = applied.state
+    const sportState = applied.state.sportGameState
+    expect(basketballDetailsEditMode(state)).toBe('correcting')
+    const target = Object.values(sportState.projection.participants)
+      .find(participant => participant.teamSide === 'tracked' && participant.playerId)
+    if (!target) throw new Error('Anchored fixture participant is unavailable.')
+    const targetId: string = target.participantId
+    const setupNumber = sportState.setup.participants.find(item => item.id === targetId)?.number ?? null
+
+    const changed = updateBasketballParticipantDetails(state, {
+      recorderUserId: recorderId,
+      source: 'manual',
+      occurredAt: '2026-08-27T15:06:00.000Z',
+      changes: [{ participantId: targetId, number: '77', position: 'C' }],
+    })
+    if (!changed.ok) throw new Error(changed.message)
+    if (changed.state.sportGameState?.sportId !== 'basketball') throw new Error('not basketball')
+    const projection = changed.state.sportGameState.projection
+    expect(projection).toMatchObject({ status: 'ended', reopenMode: 'correct_records', endReason: 'abandoned' })
+    expect(projection.clock?.running ?? false).toBe(false)
+    expect(projection.participants[targetId]).toMatchObject({ number: '77', position: 'C' })
+
+    // Live capture stays locked, the stream replays cleanly, and republish is still ready.
+    expect(getBasketballCommandContext(changed.state, recorderId).ok).toBe(false)
+    const rebuilt = rebuildGameEventProjection(changed.state, gameEventRegistry, gameEventProjectors)
+    expect(rebuilt.inspection.complete).toBe(true)
+    expect(evaluateBasketballAnchoredFinalization(changed.state)).toEqual({ applicable: true, blockers: [] })
+    // Sync keeps the setup number on the participant row; the event carries the fix.
+    expect(basketballCloudParticipants(changed.state.sportGameState, changed.state.eventStream?.events ?? [])
+      .find(row => row.client_participant_id === targetId)?.jersey_number).toBe(setupNumber)
+    const detailsEvent = changed.state.eventStream?.events.find(event => (
+      isGameEventEnvelope(event) && event.eventType === 'basketball.participant_details_updated'
+    ))
+    expect(detailsEvent).toBeDefined()
+  })
+
+  it('RTN-2: refuses roster additions under Correct records', () => {
+    const applied = applyBasketballReopenHandoff(authorityState(), recorderId, 'anchored-game-1', handoff('correct_records'))
+    if (!applied.ok) throw new Error('reopen failed')
+    const diff = diffGameRoster(basketballRosterRefreshParticipants(applied.state), [
+      { playerId: 'new-roster-player', name: 'New Player', number: '50', position: null, isActive: true },
+    ])
+    const result = applyBasketballRosterRefresh(applied.state, {
+      recorderUserId: recorderId, diff, updateParticipantIds: [], additionPlayerIds: ['new-roster-player'],
+      occurredAt: '2026-08-27T15:06:00.000Z',
+    })
+    expect(result.ok).toBe(false)
   })
 
   it('restores Resume game at the exact paused clock with lineup review required', () => {

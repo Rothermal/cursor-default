@@ -20,6 +20,7 @@ import { createInitialCloudSyncState } from '../gameReducer'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { supabase } from '../supabase'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
+import { basketballRosterLateAddIds } from './rosterRefresh'
 import { createBasketballLifecycleEvent } from './events'
 import { createBasketballUuid } from './id'
 import { basketballRulesToTeamStatsConfig } from './rules'
@@ -103,30 +104,34 @@ export class BasketballCloudRecoveryError extends Error {
 }
 
 export function basketballCloudParticipants(
-  sportState: BasketballSportGameState
+  sportState: BasketballSportGameState,
+  events: readonly unknown[] = []
 ): EventCloudParticipant[] {
   const setupById = new Map(
     sportState.setup.participants.map(participant => [participant.id, participant])
   )
+  // RTN-2 (#428): late adds picked from the team roster carry the roster player id.
+  const rosterLateAddIds = basketballRosterLateAddIds(events)
   return Object.values(sportState.projection.participants).map(participant => {
     const origin = setupById.get(participant.participantId)
-    // Basketball late adds are free-text and mint a local player id that is
-    // never on team_players; sending it as source_player_id makes every bind
-    // fail with "Participant source player is not on the source team". If late
-    // adds ever offer roster players (#428), revisit this predicate so their
-    // roster link is kept.
+    // Free-text late adds mint a local player id that is never on team_players;
+    // sending it as source_player_id makes every bind fail with "Participant
+    // source player is not on the source team". Late adds picked from the team
+    // roster (#428, RTN-2) carry the roster id, so they keep the roster link.
     return {
       client_participant_id: participant.participantId,
       client_player_id: participant.playerId,
       source_player_id:
         sportState.setup.sourceTeamId &&
         participant.teamSide === 'tracked' &&
-        origin !== undefined
+        (origin !== undefined || rosterLateAddIds.has(participant.participantId))
           ? participant.playerId
           : null,
       kind: participant.playerId ? 'player' : 'anonymous',
       display_name: participant.displayName,
-      jersey_number: participant.number,
+      // Setup participants keep their setup number: recovery checks the row
+      // against the immutable setup, and RTN-2 number changes replay as events.
+      jersey_number: origin ? origin.number : participant.number,
       snapshot: {
         teamSide: participant.teamSide,
         initialStatus: origin?.initialStatus ?? 'bench',
@@ -171,7 +176,7 @@ export const basketballEventCloudTransportAdapter: EventCloudTransportAdapter = 
       sourceTeamId: sportState.setup.sourceTeamId,
       sourceSeasonId: sportState.setup.sourceSeasonId,
       setupSnapshot: sportState.setup,
-      participants: basketballCloudParticipants(sportState),
+      participants: basketballCloudParticipants(sportState, state.eventStream?.events ?? []),
     }
   },
   createRecoveryError(message, recoveredState) {
