@@ -451,7 +451,11 @@ function applyParticipantDetailsUpdated(
   sportState: BasketballSportGameState,
   event: Extract<BasketballLifecycleEvent, { eventType: 'basketball.participant_details_updated' }>
 ): string | null {
-  const momentError = validateActiveMoment(projection, sportState, event)
+  // RTN-2: a "Correct records" reopen keeps the match ended but may still fix
+  // numbers and positions in the final period; everything else needs a live moment.
+  const momentError = projection.status === 'ended' && projection.reopenMode === 'correct_records'
+    ? validateCurrentPeriod(projection, sportState, event)
+    : validateActiveMoment(projection, sportState, event)
   if (momentError) return momentError
   const participant = projection.participants[event.payload.participantId]
   if (!participant) return 'Basketball participant details reference an unknown participant.'

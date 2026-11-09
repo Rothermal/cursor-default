@@ -48,7 +48,7 @@ import BasketballRecorderStatus from '../components/basketball/BasketballRecorde
 import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
 import BasketballClockStrip from '../components/basketball/BasketballClockStrip'
 import BasketballWorkspaceRoster from '../components/basketball/BasketballWorkspaceRoster'
-import { BasketballParticipantEditButton, BasketballRosterRefreshButton } from '../components/basketball/BasketballRosterTools'
+import { BasketballCorrectionRosterPanel, BasketballParticipantEditButton, BasketballRosterRefreshButton } from '../components/basketball/BasketballRosterTools'
 import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
@@ -1349,6 +1349,7 @@ export default function GameTracker() {
           <p className="border border-warning-line bg-warning px-3 py-2 text-sm font-semibold text-warning-content">
             Correct records mode. Live capture remains locked until this result is republished.
           </p>
+          <BasketballCorrectionRosterPanel state={state} trackedTeamName={trackedTeamLabel} opponentName={opponentTeamLabel} onState={next => { setLifecycleError(null); dispatch({ type: 'HYDRATE_STATE', state: next }) }} />
           <BasketballTimeline />
         </div>
       ) : (!isBasketball || basketballWorkspace !== 'timeline') ? (

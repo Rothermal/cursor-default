@@ -470,12 +470,22 @@ function buildCaptureUnit(
     captureCommandId,
     eventIds: events.map(event => event.id),
     events,
-    who: captureUnitActorLabel(state, primary),
+    who: isMultiPlayerRosterRefresh(events) ? 'Roster' : captureUnitActorLabel(state, primary),
     what: captureUnitLabel(state, events, shot),
     containsLocatedFieldGoal: Boolean(shot),
     kind: boundary ? 'boundary' : 'capture',
     undoable: !boundary,
   }
+}
+
+function isRosterChangeEvent(event: BasketballMatchEvent): boolean {
+  return event.eventType === 'basketball.participant_details_updated' ||
+    event.eventType === 'basketball.match_roster_added'
+}
+
+/** RTN-2: one refresh can change and add several players under one capture id. */
+function isMultiPlayerRosterRefresh(events: BasketballMatchEvent[]): boolean {
+  return events.length > 1 && events.every(isRosterChangeEvent)
 }
 
 function captureUnitActorLabel(state: GameState, event: BasketballMatchEvent): string {
@@ -533,6 +543,14 @@ function captureUnitLabel(
     }
     return label
   }
+  if (isMultiPlayerRosterRefresh(events)) {
+    const updated = events.filter(event => event.eventType === 'basketball.participant_details_updated').length
+    const added = events.length - updated
+    return `Roster refresh: ${[
+      updated > 0 ? `${updated} updated` : null,
+      added > 0 ? `${added} added` : null,
+    ].filter(Boolean).join(', ')}`
+  }
   switch (events[0]?.eventType) {
     case 'basketball.period_started':
       return `${periodLabel(state, events[0].payload.periodId)} started`
@@ -545,8 +563,6 @@ function captureUnitLabel(
     case 'basketball.participant_resolved': return 'Participant identity updated'
     case 'basketball.participant_details_updated': {
       const payload = events[0].payload
-      const count = events.length
-      if (count > 1) return `Roster refresh: ${count} players updated`
       return `Now ${payload.number ? `#${payload.number}` : 'no number'}, ${payload.position ?? 'no position'}`
     }
     case 'basketball.match_ended': {

@@ -130,7 +130,7 @@ describe('updateBasketballParticipantDetails', () => {
     )
     expect(final).toMatchObject({ ok: false, code: 'cloud_flow_unsupported' })
     expect(basketballRosterRefreshAvailability({ ...state, cloudSync: { ...state.cloudSync, gameStatus: 'final' } })).toEqual({ kind: 'reopen' })
-    expect(basketballRosterRefreshAvailability(state)).toEqual({ kind: 'available', teamId: 'team-1' })
+    expect(basketballRosterRefreshAvailability(state)).toEqual({ kind: 'available', teamId: 'team-1', correcting: false })
   })
 })
 
@@ -157,6 +157,14 @@ describe('applyBasketballRosterRefresh', () => {
     expect(basketballRosterLateAddIds(result.state.eventStream!.events).has(added.participantId)).toBe(true)
     expect(isBasketballRosterParticipant(result.state, added.participantId)).toBe(true)
     expect(isBasketballRosterParticipant(result.state, P1)).toBe(true)
+
+    // One refresh is one capture unit: a single Undo removes the changes and the additions.
+    const unit = basketballLiveCaptureUnits(result.state)[0]
+    expect(unit).toMatchObject({ who: 'Roster', what: 'Roster refresh: 1 updated, 1 added', undoable: true })
+    const undone = undoLatestBasketballCourtCapture(result.state, AT)
+    if (!undone.ok) throw new Error(undone.message)
+    expect(projection(undone.state).participants[P1].number).toBe('4')
+    expect(Object.values(projection(undone.state).participants).some(item => item.playerId === 'player-3')).toBe(false)
 
     if (result.state.sportGameState?.sportId !== 'basketball') throw new Error('not basketball')
     const cloud = basketballCloudParticipants(result.state.sportGameState, result.state.eventStream!.events)

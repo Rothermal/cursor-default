@@ -733,7 +733,13 @@ export function updateBasketballParticipantDetails(
   if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
-  const context = getBasketballLifecycleContext(state, options.recorderUserId, options.occurredAt)
+  const correcting = state.sportGameState?.sportId === 'basketball' &&
+    state.sportGameState.projection.status === 'ended' &&
+    state.sportGameState.projection.reopenMode === 'correct_records'
+  // "Correct records" keeps the game ended; the change lands in the final period.
+  const context = correcting
+    ? getBasketballTerminalLifecycleContext(state, options.recorderUserId, options.occurredAt)
+    : getBasketballLifecycleContext(state, options.recorderUserId, options.occurredAt)
   if (!context.ok) return { ...context, state }
   const participants = context.value.sportState.projection.participants
   const seen = new Set<string>()

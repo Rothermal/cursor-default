@@ -42,27 +42,45 @@ export function basketballRosterRefreshParticipants(state: GameState): RosterRef
   }))
 }
 
+/**
+ * When a game's numbers and positions can change: `live` while a period is
+ * open, `correcting` after a "Correct records" reopen (details only, no
+ * additions), `reopen` for an ended, suspended or final game.
+ */
+export type BasketballDetailsEditMode = 'live' | 'correcting' | 'reopen' | 'not_started'
+
+export function basketballDetailsEditMode(state: GameState): BasketballDetailsEditMode {
+  if (state.sportGameState?.sportId !== 'basketball') return 'not_started'
+  if (state.cloudSync.gameStatus === 'final') return 'reopen'
+  const { status, reopenMode, currentPeriodId } = state.sportGameState.projection
+  if (status === 'ended' && reopenMode === 'correct_records' && currentPeriodId) return 'correcting'
+  if (status === 'ended' || status === 'suspended') return 'reopen'
+  if (status === 'not_started' || !currentPeriodId) return 'not_started'
+  return 'live'
+}
+
 export type BasketballRosterRefreshAvailability =
-  | { kind: 'available'; teamId: string }
+  /** `correcting`: a "Correct records" reopen; numbers and positions only, no additions. */
+  | { kind: 'available'; teamId: string; correcting: boolean }
   | { kind: 'reopen' }
   | { kind: 'not_started' }
   | { kind: 'no_team' }
 
-/** Whether "Refresh from roster" applies: cloud team games only, while the game is open. */
+/** Whether "Refresh from roster" applies: cloud team games only, while details can change. */
 export function basketballRosterRefreshAvailability(state: GameState): BasketballRosterRefreshAvailability {
   if (state.sportGameState?.sportId !== 'basketball') return { kind: 'no_team' }
   const teamId = state.sportGameState.setup.sourceTeamId
   if (!teamId) return { kind: 'no_team' }
-  const status = state.sportGameState.projection.status
-  if (status === 'ended' || status === 'suspended' || state.cloudSync.gameStatus === 'final') return { kind: 'reopen' }
-  if (status === 'not_started' || !state.sportGameState.projection.currentPeriodId) return { kind: 'not_started' }
-  return { kind: 'available', teamId }
+  const mode = basketballDetailsEditMode(state)
+  if (mode === 'reopen' || mode === 'not_started') return { kind: mode }
+  return { kind: 'available', teamId, correcting: mode === 'correcting' }
 }
 
 /**
  * Apply the selected roster refresh: one details command for every selected
- * number/position change (they undo together), then one bench late add per
- * selected roster player. Stops at the first failure and returns the original state.
+ * number/position change, then one bench late add per selected roster player.
+ * Every event shares one captureCommandId, so one Undo reverts the whole
+ * refresh. Stops at the first failure and returns the original state.
  */
 export function applyBasketballRosterRefresh(
   state: GameState,
@@ -75,12 +93,14 @@ export function applyBasketballRosterRefresh(
   }
 ): BasketballStateCommandResult {
   let next = state
+  const captureCommandId = createBasketballCaptureCommandId()
   const updates = options.diff.updates.filter(update => options.updateParticipantIds.includes(update.participantId))
   if (updates.length > 0) {
     const result = updateBasketballParticipantDetails(next, {
       recorderUserId: options.recorderUserId,
       source: 'roster_refresh',
       occurredAt: options.occurredAt,
+      captureCommandId,
       changes: updates.map(update => ({ participantId: update.participantId, ...update.to })),
     })
     if (!result.ok) return { ...result, state }
@@ -96,7 +116,7 @@ export function applyBasketballRosterRefresh(
       playerId: addition.playerId,
       fromRoster: true,
       occurredAt: options.occurredAt,
-      captureCommandId: createBasketballCaptureCommandId(),
+      captureCommandId,
     })
     if (!result.ok) return { ...result, state }
     next = result.state

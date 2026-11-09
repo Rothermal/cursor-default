@@ -8,6 +8,7 @@ import { updateBasketballParticipantDetails } from '../../lib/basketball/command
 import { BASKETBALL_POSITION_MAX_LENGTH } from '../../lib/basketball/positions'
 import {
   applyBasketballRosterRefresh,
+  basketballDetailsEditMode,
   basketballRosterRefreshAvailability,
   basketballRosterRefreshParticipants,
   isBasketballRosterParticipant,
@@ -35,6 +36,7 @@ export function BasketballRosterRefreshButton({ state, onState, teamName }: Rost
   const [notice, setNotice] = useState<string | null>(null)
   const cloudReady = Boolean(isConfigured && user && supabase)
   const teamId = availability.kind === 'available' ? availability.teamId : null
+  const correcting = availability.kind === 'available' && availability.correcting
 
   const load = useCallback(async () => {
     if (!supabase || !teamId) return
@@ -43,13 +45,15 @@ export function BasketballRosterRefreshButton({ state, onState, teamName }: Rost
     setDiff(null)
     try {
       const roster = await loadTeamRosterSnapshot(supabase, teamId)
-      setDiff(diffGameRoster(basketballRosterRefreshParticipants(state), roster))
+      const next = diffGameRoster(basketballRosterRefreshParticipants(state), roster)
+      // "Correct records" fixes numbers and positions only; adding players needs Resume game.
+      setDiff(correcting ? { ...next, additions: [] } : next)
     } catch (reason) {
       setLoadError(reason instanceof Error ? reason.message : 'The team roster could not load.')
     } finally {
       setLoading(false)
     }
-  }, [state, teamId])
+  }, [correcting, state, teamId])
 
   if (availability.kind === 'no_team' || !cloudReady) return null
   if (availability.kind === 'reopen') {
@@ -114,7 +118,7 @@ export function BasketballRosterRefreshButton({ state, onState, teamName }: Rost
 }
 
 /** RTN-2 per-player "Edit number / position" in the player detail view. */
-export function BasketballParticipantEditButton({ state, onState, playerId }: RosterToolProps & { playerId: string }) {
+export function BasketballParticipantEditButton({ state, onState, playerId, compact = false }: RosterToolProps & { playerId: string; compact?: boolean }) {
   const { user, isConfigured } = useAuth()
   const sportState = state.sportGameState?.sportId === 'basketball' ? state.sportGameState : null
   const participant = sportState
@@ -127,11 +131,11 @@ export function BasketballParticipantEditButton({ state, onState, playerId }: Ro
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   if (!sportState || !participant) return null
-  const availability = basketballRosterRefreshAvailability(state)
-  if (availability.kind === 'reopen') {
+  const mode = basketballDetailsEditMode(state)
+  if (mode === 'reopen') {
     return <p className="mt-2 text-xs text-content-muted">Reopen the game to change this player's number or position.</p>
   }
-  const gameOpen = sportState.projection.status !== 'not_started' && Boolean(sportState.projection.currentPeriodId)
+  const gameOpen = mode === 'live' || mode === 'correcting'
   const isRosterPlayer = isBasketballRosterParticipant(state, participant.participantId)
   const canUpdateRoster = Boolean(supabase && teamId && isRosterPlayer && canManageRoster(rosterAccess.role))
 
@@ -139,12 +143,13 @@ export function BasketballParticipantEditButton({ state, onState, playerId }: Ro
     <>
       <button
         type="button"
-        className="btn-secondary mt-2 flex min-h-11 items-center gap-2 px-3"
+        className={`btn-secondary flex min-h-11 items-center gap-2 px-3 ${compact ? '' : 'mt-2'}`}
         disabled={!gameOpen}
+        aria-label={compact ? `Edit number or position for ${participant.displayName}` : undefined}
         title={gameOpen ? undefined : 'Start the game before editing numbers.'}
         onClick={() => { setOpen(true); setError(null); setNotice(null) }}
       >
-        <Pencil size={16} aria-hidden /> Edit number / position
+        <Pencil size={16} aria-hidden /> {compact ? 'Edit' : 'Edit number / position'}
       </button>
       {notice && <p role="status" className="mt-1 text-xs text-content-muted">{notice}</p>}
       {open && (
@@ -181,5 +186,48 @@ export function BasketballParticipantEditButton({ state, onState, playerId }: Ro
         />
       )}
     </>
+  )
+}
+
+/**
+ * RTN-2 "Correct records" entry point: the reopened game stays ended and the
+ * tracker shows only the Timeline, so numbers and positions are fixed here.
+ */
+export function BasketballCorrectionRosterPanel({ state, onState, trackedTeamName, opponentName }: RosterToolProps & { trackedTeamName: string; opponentName: string }) {
+  if (state.sportGameState?.sportId !== 'basketball' || basketballDetailsEditMode(state) !== 'correcting') return null
+  const participants = Object.values(state.sportGameState.projection.participants)
+    .filter(participant => participant.playerId)
+  const sides = [
+    { side: 'tracked' as const, label: trackedTeamName },
+    { side: 'opponent' as const, label: opponentName },
+  ]
+  return (
+    <details className="rounded-lg border border-line bg-surface px-3 py-2">
+      <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-content">Numbers and positions</summary>
+      <p className="text-xs text-content-muted">Fix a number or position in this finished game. Republish to save the correction.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <BasketballRosterRefreshButton state={state} onState={onState} teamName={trackedTeamName} />
+      </div>
+      {sides.map(({ side, label }) => {
+        const rows = participants.filter(participant => participant.teamSide === side)
+        if (rows.length === 0) return null
+        return (
+          <section key={side} className="mt-3" aria-label={label}>
+            <h3 className="break-words text-xs font-semibold uppercase text-content-muted">{label}</h3>
+            <ul className="divide-y divide-line">
+              {rows.map(participant => (
+                <li key={participant.participantId} className="flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0 break-words text-sm text-content">
+                    {participant.number ? `#${participant.number} ` : ''}{participant.displayName}
+                    {participant.position && <span className="text-content-muted"> · {participant.position}</span>}
+                  </span>
+                  <BasketballParticipantEditButton compact state={state} onState={onState} playerId={participant.playerId!} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      })}
+    </details>
   )
 }
