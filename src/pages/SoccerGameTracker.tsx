@@ -42,6 +42,7 @@ import SoccerLiveActionDialog, {
   type SoccerLiveDialogKind,
 } from '../components/soccer/SoccerLiveActionDialog'
 import SoccerTimeline from '../components/soccer/SoccerTimeline'
+import { SoccerNumberDialog, SoccerRosterRefreshButton } from '../components/soccer/SoccerRosterTools'
 import SoccerScoreTimelineDialog from '../components/soccer/SoccerScoreTimelineDialog'
 import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } from '../components/soccer/SoccerShootoutManagementDialog'
 import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
@@ -129,6 +130,7 @@ export default function SoccerGameTracker() {
   const [actionsOpen, setActionsOpen] = useState(false)
   const [dialogKind, setDialogKind] = useState<SoccerLiveDialogKind | null>(null)
   const [dialogParticipantId, setDialogParticipantId] = useState<string | null>(null)
+  const [numberParticipantId, setNumberParticipantId] = useState<string | null>(null)
   const [confirmEndPeriod, setConfirmEndPeriod] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isApplying, setIsApplying] = useState(false)
@@ -850,6 +852,9 @@ export default function SoccerGameTracker() {
             </div>
           ) : mainTab === 'lineup' ? (
             <>
+              {healthy && !cloudFinal && (
+                <SoccerRosterRefreshButton state={state} recorderUserId={user?.id ?? null} disabled={isApplying} onApply={applyResult} teamName={trackedLabel} />
+              )}
               <button type="button" onClick={() => openDialog('substitution')} disabled={!substitutionActionEnabled}
                 className="mb-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-success-line bg-success px-3 text-sm font-bold text-success-content disabled:bg-control-disabled disabled:text-content-disabled">
                 <Repeat2 size={18} />{projection.clock.running ? 'Pause clock to manage lineup' : 'Manage Lineup'}
@@ -875,6 +880,7 @@ export default function SoccerGameTracker() {
                     canResolve={participant.playerId === null && state.players.some(player => !participants.some(item => item.playerId === player.id))}
                     onRole={() => openDialog('roles', participant.participantId)}
                     onResolve={() => openDialog('resolve', participant.participantId)}
+                    onNumber={() => setNumberParticipantId(participant.participantId)}
                   />
                 ))}
               </div>
@@ -936,6 +942,16 @@ export default function SoccerGameTracker() {
             projection.attackingDirection === 'left_to_right' ? 'right_to_left' : 'left_to_right',
             options
           ))}
+        />
+      )}
+
+      {numberParticipantId && (
+        <SoccerNumberDialog
+          state={state}
+          recorderUserId={user?.id ?? null}
+          participantId={numberParticipantId}
+          onApply={applyResult}
+          onClose={() => setNumberParticipantId(null)}
         />
       )}
 
@@ -1121,7 +1137,7 @@ export default function SoccerGameTracker() {
   )
 }
 
-function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled, canResolve, onRole, onResolve }: {
+function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled, canResolve, onRole, onResolve, onNumber }: {
   participant: SoccerProjectedParticipant
   projection: SoccerMatchProjection
   nowMs: number
@@ -1130,6 +1146,7 @@ function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled
   canResolve: boolean
   onRole: () => void
   onResolve: () => void
+  onNumber: () => void
 }) {
   const activeMs = participantActiveMs(participant, projection, nowMs)
   return (
@@ -1146,6 +1163,7 @@ function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled
       {!disabled && (
         <div className="flex gap-1">
           {canResolve && <button type="button" onClick={onResolve} className="h-9 px-2 text-xs font-bold text-info-content" title="Resolve participant">Resolve</button>}
+          <button type="button" onClick={onNumber} className="h-9 px-2 text-xs font-bold text-content-muted" aria-label={`Edit number for ${participant.displayName}`}>No.</button>
           {participant.status !== 'left' && <button type="button" disabled={roleDisabled} onClick={onRole} className="h-9 px-2 text-xs font-bold text-content-muted disabled:bg-control-disabled disabled:text-content-disabled">Role</button>}
         </div>
       )}

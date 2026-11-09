@@ -52,7 +52,9 @@ export function normalizeRosterLabel(value: string | null | undefined): string |
 
 export function diffGameRoster(
   participants: RosterRefreshParticipant[],
-  roster: RosterRefreshRosterRow[]
+  roster: RosterRefreshRosterRow[],
+  /** `number`: sports whose game position is tactical (Soccer) compare numbers only. */
+  fields: 'number' | 'number_and_position' = 'number_and_position'
 ): RosterRefreshDiff {
   const rosterById = new Map(roster.map(row => [row.playerId, row]))
   const inGame = new Set<string>()
@@ -67,7 +69,10 @@ export function diffGameRoster(
       continue
     }
     const from = { number: normalizeRosterLabel(participant.number), position: normalizeRosterLabel(participant.position) }
-    const to = { number: normalizeRosterLabel(row.number), position: normalizeRosterLabel(row.position) }
+    const to = {
+      number: normalizeRosterLabel(row.number),
+      position: fields === 'number' ? from.position : normalizeRosterLabel(row.position),
+    }
     if (from.number === to.number && from.position === to.position) continue
     updates.push({ participantId: participant.participantId, playerId: participant.playerId, displayName: participant.displayName, from, to })
   }

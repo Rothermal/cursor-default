@@ -6,7 +6,8 @@ import { useSettings } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import OpponentPicker from '../components/opponents/OpponentPicker'
 import { useSavedOpponents } from '../hooks/useSavedOpponents'
-import { createOpponentTeam, normalizeOpponentLabel, opponentSaveCandidate, updateOpponentTeam } from '../lib/opponentTeams'
+import { normalizeOpponentLabel } from '../lib/opponentTeams'
+import { persistSetupLabels as saveSetupLabels } from '../lib/setupLabels'
 import { supabase } from '../lib/supabase'
 import { gameSetupPath, teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
@@ -537,26 +538,18 @@ export default function GameSetup() {
   const persistSetupLabels = () => {
     const client = supabase
     if (!client || !isCloudFlow || !sport) return
-    const candidate = opponentSaveCandidate(savedOpponents.opponents, opponentName, opponentNickname)
-    if (saveOpponent && candidate) {
-      const nickname = normalizeOpponentLabel(opponentNickname)
-      const write = candidate.kind === 'new'
-        ? createOpponentTeam(client, sport.id, opponentName, nickname)
-        : updateOpponentTeam(client, candidate.opponent.id, candidate.opponent.name, nickname)
-      void write.catch((error: unknown) => {
-        console.warn('[StatKeeper] Saved opponent could not be stored', error instanceof Error ? error.message : error)
-      })
-    }
-    if (saveTeamNickname && offerTeamNicknameSave && selectedTeam) {
-      void client
-        .from('teams')
-        .update({ nickname: normalizeOpponentLabel(teamNickname) })
-        .eq('id', selectedTeam.id)
-        .then(({ error }) => {
-          if (error) console.warn('[StatKeeper] Team nickname could not be saved', error.message)
-          else setTeams(prev => prev.map(team => team.id === selectedTeam.id ? { ...team, nickname: normalizeOpponentLabel(teamNickname) } : team))
-        })
-    }
+    const teamId = saveTeamNickname && offerTeamNicknameSave && selectedTeam ? selectedTeam.id : null
+    void saveSetupLabels({
+      client,
+      sportId: sport.id,
+      savedOpponents: savedOpponents.opponents,
+      opponentName,
+      opponentNickname,
+      saveOpponent,
+      teamNickname: teamId ? { teamId, value: teamNickname } : null,
+    }).then(saved => {
+      if (teamId && saved !== undefined) setTeams(prev => prev.map(team => team.id === teamId ? { ...team, nickname: saved } : team))
+    })
   }
   const selectedNewTeamSeasonRow = useMemo(
     () => seasonsForNewTeam.find(s => s.id === selectedNewTeamSeasonId) ?? null,

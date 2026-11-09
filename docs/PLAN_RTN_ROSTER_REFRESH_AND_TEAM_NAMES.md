@@ -2,8 +2,9 @@
 
 Status: Plan and RTN-0 merged in #518 (2026-11-08). Mark accepted all six
 recommended answers on 2026-11-08 (section 4). RTN-1 merged in #522 (Mark applies
-migration 082). RTN-2 (Basketball roster refresh) is
-implemented for review (section 6). RTN-3 follows.
+migration 082). RTN-2 merged in #523 (section 6). RTN-3A
+(Soccer) is implemented for review (section 7); RTN-3B Hockey and RTN-3C
+Baseball follow.
 
 Owner request (2026-11-07): "Basketball first but should apply to all sports.
 Need an option to refresh player metadata, numbers, positions during a game. The
@@ -231,3 +232,47 @@ Recommended answers are in bold. Mark accepted all six on 2026-11-08.
   that also added a player; reopen a final game with Correct records, fix a
   number in "Numbers and positions", republish; confirm Summary and Timeline
   show the new number.
+
+## 7. RTN-3A delivery record (Soccer)
+
+- Event `soccer.participant_details_updated` (match-state event, payload
+  `{ changes: [{ participantId, number }], source: 'roster_refresh' | 'manual' }`,
+  schema unchanged, no migration). One event holds every change from one
+  refresh or edit, so Field Undo (now allowed for this type) reverts it in one
+  step. The projector sets the current number while the match is active
+  (in progress, period break or shootout); not started, ended and suspended
+  matches refuse it, and a final cloud game asks for Reopen first. Soccer's
+  reopen returns the match to a period break, so "reopen, refresh, finalize
+  again" works without extra handling.
+- Numbers only: a Soccer participant's position is its tactical role, which
+  already changes through `soccer.role_changed`. The shared diff takes
+  `fields: 'number'` so a roster role never shows as a change, and "Also update
+  team roster" writes only `team_players.jersey_number`.
+- Display: the Lineup list, Summary players and lineup labels read the
+  projected participant, so the current number shows everywhere. Timeline
+  rows read "Number change" with "Roster refresh: now #13" or "Roster change:
+  2 numbers"; the event appears under the Lineup filter, has a Timeline edit
+  form, and counts as a participant reference for removal guards.
+- Roster additions use the existing `soccer.match_roster_added` (bench, role
+  from `team_players.position`); Soccer cloud sync already sends
+  `source_player_id` for every team game player, so no marker is needed.
+  Participant rows keep the number they were first bound with (the shared
+  binder is `on conflict do nothing`); the event carries the change.
+- Tracker: Lineup tab shows "Refresh from Roster" for cloud team games while
+  the match is active, and each row has "No." for a one-off number edit with
+  "Also update team roster" (unchecked, team managers, roster players).
+- Setup: `SoccerGameSetup` uses `OpponentPicker` (saved opponents, "Save
+  opponent for future games") and offers "Save as the team's nickname" to team
+  managers. Saves run on Continue through the shared `src/lib/setupLabels.ts`,
+  which Basketball setup now uses too; they never block setup.
+- Tests: `src/lib/soccer/rosterRefresh.test.ts` (event, replay, Field Undo,
+  labels, refusals, number-only diff, roster addition with role and
+  `source_player_id`).
+- The Soccer schema-count pins in `soccer.test.ts` and `soc4.test.ts` move
+  from 26 to 27 definitions.
+- Checks: typecheck clean; lint 0 errors / 3 known warnings; 363 files / 3,722
+  tests; build passes, app chunk 915,449 bytes. Not browser-tested.
+- Pending owner checks (signed in, Soccer team game): change a number in Team
+  Manage mid-match and refresh; add a roster player from the dialog; edit one
+  number with "Also update team roster"; Field Undo a refresh; pick and save an
+  opponent in Soccer setup; save a team nickname from Soccer setup.

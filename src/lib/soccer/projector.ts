@@ -215,6 +215,8 @@ function applySoccerEvent(
       return applyRosterAddition(projection, event.payload.participant, event.payload.destination, event.elapsedMs)
     case 'soccer.participant_resolved':
       return applyParticipantResolution(projection, event.payload, gameState)
+    case 'soccer.participant_details_updated':
+      return applyParticipantDetailsUpdated(projection, event.payload)
     case 'soccer.match_ended':
       return applyMatchEnded(projection, event.payload.reason, event.occurredAt)
     case 'soccer.match_reopened':
@@ -593,6 +595,21 @@ function applyParticipantResolution(
   participant.playerId = payload.playerId
   participant.displayName = payload.displayName
   participant.number = payload.number
+  return null
+}
+
+/** RTN-3A: later events win, so every view shows the participant's current number. */
+function applyParticipantDetailsUpdated(
+  projection: SoccerMatchProjection,
+  payload: { changes: Array<{ participantId: string; number: string | null }> }
+): string | null {
+  if (projection.status === 'not_started' || projection.status === 'ended' || projection.status === 'suspended') {
+    return 'Number changes require an active match.'
+  }
+  for (const change of payload.changes) {
+    if (!projection.participants[change.participantId]) return 'Number change references an unknown participant.'
+  }
+  for (const change of payload.changes) projection.participants[change.participantId].number = change.number
   return null
 }
 

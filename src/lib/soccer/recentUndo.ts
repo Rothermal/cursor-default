@@ -12,6 +12,7 @@ const UNDOABLE_EVENT_TYPES = new Set([
   'soccer.substitution_window',
   'soccer.lineup_transition',
   'soccer.role_changed',
+  'soccer.participant_details_updated',
 ])
 
 /** Lineup families follow the lineup manager's paused-clock rule. */

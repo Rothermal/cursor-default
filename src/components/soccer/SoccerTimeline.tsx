@@ -778,6 +778,10 @@ function renderEventEditor(
       const payload = event.payload
       return <div className="space-y-3"><ParticipantEditor label="Anonymous participant" value={payload.participantId} participants={participants.filter(item => item.participantId === payload.participantId || !item.participantId)} onChange={participantId => setPayload({ ...payload, participantId })} /><label className="block text-sm font-medium text-content">Roster player<select value={payload.playerId} onChange={change => { const player = state.players.find(item => item.id === change.target.value); if (player) setPayload({ ...payload, playerId: player.id, displayName: player.name, number: player.number || null }) }} className="input-field mt-1">{state.players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label></div>
     }
+    case 'soccer.participant_details_updated': {
+      const payload = event.payload
+      return <div className="space-y-3">{payload.changes.map((change, index) => <div key={change.participantId} className="border border-line rounded-md p-3 space-y-2"><p className="text-sm font-medium text-content">{participants.find(item => item.participantId === change.participantId)?.displayName ?? 'Participant'}</p><label className="block text-sm font-medium text-content">Number<input value={change.number ?? ''} onChange={update => setPayload({ ...payload, changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, number: update.target.value.trim() || null } : item) })} className="input-field mt-1" /></label></div>)}</div>
+    }
     case 'soccer.match_ended': {
       const payload = event.payload
       return <label className="block text-sm font-medium text-content">Reason<select value={payload.reason} onChange={change => setPayload({ reason: change.target.value as 'completed' | 'suspended' | 'abandoned' })} className="input-field mt-1"><option value="completed">Completed</option><option value="suspended">Suspended</option><option value="abandoned">Abandoned</option></select></label>

@@ -28,6 +28,11 @@ import {
 } from '../lib/teamPermissions'
 import SoccerRulesOverrideEditor from '../components/soccer/SoccerRulesOverrideEditor'
 import { teamDisplayName } from '../lib/display'
+import OpponentPicker from '../components/opponents/OpponentPicker'
+import { useSavedOpponents } from '../hooks/useSavedOpponents'
+import { normalizeOpponentLabel } from '../lib/opponentTeams'
+import { persistSetupLabels } from '../lib/setupLabels'
+import { canManageTeam } from '../lib/teamPermissions'
 
 interface SoccerCloudTeam {
   id: string
@@ -213,6 +218,13 @@ export default function SoccerGameSetup() {
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [selectedTeamId, teams]
   )
+  // RTN-3A: saved opponents and team nickname save-back (cloud only, best effort).
+  const savedOpponents = useSavedOpponents('soccer', cloudAvailable)
+  const [saveOpponent, setSaveOpponent] = useState(true)
+  const [saveTeamNickname, setSaveTeamNickname] = useState(false)
+  const offerTeamNicknameSave = teamSource === 'cloud' && selectedTeam !== null &&
+    canManageTeam(selectedTeam.accessRole) &&
+    normalizeOpponentLabel(teamNickname) !== normalizeOpponentLabel(selectedTeam.nickname)
   const setupRules = useMemo(
     () => resolveSoccerSetupRuleState({
       personalDefaults: soccerSettings.rules,
@@ -354,6 +366,18 @@ export default function SoccerGameSetup() {
         teamDefaultLineup: preservedTeamDefault,
       }),
     })
+    if (supabase && cloudAvailable) {
+      const teamId = saveTeamNickname && offerTeamNicknameSave && selectedTeam ? selectedTeam.id : null
+      void persistSetupLabels({
+        client: supabase,
+        sportId: 'soccer',
+        savedOpponents: savedOpponents.opponents,
+        opponentName,
+        opponentNickname,
+        saveOpponent,
+        teamNickname: teamId ? { teamId, value: teamNickname } : null,
+      })
+    }
     navigate('/players')
   }
 
@@ -441,13 +465,29 @@ export default function SoccerGameSetup() {
             <TextField label="Team" value={teamName} onChange={setTeamName} required />
           )}
           <TextField label="Team nickname" value={teamNickname} onChange={setTeamNickname} maxLength={100} />
+          {offerTeamNicknameSave && (
+            <label className="flex items-center gap-2 text-sm text-content-muted">
+              <input type="checkbox" checked={saveTeamNickname} onChange={event => setSaveTeamNickname(event.target.checked)} />
+              Save as the team's nickname
+            </label>
+          )}
         </section>
 
         <section className="border-t border-line pt-5 space-y-3">
           <h2 className="text-sm font-bold uppercase text-content-muted">Match</h2>
           <div className="grid sm:grid-cols-2 gap-3">
-            <TextField label="Opponent" value={opponentName} onChange={setOpponentName} required />
-            <TextField label="Opponent nickname" value={opponentNickname} onChange={setOpponentNickname} maxLength={100} />
+            <div className="sm:col-span-2">
+              <OpponentPicker
+                name={opponentName}
+                nickname={opponentNickname}
+                onNameChange={setOpponentName}
+                onNicknameChange={setOpponentNickname}
+                opponents={savedOpponents.opponents}
+                savedAvailable={cloudAvailable && !savedOpponents.error}
+                saveOpponent={saveOpponent}
+                onSaveOpponentChange={setSaveOpponent}
+              />
+            </div>
             <label className="block text-sm font-medium text-content">
               Date
               <input type="date" value={date} onChange={event => setDate(event.target.value)} className="input-field mt-1" />

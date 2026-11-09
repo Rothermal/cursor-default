@@ -27,6 +27,7 @@ import type {
   SoccerOpeningLineupPayload,
   SoccerOwnGoalPayload,
   SoccerParticipantResolvedPayload,
+  SoccerParticipantDetailsUpdatedPayload,
   SoccerPeriodPayload,
   SoccerRoleChangedPayload,
   SoccerScoreAdjustmentPayload,
@@ -56,6 +57,7 @@ export type SoccerEventPayloadByType = {
   'soccer.attacking_direction_changed': SoccerAttackingDirectionChangedPayload
   'soccer.match_roster_added': SoccerMatchRosterAddedPayload
   'soccer.participant_resolved': SoccerParticipantResolvedPayload
+  'soccer.participant_details_updated': SoccerParticipantDetailsUpdatedPayload
   'soccer.match_ended': SoccerMatchEndedPayload
   'soccer.match_reopened': SoccerMatchReopenedPayload
   'soccer.shot': SoccerShotPayload
@@ -135,6 +137,7 @@ export const soccerEventDefinitions: GameEventDefinition<GameEvent>[] = [
   matchStateDefinition('soccer.attacking_direction_changed', validateDirectionChanged),
   matchStateDefinition('soccer.match_roster_added', validateRosterAdded),
   matchStateDefinition('soccer.participant_resolved', validateParticipantResolved),
+  matchStateDefinition('soccer.participant_details_updated', validateParticipantDetailsUpdated),
   matchStateDefinition('soccer.match_ended', validateMatchEnded),
   matchStateDefinition('soccer.match_reopened', validateMatchReopened),
   attackingDefinition(
@@ -411,6 +414,22 @@ function validateRosterAdded(payload: JsonObject): boolean {
 function validateParticipantResolved(payload: JsonObject): boolean {
   return isId(payload.participantId) && isId(payload.playerId) && isNonEmptyString(payload.displayName) &&
     (payload.number === null || typeof payload.number === 'string')
+}
+
+export const SOCCER_PARTICIPANT_NUMBER_MAX_LENGTH = 80
+
+function validateParticipantDetailsUpdated(payload: JsonObject): boolean {
+  if (payload.source !== 'roster_refresh' && payload.source !== 'manual') return false
+  if (!Array.isArray(payload.changes) || payload.changes.length === 0) return false
+  const ids = new Set<string>()
+  for (const change of payload.changes) {
+    if (!isPlainObject(change) || !isId(change.participantId) || ids.has(change.participantId)) return false
+    ids.add(change.participantId)
+    const number = change.number
+    if (!(number === null || (typeof number === 'string' && number.length > 0 && number === number.trim() &&
+      number.length <= SOCCER_PARTICIPANT_NUMBER_MAX_LENGTH))) return false
+  }
+  return true
 }
 
 function validateMatchEnded(payload: JsonObject): boolean {

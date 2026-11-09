@@ -140,7 +140,8 @@ export function soccerSummaryEventMatchesFilter(
       event.eventType === 'soccer.lineup_transition' ||
       event.eventType === 'soccer.role_changed' ||
       event.eventType === 'soccer.match_roster_added' ||
-      event.eventType === 'soccer.participant_resolved'
+      event.eventType === 'soccer.participant_resolved' ||
+      event.eventType === 'soccer.participant_details_updated'
     ) return true
     return (
       (event.eventType === 'soccer.foul' || event.eventType === 'soccer.card') &&

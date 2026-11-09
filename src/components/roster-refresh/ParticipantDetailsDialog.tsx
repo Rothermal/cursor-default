@@ -17,13 +17,15 @@ interface ParticipantDetailsDialogProps {
   busy: boolean
   errorMessage: string | null
   maxLength: number
+  /** False for sports whose game position is tactical (Soccer): number only. */
+  showPosition?: boolean
   onSave: (input: ParticipantDetailsInput) => void
   onClose: () => void
 }
 
 /** RTN-2 shared per-player "Edit number / position" dialog. */
 export default function ParticipantDetailsDialog({
-  displayName, number, position, canUpdateRoster, busy, errorMessage, maxLength, onSave, onClose,
+  displayName, number, position, canUpdateRoster, busy, errorMessage, maxLength, showPosition = true, onSave, onClose,
 }: ParticipantDetailsDialogProps) {
   const [nextNumber, setNextNumber] = useState(number ?? '')
   const [nextPosition, setNextPosition] = useState(position ?? '')
@@ -45,7 +47,7 @@ export default function ParticipantDetailsDialog({
       >
         <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
-            <h2 id="participant-details-title" className="text-base font-bold text-content">Edit number / position</h2>
+            <h2 id="participant-details-title" className="text-base font-bold text-content">{showPosition ? 'Edit number / position' : 'Edit number'}</h2>
             <p className="break-words text-xs text-content-muted">{displayName}. The new number shows everywhere in this game.</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted" aria-label="Close edit number and position">
@@ -60,15 +62,15 @@ export default function ParticipantDetailsDialog({
             onSave({ number: nextNumber, position: nextPosition, alsoUpdateRoster })
           }}
         >
-          <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3">
+          <div className={showPosition ? 'grid grid-cols-[6rem_minmax(0,1fr)] gap-3' : 'grid grid-cols-[6rem] gap-3'}>
             <label className="block text-sm font-semibold text-content">
               Number
               <input ref={numberRef} type="text" value={nextNumber} onChange={event => setNextNumber(event.target.value)} className="input-field mt-1" inputMode="numeric" maxLength={maxLength} placeholder="#" />
             </label>
-            <label className="block min-w-0 text-sm font-semibold text-content">
+            {showPosition && <label className="block min-w-0 text-sm font-semibold text-content">
               Position
               <input type="text" value={nextPosition} onChange={event => setNextPosition(event.target.value)} className="input-field mt-1 w-full" maxLength={maxLength} placeholder="Position (optional)" />
-            </label>
+            </label>}
           </div>
           {canUpdateRoster && (
             <label className="flex items-center gap-2 text-sm text-content">

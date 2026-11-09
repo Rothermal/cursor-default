@@ -285,7 +285,7 @@ describe('SOC-4A rules, state, and schemas', () => {
   })
 
   it('registers every SOC-4 schema and rejects malformed conditional payloads', () => {
-    expect(soccerEventDefinitions).toHaveLength(26)
+    expect(soccerEventDefinitions).toHaveLength(27)
     const malformed = event(0, 'soccer.defensive_action', {
       action: 'interception',
       tackleOutcome: 'won',
