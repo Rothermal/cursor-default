@@ -42,11 +42,14 @@ export async function updateTeamRosterDetails(
   client: SupabaseClient,
   teamId: string,
   playerId: string,
-  details: { number: string | null; position: string | null }
+  /** Leave `position` undefined to change the number only (Soccer roster roles stay as they are). */
+  details: { number: string | null; position?: string | null }
 ): Promise<void> {
+  const update: { jersey_number: string | null; position?: string | null } = { jersey_number: normalizeRosterLabel(details.number) }
+  if (details.position !== undefined) update.position = normalizeRosterLabel(details.position)
   const { data, error } = await client
     .from('team_players')
-    .update({ jersey_number: normalizeRosterLabel(details.number), position: normalizeRosterLabel(details.position) })
+    .update(update)
     .eq('team_id', teamId)
     .eq('player_id', playerId)
     .select('player_id')

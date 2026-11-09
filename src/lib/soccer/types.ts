@@ -402,6 +402,17 @@ export interface SoccerParticipantResolvedPayload extends JsonObject {
   number: string | null
 }
 
+/** RTN-3A: new jersey numbers for game participants (one event per refresh or edit). */
+export interface SoccerParticipantDetailsChange extends JsonObject {
+  participantId: string
+  number: string | null
+}
+
+export interface SoccerParticipantDetailsUpdatedPayload extends JsonObject {
+  changes: SoccerParticipantDetailsChange[]
+  source: 'roster_refresh' | 'manual'
+}
+
 export interface SoccerMatchEndedPayload extends JsonObject {
   reason: 'completed' | 'suspended' | 'abandoned'
 }
@@ -495,6 +506,7 @@ export type SoccerRoleChangedEvent = GameEvent<SoccerRoleChangedPayload, 'soccer
 export type SoccerAttackingDirectionChangedEvent = GameEvent<SoccerAttackingDirectionChangedPayload, 'soccer.attacking_direction_changed', 'soccer', SoccerTeamSide>
 export type SoccerMatchRosterAddedEvent = GameEvent<SoccerMatchRosterAddedPayload, 'soccer.match_roster_added', 'soccer', SoccerTeamSide>
 export type SoccerParticipantResolvedEvent = GameEvent<SoccerParticipantResolvedPayload, 'soccer.participant_resolved', 'soccer', SoccerTeamSide>
+export type SoccerParticipantDetailsUpdatedEvent = GameEvent<SoccerParticipantDetailsUpdatedPayload, 'soccer.participant_details_updated', 'soccer', SoccerTeamSide>
 export type SoccerMatchEndedEvent = GameEvent<SoccerMatchEndedPayload, 'soccer.match_ended', 'soccer', SoccerTeamSide>
 export type SoccerMatchReopenedEvent = GameEvent<SoccerMatchReopenedPayload, 'soccer.match_reopened', 'soccer', SoccerTeamSide>
 export type SoccerShotEvent = GameEvent<SoccerShotPayload, 'soccer.shot', 'soccer', SoccerTeamSide>
@@ -523,6 +535,7 @@ export type SoccerMatchEvent =
   | SoccerAttackingDirectionChangedEvent
   | SoccerMatchRosterAddedEvent
   | SoccerParticipantResolvedEvent
+  | SoccerParticipantDetailsUpdatedEvent
   | SoccerMatchEndedEvent
   | SoccerMatchReopenedEvent
   | SoccerShotEvent

@@ -16,6 +16,7 @@ const EVENT_TITLES: Record<string, string> = {
   'soccer.attacking_direction_changed': 'Direction changed',
   'soccer.match_roster_added': 'Participant added',
   'soccer.participant_resolved': 'Participant resolved',
+  'soccer.participant_details_updated': 'Number change',
   'soccer.match_ended': 'Match ended',
   'soccer.match_reopened': 'Match reopened',
   'soccer.shot': 'Shot',
@@ -64,6 +65,13 @@ export function soccerEventDetail(event: GameEvent): string {
     case 'soccer.attacking_direction_changed': return payload.direction === 'left_to_right' ? 'Left to right' : 'Right to left'
     case 'soccer.match_roster_added': return String((payload.participant as { displayName?: unknown } | undefined)?.displayName ?? 'Participant')
     case 'soccer.participant_resolved': return String(payload.displayName ?? 'Roster player')
+    case 'soccer.participant_details_updated': {
+      const changes = Array.isArray(payload.changes) ? payload.changes as Array<{ number?: unknown }> : []
+      const prefix = payload.source === 'roster_refresh' ? 'Roster refresh' : 'Roster change'
+      return changes.length === 1
+        ? `${prefix}: now ${changes[0].number ? `#${String(changes[0].number)}` : 'no number'}`
+        : `${prefix}: ${changes.length} numbers`
+    }
     case 'soccer.match_ended': return String(payload.reason ?? 'Ended')
     case 'soccer.match_reopened': return String(payload.reason ?? 'Reopened')
     case 'soccer.shot': {

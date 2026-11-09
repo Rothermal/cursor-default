@@ -17,7 +17,7 @@ import {
 } from '../gameEvents/mutations'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { createSoccerEvent, nextSoccerEventSequence, type SoccerEventPayloadByType } from './events'
+import { createSoccerEvent, nextSoccerEventSequence, SOCCER_PARTICIPANT_NUMBER_MAX_LENGTH, type SoccerEventPayloadByType } from './events'
 import { requireSoccerEventGameState, type SoccerEventGameState } from './gameState'
 import { createSoccerUuid } from './id'
 import { orderedSoccerSegments } from './rules'
@@ -838,6 +838,41 @@ export function resolveSoccerParticipant(
   return appendSpecs(state, options, [{
     eventType: 'soccer.participant_resolved',
     payload: { participantId, playerId, displayName, number },
+    elapsedMs: context.elapsedMs,
+  }])
+}
+
+/**
+ * RTN-3A: record new jersey numbers. Setup stays immutable; one event holds
+ * every change from one refresh or edit, so Field Undo reverts it in one step.
+ * Changes that match the current number are skipped.
+ */
+export function updateSoccerParticipantNumbers(
+  state: GameState,
+  changes: Array<{ participantId: string; number: string | null }>,
+  source: 'roster_refresh' | 'manual',
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  if (state.cloudSync.gameStatus === 'final') return failure(state, 'Reopen the final game before changing numbers.')
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  const seen = new Set<string>()
+  const effective: Array<{ participantId: string; number: string | null }> = []
+  for (const change of changes) {
+    const participant = context.projection.participants[change.participantId]
+    if (!participant) return failure(state, 'That participant is not in this match.')
+    if (seen.has(change.participantId)) return failure(state, 'Each participant can change only once per update.')
+    seen.add(change.participantId)
+    const number = change.number?.trim() || null
+    if ((number?.length ?? 0) > SOCCER_PARTICIPANT_NUMBER_MAX_LENGTH) {
+      return failure(state, `Numbers must be at most ${SOCCER_PARTICIPANT_NUMBER_MAX_LENGTH} characters.`)
+    }
+    if (number !== participant.number) effective.push({ participantId: change.participantId, number })
+  }
+  if (effective.length === 0) return failure(state, 'Nothing changed.')
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.participant_details_updated',
+    payload: { changes: effective, source },
     elapsedMs: context.elapsedMs,
   }])
 }

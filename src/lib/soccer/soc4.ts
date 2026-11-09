@@ -1063,6 +1063,8 @@ function eventReferencesParticipant(event: SoccerMatchEvent, participantId: stri
       return event.payload.participant.id === participantId
     case 'soccer.participant_resolved':
       return event.payload.participantId === participantId
+    case 'soccer.participant_details_updated':
+      return event.payload.changes.some(change => change.participantId === participantId)
     case 'soccer.foul':
     case 'soccer.card':
       return event.payload.lineupResolution?.replacementChanges.some(change =>
